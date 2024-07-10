@@ -2,6 +2,36 @@
   "expo": {
     "name": "rsf_app",
     "slug": "rsf_app",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "scheme": "scheme",
+    "orientation": "portrait",
+    "icon": "./Assets/icon.png/",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./Assets/images/fulllogo_transparent.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#fff"
+    },
+
+"assetBundlePatterns": [
+  "**/*"
+],
+
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+       "backgroundImage": "./Assets//images/fulllogo_transparent.png",
+        "foregroundImage": "",
+        "backgroundColor": "#fff"
+      },
+      "package": "com.readysetfly.rsf"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "@react-native-google-signin/google-signin"
+    ]
   }
 }
