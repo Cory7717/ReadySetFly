@@ -21,7 +21,7 @@ const Home = () => {
         />
         <ScrollView contentContainerStyle={{height: "100%"}}>
         <View className="flex-1 items-center justify-normal pt-10 bg-white"> 
-        <Image source={"./Assets/images/background.png"} />
+        {/* <Image source={"./Assets/images/background.png"} /> */}
         <Text className="font-rubikblack text-2xl text-teal-400">Home Screen!</Text> 
             
           </View>

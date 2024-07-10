@@ -7,8 +7,8 @@ import FormField from "../../components/FormField";
 import CustomButton from "../../components/CustomButton";
 import { StatusBar } from "expo-status-bar";
 import { useGlobalContext } from "../../context/GlobalProvider";
-// import { signIn } from "../../lib/appwrite";
-// import { getCurrentUser } from "../../lib/appwrite";
+import { signIn } from "../../lib/appwrite";
+import { getCurrentUser } from "../../lib/appwrite";
 
 const SignIn = () => {
   const { setUser, setIsLogged } = useGlobalContext();
