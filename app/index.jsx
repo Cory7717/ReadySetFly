@@ -37,7 +37,7 @@ const App = () => {
           <Image source={images.logo} className="w-[300px] h-[300px]" />
         </View>
 
-        <View className="relative py-10">
+        <View className="relative py-5">
           <Text className="font-rubikregular text-2xl text-center color-teal-400 py-5">
             Where's your next destination?
           </Text>
@@ -50,6 +50,11 @@ const App = () => {
         <CustomButton
           title="Click here to view content "
           handlePress={() => router.push("/home")}
+          containerStyles="mx-10 mt-10 bg-black"
+        />
+        <CustomButton
+          title="Learn to Fly "
+          handlePress={() => router.push("/cfi")}
           containerStyles="mx-10 mt-10 bg-black"
         />
       </ScrollView>
