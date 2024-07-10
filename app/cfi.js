@@ -5,6 +5,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import MapView  from 'react-native-maps'
 
 const CFI = () => {
+  const INITIAL_REGION = {
+    latitude: 30.2666666,
+    longitude: -97.733330,
+    latitudeDelta: 1,
+    longitudeDelta: 1
+  }
   return (
     <SafeAreaView className="h-full bg-white sand">
       <ScrollView contentContainerStyle={{ height: "100%" }}>
@@ -20,7 +26,9 @@ const CFI = () => {
           </Text>
         </View>
         <View className="flex-1 ">
-      <MapView className="flex-1 " />
+      <MapView 
+      initialRegion={INITIAL_REGION}
+      className="flex-1 " />
     </View>
       </ScrollView>
     </SafeAreaView>
