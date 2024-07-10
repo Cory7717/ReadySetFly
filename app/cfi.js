@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, ScrollView } from "react-native";
 import React from "react";
 import { Stack, Tabs } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import MapView  from 'react-native-maps'
 
 const CFI = () => {
   return (
@@ -18,6 +19,9 @@ const CFI = () => {
             Instructor
           </Text>
         </View>
+        <View className="flex-1 ">
+      <MapView className="flex-1 " />
+    </View>
       </ScrollView>
     </SafeAreaView>
   );

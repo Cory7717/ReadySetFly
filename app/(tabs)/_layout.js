@@ -90,7 +90,7 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="flights"
           options={{
-            title: "Flights",
+            title: "Search Airplanes",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
               <MaterialCommunityIcons
