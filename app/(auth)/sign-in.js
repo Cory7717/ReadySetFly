@@ -59,14 +59,14 @@ const SignIn = () => {
             title="Email"
             value={form.email}
             handleChangeText={(e) => setForm({ ...form, email: e })}
-            otherStyles="mt-7 mx-5"
+            otherStyles="mt-7 mx-5 bg-white"
             keyboardType="email-address"
           />
           <FormField
             title="Password"
             value={form.password}
             handleChangeText={(e) => setForm({ ...form, password: e })}
-            otherStyles="mt-7 mx-5"
+            otherStyles="mt-7 mx-5 bg-white"
           />
           <CustomButton
             title="Sign-In"
