@@ -61,7 +61,7 @@ const TabsLayout = () => {
           name="home"
           options={{
             title: "Home",
-            headerShown: false,
+            headerShown: true,
             tabBarIcon: ({ name, icon, color, focused, size }) => (
               <AntDesign name="home" size={32} color={color} />
             ),

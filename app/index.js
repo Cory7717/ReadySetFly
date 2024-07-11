@@ -34,7 +34,7 @@ const App = () => {
       {/* <ImageBackground source={images.background} className="bg-opacity-75"/> */}
       <ScrollView contentContainerStyle={{ height: "100%" }}>
         <View className="w-full min-h-[85px] px-12 py-10">
-          <Image source={images.logo} className="w-[300px] h-[300px]" />
+          <Image source={images.logo} className="w-[300px] h-[200px]" />
         </View>
 
         <View className="relative py-5">
@@ -57,6 +57,7 @@ const App = () => {
           handlePress={() => router.push("/cfi")}
           containerStyles="mx-10 mt-10 bg-black"
         />
+      
       </ScrollView>
       <StatusBar backgroundColor="white" />
     </SafeAreaView>

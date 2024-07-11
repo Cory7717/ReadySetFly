@@ -5,6 +5,8 @@ import { useFonts } from "expo-font";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/stack";
 import GlobalProvider from "../context/GlobalProvider";
+// import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo"
+// import { Slot } from "expo-router"
 
 SplashScreen.preventAutoHideAsync();
 
@@ -34,6 +36,7 @@ const RootLayout = () => {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
         <Stack.Screen name="cfi" options={{ headerShown: false }} />
+       
       </Stack>
     </GlobalProvider>
   );
