@@ -9,6 +9,7 @@ import { useFonts } from "expo-font";
 import { images } from "../constants";
 import CustomButton from "../components/CustomButton";
 import { useGlobalContext } from "../context/GlobalProvider";
+import MessagingScreen from "../components/MessagingScreen";
 
 {
   /* const sendCodeEmail = () => {
