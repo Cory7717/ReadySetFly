@@ -39,7 +39,7 @@ const CFI = () => {
     <SafeAreaView className="h-full bg-white sand">
       <ScrollView contentContainerStyle={{ height: "100%" }}>
         <View className="flex-1 items-center justify-center bg-white">
-          <Text className="font-rubikblack text-center text-2xl text-teal-400 px-8">
+          <Text className="font-rubikblack text-center text-2xl text-#404040 px-8">
             Certified Flight Instructors
           </Text>
         </View>

@@ -74,7 +74,7 @@ const SignIn = () => {
             containerStyles="mt-5 bg-black"
           />
           <View className="justify-center pt-5 flex-row gap-2">
-            <Text className="text-lg font-rubikregular text-teal-700">
+            <Text className="text-lg font-rubikregular text-#404040">
               Don't have an account?
             </Text>
             <Link

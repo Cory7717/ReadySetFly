@@ -8,6 +8,7 @@ import GlobalProvider from "../context/GlobalProvider";
 // import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo"
 // import { Slot } from "expo-router"
 
+
 SplashScreen.preventAutoHideAsync();
 
 const App = () => {};
@@ -32,7 +33,7 @@ const RootLayout = () => {
     <GlobalProvider>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: true }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
         <Stack.Screen name="cfi" options={{ headerShown: false }} />

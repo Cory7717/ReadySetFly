@@ -5,30 +5,32 @@ import {
   Image,
   ImageBackground,
   FlatList,
-  TextInput, 
-  TouchableOpacity, 
-  Button
+  TextInput,
+  TouchableOpacity,
+  Button,
 } from "react-native";
 import React from "react";
 import { Stack, Tabs } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ExploreHeader from "../../constants/ExploreHeader";
 import Listings from "../../constants/listings";
-import * as ImagePicker from 'expo-image-picker'
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
-
+import { createStackNavigator } from "@react-navigation/stack";
+import { NavigationContainer } from "@react-navigation/native";
+import { StackScreen } from '@react-navigation/stack'
 
 const Home = () => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [listings, setListings] = useState([]);
   const [photo, setPhoto] = useState(null);
   const handleAddListing = () => {
     if (title && description) {
       const newListing = { title, description, photo };
       setListings([...listings, newListing]);
-      setTitle('');
-      setDescription('');
+      setTitle("");
+      setDescription("");
       setPhoto(null);
     }
   };
@@ -45,12 +47,33 @@ const Home = () => {
       setPhoto(result.uri);
     }
   };
+  function StackScreen() {
+    return (
+      <Stack.Navigator>
+        <Stack.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            title: 'My home',
+            headerStyle: {
+              
+              backgroundColor: '#f4511e',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+              fontFamily: 'rubikregular'
+            },
+          }}
+        />
+      </Stack.Navigator>
+    );
+  }
 
   return (
     <>
-       <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView className="flex-1 bg-white">
         <ScrollView contentContainerStyle={{ padding: 20 }}>
-        
           <Text className="text-2xl font-bold mb-4">List your aircraft</Text>
           <TextInput
             className="border p-2 mb-4"

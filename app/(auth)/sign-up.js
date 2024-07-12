@@ -86,7 +86,7 @@ const SignUp = () => {
           isLoading={isSubmitting}         
            />
            <View className='justify-center pt-5 flex-row gap-2'>
-           <Text className='text-lg font-rubikregular text-teal-700'>
+           <Text className='text-lg font-rubikregular text-#404040'>
             Already have an account? 
            </Text>
             <Link href='/sign-in' className='text-lg font-rubikbold text-emerald-700'>Sign In
