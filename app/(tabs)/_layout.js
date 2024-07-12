@@ -40,6 +40,7 @@ const TabIcon = ({ icon, color, focused, name }) => {
   );
 };
 
+
 const TabsLayout = () => {
   return (
     <>
@@ -62,6 +63,12 @@ const TabsLayout = () => {
           options={{
             title: "Home",
             headerShown: true,
+            headerTitle: "Listings",
+            headerStyle: {
+              backgroundColor: "#f2f2f2",
+            
+              
+            },
             tabBarIcon: ({ name, icon, color, focused, size }) => (
               <AntDesign name="home" size={32} color={color} />
             ),

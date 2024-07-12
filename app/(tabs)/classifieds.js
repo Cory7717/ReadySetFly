@@ -52,7 +52,7 @@ const Classifieds = () => {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <Text className="font-rubikregular text-center text-2xl text-emerald-700 px-8">
+        <Text className="font-rubikregular text-center text-2xl text-#606060 px-8 text-decoration-line: underline font-bold">
           Aircraft Marketplace
         </Text>
         <TextInput
@@ -100,7 +100,7 @@ const Classifieds = () => {
         <Button title="Add Listing" 
         onPress={handleAddListing} />
         <View className="mt-8">
-          <Text className="text-xl font-bold mb-4">Listings</Text>
+          <Text className="text-xl font-bold mb-4 text-decoration-line: underline text-center">Listings</Text>
           {listings.map((listing, index) => (
             <View key={index} className="border p-4 mb-4">
               <Text className="text-lg font-bold">{listing.title}</Text>
