@@ -23,13 +23,15 @@ import { StackScreen } from '@react-navigation/stack'
 const Home = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
   const [listings, setListings] = useState([]);
   const [photo, setPhoto] = useState(null);
   const handleAddListing = () => {
     if (title && description) {
-      const newListing = { title, description, photo };
+      const newListing = { title, description, price, photo };
       setListings([...listings, newListing]);
       setTitle("");
+      setPrice("");
       setDescription("");
       setPhoto(null);
     }
@@ -83,6 +85,12 @@ const Home = () => {
           />
           <TextInput
             className="border p-2 mb-4"
+            placeholder="Cost per hour"
+            value={price}
+            onChangeText={setPrice}
+          />
+          <TextInput
+            className="border p-2 mb-4"
             placeholder="Description"
             value={description}
             onChangeText={setDescription}
@@ -104,6 +112,7 @@ const Home = () => {
             {listings.map((listing, index) => (
               <View key={index} className="border p-4 mb-4">
                 <Text className="text-lg font-bold">{listing.title}</Text>
+                <Text>{listing.price}</Text>
                 <Text>{listing.description}</Text>
                 {listing.photo && (
                   <Image
