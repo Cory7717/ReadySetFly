@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, ScrollView } from 'react-native'
 import React from 'react'
 import { Stack, Tabs } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import MessagingScreen from '../../components/MessagingScreen'
+
 import {  createStackNavigator } from '@react-navigation/native'
 
 const Inbox = () => {
