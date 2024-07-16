@@ -12,6 +12,7 @@ import { Stack, Tabs } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
 import { styled } from "nativewind";
+import { SearchBar } from "react-native-screens";
 
 const CFI = () => {
   const INITIAL_REGION = {
@@ -20,24 +21,25 @@ const CFI = () => {
     latitudeDelta: 1,
     longitudeDelta: 1,
   };
-  // const StyledView = styled(View);
-  // const StyledText = styled(Text);
-  // const StyledTextInput = styled(TextInput);
-  // const StyledButton = styled(Button);
+  const StyledView = styled(View);
+  const StyledText = styled(Text);
+  const StyledTextInput = styled(TextInput);
+  const StyledButton = styled(Button);
 
-  // const ProfileScreen = ()=> {
-  //   const [name, setName] = useState("");
-  //   const [bio, setBio] = useState("");
+  const ProfileScreen = ()=> {
+    const [name, setName] = useState("");
+    const [bio, setBio] = useState("");
 
-  // const handleSaveProfile = () => {
-  //   // Add my login here for save profile
-  //   console.log('Profile saved:', {name, bio});
-  // }
-  // };
+  const handleSaveProfile = () => {
+    // Add my logic here for save profile
+    console.log('Profile saved:', {name, bio});
+  }
+  };
 
   return (
     <SafeAreaView className="h-full bg-white sand">
       <ScrollView contentContainerStyle={{ height: "100%" }}>
+     
         <View className="flex-1 items-center justify-center bg-white">
           <Text className="font-rubikblack text-center text-2xl text-#404040 px-8">
             Certified Flight Instructors

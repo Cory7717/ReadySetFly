@@ -8,7 +8,7 @@ const Create = () => {
     <SafeAreaView className="h-full bg-white sand">
     <ScrollView contentContainerStyle={{height: "100%"}}>
     <View className="flex-1 items-center justify-center bg-white"> 
-            <Text className="font-rubikblack text-4xl text-#404040 px-8">Owner Profile</Text> 
+            <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">Owner Dashboard</Text> 
           </View> 
         <View className="flex-1 items-center bg-white"> 
               <Text className="flex-1 font-rubikregular text-regular text-#404040 justify-center text-center px-8">This screen is a temporary placeholder</Text>        

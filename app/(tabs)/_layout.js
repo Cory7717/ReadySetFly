@@ -74,7 +74,7 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="owner"
           options={{
-            title: "Owner",
+            title: "Owner Dashboard",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
               <FontAwesome name="sign-in" size={32} color={color} />
@@ -84,7 +84,7 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="renter"
           options={{
-            title: "Renter",
+            title: "Renter Dashboard",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
               <Ionicons name="person-outline" size={32} color={color} />

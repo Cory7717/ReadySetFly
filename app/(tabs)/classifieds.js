@@ -8,6 +8,7 @@ import {
   Button,
   TouchableOpacity,
   HorizontalScroll,
+  ImageBackground,
 } from "react-native";
 import React from "react";
 import { Stack, Tabs } from "expo-router";
@@ -22,7 +23,8 @@ import SingleEngineProp from "../../components/SingleEngineProp";
 import SingleEnginePiston from "../../components/SingleEnginePiston";
 import TwinEnginePiston from "../../components/TwinEnginePiston";
 import PistonHelicopter from "../../components/PistonHelicopter";
-import { FontAwesome5 } from "@expo/vector-icons";
+import { FontAwesome6, Ionicons, Fontisto, Entypo } from "@expo/vector-icons";
+
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -36,6 +38,8 @@ const Classifieds = () => {
   const [price, setPrice] = useState("");
   const [photo, setPhoto] = useState(null);
   const [contact, setContact] = useState("");
+
+
 
   const handleAddListing = () => {
     if (title && description) {
@@ -82,6 +86,7 @@ const Classifieds = () => {
               textBarShowLabel: true,
               tabBarStyle: {
                 backgroundColor: "#fff",
+                text: "small",
               },
             }}
           >
@@ -89,25 +94,80 @@ const Classifieds = () => {
               name="Single Engine Prop"
               component={SingleEngineProp}
               options={{
-               
+                tabBarShowLabel: true,
+                tabBarIcon: ({ size, color }) => (
+                  <Fontisto name="propeller-3" size={24} color={color} />
+                ),
               }}
             />
-            <Tab.Screen name="Twin Engine Prop" component={TwinEngineProp} />
+            <Tab.Screen
+              name="Twin Engine Prop"
+              component={TwinEngineProp}
+              options={{
+                tabBarShowLabel: true,
+                tabBarIcon: ({ size, color, contain }) => (
+                  <Entypo
+                    name="aircraft-landing"
+                    size={24}
+                    resizeMode={contain}
+                    color={color}
+                  />
+                ),
+              }}
+            />
+
             <Tab.Screen
               name="Single Engine Piston"
               component={SingleEnginePiston}
+              options={{
+                tabBarShowLabel: true,
+                tabBarIcon: ({ size, color, contain }) => (
+                  <Entypo
+                    name="aircraft-take-off"
+                    size={24}
+                    resizeMode={contain}
+                    color={color}
+                  />
+                ),
+              }}
             />
             <Tab.Screen
               name="Twin Engine Piston"
               component={TwinEnginePiston}
+              options={{
+                tabBarShowLabel: true,
+                tabBarIcon: ({ size, color, contain }) => (
+                  <Ionicons
+                    name="airplane-outline"
+                    size={24}
+                    resizeMode={contain}
+                    color={color}
+                  />
+                ),
+              }}
             />
-            <Tab.Screen name="Piston Helicopter" component={PistonHelicopter} />
+            <Tab.Screen
+              name="Piston Helicopter"
+              component={PistonHelicopter}
+              options={{
+                tabBarShowLabel: true,
+                tabBarIcon: ({ size, color, contain }) => (
+                  <Fontisto
+                    name="helicopter"
+                    size={24}
+                    resizeMode={contain}
+                    color={color}
+                  />
+                ),
+              }}
+            />
           </Tab.Navigator>
         </View>
-
+        
         <Text className="font-rubikregular text-center text-2xl text-#606060 px-8 mt-10 text-decoration-line: underline font-bold">
           Aircraft Marketplace
         </Text>
+        
         <TextInput
           className="border-bottom-1 p-2 mb-4 font-bold"
           placeholder="Title"
