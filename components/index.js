@@ -6,6 +6,11 @@ import Loader from "./Loader";
 import Trending from "./Trending";
 import SearchInput from "./SearchInput";
 import EmptyState from "./EmptyState";
+import SingleEngineProp from "./SingleEngineProp";
+import TwinEngineProp from "./TwinEngineProp";
+import SingleEnginePiston from "./SingleEnginePiston";
+import TwinEnginePiston from "./TwinEnginePiston";
+import PistonHelicopter from "./PistonHelicopter";
 
 export {
   VideoCard,
@@ -16,4 +21,9 @@ export {
   Trending,
   SearchInput,
   EmptyState,
+  SingleEngineProp,
+  TwinEngineProp,
+  SingleEnginePiston,
+  TwinEnginePiston,
+  PistonHelicopter
 };

@@ -9,6 +9,8 @@ import { StatusBar } from "expo-status-bar";
 import { useGlobalContext } from "../../context/GlobalProvider";
 import { signIn } from "../../lib/appwrite";
 import { getCurrentUser } from "../../lib/appwrite";
+import { IonIcons } from "@expo/vector-icons";
+import { FontAwesome5 } from "@expo/vector-icons";
 
 const SignIn = () => {
   const { setUser, setIsLogged } = useGlobalContext();
@@ -50,7 +52,6 @@ const SignIn = () => {
             className="w-[200px] h-[200px]"
           />
         </View>
-
         <View className=" mt-24 justify-center items-center">
           <Text className="text-2xl font-rubikblack justify-center items-center">
             Login into Ready, Set, Fly!
@@ -79,8 +80,7 @@ const SignIn = () => {
             </Text>
             <Link
               href="/sign-up"
-              className="text-lg font-rubikbold text-emerald-700"
-            >
+              className="text-lg font-rubikbold text-emerald-700">
               Sign Up
             </Link>
           </View>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Image } from "react-native";
-
+import { IonIcons } from '@expo/vector-icons'
 import { icons } from "../constants";
 
 const FormField = ({
@@ -16,7 +16,6 @@ const FormField = ({
   return (
     <View className={`space-y-2 ${otherStyles}`}>
       <Text className="text-base text-black font-rubikregular">{title}</Text>
-
       <View className="w-full h-16 px-4 bg-white rounded-2xl border-2 border-black-200 focus:border-secondary flex flex-row items-center">
         <TextInput
           className="flex-1 text-black font-rubikbold text-base"
