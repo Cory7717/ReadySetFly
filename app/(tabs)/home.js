@@ -54,7 +54,7 @@ const Home = () => {
     <>
       <SafeAreaView className="flex-1 bg-white">
         <ScrollView contentContainerStyle={{ padding: 20 }}>
-          <View className="pb-7">
+          <View className="pb-2 border-b-2">
             <Text className="text-black text-center font-rubikbold text-xl">
               Search listings by type
             </Text>
@@ -89,7 +89,7 @@ const Home = () => {
             </Tab.Navigator>
           </View>
 
-          <Text className="text-2xl font-bold mb-4 text-decoration-line: underline text-center">
+          <Text className="text-2xl font-bold px-8 mt-10 text-decoration-line: underline text-center">
             List your aircraft
           </Text>
           <TextInput

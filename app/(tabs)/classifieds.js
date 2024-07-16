@@ -71,7 +71,7 @@ const Classifieds = () => {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <View className="pb-7">
+        <View className="pb-2 border-b-2">
           <Text className="text-black text-center font-rubikbold text-xl">
             Search listings by type
           </Text>
@@ -105,7 +105,7 @@ const Classifieds = () => {
           </Tab.Navigator>
         </View>
 
-        <Text className="font-rubikregular text-center text-2xl text-#606060 px-8 text-decoration-line: underline font-bold">
+        <Text className="font-rubikregular text-center text-2xl text-#606060 px-8 mt-10 text-decoration-line: underline font-bold">
           Aircraft Marketplace
         </Text>
         <TextInput
