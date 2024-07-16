@@ -61,7 +61,7 @@ const TabsLayout = () => {
           name="home"
           options={{
             title: "Home",
-            headerShown: true,
+            headerShown: false,
             headerTitle: "Listings",
             headerStyle: {
               backgroundColor: "#f2f2f2",

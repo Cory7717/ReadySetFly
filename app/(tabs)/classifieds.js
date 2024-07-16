@@ -77,7 +77,7 @@ const Classifieds = () => {
           </Text>
           <Tab.Navigator
             screenOptions={{
-            
+              tabBarIndicatorStyle: "",
               tabBarScrollEnabled: true,
               textBarShowLabel: true,
               tabBarStyle: {
@@ -88,6 +88,9 @@ const Classifieds = () => {
             <Tab.Screen
               name="Single Engine Prop"
               component={SingleEngineProp}
+              options={{
+               
+              }}
             />
             <Tab.Screen name="Twin Engine Prop" component={TwinEngineProp} />
             <Tab.Screen

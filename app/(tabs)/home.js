@@ -3,22 +3,22 @@ import {
   Text,
   View,
   Image,
-  ImageBackground,
-  FlatList,
   TextInput,
   TouchableOpacity,
   Button,
 } from "react-native";
 import React from "react";
-import { Stack, Tabs } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import ExploreHeader from "../../constants/ExploreHeader";
-import Listings from "../../constants/listings";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
-import { createStackNavigator } from "@react-navigation/stack";
-import { NavigationContainer } from "@react-navigation/native";
-import { StackScreen } from '@react-navigation/stack';
+import TwinEngineProp from "../../components/TwinEngineProp";
+import SingleEngineProp from "../../components/SingleEngineProp";
+import SingleEnginePiston from "../../components/SingleEnginePiston";
+import TwinEnginePiston from "../../components/TwinEnginePiston";
+import PistonHelicopter from "../../components/PistonHelicopter";
+import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+
+const Tab = createMaterialTopTabNavigator();
 
 const Home = () => {
   const [title, setTitle] = useState("");
@@ -49,35 +49,49 @@ const Home = () => {
       setPhoto(result.uri);
     }
   };
-  // function StackScreen() {
-  //   return (
-  //     <Stack.Navigator>
-  //       <Stack.Screen
-  //         name="Home"
-  //         component={HomeScreen}
-  //         options={{
-  //           title: 'My home',
-  //           headerStyle: {
-              
-  //             backgroundColor: '#f4511e',
-  //           },
-  //           headerTintColor: '#fff',
-  //           headerTitleStyle: {
-  //             fontWeight: 'bold',
-  //             fontFamily: 'rubikregular'
-  //           },
-  //         }}
-  //       />
-  //     </Stack.Navigator>
-  //   );
-  // }
 
   return (
     <>
       <SafeAreaView className="flex-1 bg-white">
         <ScrollView contentContainerStyle={{ padding: 20 }}>
-       
-          <Text className="text-2xl font-bold mb-4 text-decoration-line: underline text-center">List your aircraft</Text>
+          <View className="pb-7">
+            <Text className="text-black text-center font-rubikbold text-xl">
+              Search listings by type
+            </Text>
+            <Tab.Navigator
+              screenOptions={{
+                tabBarIndicatorStyle: "",
+                tabBarScrollEnabled: true,
+                textBarShowLabel: true,
+                tabBarStyle: {
+                  backgroundColor: "#fff",
+                },
+              }}
+            >
+              <Tab.Screen
+                name="Single Engine Prop"
+                component={SingleEngineProp}
+                options={{}}
+              />
+              <Tab.Screen name="Twin Engine Prop" component={TwinEngineProp} />
+              <Tab.Screen
+                name="Single Engine Piston"
+                component={SingleEnginePiston}
+              />
+              <Tab.Screen
+                name="Twin Engine Piston"
+                component={TwinEnginePiston}
+              />
+              <Tab.Screen
+                name="Piston Helicopter"
+                component={PistonHelicopter}
+              />
+            </Tab.Navigator>
+          </View>
+
+          <Text className="text-2xl font-bold mb-4 text-decoration-line: underline text-center">
+            List your aircraft
+          </Text>
           <TextInput
             className=" p-2 mb-4"
             placeholder="Title"
@@ -109,7 +123,9 @@ const Home = () => {
           )}
           <Button title="Add Listing" onPress={handleAddListing} />
           <View className="mt-8">
-            <Text className="text-xl font-bold mb-4 text-decoration-line: underline text-center">Listings</Text>
+            <Text className="text-xl font-bold mb-4 text-decoration-line: underline text-center">
+              Listings
+            </Text>
             {listings.map((listing, index) => (
               <View key={index} className=" p-4 mb-4">
                 <Text className="text-lg font-bold">{listing.title}</Text>
