@@ -6,8 +6,9 @@ import {
   TextInput,
   TouchableOpacity,
   Button,
+  StyleSheet,
 } from "react-native";
-import React from "react";
+import React, { useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
@@ -17,6 +18,8 @@ import SingleEnginePiston from "../../components/SingleEnginePiston";
 import TwinEnginePiston from "../../components/TwinEnginePiston";
 import PistonHelicopter from "../../components/PistonHelicopter";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+import { Formik } from "formik";
+import { Picker, PickerItem } from "@react-native-picker/picker";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -36,6 +39,18 @@ const Home = () => {
       setPhoto(null);
     }
   };
+
+  // const [categoryList, setCategoryList] =useState([]);
+  // useEffect(()=>{
+  //   getCategoryList();
+  // }, [])
+
+  // const getCategoryList=async()=>{
+  //   const querySnapshot=await getDocs(collection(db, 'Category'));
+  //   querySnapshot.forEach((doc)=>{
+  //     setCategoryList(categoryList=>[...categoryList. doc.data()])
+  //   })
+  // }
 
   const handleChoosePhoto = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -89,27 +104,126 @@ const Home = () => {
             </Tab.Navigator>
           </View>
 
-          <Text className="text-2xl font-bold px-8 mt-10 text-decoration-line: underline text-center">
-            List your aircraft
-          </Text>
-          <TextInput
-            className=" p-2 mb-4"
-            placeholder="Title"
-            value={title}
-            onChangeText={setTitle}
-          />
-          <TextInput
-            className="p-2 mb-4"
-            placeholder="Cost per hour"
-            value={price}
-            onChangeText={setPrice}
-          />
-          <TextInput
-            className=" p-2 mb-4"
-            placeholder="Description"
-            value={description}
-            onChangeText={setDescription}
-          />
+          {/* Below is the Formik code */}
+          {/* <View className="pt-5">
+          <Text className="font-rubikbold text-xl text-center text-decoration-line mb-2">List your aircraft</Text>
+            <Formik
+              initialValues={{
+                title: "",
+                desc: "",
+                category: "",
+                address: "",
+                price: "",
+                image: "",
+              }}
+              onSubmit={(value) => console.log(value)}
+            >
+              {({ handleChange, handleBlur, handleSubmit, values, handleAddListing }) => (
+                <View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Title"
+                    value={values?.title}
+                    onChangeText={handleChange("title")}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Description"
+                    value={values?.desc}
+                    numberOfLines={5}
+                    onChangeText={handleChange("desc")}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Price"
+                    value={values?.price}
+                    keyboardType="numeric"
+                    onChangeText={handleChange("price")}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Location"
+                    value={values?.address}
+                    
+                    onChangeText={handleChange("location")}
+                  />
+                  <Picker 
+                    selectedValue={values?.category}
+                    onValueChange={handleChange("Category")}
+                    className='border-spacing-2'
+                  >
+                    <Picker.Item
+                      label="Single Engine Prop"
+                      value={"Dropdown"}
+                    /> */}
+          {/* {categoryList&&categoryList.map(()=>(
+                    
+                   ))}
+                   <Picker.Item  key={index}
+                      label="Turbo Prop"
+                      value={'Dropdown'}
+                    /> */}
+          {/* <Picker.Item label="Twin Engine Prop" value={"Dropdown"} />
+                    <Picker.Item label="Turbo Prop" value={"Dropdown"} />
+                    <Picker.Item label="Helicopter" value={"Dropdown"} />
+                    <Picker.Item label="Jet" value={"Dropdown"} />
+                  </Picker>
+                  <Button
+                    onPress={handleAddListing}
+                    className="mt-7"
+                    title="submit"
+                  />
+                </View>
+              )}
+            </Formik>
+          </View> */}
+          {/* Code above is test for Formik */}
+          
+          <View>
+            <Text className="text-2xl px-8 mt-5 text-decoration-line: underline text-center font-rubikbold">
+              List your aircraft
+            </Text>
+          </View>
+          <TouchableOpacity onPress={()=>console.log("Image")}>
+          <View>
+            <Image source={require("../../Assets/images/Placeholder_view_vector.png")} 
+              style={{width:150, height:150, borderRadius:15, paddingBottom:10, marginBottom:15, marginTop:15}}
+            />
+          </View>
+          </TouchableOpacity>
+          
+         
+          <View className="border mb-5">
+            <Picker>
+              <Picker.Item label="Single Engine Prop" value={"Dropdown"} />
+              <Picker.Item label="Twin Engine Prop" value={"Dropdown"} />
+              <Picker.Item label="Turbo Prop" value={"Dropdown"} />
+              <Picker.Item label="Helicopter" value={"Dropdown"} />
+              <Picker.Item label="Jet" value={"Dropdown"} />
+            </Picker>
+          </View>
+          <View className="align-text-top">
+            <TextInput
+              className=" p-2 mb-4 border"
+              placeholder="Title"
+              value={title}
+              onChangeText={setTitle}
+            />
+            <TextInput
+              className="p-2 mb-4 border"
+              placeholder="Cost per hour"
+              value={price}
+              keyboardType="numeric"
+              onChangeText={setPrice}
+            />
+            <TextInput
+              className=" p-2 mb-4 border text-start "
+              placeholder="Description"
+              value={description}
+              numberOfLines={5}
+              onChangeText={setDescription}
+            />
+          </View>
           <TouchableOpacity onPress={handleChoosePhoto} className="mb-4">
             <View className=" p-4">
               <Text className="text-center">Choose Photo</Text>
@@ -145,5 +259,18 @@ const Home = () => {
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    paddingHorizontal: 17,
+    fontSize: 17,
+    marginBottom: 5,
+    marginTop: 10,
+    textAlignVertical: "top",
+  },
+});
 
 export default Home;

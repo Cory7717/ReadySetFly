@@ -11,18 +11,6 @@ import CustomButton from "../components/CustomButton";
 import { useGlobalContext } from "../context/GlobalProvider";
 
 
-
-
-{
-  /* const sendCodeEmail = () => {
-  const to = ['coryarmer@gmail.com'];
-  sendEmail(to, {
-    subject: 'Your Code',
-    body: 'Here is your code: 123456',
-  }).catch(console.error);
-}; */
-}
-
 NativeWindStyleSheet.setOutput({
   default: "native",
 });

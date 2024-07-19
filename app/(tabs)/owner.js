@@ -3,10 +3,12 @@ import React from 'react'
 import { Stack, Tabs } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+
 const Create = () => {
   return (
     <SafeAreaView className="h-full bg-white sand">
     <ScrollView contentContainerStyle={{height: "100%"}}>
+    
     <View className="flex-1 items-center justify-center bg-white"> 
             <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">Owner Dashboard</Text> 
           </View> 
