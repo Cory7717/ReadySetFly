@@ -21,6 +21,9 @@ import { createMaterialTopTabNavigator } from "@react-navigation/material-top-ta
 import { Formik } from "formik";
 import { Picker, PickerItem } from "@react-native-picker/picker";
 
+const ImagePickerExample = () => {
+  const [image, setImage] = useState(null);}
+
 const Tab = createMaterialTopTabNavigator();
 
 const Home = () => {
@@ -65,6 +68,22 @@ const Home = () => {
     }
   };
 
+  const pickImage = async () => {
+    // No permissions request is necessary for launching the image library
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    console.log(result);
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
   return (
     <>
       <SafeAreaView className="flex-1 bg-white">
@@ -104,95 +123,29 @@ const Home = () => {
             </Tab.Navigator>
           </View>
 
-          {/* Below is the Formik code */}
-          {/* <View className="pt-5">
-          <Text className="font-rubikbold text-xl text-center text-decoration-line mb-2">List your aircraft</Text>
-            <Formik
-              initialValues={{
-                title: "",
-                desc: "",
-                category: "",
-                address: "",
-                price: "",
-                image: "",
-              }}
-              onSubmit={(value) => console.log(value)}
-            >
-              {({ handleChange, handleBlur, handleSubmit, values, handleAddListing }) => (
-                <View>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Title"
-                    value={values?.title}
-                    onChangeText={handleChange("title")}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Description"
-                    value={values?.desc}
-                    numberOfLines={5}
-                    onChangeText={handleChange("desc")}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Price"
-                    value={values?.price}
-                    keyboardType="numeric"
-                    onChangeText={handleChange("price")}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Location"
-                    value={values?.address}
-                    
-                    onChangeText={handleChange("location")}
-                  />
-                  <Picker 
-                    selectedValue={values?.category}
-                    onValueChange={handleChange("Category")}
-                    className='border-spacing-2'
-                  >
-                    <Picker.Item
-                      label="Single Engine Prop"
-                      value={"Dropdown"}
-                    /> */}
-          {/* {categoryList&&categoryList.map(()=>(
-                    
-                   ))}
-                   <Picker.Item  key={index}
-                      label="Turbo Prop"
-                      value={'Dropdown'}
-                    /> */}
-          {/* <Picker.Item label="Twin Engine Prop" value={"Dropdown"} />
-                    <Picker.Item label="Turbo Prop" value={"Dropdown"} />
-                    <Picker.Item label="Helicopter" value={"Dropdown"} />
-                    <Picker.Item label="Jet" value={"Dropdown"} />
-                  </Picker>
-                  <Button
-                    onPress={handleAddListing}
-                    className="mt-7"
-                    title="submit"
-                  />
-                </View>
-              )}
-            </Formik>
-          </View> */}
-          {/* Code above is test for Formik */}
-          
+    
+
           <View>
             <Text className="text-2xl px-8 mt-5 text-decoration-line: underline text-center font-rubikbold">
               List your aircraft
             </Text>
           </View>
-          <TouchableOpacity onPress={()=>console.log("Image")}>
-          <View>
-            <Image source={require("../../Assets/images/Placeholder_view_vector.png")} 
-              style={{width:150, height:150, borderRadius:15, paddingBottom:10, marginBottom:15, marginTop:15}}
-            />
-          </View>
+          <TouchableOpacity onPress={pickImage}>
+            <View className="items-center">
+              <Image
+                source={require("../../Assets/images/Placeholder_view_vector.png")}
+                style={{
+                  width: 150,
+                  height: 150,
+                  borderRadius: 15,
+                  paddingBottom: 10,
+                  marginBottom: 15,
+                  marginTop: 15,
+                }}
+              />
+            </View>
           </TouchableOpacity>
-          
-         
+
           <View className="border mb-5">
             <Picker>
               <Picker.Item label="Single Engine Prop" value={"Dropdown"} />

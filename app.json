@@ -13,16 +13,14 @@
       "backgroundColor": "#fff"
     },
 
-"assetBundlePatterns": [
-  "**/*"
-],
+    "assetBundlePatterns": ["**/*"],
 
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-       "backgroundImage": "./Assets//images/fulllogo_transparent.png",
+        "backgroundImage": "./Assets//images/fulllogo_transparent.png",
         "foregroundImage": "",
         "backgroundColor": "#fff"
       },
@@ -31,7 +29,13 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses you photos to let you share them with your friends."
+        }
+      ]
     ]
   }
 }
