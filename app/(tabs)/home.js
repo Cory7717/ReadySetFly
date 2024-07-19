@@ -223,6 +223,10 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     marginTop: 10,
     textAlignVertical: "top",
+    justifyContent: "space-evenly",
+    flexDirection: "row",
+    flex: 1,
+    flexWrap: "wrap",
   },
 });
 
