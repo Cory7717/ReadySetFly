@@ -173,7 +173,7 @@ const Home = () => {
               onChangeText={setPrice}
             />
             <TextInput
-              className=" p-2 mb-4 border text-start "
+              className=" p-2 mb-4 border "
               placeholder="Description"
               value={description}
               numberOfLines={5}
@@ -210,6 +210,7 @@ const Home = () => {
               </View>
             ))}
           </View>
+          
         </ScrollView>
       </SafeAreaView>
     </>

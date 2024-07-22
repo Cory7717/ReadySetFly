@@ -1,5 +1,13 @@
 import { StatusBar } from "expo-status-bar";
-import { Text, View, Image, ScrollView, ImageBackground } from "react-native";
+import {
+  Text,
+  View,
+  Image,
+  ScrollView,
+  ImageBackground,
+  TouchableOpacity,
+  TextInput,
+} from "react-native";
 import { router, Link, Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeWindStyleSheet } from "nativewind";
@@ -9,7 +17,6 @@ import { useFonts } from "expo-font";
 import { images } from "../constants";
 import CustomButton from "../components/CustomButton";
 import { useGlobalContext } from "../context/GlobalProvider";
-
 
 NativeWindStyleSheet.setOutput({
   default: "native",
@@ -25,10 +32,10 @@ const App = () => {
       {/* <ImageBackground source={images.background} className="bg-opacity-75"/> */}
       <ScrollView contentContainerStyle={{ height: "100%" }}>
         <View className="w-full min-h-[85px] px-12 py-10">
-          <Image source={images.logo} className="w-[300px] h-[200px]" />
+          <Image source={images.logo} className="w-[250px] h-[175px] ml-5" />
         </View>
 
-        <View className="relative py-5">
+        <View className="relative py-3">
           <Text className="font-rubikregular text-2xl text-center color-teal-400 py-5">
             Where's your next destination?
           </Text>
@@ -36,7 +43,7 @@ const App = () => {
         <CustomButton
           title="Sign in/up for an account "
           handlePress={() => router.push("/sign-in")}
-          containerStyles="mx-10 mt-10 bg-black"
+          containerStyles="mx-8 mt-5  bg-black"
         />
         <CustomButton
           title="Click here to view content "
@@ -48,7 +55,29 @@ const App = () => {
           handlePress={() => router.push("/cfi")}
           containerStyles="mx-10 mt-10 bg-black"
         />
-      
+        <View className="flex-row p-5 items-center gap-1 border-radius-15">
+          <View>
+            <Text className="text-[14px] font-rubikblack ml-5 text-center justify-center">
+              Are you a Certified Flight instructor?
+              {/* <HeaderCFI ></HeaderCFI> */}
+            </Text>
+            <Text className="text-l font-rubikblack ml-5 text-center justify-center items-center">
+              Create your profile today
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity>
+          <View className="items-center justify-center rounded-full p-3 ml-5 mr-5 border bg-blue-400">
+            <Text className="text-bold text-l">
+              {" "}
+              Create CFI Profile
+              <TextInput
+                className="text-bold"
+                // placeholder="Register"
+              />
+            </Text>
+          </View>
+        </TouchableOpacity>
       </ScrollView>
       <StatusBar backgroundColor="white" />
     </SafeAreaView>
