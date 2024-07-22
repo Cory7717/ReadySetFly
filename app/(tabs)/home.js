@@ -26,6 +26,9 @@ const ImagePickerExample = () => {
 
 const Tab = createMaterialTopTabNavigator();
 
+
+
+// 1:52:00 into video for search bar and slider
 const Home = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
