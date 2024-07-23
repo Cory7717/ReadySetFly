@@ -20,6 +20,10 @@ import PistonHelicopter from "../../components/PistonHelicopter";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { Formik } from "formik";
 import { Picker, PickerItem } from "@react-native-picker/picker";
+import Slider from "../../components/Slider";
+import  getFirestore  from "firebase/firestore";
+import { app } from "../../firebaseConfig"
+
 
 const ImagePickerExample = () => {
   const [image, setImage] = useState(null);}
@@ -87,11 +91,20 @@ const Home = () => {
     }
   };
 
+ 
+//  The function below is throwing 0,_firestore.default is not a function - Error
+  // const db = getFirestore(app);
+
+  const getSliders=()=> {
+
+  }
+
   return (
     <>
       <SafeAreaView className="flex-1 bg-white">
         <ScrollView contentContainerStyle={{ padding: 20 }}>
           <View className="pb-2 border-b-2">
+          
             <Text className="text-black text-center font-rubikbold text-xl">
               Search listings by type
             </Text>
@@ -129,6 +142,7 @@ const Home = () => {
     
 
           <View>
+          <Slider/>
             <Text className="text-2xl px-8 mt-5 text-decoration-line: underline text-center font-rubikbold">
               List your aircraft
             </Text>

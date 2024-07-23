@@ -5,8 +5,13 @@ import { useFonts } from "expo-font";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/stack";
 import GlobalProvider from "../context/GlobalProvider";
-// import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo"
+// import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
 // import { Slot } from "expo-router"
+
+// const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+// if (!publishableKey) {
+//   throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env')
+// }
 
 SplashScreen.preventAutoHideAsync();
 
@@ -38,7 +43,7 @@ const RootLayout = () => {
             headerShown: false,
           }}
         />
-        
+
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
         <Stack.Screen name="cfi" options={{ headerShown: false }} />

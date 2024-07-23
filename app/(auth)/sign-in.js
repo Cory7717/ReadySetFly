@@ -11,6 +11,7 @@ import { signIn } from "../../lib/appwrite";
 import { getCurrentUser } from "../../lib/appwrite";
 import { IonIcons } from "@expo/vector-icons";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { Fontisto } from '@expo/vector-icons';
 
 const SignIn = () => {
   const { setUser, setIsLogged } = useGlobalContext();
@@ -56,12 +57,14 @@ const SignIn = () => {
           <Text className="text-2xl font-rubikblack justify-center items-center">
             Login into Ready, Set, Fly!
           </Text>
+          
           <FormField
             title="Email"
             value={form.email}
             handleChangeText={(e) => setForm({ ...form, email: e })}
             otherStyles="mt-7 mx-5 bg-white"
             keyboardType="email-address"
+            
           />
           <FormField
             title="Password"

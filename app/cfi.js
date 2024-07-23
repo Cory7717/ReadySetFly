@@ -69,7 +69,7 @@ const CFI = () => {
               />
           </View>
         </TouchableOpacity>
-        <View className="flex-1 rounded-full pt-5 ">
+        <View className="flex-1 rounded-full pt-5 " resizeMode='contain'>
           <MapView resizeMode='contain' initialRegion={INITIAL_REGION} className="flex-1 mb-10 " />
         </View>
       </ScrollView>

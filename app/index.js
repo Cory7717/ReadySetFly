@@ -31,6 +31,8 @@ const App = () => {
     <SafeAreaView className="bg-white">
       {/* <ImageBackground source={images.background} className="bg-opacity-75"/> */}
       <ScrollView contentContainerStyle={{ height: "100%" }}>
+
+      
         <View className="w-full min-h-[85px] px-12 py-10">
           <Image source={images.logo} className="w-[250px] h-[175px] ml-5" />
         </View>
@@ -55,13 +57,13 @@ const App = () => {
           handlePress={() => router.push("/cfi")}
           containerStyles="mx-10 mt-10 bg-black"
         />
-        <View className="flex-row p-5 items-center gap-1 border-radius-15">
+        <View className="flex-row p-5 items-center gap-1 border-radius-15 justify-center">
           <View>
-            <Text className="text-[14px] font-rubikblack ml-5 text-center justify-center">
+            <Text className="text-[14px] font-rubikblack ">
               Are you a Certified Flight instructor?
               {/* <HeaderCFI ></HeaderCFI> */}
             </Text>
-            <Text className="text-l font-rubikblack ml-5 text-center justify-center items-center">
+            <Text className="text-l font-rubikblack text-center justify-center items-center">
               Create your profile today
             </Text>
           </View>
