@@ -31,8 +31,6 @@ const App = () => {
     <SafeAreaView className="bg-white">
       {/* <ImageBackground source={images.background} className="bg-opacity-75"/> */}
       <ScrollView contentContainerStyle={{ height: "100%" }}>
-
-      
         <View className="w-full min-h-[85px] px-12 py-10">
           <Image source={images.logo} className="w-[250px] h-[175px] ml-5" />
         </View>
@@ -68,10 +66,9 @@ const App = () => {
             </Text>
           </View>
         </View>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("./cfi")}>
           <View className="items-center justify-center rounded-full p-3 ml-5 mr-5 border bg-blue-400">
             <Text className="text-bold text-l">
-              {" "}
               Create CFI Profile
               <TextInput
                 className="text-bold"

@@ -21,7 +21,7 @@ import { createMaterialTopTabNavigator } from "@react-navigation/material-top-ta
 import { Formik } from "formik";
 import { Picker, PickerItem } from "@react-native-picker/picker";
 import Slider from "../../components/Slider";
-import  getFirestore  from "firebase/firestore";
+import  getFirestore, { getDocs }  from "firebase/firestore";
 import { app } from "../../firebaseConfig"
 
 
@@ -39,6 +39,8 @@ const Home = () => {
   const [price, setPrice] = useState("");
   const [listings, setListings] = useState([]);
   const [photo, setPhoto] = useState(null);
+  const [sliderList, setSliderList] = useState([]);
+
   const handleAddListing = () => {
     if (title && description) {
       const newListing = { title, description, price, photo };
@@ -91,13 +93,17 @@ const Home = () => {
     }
   };
 
+  const fetchSliders = async () => {
+    setSliderList([]);
+    const db = getFirestore(app);
+    const querySnapshot = await getDocs(collection(db, 'Slider'));
+
+    querySnapshot.forEach((doc) => {
+      setSliderList((prevSliderList) => [...prevSliderList, doc.data()]);
+    });
+  };
  
-//  The function below is throwing 0,_firestore.default is not a function - Error
-  // const db = getFirestore(app);
 
-  const getSliders=()=> {
-
-  }
 
   return (
     <>

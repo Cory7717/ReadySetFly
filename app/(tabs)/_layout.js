@@ -12,6 +12,7 @@ import {
   Feather,
   AntDesign,
   FontAwesome,
+  Octicons
 } from "@expo/vector-icons";
 
 NativeWindStyleSheet.setOutput({
@@ -87,18 +88,18 @@ const TabsLayout = () => {
             title: "Renter Dashboard",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
-              <Ionicons name="person-outline" size={32} color={color} />
+              <Octicons name="paper-airplane" size={26} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="flights"
           options={{
-            title: "Search Airplanes",
+            title: "Social",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
-              <MaterialCommunityIcons
-                name="airplane-takeoff"
+              <Ionicons
+                name="people-outline"
                 size={32}
                 color={color}
               />
@@ -111,7 +112,7 @@ const TabsLayout = () => {
             title: "Inbox",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
-              <AntDesign name="message1" size={32} color={color} />
+              <AntDesign name="message1" size={26} color={color} />
             ),
           }}
         />
