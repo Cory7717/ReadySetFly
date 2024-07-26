@@ -47,7 +47,7 @@ const RootLayout = () => {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
         <Stack.Screen name="cfi" options={{ headerShown: false }} />
-        <Stack.Screen name='cfiprofile' options={{ headerShown: false}} />
+        
       </Stack>
     </GlobalProvider>
   );

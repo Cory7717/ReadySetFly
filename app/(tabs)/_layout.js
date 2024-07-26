@@ -109,10 +109,10 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="inbox"
           options={{
-            title: "Inbox",
+            title: "Chat",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
-              <AntDesign name="message1" size={26} color={color} />
+              <Ionicons name="chatbox-outline" size={26} color="color" />
             ),
           }}
         />
