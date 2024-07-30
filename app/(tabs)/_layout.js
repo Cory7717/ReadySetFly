@@ -12,7 +12,8 @@ import {
   Feather,
   AntDesign,
   FontAwesome,
-  Octicons
+  Octicons, 
+  FontAwesome6
 } from "@expo/vector-icons";
 
 NativeWindStyleSheet.setOutput({
@@ -112,7 +113,7 @@ const TabsLayout = () => {
             title: "Chat",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
-              <Ionicons name="chatbox-outline" size={26} color="color" />
+              <Ionicons name="chatbox-outline" size={26} color={color} />
             ),
           }}
         />
@@ -122,7 +123,7 @@ const TabsLayout = () => {
             title: "Classifieds",
             headerShown: false,
             tabBarIcon: ({ name, icon, color, focused }) => (
-              <Ionicons name="list-outline" size={32} color={color} />
+              <FontAwesome6 name="money-bill-1" size={24} color={color} />
             ),
           }}
         />

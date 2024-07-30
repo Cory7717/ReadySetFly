@@ -18,6 +18,7 @@ import { images } from "../constants";
 import CustomButton from "../components/CustomButton";
 import { useGlobalContext } from "../context/GlobalProvider";
 
+
 NativeWindStyleSheet.setOutput({
   default: "native",
 });

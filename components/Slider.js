@@ -1,11 +1,22 @@
-import { View, Text } from 'react-native'
+import { View, Text, FlatList } from 'react-native'
 import React from 'react'
-import { FlatList } from 'react-native-gesture-handler'
+
 
 const Slider = (sliderList) => {
   return (
     <View>
-     <Text>Slider</Text>
+     <FlatList
+      data={sliderList}
+      horizontal="true"
+      showsHorizontalScrollIndicator={false}
+      renderItem={({item, index }) => (
+        <View>
+       <Image source={{uri:item?.Image}}
+          className="h=[200px] w-[30px]"
+           />
+        </View>
+      )}
+     />
     </View>
   )
 }

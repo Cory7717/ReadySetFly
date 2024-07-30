@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   Text,
@@ -8,31 +9,23 @@ import {
   Button,
   StyleSheet,
 } from "react-native";
-import React, { useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import { db } from "../../firebaseConfig";
+import { collection, getDocs } from "firebase/firestore"; // Ensure this import is correct
+import { Picker } from "@react-native-picker/picker";
+import Slider from "../../components/Slider";
+import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+
 import TwinEngineProp from "../../components/TwinEngineProp";
 import SingleEngineProp from "../../components/SingleEngineProp";
 import SingleEnginePiston from "../../components/SingleEnginePiston";
 import TwinEnginePiston from "../../components/TwinEnginePiston";
 import PistonHelicopter from "../../components/PistonHelicopter";
-import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import { Formik } from "formik";
-import { Picker, PickerItem } from "@react-native-picker/picker";
-import Slider from "../../components/Slider";
-import  getFirestore, { getDocs }  from "firebase/firestore";
-import { app } from "../../firebaseConfig"
-
-
-const ImagePickerExample = () => {
-  const [image, setImage] = useState(null);}
+import Categories from "../../components/Categories";
 
 const Tab = createMaterialTopTabNavigator();
 
-
-
-// 1:52:00 into video for search bar and slider
 const Home = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -40,6 +33,13 @@ const Home = () => {
   const [listings, setListings] = useState([]);
   const [photo, setPhoto] = useState(null);
   const [sliderList, setSliderList] = useState([]);
+  const [categoryList, setCategoryList] = useState([]);
+  const [image, setImage] = useState(null);
+
+  useEffect(() => {
+    getCategoryList();
+    getSliders();
+  }, []);
 
   const handleAddListing = () => {
     if (title && description) {
@@ -52,17 +52,19 @@ const Home = () => {
     }
   };
 
-  // const [categoryList, setCategoryList] =useState([]);
-  // useEffect(()=>{
-  //   getCategoryList();
-  // }, [])
-
-  // const getCategoryList=async()=>{
-  //   const querySnapshot=await getDocs(collection(db, 'Category'));
-  //   querySnapshot.forEach((doc)=>{
-  //     setCategoryList(categoryList=>[...categoryList. doc.data()])
-  //   })
-  // }
+  const getCategoryList = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "Category"));
+      querySnapshot.forEach((doc) => {
+        setCategoryList((prevCategoryList) => [
+          ...prevCategoryList,
+          doc.data(),
+        ]);
+      });
+    } catch (error) {
+      console.error("Error fetching category list:", error);
+    }
+  };
 
   const handleChoosePhoto = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -78,7 +80,6 @@ const Home = () => {
   };
 
   const pickImage = async () => {
-    // No permissions request is necessary for launching the image library
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
@@ -86,151 +87,144 @@ const Home = () => {
       quality: 1,
     });
 
-    console.log(result);
-
     if (!result.canceled) {
       setImage(result.assets[0].uri);
     }
   };
 
-  const fetchSliders = async () => {
-    setSliderList([]);
-    const db = getFirestore(app);
-    const querySnapshot = await getDocs(collection(db, 'Slider'));
-
-    querySnapshot.forEach((doc) => {
-      setSliderList((prevSliderList) => [...prevSliderList, doc.data()]);
-    });
+  const getSliders = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "Sliders"));
+      querySnapshot.forEach((doc) => {
+        setSliderList((prevSliderList) => [...prevSliderList, doc.data()]);
+      });
+    } catch (error) {
+      console.error("Error fetching sliders:", error);
+    }
   };
- 
-
 
   return (
     <>
       <SafeAreaView className="flex-1 bg-white">
-        <ScrollView contentContainerStyle={{ padding: 20 }}>
-          <View className="pb-2 border-b-2">
-          
-            <Text className="text-black text-center font-rubikbold text-xl">
-              Search listings by type
-            </Text>
-            <Tab.Navigator
-              screenOptions={{
-                tabBarIndicatorStyle: "",
-                tabBarScrollEnabled: true,
-                textBarShowLabel: true,
-                tabBarStyle: {
-                  backgroundColor: "#fff",
-                },
-              }}
-            >
-              <Tab.Screen
-                name="Single Engine Prop"
-                component={SingleEngineProp}
-                options={{}}
-              />
-              <Tab.Screen name="Twin Engine Prop" component={TwinEngineProp} />
-              <Tab.Screen
-                name="Single Engine Piston"
-                component={SingleEnginePiston}
-              />
-              <Tab.Screen
-                name="Twin Engine Piston"
-                component={TwinEnginePiston}
-              />
-              <Tab.Screen
-                name="Piston Helicopter"
-                component={PistonHelicopter}
-              />
-            </Tab.Navigator>
-          </View>
-
-    
-
-          <View>
-          <Slider/>
-            <Text className="text-2xl px-8 mt-5 text-decoration-line: underline text-center font-rubikbold">
-              List your aircraft
-            </Text>
-          </View>
-          <TouchableOpacity onPress={pickImage}>
-            <View className="items-center">
-              <Image
-                source={require("../../Assets/images/Placeholder_view_vector.png")}
-                style={{
-                  width: 150,
-                  height: 150,
-                  borderRadius: 15,
-                  paddingBottom: 10,
-                  marginBottom: 15,
-                  marginTop: 15,
-                }}
-              />
-            </View>
-          </TouchableOpacity>
-
-          <View className="border mb-5">
-            <Picker>
-              <Picker.Item label="Single Engine Prop" value={"Dropdown"} />
-              <Picker.Item label="Twin Engine Prop" value={"Dropdown"} />
-              <Picker.Item label="Turbo Prop" value={"Dropdown"} />
-              <Picker.Item label="Helicopter" value={"Dropdown"} />
-              <Picker.Item label="Jet" value={"Dropdown"} />
-            </Picker>
-          </View>
-          <View className="align-text-top">
-            <TextInput
-              className=" p-2 mb-4 border"
-              placeholder="Title"
-              value={title}
-              onChangeText={setTitle}
+      <ScrollView>
+        <View className="pb-2 border-b-2">
+          <Text className="text-black text-center font-rubikbold text-xl">
+            Search listings by type
+          </Text>
+        </View>
+        <View>
+          <Tab.Navigator
+            screenOptions={{
+              tabBarIndicatorStyle: "",
+              tabBarScrollEnabled: true,
+              textBarShowLabel: true,
+              tabBarStyle: {
+                backgroundColor: "#fff",
+              },
+            }}
+          >
+            <Tab.Screen
+              name="Single Engine Prop"
+              component={SingleEngineProp}
+              options={{}}
             />
-            <TextInput
-              className="p-2 mb-4 border"
-              placeholder="Cost per hour"
-              value={price}
-              keyboardType="numeric"
-              onChangeText={setPrice}
+            <Tab.Screen name="Twin Engine Prop" component={TwinEngineProp} />
+            <Tab.Screen
+              name="Single Engine Piston"
+              component={SingleEnginePiston}
             />
-            <TextInput
-              className=" p-2 mb-4 border "
-              placeholder="Description"
-              value={description}
-              numberOfLines={5}
-              onChangeText={setDescription}
+            <Tab.Screen
+              name="Twin Engine Piston"
+              component={TwinEnginePiston}
             />
-          </View>
-          <TouchableOpacity onPress={handleChoosePhoto} className="mb-4">
-            <View className=" p-4">
-              <Text className="text-center">Choose Photo</Text>
-            </View>
-          </TouchableOpacity>
-          {photo && (
+            <Tab.Screen name="Piston Helicopter" component={PistonHelicopter} />
+          </Tab.Navigator>
+
+          <Text className="text-2xl px-8 mt-5 text-decoration-line: underline text-center font-rubikbold">
+            List your aircraft
+          </Text>
+        </View>
+        <View>
+          <Slider sliderList={sliderList} />
+          <Categories  categoryList={categoryList}/>
+        </View>
+        <TouchableOpacity onPress={pickImage}>
+          <View className="items-center">
             <Image
-              source={{ uri: photo }}
-              style={{ width: 100, height: 100, marginBottom: 20 }}
+              source={require("../../Assets/images/Placeholder_view_vector.png")}
+              style={{
+                width: 150,
+                height: 150,
+                borderRadius: 15,
+                paddingBottom: 10,
+                marginBottom: 15,
+                marginTop: 15,
+              }}
             />
-          )}
-          <Button title="Add Listing" onPress={handleAddListing} />
-          <View className="mt-8">
-            <Text className="text-xl font-bold mb-4 text-decoration-line: underline text-center">
-              Listings
-            </Text>
-            {listings.map((listing, index) => (
-              <View key={index} className=" p-4 mb-4">
-                <Text className="text-lg font-bold">{listing.title}</Text>
-                <Text>{listing.price}</Text>
-                <Text>{listing.description}</Text>
-                {listing.photo && (
-                  <Image
-                    source={{ uri: listing.photo }}
-                    style={{ width: 100, height: 100, marginTop: 10 }}
-                  />
-                )}
-              </View>
-            ))}
           </View>
-          
+        </TouchableOpacity>
+
+        <View className="border mb-5">
+          <Picker>
+            <Picker.Item label="Single Engine Prop" value={"Dropdown"} />
+            <Picker.Item label="Twin Engine Prop" value={"Dropdown"} />
+            <Picker.Item label="Turbo Prop" value={"Dropdown"} />
+            <Picker.Item label="Helicopter" value={"Dropdown"} />
+            <Picker.Item label="Jet" value={"Dropdown"} />
+          </Picker>
+        </View>
+        <View className="align-text-top">
+          <TextInput
+            className=" p-2 mb-4 border"
+            placeholder="Title"
+            value={title}
+            onChangeText={setTitle}
+          />
+          <TextInput
+            className="p-2 mb-4 border"
+            placeholder="Cost per hour"
+            value={price}
+            keyboardType="numeric"
+            onChangeText={setPrice}
+          />
+          <TextInput
+            className=" p-2 mb-4 border "
+            placeholder="Description"
+            value={description}
+            numberOfLines={5}
+            onChangeText={setDescription}
+          />
+        </View>
+        <TouchableOpacity onPress={handleChoosePhoto} className="mb-4">
+          <View className=" p-4">
+            <Text className="text-center">Choose Photo</Text>
+          </View>
+        </TouchableOpacity>
+        {photo && (
+          <Image
+            source={{ uri: photo }}
+            style={{ width: 100, height: 100, marginBottom: 20 }}
+          />
+        )}
+        <Button title="Add Listing" onPress={handleAddListing} />
+        <View className="mt-8">
+          <Text className="text-xl font-bold mb-4 text-decoration-line: underline text-center">
+            Listings
+          </Text>
+          {listings.map((listing, index) => (
+            <View key={index} className=" p-4 mb-4">
+              <Text className="text-lg font-bold">{listing.title}</Text>
+              <Text>{listing.price}</Text>
+              <Text>{listing.description}</Text>
+              {listing.photo && (
+                <Image
+                  source={{ uri: listing.photo }}
+                  style={{ width: 100, height: 100, marginTop: 10 }}
+                />
+              )}
+            </View>
+          ))}
+        </View>
         </ScrollView>
       </SafeAreaView>
     </>
