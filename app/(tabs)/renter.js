@@ -1,70 +1,104 @@
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  TextInput,
-  Button,
-} from "react-native";
-import React from "react";
-import { useEffect, useState } from "react";
-import { Stack, Tabs } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, TextInput, Image, View, Text, Button, Alert, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { Calendar, CalendarList, Agenda } from 'react-native-calendars';
+import { getFirestore, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import { Formik } from "formik";
-import { Picker, PickerItem } from "@react-native-picker/picker";
-import * as ImagePicker from "expo-image-picker";
 import UpcomingBookings from "../../components/UpcomingBookings";
 import RenterProfile from "../../components/RenterProfile";
-import { tw } from "nativewind";
+import { Formik } from "formik";
+import { Picker, PickerItem } from "@react-native-picker/picker";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { app } from "../../firebaseConfig";
+
+
 
 const Tab = createMaterialTopTabNavigator();
 
-const handleChoosePhoto = async () => {
-  let result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true,
-    aspect: [4, 3],
-    quality: 1,
-  });
 
-  if (!result.canceled) {
-    setPhoto(result.uri);
-  }
-};
 
-const pickImage = async () => {
-  // No permissions request is necessary for launching the image library
-  let result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.All,
-    allowsEditing: true,
-    aspect: [4, 3],
-    quality: 1,
-  });
+const BookingCalendar = ({ airplaneId, userId }) => {
+  const [bookings, setBookings] = useState({});
+  const [selectedDate, setSelectedDate] = useState('');
 
-  console.log(result);
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (!airplaneId) {
+        console.error('airplaneId is undefined');
+        return;
+      }
 
-  if (!result.canceled) {
-    setImage(result.assets[0].uri);
-  }
-};
+      const db = getFirestore();
+      const bookingsCollection = collection(db, 'bookings');
+      const q = query(bookingsCollection, where('airplaneId', '==', airplaneId));
 
-const Create = () => {
-  const onSubmitValue = (value) => {
-    value.image=image;
-    console.log(value)
-  }
-  const [image, setImage] = useState(null);
+      try {
+        const querySnapshot = await getDocs(q);
+        let bookingsData = {};
+        querySnapshot.forEach((doc) => {
+          const { startDate, endDate } = doc.data();
+          bookingsData[startDate] = { marked: true, dotColor: 'red' };
+          bookingsData[endDate] = { marked: true, dotColor: 'red' };
+        });
+        setBookings(bookingsData);
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
+      }
+    };
 
-  // const handleSetImage = () => {
-  //   setImage("path_to_new_image");
-  // };
+    fetchBookings();
+  }, [airplaneId]);
+
+  const handleDayPress = (day) => {
+    setSelectedDate(day.dateString);
+  };
+
+  const pickImage = async () => {
+    // No permissions request is necessary for launching the image library
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+  
+    console.log(result);
+  
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+  
+
+  const handleBooking = async () => {
+    if (!selectedDate) {
+      Alert.alert('Please select a date first.');
+      return;
+    }
+
+    if (!userId) {
+      console.error('userId is undefined');
+      return;
+    }
+
+    const db = getFirestore();
+    try {
+      await addDoc(collection(db, 'bookings'), {
+        airplaneId,
+        renterId: userId,
+        startDate: selectedDate,
+        endDate: selectedDate,
+        status: 'pending'
+      });
+      Alert.alert('Booking request sent!');
+    } catch (error) {
+      console.error('Error adding booking:', error);
+    }
+  };
+
   return (
-    <SafeAreaView className="h-full bg-white sand">
+    <SafeAreaView className="h-full bg-white sand mt-7">
       <ScrollView>
-        <View className="pb-2 border-b-2">
+      <View className="pb-2 border-b-2">
           <Tab.Navigator
             screenOptions={{
               tabBarIndicatorStyle: "",
@@ -84,6 +118,11 @@ const Create = () => {
             <Tab.Screen name="Profile" component={RenterProfile} />
           </Tab.Navigator>
         </View>
+        <View className="flex-1 items-center justify-center bg-white">
+          <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">
+            Renter Dashboard
+          </Text>
+        </View>
         <TouchableOpacity onPress={pickImage}>
           <View className="items-center">
             <Image
@@ -100,16 +139,7 @@ const Create = () => {
             />
           </View>
         </TouchableOpacity>
-        <View className="flex-1 items-center justify-center bg-white">
-          <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">
-            Renter Dashboard
-          </Text>
-        </View>
-        <View className="pt-5">
-          <Text className="font-rubikbold text-xl text-center text-decoration-line mb-2">
-            Create your profile!
-          </Text>
-          <Formik
+        <Formik
             initialValues={{
               name: "",
               certifications: "",
@@ -178,8 +208,14 @@ const Create = () => {
               </View>
             )}
           </Formik>
-        </View>
-      </ScrollView>
+    <View>
+      <Calendar
+        onDayPress={handleDayPress}
+        markedDates={bookings}
+      />
+      <Button title="Book Airplane" onPress={handleBooking} />
+    </View>
+    </ScrollView>
     </SafeAreaView>
   );
 };
@@ -201,4 +237,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Create;
+export default BookingCalendar;

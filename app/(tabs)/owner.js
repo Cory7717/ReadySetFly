@@ -1,19 +1,21 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from "react-native";
-import React from "react";
-import { Stack, Tabs } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState } from "react";
+import {
+  View,
+  TextInput,
+  Button,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Text,
+} from "react-native";
+import { getFirestore, collection, addDoc } from "firebase/firestore";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import BookingCalendar from "../../components/BookingCalendar";
-import OwnerProfile from "../../components/OwnerProfile";
-import { Formik } from "formik";
-import { Picker, PickerItem } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 
-
-
-
-
 const Tab = createMaterialTopTabNavigator();
+
 const handleChoosePhoto = async () => {
   let result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -43,35 +45,43 @@ const pickImage = async () => {
   }
 };
 
+const AirplaneUploadForm = ({ ownerId }) => {
+  const [airplaneName, setAirplaneName] = useState("");
+  const [airplaneModel, setAirplaneModel] = useState("");
+  const [availability, setAvailability] = useState("");
 
+  const handleUpload = async () => {
+    if (!airplaneName || !airplaneModel || !availability) {
+      Alert.alert("Please fill out all fields.");
+      return;
+    }
 
-const Create = () => {
+    const db = getFirestore();
+    try {
+      await addDoc(collection(db, "airplanes"), {
+        ownerId,
+        airplaneName,
+        airplaneModel,
+        availability,
+        isBookable: true,
+      });
+      Alert.alert("Airplane listing uploaded!");
+    } catch (error) {
+      console.error("Error uploading airplane listing:", error);
+    }
+  };
+
   return (
-    <SafeAreaView className="h-full bg-white sand">
-      <ScrollView>
-        <View className="pb-2 border-b-2">
-          <Tab.Navigator
-            screenOptions={{
-              tabBarIndicatorStyle: "",
-              tabBarScrollEnabled: true,
-              textBarShowLabel: true,
-              tabBarStyle: {
-                backgroundColor: "#fff",
-                alignItems: 'center'
-              },
-            }}
-          >
-            <Tab.Screen
-              name="Booking Calendar"
-              component={BookingCalendar}
-              options={{}}
-            />
-            <Tab.Screen name="Profile" component={OwnerProfile} />
-          </Tab.Navigator>
-        </View>
-        <TouchableOpacity onPress={pickImage}>
+    <SafeAreaView className="bg-white pt-10">
+      <ScrollView className="bg-white">
+        <View className="flex-1 items-center justify-center bg-white">
+          <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">
+            Owner Dashboard
+          </Text>
+          <TouchableOpacity onPress={pickImage}>
             <View className="items-center">
-              <Image className="align-center, content-center"
+              <Image
+                className="align-center, content-center"
                 source={require("../../Assets/images/Placeholder_view_vector.png")}
                 style={{
                   width: 150,
@@ -84,19 +94,37 @@ const Create = () => {
               />
             </View>
           </TouchableOpacity>
-        <View className="flex-1 items-center justify-center bg-white">
-          <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">
-            Owner Dashboard
-          </Text>
         </View>
-        <View className="flex-1 items-center bg-white">
-          <Text className="flex-1 font-rubikregular text-regular text-#404040 justify-center text-center px-8">
-            This screen is a temporary placeholder
-          </Text>
+        <View className="pt-10 gap-5">
+          <TextInput
+            placeholder="Airplane Name"
+            value={airplaneName}
+            onChangeText={setAirplaneName}
+          />
+          <TextInput
+            placeholder="Airplane Model"
+            value={airplaneModel}
+            onChangeText={setAirplaneModel}
+          />
+          <TextInput
+            placeholder="Availability"
+            value={availability}
+            onChangeText={setAvailability}
+          />
+
+          <TouchableOpacity
+            onPress={handleUpload}
+            className="p-2 bg-black rounded-full mt-5"
+          >
+            <Text className="color-white text-center text-[18px] font-rubikbold">
+              Upload your Aircraft
+            </Text>
+          </TouchableOpacity>
+          {/* <Button title="Upload Airplane Listing" onPress={handleUpload}/> */}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-export default Create;
+export default AirplaneUploadForm;

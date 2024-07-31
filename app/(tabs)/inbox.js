@@ -5,7 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import {  createStackNavigator } from '@react-navigation/native'
 
+
+
 const Inbox = () => {
+
+
+  
   return (
     <SafeAreaView className="h-full bg-white sand">
     <ScrollView contentContainerStyle={{height: "100%"}}>

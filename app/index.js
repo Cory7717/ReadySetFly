@@ -17,7 +17,10 @@ import { useFonts } from "expo-font";
 import { images } from "../constants";
 import CustomButton from "../components/CustomButton";
 import { useGlobalContext } from "../context/GlobalProvider";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
 
+const Stack = createStackNavigator
 
 NativeWindStyleSheet.setOutput({
   default: "native",
@@ -78,9 +81,11 @@ const App = () => {
             </Text>
           </View>
         </TouchableOpacity>
+        
       </ScrollView>
-      <StatusBar backgroundColor="white" />
+     
     </SafeAreaView>
+    
   );
 };
 
