@@ -7,23 +7,33 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  ToastAndroid
+  ToastAndroid,
+  KeyboardAvoidingView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import React, { useEffect, useState } from "react";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { getFirestore, collection, getDocs, addDoc } from "firebase/firestore";
 import { app } from "../../firebaseConfig";
 import { Formik } from "formik";
 import { Picker, PickerItem } from "@react-native-picker/picker";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as ImagePicker from 'expo-image-picker'
+import * as ImagePicker from "expo-image-picker";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { useNavigation } from "@react-navigation/native";
+// import { useUser } from "@clerk/clerk-expo";
+
 
 
 const Classifieds = () => {
   const [image, setImage] = useState(null);
   const db = getFirestore(app);
+  const [loading, setLoading] = useState(false);
   const storage = getStorage();
+  // const { user } = useUser();
+  const navigation = useNavigation();
   const [categoryList, setCategoryList] = useState([]);
+  
   useEffect(() => {
     getCategoryList();
   }, []);
@@ -32,7 +42,7 @@ const Classifieds = () => {
     setCategoryList([]);
     const querySnapshot = await getDocs(collection(db, "Category"));
     querySnapshot.forEach((doc) => {
-    //   console.log("Docs:", doc.data());
+      //   console.log("Docs:", doc.data());
       setCategoryList((categoryList) => [...categoryList, doc.data()]);
     });
   };
@@ -47,7 +57,6 @@ const Classifieds = () => {
       setPhoto(null);
     }
   };
-
 
   const pickImage = async () => {
     // No permissions request is necessary for launching the image library
@@ -66,30 +75,33 @@ const Classifieds = () => {
     }
   };
 
-  const onSubmitMethod=async(value) => {
-   
-    const resp=await fetch(image);
-    const blob=await resp.blob();
-    const storageRef = ref(storage,  'airplane_listings/'+Date.now()+'.jpg');
+  const onSubmitMethod = async (value) => {
+    setLoading(true);
+    const resp = await fetch(image);
+    const blob = await resp.blob();
+    const storageRef = ref(storage, "airplane_listings/" + Date.now() + ".jpg");
 
-    uploadBytes(storageRef, blob).then((snapshot) => {
-        console.log('You Uploaded an Image')
-    }).then((resp) => {
-        getDownloadURL(storageRef).then(async(downloadUrl) => {
-            console.log(downloadUrl);
-            value.image=downloadUrl;
-            // value.userName=user.fullName;
-            // value.userEmail=user.primaryEmailAddress.emailAddress;
-            // value.userImage=user.imageUrl;
+    uploadBytes(storageRef, blob)
+      .then((snapshot) => {
+        console.log("You Uploaded an Image");
+      })
+      .then((resp) => {
+        getDownloadURL(storageRef).then(async (downloadUrl) => {
+          console.log(downloadUrl);
+          value.image = downloadUrl;
+          // value.userName = user.fullName;
+          // value.userEmail = user.primaryEmailAddress.emailAddress;
+          // value.userImage = user.imageUrl;
 
-            // Add userPost code below to upload doc info for post
-            // const docRef=await addDoc(collection(db, "UserPost"), value)
-            // if(docRef.id)
-            // { console.log("Document Added!!")}
-            
-        })
-    });
-  }
+          // Add userPost code below to upload doc info for post
+          const docRef = await addDoc(collection(db, "UserPost"), value);
+          if (docRef.id) {
+            setLoading(false);
+            Alert.alert("Your post was successfully added!");
+          }
+        });
+      });
+  };
 
   return (
     <SafeAreaView>
@@ -107,17 +119,22 @@ const Classifieds = () => {
               location: "",
               price: "",
               image: "",
+              // userName: "",
+              // userEmail: "",
+              // userImage: "",
             }}
             onSubmit={(value) => onSubmitMethod(value)}
-            validate={(values => {
-                const errors={}
-                if(!values.title)
-                {
-                    ToastAndroid.show('You must fill in the title', ToastAndroid.CENTER)
-                    errors.name="You must fill in the Title"
-                }
-                return errors
-            })}
+            validate={(values) => {
+              const errors = {};
+              if (!values.title) {
+                ToastAndroid.show(
+                  "You must fill in the title",
+                  ToastAndroid.CENTER
+                );
+                errors.name = "You must fill in the Title";
+              }
+              return errors;
+            }}
           >
             {({
               handleChange,
@@ -128,16 +145,65 @@ const Classifieds = () => {
               errors,
             }) => (
               <View>
-              <TouchableOpacity onPress={pickImage} allowMultipleSelection>
-              {image?
-              <Image source={{uri:image}} style={{width:100, height:100, borderRadius:15}} />
-              :<Image source={require('../../Assets/images/Placeholder_view_vector.png')}
-              style={{width:150, height:150, borderRadius:15}}
-               />}
-              <View className='pb-3'>
+              <View className='flex-row gap-2' horizontal={true}>
               
-              </View>
-              </TouchableOpacity>
+              <TouchableOpacity onPress={pickImage} allowMultipleSelection>
+                  {image ? (
+                    <Image
+                      source={{ uri: image }}
+                      style={{ width: 100, height: 100, borderRadius: 15 }}
+                    />
+                  ) : (
+                    <Image
+                      source={require("../../Assets/images/Placeholder_view_vector.png")}
+                      style={{ width: 150, height: 150, borderRadius: 15 }}
+                    />
+                  )}
+                  {/* <View className="pb-3"></View> */}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={pickImage} allowMultipleSelection>
+                  {image ? (
+                    <Image
+                      source={{ uri: image }}
+                      style={{ width: 100, height: 100, borderRadius: 15 }}
+                    />
+                  ) : (
+                    <Image
+                      source={require("../../Assets/images/Placeholder_view_vector.png")}
+                      style={{ width: 150, height: 150, borderRadius: 15 }}
+                    />
+                  )}
+                  {/* <View className="pb-3"></View> */}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={pickImage} allowMultipleSelection>
+                  {image ? (
+                    <Image
+                      source={{ uri: image }}
+                      style={{ width: 100, height: 100, borderRadius: 15 }}
+                    />
+                  ) : (
+                    <Image
+                      source={require("../../Assets/images/Placeholder_view_vector.png")}
+                      style={{ width: 150, height: 150, borderRadius: 15 }}
+                    />
+                  )}
+                  {/* <View className="pb-3"></View> */}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={pickImage} allowMultipleSelection>
+                  {image ? (
+                    <Image
+                      source={{ uri: image }}
+                      style={{ width: 100, height: 100, borderRadius: 15 }}
+                    />
+                  ) : (
+                    <Image
+                      source={require("../../Assets/images/Placeholder_view_vector.png")}
+                      style={{ width: 150, height: 150, borderRadius: 15 }}
+                    />
+                  )}
+                  {/* <View className="pb-3"></View> */}
+                </TouchableOpacity>
+                </View>
                 <TextInput
                   style={styles.input}
                   placeholder="Title"
@@ -165,12 +231,13 @@ const Classifieds = () => {
                   value={values?.location}
                   onChangeText={handleChange("location")}
                 />
-                <View style={{
-                    borderWidth:1, 
-                    borderRadius:15,
-                    marginTop:10
-                    
-                    }}>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderRadius: 15,
+                    marginTop: 10,
+                  }}
+                >
                   <Picker
                     selectedValue={values?.category}
                     className="border "
@@ -192,19 +259,20 @@ const Classifieds = () => {
                   onPress={handleSubmit}
                   className="p-2 bg-black rounded-full mt-5"
                 >
-                  <Text className="color-white text-center text-[20px] font-rubikbold">
+                {loading? 
+                <ActivityIndicator color='#fff'/>
+                :
+                <Text className="color-white text-center text-[20px] font-rubikbold">
                     Submit
                   </Text>
+                }
                 </TouchableOpacity>
               </View>
             )}
-            
           </Formik>
-          
         </View>
-        
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
   );
 };
 

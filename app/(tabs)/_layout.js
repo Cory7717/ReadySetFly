@@ -15,6 +15,10 @@ import {
   Octicons, 
   FontAwesome6
 } from "@expo/vector-icons";
+import { createStackNavigator } from "@react-navigation/stack";
+
+
+const Stack = createStackNavigator();
 
 NativeWindStyleSheet.setOutput({
   default: "native",

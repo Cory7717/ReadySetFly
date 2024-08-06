@@ -76,8 +76,8 @@ const Flights = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-zinc-100">
-      <ScrollView className="p-4">
+    <SafeAreaView className="flex-1 bg-zinc-100 ">
+      <ScrollView className="p-2">
         <Text className="text-2xl text-emerald-700 font-rubikblack mb-3">Ready, Set, Fly!</Text>
         <SocialMediaPost post={samplePost} />
         <SocialMediaPost post={post} />

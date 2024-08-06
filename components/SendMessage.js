@@ -1,10 +1,24 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, StyleSheet } from 'react-native';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+// import { firebase } from '../firebaseConfig';
+import tw from 'nativewind';
 
 const SendMessage = ({ userId, contactId }) => {
   const [messageText, setMessageText] = useState('');
+  const [text, setText] = useState('');
 
+
+  const sendMessage = async () => {
+    if (text.length > 0) {
+      await firebase.firestore().collection('messages').add({
+        text,
+        user: 'User1',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setText('');
+    }
+  };
   const handleSendMessage = async () => {
     if (messageText.trim() === '') return;
 
@@ -23,16 +37,16 @@ const SendMessage = ({ userId, contactId }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <TextInput
-        style={styles.input}
-        placeholder="Type a message..."
-        value={messageText}
-        onChangeText={setMessageText}
-      />
-      <Button title="Send" onPress={handleSendMessage} />
-    </View>
-  );
+    <View style={tw`flex-row items-center p-4`}>
+    <TextInput
+      style={tw`flex-1 border rounded p-2`}
+      placeholder="Type a message"
+      value={text}
+      onChangeText={setText}
+    />
+    <Button title="Send" onPress={sendMessage} />
+  </View>
+);
 };
 
 const styles = StyleSheet.create({

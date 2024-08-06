@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { getFirestore, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { firebase } from '../firebaseConfig';
+import tw from 'nativewind';
 
 const MessageList = ({ userId, contactId }) => {
   const [messages, setMessages] = useState([]);

@@ -1,12 +1,12 @@
-import { View, Text } from 'react-native'
-import React from 'react'
+import React from 'react';
+import { View, Text } from 'react-native';
 
 const UpcomingBookings = () => {
   return (
     <View>
-      <Text>UpcomingBookings</Text>
+      <Text>Upcoming Bookings</Text>
     </View>
-  )
-}
+  );
+};
 
-export default UpcomingBookings
+export default UpcomingBookings;

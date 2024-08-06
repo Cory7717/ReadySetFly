@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@clerk/clerk-expo": "^1.2.8",
+    "@react-native-firebase/app": "^20.3.0",
     "@react-native-google-signin/google-signin": "^12.2.1",
     "@react-native-picker/picker": "2.7.5",
     "@react-navigation/bottom-tabs": "^6.5.20",
@@ -30,7 +31,8 @@
     "firebase-admin": "~12.2.0",
     "formik": "^2.4.6",
     "nativewind": "^2.0.11",
-    "react": "18.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.3.1",
     "react-native": "0.74.2",
     "react-native-appwrite": "^0.4.0",
     "react-native-calendars": "^1.1306.0",

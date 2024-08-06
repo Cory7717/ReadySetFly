@@ -117,7 +117,7 @@ const AirplaneUploadForm = ({ ownerId }) => {
             className="p-2 bg-black rounded-full mt-5"
           >
             <Text className="color-white text-center text-[18px] font-rubikbold">
-              Upload your Aircraft
+              List your Aircraft
             </Text>
           </TouchableOpacity>
           {/* <Button title="Upload Airplane Listing" onPress={handleUpload}/> */}
