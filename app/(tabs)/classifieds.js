@@ -21,21 +21,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useNavigation } from "@react-navigation/native";
-// import { useUser } from "@clerk/clerk-expo";
-
-
+import Slider from "../../components/HomeScreen/Slider.js";
+import Header from "../../components/HomeScreen/Header.js";
+import * as AuthSession from "expo-auth-session";
+// import { ClerkProvider } from "@clerk/clerk-expo";
+import { useUser } from "@clerk/clerk-expo";
 
 const Classifieds = () => {
   const [image, setImage] = useState(null);
   const db = getFirestore(app);
   const [loading, setLoading] = useState(false);
   const storage = getStorage();
-  // const { user } = useUser();
+  const [sliderList, setSliderList] = useState([]);
+  const { user } = useUser();
   const navigation = useNavigation();
   const [categoryList, setCategoryList] = useState([]);
-  
+
   useEffect(() => {
     getCategoryList();
+    getSliders();
   }, []);
 
   const getCategoryList = async () => {
@@ -56,6 +60,15 @@ const Classifieds = () => {
       setDescription("");
       setPhoto(null);
     }
+  };
+
+  const getSliders = async () => {
+    setSliderList([]);
+    const querySnapshot = await getDocs(collection(db, "Sliders"));
+    querySnapshot.forEach((doc) => {
+      // doc.data() is never undefined for query doc snapshots
+      setSliderList((sliderList) => [...sliderList, doc.data()]);
+    });
   };
 
   const pickImage = async () => {
@@ -89,9 +102,9 @@ const Classifieds = () => {
         getDownloadURL(storageRef).then(async (downloadUrl) => {
           console.log(downloadUrl);
           value.image = downloadUrl;
-          // value.userName = user.fullName;
-          // value.userEmail = user.primaryEmailAddress.emailAddress;
-          // value.userImage = user.imageUrl;
+          value.userName = user.fullName;
+          value.userEmail = user.primaryEmailAddress.emailAddress;
+          value.userImage = user.imageUrl;
 
           // Add userPost code below to upload doc info for post
           const docRef = await addDoc(collection(db, "UserPost"), value);
@@ -107,6 +120,8 @@ const Classifieds = () => {
     <SafeAreaView>
       <ScrollView>
         <View className="pt-2 pl-5 pr-5 bg-white">
+                    <Header />
+        
           <Text className="font-rubikbold text-2xl">Aircraft Marketplace</Text>
           <Text className="font-rubikregular text-[20px] text-gray-500 mb-5">
             List your aircraft
@@ -119,9 +134,9 @@ const Classifieds = () => {
               location: "",
               price: "",
               image: "",
-              // userName: "",
-              // userEmail: "",
-              // userImage: "",
+              userName: "",
+              userEmail: "",
+              userImage: "",
             }}
             onSubmit={(value) => onSubmitMethod(value)}
             validate={(values) => {
@@ -145,64 +160,74 @@ const Classifieds = () => {
               errors,
             }) => (
               <View>
-              <View className='flex-row gap-2' horizontal={true}>
-              
-              <TouchableOpacity onPress={pickImage} allowMultipleSelection>
-                  {image ? (
-                    <Image
-                      source={{ uri: image }}
-                      style={{ width: 100, height: 100, borderRadius: 15 }}
-                    />
-                  ) : (
-                    <Image
-                      source={require("../../Assets/images/Placeholder_view_vector.png")}
-                      style={{ width: 150, height: 150, borderRadius: 15 }}
-                    />
-                  )}
-                  {/* <View className="pb-3"></View> */}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={pickImage} allowMultipleSelection>
-                  {image ? (
-                    <Image
-                      source={{ uri: image }}
-                      style={{ width: 100, height: 100, borderRadius: 15 }}
-                    />
-                  ) : (
-                    <Image
-                      source={require("../../Assets/images/Placeholder_view_vector.png")}
-                      style={{ width: 150, height: 150, borderRadius: 15 }}
-                    />
-                  )}
-                  {/* <View className="pb-3"></View> */}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={pickImage} allowMultipleSelection>
-                  {image ? (
-                    <Image
-                      source={{ uri: image }}
-                      style={{ width: 100, height: 100, borderRadius: 15 }}
-                    />
-                  ) : (
-                    <Image
-                      source={require("../../Assets/images/Placeholder_view_vector.png")}
-                      style={{ width: 150, height: 150, borderRadius: 15 }}
-                    />
-                  )}
-                  {/* <View className="pb-3"></View> */}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={pickImage} allowMultipleSelection>
-                  {image ? (
-                    <Image
-                      source={{ uri: image }}
-                      style={{ width: 100, height: 100, borderRadius: 15 }}
-                    />
-                  ) : (
-                    <Image
-                      source={require("../../Assets/images/Placeholder_view_vector.png")}
-                      style={{ width: 150, height: 150, borderRadius: 15 }}
-                    />
-                  )}
-                  {/* <View className="pb-3"></View> */}
-                </TouchableOpacity>
+                <View className="flex-row gap-2" horizontal={true}>
+                  <Slider sliderList={sliderList}>
+                    <TouchableOpacity
+                      onPress={pickImage}
+                      allowMultipleSelection
+                    >
+                      {image ? (
+                        <Image
+                          source={{ uri: image }}
+                          style={{ width: 100, height: 100, borderRadius: 15 }}
+                        />
+                      ) : (
+                        <Image
+                          source={require("../../Assets/images/Placeholder_view_vector.png")}
+                          style={{ width: 150, height: 150, borderRadius: 15 }}
+                        />
+                      )}
+                      {/* <View className="pb-3"></View> */}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={pickImage}
+                      allowMultipleSelection
+                    >
+                      {image ? (
+                        <Image
+                          source={{ uri: image }}
+                          style={{ width: 100, height: 100, borderRadius: 15 }}
+                        />
+                      ) : (
+                        <Image
+                          source={require("../../Assets/images/Placeholder_view_vector.png")}
+                          style={{ width: 150, height: 150, borderRadius: 15 }}
+                        />
+                      )}
+                      {/* <View className="pb-3"></View> */}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={pickImage}
+                      allowMultipleSelection
+                    >
+                      {image ? (
+                        <Image
+                          source={{ uri: image }}
+                          style={{ width: 100, height: 100, borderRadius: 15 }}
+                        />
+                      ) : (
+                        <Image
+                          source={require("../../Assets/images/Placeholder_view_vector.png")}
+                          style={{ width: 150, height: 150, borderRadius: 15 }}
+                        />
+                      )}
+                      {/* <View className="pb-3"></View> */}
+                    </TouchableOpacity>
+                  </Slider>
+                  <TouchableOpacity onPress={pickImage} allowMultipleSelection>
+                    {image ? (
+                      <Image
+                        source={{ uri: image }}
+                        style={{ width: 100, height: 100, borderRadius: 15 }}
+                      />
+                    ) : (
+                      <Image
+                        source={require("../../Assets/images/Placeholder_view_vector.png")}
+                        style={{ width: 150, height: 150, borderRadius: 15 }}
+                      />
+                    )}
+                    {/* <View className="pb-3"></View> */}
+                  </TouchableOpacity>
                 </View>
                 <TextInput
                   style={styles.input}
@@ -230,6 +255,18 @@ const Classifieds = () => {
                   placeholder="Location"
                   value={values?.location}
                   onChangeText={handleChange("location")}
+                />
+                 <TextInput
+                  style={styles.input}
+                  placeholder="User Name"
+                  value={values?.userName}
+                  onChangeText={handleChange("userName")}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  value={values?.userEmail}
+                  onChangeText={handleChange("userEmail")}
                 />
                 <View
                   style={{
@@ -259,20 +296,20 @@ const Classifieds = () => {
                   onPress={handleSubmit}
                   className="p-2 bg-black rounded-full mt-5"
                 >
-                {loading? 
-                <ActivityIndicator color='#fff'/>
-                :
-                <Text className="color-white text-center text-[20px] font-rubikbold">
-                    Submit
-                  </Text>
-                }
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text className="color-white text-center text-[20px] font-rubikbold">
+                      Submit
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             )}
           </Formik>
         </View>
       </ScrollView>
-      </SafeAreaView>
+    </SafeAreaView>
   );
 };
 

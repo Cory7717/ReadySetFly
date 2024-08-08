@@ -17,13 +17,15 @@ import { Picker } from "@react-native-picker/picker";
 import Slider from "../../components/HomeScreen/Slider.js";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import Header from "../../components/HomeScreen/Header.js";
-import TwinEngineProp from "../../components/TwinEngineProp";
-import SingleEngineProp from "../../components/SingleEngineProp";
-import SingleEnginePiston from "../../components/SingleEnginePiston";
-import TwinEnginePiston from "../../components/TwinEnginePiston";
-import PistonHelicopter from "../../components/PistonHelicopter";
-// import Categories from "../../components/Categories";
-// import LatestItemList from "../../components/LatestItemList";
+// import TwinEngineProp from "../../components/TwinEngineProp";
+// import SingleEngineProp from "../../components/SingleEngineProp";
+// import SingleEnginePiston from "../../components/SingleEnginePiston";
+// import TwinEnginePiston from "../../components/TwinEnginePiston";
+// import PistonHelicopter from "../../components/PistonHelicopter";
+import Categories from "../../components/Categories";
+import LatestItemList from "../../components/LatestItemList";
+import { ClerkLoading, ClerkProvider } from "@clerk/clerk-expo";
+import { orderBy } from "firebase/firestore";
 
 // import { useUser } from "@clerk/clerk-expo";
 
@@ -39,12 +41,12 @@ const Home = () => {
   const [sliderList, setSliderList] = useState([]);
   const [categoryList, setCategoryList] = useState([]);
   const [image, setImage] = useState(null);
-  // const [latestItemList, setLatestItemList] = useState([]);
+  const [latestItemList, setLatestItemList] = useState([]);
 
   useEffect(() => {
     getCategoryList();
     getSliders();
-    // getLatestItemList();
+    getLatestItemList();
   }, []);
 
   const handleAddListing = () => {
@@ -58,7 +60,6 @@ const Home = () => {
     }
   };
 
- 
   const handleChoosePhoto = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -98,33 +99,40 @@ const Home = () => {
     setCategoryList([]);
     const querySnapshot = await getDocs(collection(db, "Category"));
     querySnapshot.forEach((doc) => {
-      console.log("Docs:", doc.data());
+      // console.log("Docs:", doc.data());
       setCategoryList((categoryList) => [...categoryList, doc.data()]);
-    })
-  }
+    });
+  };
 
-  // const getLatestItemList = async () => {
-  //   setLatestItemList([]);
-  //   const querySnapShot = await getDocs(
-  //     collection(db, "UserPost"),
-  //     orderBy("createdAt", "desc")
-  //   );
-  //   querySnapShot.forEach((doc) => {
-  //     console.log("Docs", doc.data());
-  //     setLatestItemList((latestItemList) => [...latestItemList, doc.data()]);
-  //   });
-  // };
-
+  const getLatestItemList = async () => {
+    setLatestItemList([]);
+    const querySnapShot = await getDocs(
+      collection(db, "UserPost"),
+      orderBy("createdAt", "desc")
+    );
+    querySnapShot.forEach((doc) => {
+      // console.log("Docs", doc.data());
+      setLatestItemList((latestItemList) => [...latestItemList, doc.data()]);
+    });
+  };
 
   return (
     <>
       <SafeAreaView className="flex-1 bg-white">
-        <ScrollView>
-          <View className="pb-2 border-b-2">
-            <Text className="text-black text-center font-rubikbold text-xl">
+      <View className="flex-row pl-5 mt-5">
+        <Header  />
+        </View>
+        <View >
+        <Slider />
+        </View>
+        <Categories  />
+       
+        {/* <View className="pb-2 border-b-2"> */}
+          {/* <Text className="text-black text-center font-rubikbold text-xl">
               Search listings by type
-            </Text>
-          </View>
+            </Text> */}
+        {/* </View> */}
+        <ScrollView>
           <View>
             {/* <Tab.Navigator
             screenOptions={{
@@ -157,11 +165,11 @@ const Home = () => {
               List your aircraft
             </Text>
           </View>
-          <Header />
+
           {/* Slider  */}
-          <Slider sliderList={sliderList} />
+          {/* <Slider sliderList={sliderList} className="flex-row"/> */}
           {/* Category List  */}
-          {/* <Categories categoryList={categoryList} /> */}
+          {/* <Categories categoryList={categoryList} className="flex flex-row"/> */}
           {/* Latest Item List   */}
           {/* <LatestItemList
             latestItemList={latestItemList}
@@ -243,6 +251,10 @@ const Home = () => {
                 )}
               </View>
             ))}
+            <LatestItemList
+            latestItemList={latestItemList}
+            heading={"Latest Items"}
+          />
           </View>
         </ScrollView>
       </SafeAreaView>

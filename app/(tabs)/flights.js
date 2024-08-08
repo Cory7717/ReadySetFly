@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import SocialMediaPost from "../../components/SocialMediaPost";
 import CreateNewPost from "../../components/CreateNewPost";
 import { Ionicons } from "@expo/vector-icons";
+import Header from "../../components/HomeScreen/Header";
 
 // const buttonScale = useRef(new Animated.Value(1)).current;
 
@@ -20,23 +21,23 @@ const addPost = (newPost) => {
   setPosts((prevPosts) => [...prevPosts, newPost]);
 };
 
-// const handlePressIn = (onPress) => {
-// Animated.timing(buttonScale, {
-//   toValue: 0.5, // Scale down to 50% of original size
-//   duration: 200, // Duration of the animation
-//   useNativeDriver: true, // Use native driver for better performance
-// }).start();
-// setIsMinimized(true);
-// };
+const handlePressIn = (onPress) => {
+Animated.timing(buttonScale, {
+  toValue: 0.5, // Scale down to 50% of original size
+  duration: 200, // Duration of the animation
+  useNativeDriver: true, // Use native driver for better performance
+}).start();
+setIsMinimized(true);
+};
 
-// const handlePressOut = () => {
-// Animated.timing(buttonScale, {
-//   toValue: 1, // Scale back to original size
-//   duration: 200, // Duration of the animation
-//   useNativeDriver: true, // Use native driver for better performance
-// }).start();
-// setIsMinimized(false);
-// };
+const handlePressOut = () => {
+Animated.timing(buttonScale, {
+  toValue: 1, // Scale back to original size
+  duration: 200, // Duration of the animation
+  useNativeDriver: true, // Use native driver for better performance
+}).start();
+setIsMinimized(false);
+};
 
 const samplePost = {
   profileImage: "https://example.com/profile.jpg",
@@ -77,6 +78,7 @@ const Flights = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-zinc-100 ">
+    <Header></Header>
       <ScrollView className="p-2">
         <Text className="text-2xl text-emerald-700 font-rubikblack mb-3">Ready, Set, Fly!</Text>
         <SocialMediaPost post={samplePost} />

@@ -3,6 +3,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react'
 import { Stack, Redirect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar';
+import { ClerkProvider } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/clerk-expo'
+
+
 
 
 // const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -14,9 +18,16 @@ import { StatusBar } from 'expo-status-bar';
 
 const AuthLayout = () => {
   return (
+   
     <>
-    {/* <ClerkProvider publishableKey={publishableKey}> */}
+    
+    
     <Stack>
+    {/* <Stack.Screen
+      name="renter_sign_in"
+      options={{
+        headerShown: false
+      }} /> */}
       <Stack.Screen
       name="sign-in"
       options={{
@@ -28,10 +39,11 @@ const AuthLayout = () => {
         headerShown: false
       }} />
     </Stack>
-    {/* </ClerkProvider> */}
+   
     <StatusBar backgroundColor='white' />
   
-    </> 
+    </>
+   
   )
 }
 

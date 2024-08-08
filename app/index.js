@@ -20,6 +20,7 @@ import { useGlobalContext } from "../context/GlobalProvider";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 
+
 const Stack = createStackNavigator
 
 NativeWindStyleSheet.setOutput({
@@ -32,35 +33,41 @@ const App = () => {
   const { isLoading, isLoggedIn } = useGlobalContext;
   if (!isLoading && isLoggedIn) return <Redirect href="/home" />;
   return (
+    
     <SafeAreaView className="bg-white">
       {/* <ImageBackground source={images.background} className="bg-opacity-75"/> */}
       <ScrollView contentContainerStyle={{ height: "100%" }}>
         <View className="w-full min-h-[85px] px-12 py-10">
-          <Image source={images.logo} className="w-[250px] h-[175px] ml-5" />
+          <Image source={images.logo} className="w-[250px] h-[250px] ml-5" />
         </View>
 
         <View className="relative py-3">
-          <Text className="font-rubikregular text-2xl text-center color-teal-400 py-5">
+          {/* <Text className="font-rubikregular text-2xl text-center color-teal-400 py-5">
             Where's your next destination?
-          </Text>
+          </Text> */}
         </View>
         <CustomButton
-          title="Sign in/up for an account "
+          title="Renter - Sign in/up"
+          handlePress={() => router.push("screens/renter_sign_in")}
+          containerStyles="mx-8 mb-5  bg-black"
+        />
+        <CustomButton
+          title="Owner Sign in/up"
           handlePress={() => router.push("/sign-in")}
-          containerStyles="mx-8 mt-5  bg-black"
+          containerStyles="mx-8 mt-5 bg-black"
         />
         <CustomButton
           title="Click here to view content "
           handlePress={() => router.push("/home")}
           containerStyles="mx-10 mt-10 bg-black"
         />
-        <CustomButton
+        {/* <CustomButton
           title="Learn to Fly "
           handlePress={() => router.push("/cfi")}
           containerStyles="mx-10 mt-10 bg-black"
-        />
+        /> */}
         <View className="flex-row p-5 items-center gap-1 border-radius-15 justify-center">
-          <View>
+          <View className='pt-5'>
             <Text className="text-[14px] font-rubikblack ">
               Are you a Certified Flight instructor?
               {/* <HeaderCFI ></HeaderCFI> */}
@@ -85,7 +92,7 @@ const App = () => {
       </ScrollView>
      
     </SafeAreaView>
-    
+
   );
 };
 

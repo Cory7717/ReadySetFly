@@ -13,6 +13,7 @@ import {
 import { getFirestore, collection, addDoc } from "firebase/firestore";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import * as ImagePicker from "expo-image-picker";
+import Header from "../../components/HomeScreen/Header";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -74,6 +75,7 @@ const AirplaneUploadForm = ({ ownerId }) => {
   return (
     <SafeAreaView className="bg-white pt-10">
       <ScrollView className="bg-white">
+      <Header />
         <View className="flex-1 items-center justify-center bg-white">
           <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">
             Owner Dashboard

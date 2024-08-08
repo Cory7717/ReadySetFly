@@ -5,13 +5,15 @@ import { useFonts } from "expo-font";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/stack";
 import GlobalProvider from "../context/GlobalProvider";
-// import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
-// import { Slot } from "expo-router"
+import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
+import { Slot } from "expo-router"
+import RenterSignin from "../components/RenterSignin";
 
-// const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-// if (!publishableKey) {
-//   throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env')
-// }
+
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+if (!publishableKey) {
+  throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env')
+}
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,21 +37,30 @@ const RootLayout = () => {
 
   return (
     <GlobalProvider>
+    <ClerkProvider publishableKey={publishableKey}>
+      <ClerkLoaded>
       <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="(tabs)"
-          options={{
-            headerShown: false,
-          }}
-        />
-
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
-        <Stack.Screen name="cfi" options={{ headerShown: false }} />
-        {/* <Stack.Screen name="renterProfile" options={{ headerShown: true }} /> */}
+        {/* <Stack.Navigator> */}
         
-      </Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="(tabs)"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="screens/renter_sign_in"  options={{ headerShown: false }} />
+          <Stack.Screen
+            name="search/[query]"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="cfi" options={{ headerShown: false }} />
+          {/* <Stack.Screen name="renterProfile" options={{ headerShown: true }} /> */}
+        {/* </Stack.Navigator> */}
+        </Stack>
+      </ClerkLoaded>
+    </ClerkProvider>
     </GlobalProvider>
   );
 };

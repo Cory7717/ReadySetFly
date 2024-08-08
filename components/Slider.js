@@ -10,10 +10,10 @@ export default function Slider({sliderList}) {
             showsHorizontalScrollIndicator={false}
             renderItem={({item,index})=>(
                 <View>
-                    {/* <Image source={{uri:item?.image}} 
+                    <Image source={{uri:item?.image}} 
                         className="h-[160px] w-[330px] mr-3 rounded-lg
                         object-cover"
-                    /> */}
+                    />
                 </View>
             )}
         />
