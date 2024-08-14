@@ -12,72 +12,35 @@ const UploadButtonText = styled(Text, 'text-white text-center ml-2');
 const SubmitButton = styled(Button, 'bg-blue-500 p-2 rounded-lg');
 const ShowFormButton = styled(TouchableOpacity, 'bg-green-500 p-2 rounded-lg mt-4');
 
-const MinimizeButton = () => {
-  const [isMinimized, setIsMinimized] = useState(false);
-  const buttonScale = useRef(new Animated.Value(1)).current; // Initial scale
-}
-
-const handlePressIn = (onPress) => {
-  Animated.timing(buttonScale, {
-    toValue: 0.5, // Scale down to 50% of original size
-    duration: 200, // Duration of the animation
-    useNativeDriver: true, // Use native driver for better performance
-  }).start();
-  setIsMinimized(true);
-};
-
-const handlePressOut = () => {
-  Animated.timing(buttonScale, {
-    toValue: 1, // Scale back to original size
-    duration: 200, // Duration of the animation
-    useNativeDriver: true, // Use native driver for better performance
-  }).start();
-  setIsMinimized(false);
-};
-
-
 const CreateNewPost = ({ onSubmit }) => {
   const [content, setContent] = useState('');
   const [image, setImage] = useState(null);
-  // const [location, setLocation] = useState(null);
   const [tags, setTags] = useState('');
   const [showForm, setShowForm] = useState(false);
-  
 
-  
+  const buttonSize = useRef(new Animated.Value(150)).current; // Initial size of button
+  const scrollY = useRef(new Animated.Value(0)).current; // Corrected initialization
 
-  // const buttonSize = useRef(new Animated.Value(150)).current; // Initial size of button
+  useEffect(() => {
+    Animated.timing(buttonSize, {
+      toValue: showForm ? 200 : 150, // Expand when showing form, shrink otherwise
+      duration: 300, // Duration of the animation
+      useNativeDriver: false, // Not using native driver since we're animating width and height
+    }).start();
+  }, [showForm]);
 
-  // const scrollY = useRef(new.target.Value(0)).current;
-  // const handleScroll = Animated.event(
-  //   [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-  //   { useNativeDriver: false }
-  // );
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission to access location was denied');
+        return;
+      }
 
-  
-
-  // The animated effect is not showing the new post form correctly
-
-  // useEffect(() => {
-  //   Animated.timing(buttonSize, {
-  //     toValue: showForm ? 200 : 50, // Expand when showing form, shrink otherwise
-  //     duration: 300, // Duration of the animation
-  //     useNativeDriver: false, // Not using native driver since we're animating width and height
-  //   }).start();
-  // }, [showForm]);
-
-  // useEffect(() => {
-  //   (async () => {
-  //     let { status } = await Location.requestForegroundPermissionsAsync();
-  //     if (status !== 'granted') {
-  //       alert('Permission to access location was denied');
-  //       return;
-  //     }
-
-  //     let location = await Location.getCurrentPositionAsync({});
-  //     setLocation(location);
-  //   })();
-  // }, []);
+      let location = await Location.getCurrentPositionAsync({});
+      // Assuming you need to use the location
+    })();
+  }, []);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -93,10 +56,7 @@ const CreateNewPost = ({ onSubmit }) => {
   };
 
   const handleSubmit = () => {
-    // Ensure tags is always a string
-    const tagsString = tags || '';
-    // Ensure split results in an array
-    const tagsArray = Array.isArray(tagsString.split(',')) ? tagsString.split(',') : [];
+    const tagsArray = (tags || '').split(',').map(tag => tag.trim());
 
     const newPost = {
       userName: 'Current User',
@@ -104,8 +64,7 @@ const CreateNewPost = ({ onSubmit }) => {
       time: 'Just now',
       content,
       image,
-      // location: { coords: { latitude: 37.7749, longitude: -122.4194 } }, // Example location
-      tags: tagsArray.map(tag => tag.trim()), // Convert tags string to an array
+      tags: tagsArray,
       likes: 0,
       comments: 0,
     };
@@ -118,42 +77,38 @@ const CreateNewPost = ({ onSubmit }) => {
   };
 
   return (
-    
     <Container>
-      {showForm ? (
-        <View>
-          <Input
-            placeholder="What's on your mind?"
-            value={content}
-            onChangeText={setContent}
-            multiline
-          />
-          <Input
-            placeholder="Tag users (comma separated)"
-            value={tags}
-            onChangeText={setTags}
-          />
+      <Animated.View style={{ width: buttonSize, height: buttonSize }}>
+        {showForm ? (
           <View>
-          <UploadButton  onPress={pickImage}>
-            <Ionicons name="camera-outline" size={36} color="green" />
-            <FontAwesome6 name="user-tag" size={24} color="green" />
-            {/* <UploadButtonText>Upload Image</UploadButtonText> */}
-          </UploadButton>
+            <Input
+              placeholder="What's on your mind?"
+              value={content}
+              onChangeText={setContent}
+              multiline
+            />
+            {/* <Input
+              placeholder="Tag users (comma separated)"
+              value={tags}
+              onChangeText={setTags}
+            /> */}
+            <View className='flex-1'>
+              <UploadButton onPress={pickImage}>
+                <Ionicons name="camera-outline" size={36} color="green" />
+                {/* <FontAwesome6 name="user-tag" size={24} color="green" /> */}
+                <UploadButtonText>Upload Image</UploadButtonText>
+              </UploadButton>
+            </View>
+            {image && <Image source={{ uri: image }} style={{ width: '100%', height: 200, marginBottom: 10 }} />}
+            
           </View>
-          {image && <Image source={{ uri: image }} style={{ width: '100%', height: 200, marginBottom: 10 }} />}
-          {/* <Text>Location: {location ? `${location.coords.latitude}, ${location.coords.longitude}` : 'Fetching location...'}</Text> */}
-          <SubmitButton title="Post" onPress={handleSubmit} />
-        </View>
-      ) : (
-        
-
-        <ShowFormButton onPress={() => setShowForm(true)}>
-          <Text style={{ color: 'green', textAlign: 'center' }}>Create New Post</Text>
-        </ShowFormButton>
-       
-      )}
+        ) : (
+          <ShowFormButton onPress={() => setShowForm(true)}>
+            <Text style={{ color: 'green', textAlign: 'center' }}>Create New Post</Text>
+          </ShowFormButton>
+        )}
+      </Animated.View>
     </Container>
-    
   );
 };
 
