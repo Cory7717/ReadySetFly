@@ -13,10 +13,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { db } from "../../firebaseConfig";
 import { collection, getDocs } from "firebase/firestore"; // Ensure this import is correct
-import { Picker } from "@react-native-picker/picker";
+import { Picker, } from "@react-native-picker/picker";
 import Slider from "../../components/HomeScreen/Slider.js";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import Header from "../../components/HomeScreen/Header.js";
+import { Header } from "../../components";
 // import TwinEngineProp from "../../components/TwinEngineProp";
 // import SingleEngineProp from "../../components/SingleEngineProp";
 // import SingleEnginePiston from "../../components/SingleEnginePiston";
@@ -26,13 +26,13 @@ import Categories from "../../components/Categories";
 import LatestItemList from "../../components/LatestItemList";
 import { ClerkLoading, ClerkProvider } from "@clerk/clerk-expo";
 import { orderBy } from "firebase/firestore";
-
-// import { useUser } from "@clerk/clerk-expo";
+import { Ionicons } from "@expo/vector-icons";
+import { useUser } from "@clerk/clerk-expo";
 
 const Tab = createMaterialTopTabNavigator();
 
 const Home = () => {
-  // const {user}=useUser();
+  const { user } = useUser();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -119,20 +119,39 @@ const Home = () => {
   return (
     <>
       <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row pl-5 mt-5">
-        <Header  />
+      <ScrollView>
+        <View className="flex-row gap-2 pt-3 ml-2">
+          <Image
+            source={{ uri: user?.imageUrl }}
+            className="rounded-full w-12 h-12"
+          />
+          <View>
+            <Text className="text-[16px]">Welcome</Text>
+            <Text className="text-[20px] font-bold">{user?.fullName}</Text>
+{/*           
+          <View
+            className="p-[9px] px-5 flex-row 
+          bg-white mt-2 rounded-full 
+        border-[1px] border-blue-300"
+          >
+            <Ionicons name="search" size={24} color="gray" />
+            <TextInput
+              placeholder="Search"
+              // className="ml-2 text-[18px]"
+              onChangeText={(value) => console.log(value)}
+            />
+          </View> */}
+          </View>
+          <Slider />
         </View>
-        <View >
-        <Slider />
-        </View>
-        <Categories  />
-       
-        {/* <View className="pb-2 border-b-2"> */}
-          {/* <Text className="text-black text-center font-rubikbold text-xl">
+        <Categories />
+
+        {/* <View className="pb-2 border-b-2">
+          <Text className="text-black text-center font-rubikbold text-xl">
               Search listings by type
-            </Text> */}
-        {/* </View> */}
-        <ScrollView>
+            </Text>
+        </View> */}
+        
           <View>
             {/* <Tab.Navigator
             screenOptions={{
@@ -165,16 +184,6 @@ const Home = () => {
               List your aircraft
             </Text>
           </View>
-
-          {/* Slider  */}
-          {/* <Slider sliderList={sliderList} className="flex-row"/> */}
-          {/* Category List  */}
-          {/* <Categories categoryList={categoryList} className="flex flex-row"/> */}
-          {/* Latest Item List   */}
-          {/* <LatestItemList
-            latestItemList={latestItemList}
-            heading={"Latest Items"}
-          /> */}
           <TouchableOpacity onPress={pickImage}>
             <View className="items-center">
               <Image
@@ -252,9 +261,9 @@ const Home = () => {
               </View>
             ))}
             <LatestItemList
-            latestItemList={latestItemList}
-            heading={"Latest Items"}
-          />
+              latestItemList={latestItemList}
+              heading={"Latest Items"}
+            />
           </View>
         </ScrollView>
       </SafeAreaView>

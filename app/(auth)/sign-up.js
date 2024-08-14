@@ -1,6 +1,7 @@
-import { View, Text, ScrollView, Dimensions, Alert, Image } from 'react-native';
+import React from 'react';
+import { View, Text, ScrollView, Dimensions, Alert, Image, TextInput, Button } from 'react-native';
 import { useState } from 'react';
-import { Link, router } from 'expo-router';
+import { Link, router, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { images } from "../../constants";
 import FormField from '../../components/FormField';
@@ -9,40 +10,96 @@ import { StatusBar } from 'expo-status-bar';
 import { createUser, setUser } from '../../lib/appwrite';
 import { signUp } from '../../lib/appwrite';
 import { useGlobalContext } from '../../context/GlobalProvider';
+import { SignedIn, SignedOut, useUser, useSignUp } from '@clerk/clerk-expo'
 
 
 
 const SignUp = () => {
-  const { setUser, setIsLogged } = useGlobalContext();
-  const [isSubmitting, setSubmitting] = useState(false)
-  const [form, setForm] = useState({
-    username: "",
-    email: "",
-    password: "",
-  });
+  const { isLoaded, signUp, setActive } = useSignUp()
+  const router = useRouter()
 
-  
-  
-  const submit = async () => {
-    if(form.email ==="" || form.password ==="") {
-      Alert.alert('Error', 'Please fill in the required fields')
+  const [emailAddress, setEmailAddress] = React.useState('')
+  const [password, setPassword] = React.useState('')
+  const [pendingVerification, setPendingVerification] = React.useState(false)
+  const [code, setCode] = React.useState('')
+
+  const onSignUpPress = async () => {
+    if (!isLoaded) {
+      return
     }
 
-    setSubmitting(true);
-    
     try {
-      const result = await createUser(form.email, form.password, form.username);
-      setUser(result);
-      setIsLogged(true);
+      await signUp.create({
+        emailAddress,
+        password,
+      })
 
-      router.replace('/home');
-    } catch (error) {
-        Alert.alert('Error', error.message)
-    }  finally {
-      
-      setSubmitting(false);
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
+
+      setPendingVerification(true)
+    } catch (err) {
+      // See https://clerk.com/docs/custom-flows/error-handling
+      // for more info on error handling
+      console.error(JSON.stringify(err, null, 2))
     }
-  };
+  }
+
+  const onPressVerify = async () => {
+    if (!isLoaded) {
+      return
+    }
+
+    try {
+      const completeSignUp = await signUp.attemptEmailAddressVerification({
+        code,
+      })
+
+      if (completeSignUp.status === 'complete') {
+        await setActive({ session: completeSignUp.createdSessionId })
+        router.replace('/')
+      } else {
+        console.error(JSON.stringify(completeSignUp, null, 2))
+      }
+    } catch (err) {
+      // See https://clerk.com/docs/custom-flows/error-handling
+      // for more info on error handling
+      console.error(JSON.stringify(err, null, 2))
+    }
+  }
+  
+  
+  
+  
+  // const { setUser, setIsLogged } = useGlobalContext();
+  // const [isSubmitting, setSubmitting] = useState(false)
+  // const [form, setForm] = useState({
+  //   username: "",
+  //   email: "",
+  //   password: "",
+  // });
+
+  
+  
+  // const submit = async () => {
+  //   if(form.email ==="" || form.password ==="") {
+  //     Alert.alert('Error', 'Please fill in the required fields')
+  //   }
+
+  //   setSubmitting(true);
+    
+  //   try {
+  //     const result = await createUser(form.email, form.password, form.username);
+  //     setUser(result);
+  //     setIsLogged(true);
+
+  //     router.replace('/home');
+  //   } catch (error) {
+  //       Alert.alert('Error', error.message)
+  //   }  finally {
+      
+  //     setSubmitting(false);
+  //   }
+  // };
 
   return (
     <SafeAreaView className="bg-white h-full">
@@ -55,7 +112,33 @@ const SignUp = () => {
           />
         </View>
 
-        <View className=' mt-1 justify-center items-center'>
+        <View>
+      {!pendingVerification && (
+        <>
+          <TextInput
+            autoCapitalize="none"
+            value={emailAddress}
+            placeholder="Email..."
+            onChangeText={(email) => setEmailAddress(email)}
+          />
+          <TextInput
+            value={password}
+            placeholder="Password..."
+            secureTextEntry={true}
+            onChangeText={(password) => setPassword(password)}
+          />
+          <Button title="Sign Up" onPress={onSignUpPress} />
+        </>
+      )}
+      {pendingVerification && (
+        <>
+          <TextInput value={code} placeholder="Code..." onChangeText={(code) => setCode(code)} />
+          <Button title="Verify Email" onPress={onPressVerify} />
+        </>
+      )}
+    </View>
+
+        {/* <View className=' mt-1 justify-center items-center'>
           <Text className='text-2xl font-rubikblack justify-center items-center'>
             Sign up for Ready, Set, Fly!
           </Text>
@@ -93,7 +176,7 @@ const SignUp = () => {
             </Link>
            </View>
          
-        </View>
+        </View> */}
       </ScrollView>
       <StatusBar backgroundColor='white' />
     </SafeAreaView>

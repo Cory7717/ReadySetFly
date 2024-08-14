@@ -19,6 +19,8 @@ import CustomButton from "../components/CustomButton";
 import { useGlobalContext } from "../context/GlobalProvider";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-expo'
+
 
 
 const Stack = createStackNavigator
@@ -30,6 +32,7 @@ NativeWindStyleSheet.setOutput({
   /* Index screen will be the initial login/sign up with Google or create account*/
 }
 const App = () => {
+  const { user } = useUser()
   const { isLoading, isLoggedIn } = useGlobalContext;
   if (!isLoading && isLoggedIn) return <Redirect href="/home" />;
   return (
@@ -46,6 +49,19 @@ const App = () => {
             Where's your next destination?
           </Text> */}
         </View>
+        <View className='pb-5 items-center'>
+      <SignedIn>
+        <Text>Hello {user?.emailAddresses[0].emailAddress}</Text>
+      </SignedIn>
+      <SignedOut>
+        <Link href="/sign-in">
+          <Text>Sign In</Text>
+        </Link>
+        <Link href="/sign-up">
+          <Text>Sign Up</Text>
+        </Link>
+      </SignedOut>
+    </View>
         <CustomButton
           title="Renter - Sign in/up"
           handlePress={() => router.push("screens/renter_sign_in")}

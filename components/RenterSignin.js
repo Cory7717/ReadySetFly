@@ -47,28 +47,23 @@ export default function Page() {
 
   return (
     <SafeAreaView>
-      <View>
-        <FormField
-          autoCapitalize="none"
-          value={emailAddress}
-          placeholder="Email..."
-          onChangeText={(emailAddress) => setEmailAddress(emailAddress)}
-        />
-      </View>
-      <FormField
+    {/* <View>
+      <TextInput
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Email..."
+        onChangeText={(emailAddress)=> setEmailAddress(emailAddress)}
+      />
+      <TextInput
         value={password}
         placeholder="Password..."
         secureTextEntry={true}
-        onChangeText={(password) => setPassword(password)}
+        onChangeText={(password)=> setPassword(password)}
       />
-      <View className="pt-5">
-        <CustomButton
-          containerStyles="mt-5 bg-black mb-5"
-          title="Sign In"
-          onPress={onSignInPress}
-        />
-      </View>
+      </View> */}
+      <Button title="Sign In" onPress={onSignInPress} />
 
+{/*       
       <View className="justify-center flex-row">
             <Text className="text-lg font-rubikregular text-#404040">
               Don't have a Renter account?
@@ -78,7 +73,7 @@ export default function Page() {
               className="text-lg font-rubikbold text-emerald-700">
               Sign Up
             </Link>
-          </View>
+          </View> */}
     </SafeAreaView>
   );
 }

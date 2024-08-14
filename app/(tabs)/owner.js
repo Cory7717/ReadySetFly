@@ -13,7 +13,7 @@ import {
 import { getFirestore, collection, addDoc } from "firebase/firestore";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import * as ImagePicker from "expo-image-picker";
-import Header from "../../components/HomeScreen/Header";
+import { Header } from "../../components";
 
 const Tab = createMaterialTopTabNavigator();
 

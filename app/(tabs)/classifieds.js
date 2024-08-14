@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { getFirestore, collection, getDocs, addDoc } from "firebase/firestore";
@@ -22,10 +23,11 @@ import * as ImagePicker from "expo-image-picker";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useNavigation } from "@react-navigation/native";
 import Slider from "../../components/HomeScreen/Slider.js";
-import Header from "../../components/HomeScreen/Header.js";
+import { Header, HeaderCFI } from "../../components";
 import * as AuthSession from "expo-auth-session";
 // import { ClerkProvider } from "@clerk/clerk-expo";
 import { useUser } from "@clerk/clerk-expo";
+import { Ionicons } from "@expo/vector-icons";
 
 const Classifieds = () => {
   const [image, setImage] = useState(null);
@@ -117,11 +119,34 @@ const Classifieds = () => {
   };
 
   return (
-    <SafeAreaView>
+    <SafeAreaView className='bg-white'>
+   
       <ScrollView>
         <View className="pt-2 pl-5 pr-5 bg-white">
-                    <Header />
-        
+        <View className="flex-row gap-2">
+          <Image
+            source={{ uri: user?.imageUrl }}
+            className="rounded-full w-12 h-12"
+          />
+          <View className='pb-5'>
+            <Text className="text-[16px]">Welcome</Text>
+            <Text className="text-[20px] font-bold">{user?.fullName}</Text>
+          
+          <View
+            className="p-[9px] px-5 pb- flex-row 
+          bg-white mt-2 rounded-full 
+        border-[1px] border-blue-300"
+          >
+            <Ionicons name="search" size={24} color="gray" />
+            <TextInput
+              placeholder="Search"
+              // className="ml-2 text-[18px]"
+              onChangeText={(value) => console.log(value)}
+            />
+          </View>
+          </View>
+          <Slider />
+        </View>
           <Text className="font-rubikbold text-2xl">Aircraft Marketplace</Text>
           <Text className="font-rubikregular text-[20px] text-gray-500 mb-5">
             List your aircraft
@@ -256,7 +281,7 @@ const Classifieds = () => {
                   value={values?.location}
                   onChangeText={handleChange("location")}
                 />
-                 <TextInput
+                <TextInput
                   style={styles.input}
                   placeholder="User Name"
                   value={values?.userName}

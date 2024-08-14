@@ -27,7 +27,7 @@ import RenterProfile from "../../components/RenterProfile";
 import { Formik } from "formik";
 import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
-import { getStorage, ref, uploadBytes, airplaneId } from "firebase/storage";
+import { getStorage, ref, uploadBytes } from "firebase/storage";
 import { app } from "../../firebaseConfig";
 import renterProfile from "../renterProfile";
 
@@ -252,6 +252,8 @@ const BookingCalendar = ({ airplaneId, userId }) => {
             transparent={true}
             animationType="slide"
           >
+          {/* <BookingCalendar airplaneId={airplaneId} userId={yourUserId} /> */}
+
             <View style={styles.modalContainer}>
               <Calendar onDayPress={onDayPress} markedDates={selectedDates} />
               <TouchableOpacity

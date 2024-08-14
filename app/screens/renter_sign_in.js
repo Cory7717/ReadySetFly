@@ -1,35 +1,95 @@
-import { View, Text, Image, SafeAreaView} from "react-native";
-import { Link } from "expo-router";
+import {
+  View,
+  Text,
+  Image,
+  SafeAreaView,
+  TextInput,
+  Button,
+} from "react-native";
+import { Link, useRouter } from "expo-router";
 import React from "react";
-import RenterSignin from "../../components/RenterSignin";
 import { images } from "../../constants";
+import { useSignIn } from "@clerk/clerk-expo";
 
-const renter_sign_in = () => {
+const RenterSignIn = () => {
+  const { signIn, setActive, isLoaded } = useSignIn();
+  const router = useRouter();
+
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+
+  const onSignInPress = React.useCallback(async () => {
+    if (!isLoaded) {
+      return;
+    }
+
+    try {
+      const trimmedEmail = emailAddress.trim();
+      const signInAttempt = await signIn.create({
+        identifier: trimmedEmail,
+        password,
+      });
+      // const signInAttempt = await signIn.create({
+      //   identifier: emailAddress,
+      //   password,
+      // });
+
+      if (signInAttempt.status === "complete") {
+        await setActive({ session: signInAttempt.createdSessionId });
+        router.replace("/");
+      } else {
+        console.error(JSON.stringify(signInAttempt, null, 2));
+      }
+    } catch (err) {
+      console.error(JSON.stringify(err, null, 2));
+    }
+  }, [isLoaded, emailAddress, password]);
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-1 pt-10 h-10">
-        <View className="items-center bg-white">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+      <View style={{ flex: 1, paddingTop: 10 }}>
+        <View style={{ alignItems: "center", backgroundColor: "white" }}>
           <Image
             source={images.logo}
             resizeMode="contain"
-            className="w-[300px] h-[300px]"
+            style={{ width: 300, height: 300 }}
           />
-         
-        <RenterSignin></RenterSignin>
+          
+          <View style={{ borderWidth: 1, width: "100%", height: 40, marginBottom: 10 }}>
+            <TextInput
+              autoCapitalize="none"
+              value={emailAddress}
+              placeholder="Email..."
+              onChangeText={(emailAddress) => setEmailAddress(emailAddress)}
+              style={{ flex: 1, paddingHorizontal: 8 }}
+            />
+          </View>
+          <View style={{ borderWidth: 1, width: "100%", height: 40, marginBottom: 10 }}>
+            <TextInput
+              value={password}
+              placeholder="Password..."
+              secureTextEntry={true}
+              onChangeText={(password) => setPassword(password)}
+              style={{ flex: 1, paddingHorizontal: 8 }}
+            />
+          </View>
+          <Button title="Sign In" onPress={onSignInPress} style={{}} />
         </View>
-        {/* <View className="justify-center pt-5 flex-row gap-2">
-            <Text className="text-lg font-rubikregular text-#404040">
-              Don't have an account?
-            </Text>
-            <Link
-              href="/sign-up"
-              className="text-lg font-rubikbold text-emerald-700">
-              Sign Up
-            </Link>
-          </View> */}
+
+        <View style={{ justifyContent: "center", paddingTop: 5, flexDirection: "row", gap: 2 }}>
+          <Text style={{ fontSize: 16, color: "#404040", fontFamily: "Rubik-Regular" }}>
+            Don't have an account?
+          </Text>
+          <Link
+            href="/sign-up"
+            style={{ fontSize: 16, color: "emerald-700", fontFamily: "Rubik-Bold" }}
+          >
+            Sign Up
+          </Link>
+        </View>
       </View>
     </SafeAreaView>
   );
 };
 
-export default renter_sign_in;
+export default RenterSignIn;

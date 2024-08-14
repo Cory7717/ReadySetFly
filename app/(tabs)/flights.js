@@ -6,6 +6,8 @@ import {
   Animated,
   onPressIn,
   onPressOut,
+  Image, 
+  TextInput
 } from "react-native";
 import React, { useState, useRef } from "react";
 import { Stack, Tabs } from "expo-router";
@@ -13,12 +15,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import SocialMediaPost from "../../components/SocialMediaPost";
 import CreateNewPost from "../../components/CreateNewPost";
 import { Ionicons } from "@expo/vector-icons";
-import Header from "../../components/HomeScreen/Header";
+import { Header } from "../../components";
+import { useUser } from "@clerk/clerk-expo";
+
+
 
 // const buttonScale = useRef(new Animated.Value(1)).current;
 
 const addPost = (newPost) => {
   setPosts((prevPosts) => [...prevPosts, newPost]);
+ 
 };
 
 const handlePressIn = (onPress) => {
@@ -71,16 +77,43 @@ const post1 = {
 
 const Flights = () => {
   const [posts, setPosts] = useState(samplePost);
-
+  const { user } = useUser();
   const addPost = (newPost) => {
     setPosts((prevPosts) => [...prevPosts, newPost]);
   };
 
   return (
     <SafeAreaView className="flex-1 bg-zinc-100 ">
-    <Header></Header>
-      <ScrollView className="p-2">
-        <Text className="text-2xl text-emerald-700 font-rubikblack mb-3">Ready, Set, Fly!</Text>
+    <ScrollView>
+    <View className="pt-2 pl-5 pr-5 bg-white">
+        <View className="flex-row gap-2">
+          <Image
+            source={{ uri: user?.imageUrl }}
+            className="rounded-full w-12 h-12"
+          />
+          <View className='pb-5'>
+            <Text className="text-[16px]">Welcome</Text>
+            <Text className="text-[20px] font-bold">{user?.fullName}</Text>
+            
+          
+          {/* <View
+            className="p-[9px] px-5 pb- flex-row 
+          bg-white mt-2 rounded-full 
+        border-[1px] border-blue-300"
+          >
+            <Ionicons name="search" size={24} color="gray" />
+            <TextInput
+              placeholder="Search"
+              // className="ml-2 text-[18px]"
+              onChangeText={(value) => console.log(value)}
+            />
+          </View> */}
+          </View>
+          {/* <Text className="text-[16px] text-emerald-700 font-rubikblack mb-3">Ready, Set, Fly!</Text> */}
+        </View>
+        </View>
+      
+        
         <SocialMediaPost post={samplePost} />
         <SocialMediaPost post={post} />
         <SocialMediaPost post={post1} />
