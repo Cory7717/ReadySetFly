@@ -9,9 +9,10 @@ import {
   ActivityIndicator,
   Alert,
   SafeAreaView,
+  Button
 } from "react-native";
 import React, { useEffect, useState } from "react";
-import { getFirestore, collection, getDocs, addDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, addDoc, orderBy } from "firebase/firestore";
 import { app } from "../../firebaseConfig";
 import { Formik } from "formik";
 import { Picker } from "@react-native-picker/picker";
@@ -22,13 +23,19 @@ import Slider from "../../components/HomeScreen/Slider.js";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/clerk-expo";
 import LatestItemList from "../../components/HomeScreen/LatestItemList";
+import bgImage from "../../Assets/images/rsf_backgroundImage.png";
+import { StatusBar } from "expo-status-bar";
 
 const Classifieds = () => {
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sliderList, setSliderList] = useState([]);
   const [categoryList, setCategoryList] = useState([]);
-  const [showForm, setShowForm] = useState(false); // State to toggle form visibility
+  const [showForm, setShowForm] = useState(false);
+  const [latestItemList, setLatestItemList] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+
   const db = getFirestore(app);
   const storage = getStorage();
   const { user } = useUser();
@@ -37,6 +44,7 @@ const Classifieds = () => {
   useEffect(() => {
     getCategoryList();
     getSliders();
+    getLatestItemList();
   }, []);
 
   const getCategoryList = async () => {
@@ -52,6 +60,17 @@ const Classifieds = () => {
     const querySnapshot = await getDocs(collection(db, "Sliders"));
     querySnapshot.forEach((doc) => {
       setSliderList((prevList) => [...prevList, doc.data()]);
+    });
+  };
+
+  const getLatestItemList = async () => {
+    setLatestItemList([]);
+    const querySnapShot = await getDocs(
+      collection(db, "UserPost"),
+      orderBy("createdAt", "desc")
+    );
+    querySnapShot.forEach((doc) => {
+      setLatestItemList((latestItemList) => [...latestItemList, doc.data()]);
     });
   };
 
@@ -94,6 +113,18 @@ const Classifieds = () => {
       });
   };
 
+  const filterListings = () => {
+    return latestItemList.filter(item => {
+      const location = item.location || "";
+      const category = item.category || "";
+
+      const matchesLocation = location.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory ? category === selectedCategory : true;
+
+      return matchesLocation && matchesCategory;
+    });
+  };
+
   return (
     <SafeAreaView>
       <ScrollView>
@@ -107,12 +138,13 @@ const Classifieds = () => {
               <Text className="text-lg">Welcome</Text>
               <Text className="text-xl font-bold">{user?.fullName}</Text>
 
-              <View className="flex-row items-center bg-white mt-2 rounded-full border border-blue-500 px-4 py-2 w-full self-center">
+              <View className="flex-row items-center bg-white mt-2 rounded-full border border-blue-500 px-4 py-2 w-full self-center mr-3">
                 <Ionicons name="search" size={24} color="gray" />
                 <TextInput
                   placeholder="Search"
                   className="flex-1 ml-3"
-                  onChangeText={(value) => console.log(value)}
+                  onChangeText={(value) => setSearchTerm(value)}
+                  value={searchTerm}
                 />
               </View>
             </View>
@@ -127,7 +159,7 @@ const Classifieds = () => {
             onPress={() => setShowForm(!showForm)}
           >
             <Text className="text-white text-lg font-bold">
-              {showForm ? "Hide Form" : "List your Aircraft for sale!"}
+              {showForm ? "Show Listings" : "List your Aircraft for sale!"}
             </Text>
           </TouchableOpacity>
 
@@ -242,7 +274,6 @@ const Classifieds = () => {
                             />
                           ))}
                       </Picker>
-                      {/* <LatestItemList /> */}
                     </View>
                     <TouchableOpacity
                       onPress={handleSubmit}
@@ -261,6 +292,16 @@ const Classifieds = () => {
               </Formik>
             </View>
           )}
+
+          {/* The below section should be able to press the listing which opens the listing on a full page that shows detailed listing info */}
+
+          <View className='text-[24px] text-xl font-rubikbold items-center text-center'>
+            <LatestItemList
+              latestItemList={filterListings()}
+              heading={"Current Listings"}
+              font='rubikbold'
+            />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
