@@ -12,24 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs } from "firebase/firestore"; // Ensure this import is correct
-import { Picker, } from "@react-native-picker/picker";
+import { collection, getDocs, orderBy } from "firebase/firestore";
+import { Picker } from "@react-native-picker/picker";
 import Slider from "../../components/HomeScreen/Slider.js";
-import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import { Header } from "../../components";
-// import TwinEngineProp from "../../components/TwinEngineProp";
-// import SingleEngineProp from "../../components/SingleEngineProp";
-// import SingleEnginePiston from "../../components/SingleEnginePiston";
-// import TwinEnginePiston from "../../components/TwinEnginePiston";
-// import PistonHelicopter from "../../components/PistonHelicopter";
-import Categories from "../../components/Categories";
-import LatestItemList from "../../components/LatestItemList";
-import { ClerkLoading, ClerkProvider } from "@clerk/clerk-expo";
-import { orderBy } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/clerk-expo";
-
-const Tab = createMaterialTopTabNavigator();
+import Categories from "../../components/Categories";
+import LatestItemList from "../../components/LatestItemList";
 
 const Home = () => {
   const { user } = useUser();
@@ -42,6 +31,7 @@ const Home = () => {
   const [categoryList, setCategoryList] = useState([]);
   const [image, setImage] = useState(null);
   const [latestItemList, setLatestItemList] = useState([]);
+  const [showListings, setShowListings] = useState(false); // State to toggle listings visibility
 
   useEffect(() => {
     getCategoryList();
@@ -90,7 +80,6 @@ const Home = () => {
     setSliderList([]);
     const querySnapshot = await getDocs(collection(db, "Sliders"));
     querySnapshot.forEach((doc) => {
-      // doc.data() is never undefined for query doc snapshots
       setSliderList((sliderList) => [...sliderList, doc.data()]);
     });
   };
@@ -99,7 +88,6 @@ const Home = () => {
     setCategoryList([]);
     const querySnapshot = await getDocs(collection(db, "Category"));
     querySnapshot.forEach((doc) => {
-      // console.log("Docs:", doc.data());
       setCategoryList((categoryList) => [...categoryList, doc.data()]);
     });
   };
@@ -111,7 +99,6 @@ const Home = () => {
       orderBy("createdAt", "desc")
     );
     querySnapShot.forEach((doc) => {
-      // console.log("Docs", doc.data());
       setLatestItemList((latestItemList) => [...latestItemList, doc.data()]);
     });
   };
@@ -119,71 +106,24 @@ const Home = () => {
   return (
     <>
       <SafeAreaView className="flex-1 bg-white">
-      <ScrollView>
-        <View className="flex-row gap-2 pt-3 ml-2">
-          <Image
-            source={{ uri: user?.imageUrl }}
-            className="rounded-full w-12 h-12"
-          />
-          <View>
-            <Text className="text-[16px]">Welcome</Text>
-            <Text className="text-[20px] font-bold">{user?.fullName}</Text>
-{/*           
-          <View
-            className="p-[9px] px-5 flex-row 
-          bg-white mt-2 rounded-full 
-        border-[1px] border-blue-300"
-          >
-            <Ionicons name="search" size={24} color="gray" />
-            <TextInput
-              placeholder="Search"
-              // className="ml-2 text-[18px]"
-              onChangeText={(value) => console.log(value)}
+        <ScrollView>
+          <View className="flex-row gap-2 pt-3 ml-2">
+            <Image
+              source={{ uri: user?.imageUrl }}
+              className="rounded-full w-12 h-12"
             />
-          </View> */}
+            <View>
+              <Text className="text-[16px]">Welcome</Text>
+              <Text className="text-[20px] font-bold">{user?.fullName}</Text>
+            </View>
+            <Slider />
           </View>
-          <Slider />
-        </View>
-        <Categories />
+          <Categories />
 
-        {/* <View className="pb-2 border-b-2">
-          <Text className="text-black text-center font-rubikbold text-xl">
-              Search listings by type
-            </Text>
-        </View> */}
-        
-          <View>
-            {/* <Tab.Navigator
-            screenOptions={{
-              tabBarIndicatorStyle: "",
-              tabBarScrollEnabled: true,
-              textBarShowLabel: true,
-              tabBarStyle: {
-                backgroundColor: "#fff",
-              },
-            }}
-          >
-            <Tab.Screen
-              name="Single Engine Prop"
-              component={SingleEngineProp}
-              options={{}}
-            />
-            <Tab.Screen name="Twin Engine Prop" component={TwinEngineProp} />
-            <Tab.Screen
-              name="Single Engine Piston"
-              component={SingleEnginePiston}
-            />
-            <Tab.Screen
-              name="Twin Engine Piston"
-              component={TwinEnginePiston}
-            />
-            <Tab.Screen name="Piston Helicopter" component={PistonHelicopter} />
-          </Tab.Navigator> */}
+          <Text className="text-2xl px-8 mt-5 text-decoration-line: underline text-center font-rubikbold">
+            List your aircraft
+          </Text>
 
-            <Text className="text-2xl px-8 mt-5 text-decoration-line: underline text-center font-rubikbold">
-              List your aircraft
-            </Text>
-          </View>
           <TouchableOpacity onPress={pickImage}>
             <View className="items-center">
               <Image
@@ -243,28 +183,43 @@ const Home = () => {
             />
           )}
           <Button title="Add Listing" onPress={handleAddListing} />
-          <View className="mt-8">
-            <Text className="text-xl font-bold mb-4 text-decoration-line: underline text-center">
-              Listings
+
+          {/* Button to toggle the visibility of the listings */}
+          <TouchableOpacity
+            onPress={() => setShowListings(!showListings)}
+            style={styles.toggleButton}
+          >
+            <Text style={styles.toggleButtonText}>
+              {showListings ? "Hide Listings" : "Show Listings"}
             </Text>
-            {listings.map((listing, index) => (
-              <View key={index} className=" p-4 mb-4">
-                <Text className="text-lg font-bold">{listing.title}</Text>
-                <Text>{listing.price}</Text>
-                <Text>{listing.description}</Text>
-                {listing.photo && (
-                  <Image
-                    source={{ uri: listing.photo }}
-                    style={{ width: 100, height: 100, marginTop: 10 }}
-                  />
-                )}
-              </View>
-            ))}
-            <LatestItemList
-              latestItemList={latestItemList}
-              heading={"Latest Items"}
-            />
-          </View>
+          </TouchableOpacity>
+
+          {/* Conditional rendering of the listings */}
+          {showListings && (
+            <View className="mt-8">
+              <Text className="text-xl font-bold mb-4 text-decoration-line: underline text-center">
+                Listings
+              </Text>
+              {listings.map((listing, index) => (
+                <View key={index} className=" p-4 mb-4">
+                  <Text className="text-lg font-bold">{listing.title}</Text>
+                  <Text>{listing.price}</Text>
+                  <Text>{listing.description}</Text>
+                  {listing.photo && (
+                    <Image
+                      source={{ uri: listing.photo }}
+                      style={{ width: 100, height: 100, marginTop: 10 }}
+                    />
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+
+          <LatestItemList
+            latestItemList={latestItemList}
+            heading={"Latest Items"}
+          />
         </ScrollView>
       </SafeAreaView>
     </>
@@ -285,6 +240,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flex: 1,
     flexWrap: "wrap",
+  },
+  toggleButton: {
+    backgroundColor: "#007BFF",
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  toggleButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
   },
 });
 

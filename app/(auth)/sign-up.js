@@ -107,7 +107,7 @@ const SignUp = () => {
         <View className="w-full justify-center items-center px-4 ">
           <Image source={images.logo}
             resizeMode='contain'
-            className='w-[150px] h-[150px]'
+            className='w-[300px] h-[300px]'
             
           />
         </View>
