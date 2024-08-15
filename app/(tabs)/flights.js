@@ -178,12 +178,12 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
         </View>
         {image && <PostImage source={{ uri: image }} />}
         <PostButton onPress={handleSubmit}>
-          <Ionicons name="send" size={24} color="white" />
+          <Ionicons name="send" size={26} color="white" />
           <PostButtonText>Post</PostButtonText>
         </PostButton>
-        <View className='pt-5'>
+        <View className='pt-3'>
         <TouchableOpacity onPress={onCancel} style={{ marginTop: 10 }}>
-        <Feather name="x-circle" size={24} color="white" className='items-center justify-center align-center'/>
+        <Feather name="x-circle" size={32} color="white" />
           {/* <Text style={{ color: 'red', textAlign: 'center' }}>Cancel</Text> */}
         </TouchableOpacity>
         </View>
