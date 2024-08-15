@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, Image, SafeAreaView, ScrollView, TouchableOpacity } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { styled } from "nativewind";
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 
 const Stack = createStackNavigator();
@@ -34,6 +34,30 @@ const SocialMediaPost = ({ post }) => {
   const handlePress = () => {
     navigation.navigate('FullScreenPost', { post });
   };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      const postRef = doc(db, 'posts', post.id);
+      await updateDoc(postRef, {
+        content: editedContent,
+        image: editedImage,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      Alert.alert('Error', 'Could not update the post.');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedContent(post.content);
+    setEditedImage(post.image);
+  };
+
   return (
     
     <PostContainer>

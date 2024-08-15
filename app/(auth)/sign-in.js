@@ -2,25 +2,15 @@ import React from "react";
 import {
   View,
   Text,
-  ScrollView,
-  Dimensions,
-  Alert,
   Image,
-  Button,
   TextInput,
   TouchableOpacity,
+  SafeAreaView
 } from "react-native";
-import { useState } from "react";
-import { Link, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSignIn } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
 import { images } from "../../constants";
-import FormField from "../../components/FormField";
-import CustomButton from "../../components/CustomButton";
 import { StatusBar } from "expo-status-bar";
-import { IonIcons } from "@expo/vector-icons";
-import { FontAwesome5 } from "@expo/vector-icons";
-import { Fontisto } from "@expo/vector-icons";
-import { useSignIn, signIn, submit } from "@clerk/clerk-expo";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -44,8 +34,6 @@ const SignIn = () => {
         await setActive({ session: signInAttempt.createdSessionId });
         router.replace("/");
       } else {
-        // See https://clerk.com/docs/custom-flows/error-handling
-        // for more info on error handling
         console.error(JSON.stringify(signInAttempt, null, 2));
       }
     } catch (err) {
@@ -54,48 +42,49 @@ const SignIn = () => {
   }, [isLoaded, emailAddress, password]);
 
   return (
-    <SafeAreaView className="bg-white flex-1">
-      <View className="w-full justify-center items-center ">
+    <SafeAreaView className="flex-1 bg-white p-4">
+      <StatusBar barStyle="dark-content" />
+      <View className="flex-1 justify-center items-center">
         <Image
           source={images.logo}
           resizeMode="contain"
-          className="w-[300px] h-[300px]"
+          className="w-80 h-80 mb-6"
         />
-      </View>
-      <View className=" mt-5 justify-center items-center">
-        <Text className="text-2xl font-rubikblack justify-center items-center">
-          Login into Ready, Set, Fly!
+        <Text className="text-2xl font-bold mb-4">
+          Login to Ready, Set, Fly!
         </Text>
-        <View className="gap-2 p-5">
-          <View className="border px-2">
-            <TextInput
-              autoCapitalize="none"
-              value={emailAddress}
-              placeholder="Email..."
-              onChangeText={(emailAddress) => setEmailAddress(emailAddress)}
-            />
-          </View>
-          <View className="border px-2">
-            <TextInput
-              value={password}
-              placeholder="Password..."
-              secureTextEntry={true}
-              onChangeText={(password) => setPassword(password)}
-            />
-          </View>
-          <View className="pt-5">
-            <Button title="Sign In" onPress={onSignInPress} />
-          </View>
-          <View className="justify-center pt-5 flex-row gap-2">
-            <Text className="text-lg font-rubikregular text-#404040">
+        <View className="w-3/4 max-w-md space-y-4">
+          <TextInput
+            autoCapitalize="none"
+            value={emailAddress}
+            placeholder="Email"
+            onChangeText={setEmailAddress}
+            className="border border-gray-300 rounded-lg p-3"
+          />
+          <TextInput
+            value={password}
+            placeholder="Password"
+            secureTextEntry
+            onChangeText={setPassword}
+            className="border border-gray-300 rounded-lg p-3"
+          />
+          <TouchableOpacity
+            onPress={onSignInPress}
+            className="bg-blue-500 rounded-lg p-3"
+          >
+            <Text className="text-white text-center text-lg font-semibold">
+              Sign In
+            </Text>
+          </TouchableOpacity>
+          <View className="flex-row justify-center items-center">
+            <Text className="text-lg text-gray-600">
               Don't have an account?
             </Text>
-            <Link
-              href="/sign-up"
-              className="text-lg font-rubikbold text-emerald-700"
-            >
-              <Text>Sign up</Text>
-            </Link>
+            <TouchableOpacity onPress={() => router.push("/sign-up")}>
+              <Text className="text-lg text-blue-600 ml-2 font-semibold">
+                Sign up
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>

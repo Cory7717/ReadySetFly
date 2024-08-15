@@ -30,10 +30,13 @@ import * as ImagePicker from "expo-image-picker";
 import { getStorage, ref, uploadBytes } from "firebase/storage";
 import { app } from "../../firebaseConfig";
 import renterProfile from "../renterProfile";
+import { useUser } from "@clerk/clerk-expo";
+import Slider from "../../components/Slider";
 
 const Tab = createMaterialTopTabNavigator();
 
 const BookingCalendar = ({ airplaneId, userId }) => {
+  const { user } = useUser();
   const [bookings, setBookings] = useState({});
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedDates, setSelectedDates] = useState({});
@@ -132,29 +135,17 @@ const BookingCalendar = ({ airplaneId, userId }) => {
   return (
     <SafeAreaView className="h-full bg-white sand mt-7">
       <ScrollView>
-        <View className="pb-2 border-b-2">
-          <Tab.Navigator
-            screenOptions={{
-              tabBarIndicatorStyle: "",
-              tabBarScrollEnabled: true,
-              textBarShowLabel: true,
-              tabBarStyle: {
-                backgroundColor: "#fff",
-                alignItems: "center",
-                
-              },
-            }}
-          >
-            <Tab.Screen
-              name="Upcoming Bookings"
-              component={UpcomingBookings}
-              options={{}}
+      <View className="flex-row gap-2 pt-3 ml-2">
+            <Image
+              source={{ uri: user?.imageUrl }}
+              className="rounded-full w-12 h-12"
             />
-            
-            <Tab.Screen name="Profile" component={RenterProfile} onPress={() => router.push("/renterProfile")} />
-           
-          </Tab.Navigator>
-        </View>
+            <View>
+              <Text className="text-[16px]">Welcome</Text>
+              <Text className="text-[20px] font-bold">{user?.fullName}</Text>
+            </View>
+            <Slider />
+          </View>
         <View className="flex-1 items-center justify-center bg-white">
           <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">
             Renter Dashboard
