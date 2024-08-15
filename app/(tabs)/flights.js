@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView, ScrollView, View, Image, Text, TextInput, TouchableOpacity, Alert, FlatList, Linking, RefreshControl } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons, FontAwesome, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import { useUser } from '@clerk/clerk-expo';
 import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Text as RNText } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import FullScreenPost from '../../components/FullScreenPost';
+import SocialMediaPost from '../../components/SocialMediaPost';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+
 
 // Styled components
 const Container = styled(SafeAreaView, 'flex-1 bg-gray-100');
@@ -23,6 +28,7 @@ const PostImage = styled(Image, 'w-full h-64 rounded-lg');
 const PostActions = styled(View, 'flex-row items-center justify-between mt-2');
 const ActionButton = styled(TouchableOpacity, 'flex-row items-center');
 const ActionText = styled(Text, 'ml-1 text-gray-600');
+const Stack = createStackNavigator();
 
 // Utility function to parse hashtags, mentions, and links
 const parseContent = (text, onHashtagPress, onMentionPress) => {
@@ -163,17 +169,22 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
         {showAutocomplete && (
           <Autocomplete data={autocompleteData} onSelect={handleSelectUser} />
         )}
+        <View className='pb-5'>
         <TouchableOpacity onPress={pickImage} className="p-2 bg-gray-200 rounded mb-4">
           <Text className="text-center text-gray-700">Upload Image</Text>
         </TouchableOpacity>
+        </View>
         {image && <PostImage source={{ uri: image }} />}
         <PostButton onPress={handleSubmit}>
           <Ionicons name="send" size={24} color="white" />
           <PostButtonText>Post</PostButtonText>
         </PostButton>
+        <View className='pt-5'>
         <TouchableOpacity onPress={onCancel} style={{ marginTop: 10 }}>
-          <Text style={{ color: 'red', textAlign: 'center' }}>Cancel</Text>
+        <Feather name="x-circle" size={24} color="white" className='items-center justify-center align-center'/>
+          {/* <Text style={{ color: 'red', textAlign: 'center' }}>Cancel</Text> */}
         </TouchableOpacity>
+        </View>
       </PostContainer>
     </View>
   );
@@ -191,98 +202,109 @@ const Post = ({ post }) => {
     Alert.alert('Mention Pressed', `You pressed ${mention}`);
   };
 
+  const handlePress = () => {
+    navigation.navigate('FullScreenPost', { post });
+  };
+
   return (
-    <PostContainer>
-      <View className="flex-row items-center mb-2">
-        <ProfileImage source={{ uri: post.profileImage }} />
-        <Text className="ml-2 text-lg font-bold">{post.userName}</Text>
-      </View>
-      {post.image && <PostImage source={{ uri: post.image }} />}
-      <Text className="mt-2">{parseContent(post.content, onHashtagPress, onMentionPress)}</Text>
-      <PostActions>
-        <ActionButton>
-          <FontAwesome name="thumbs-up" size={20} color="gray" />
-          <ActionText>Like</ActionText>
-        </ActionButton>
-        <ActionButton>
-          <FontAwesome name="comment" size={20} color="gray" />
-          <ActionText>Comment</ActionText>
-        </ActionButton>
-        <ActionButton>
-          <Ionicons name="share-social-outline" size={20} color="gray" />
-          <ActionText>Share</ActionText>
-        </ActionButton>
-      </PostActions>
-    </PostContainer>
+    <TouchableOpacity onPress={handlePress}>
+      <PostContainer>
+        <View className="flex-row items-center mb-2">
+          <ProfileImage source={{ uri: post.profileImage }} />
+          <Text className="ml-2 text-lg font-bold">{post.userName}</Text>
+        </View>
+        {/* Post text now appears above the image */}
+        <Text className="mt-2">{parseContent(post.content, onHashtagPress, onMentionPress)}</Text>
+        {post.image && <PostImage source={{ uri: post.image }} />}
+        <PostActions>
+          <ActionButton>
+            <FontAwesome name="thumbs-up" size={20} color="gray" />
+            <ActionText>Like</ActionText>
+          </ActionButton>
+          <ActionButton>
+            <FontAwesome name="comment" size={20} color="gray" />
+            <ActionText>Comment</ActionText>
+          </ActionButton>
+          <ActionButton>
+            <Ionicons name="share-social-outline" size={24} color="black" />
+            <ActionText>Share</ActionText>
+          </ActionButton>
+        </PostActions>
+      </PostContainer>
+    </TouchableOpacity>
   );
 };
 
-// Main Screen Component
-const SocialMediaScreen = () => {
+// Main Feed Component
+const MainFeed = () => {
   const [posts, setPosts] = useState([]);
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+    const postsRef = collection(db, 'posts');
+    const q = query(postsRef, orderBy('createdAt', 'desc'));
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newPosts = snapshot.docs.map((doc) => ({
+      const fetchedPosts = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setPosts(newPosts);
+      setPosts(fetchedPosts);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const addPost = (newPost) => {
+  const handleCreatePost = () => {
+    setIsCreatingPost(true);
+  };
+
+  const handleCancelPost = () => {
+    setIsCreatingPost(false);
+  };
+
+  const handleSubmitPost = (newPost) => {
+    setIsCreatingPost(false);
     setPosts((prevPosts) => [newPost, ...prevPosts]);
-    setShowForm(false);
   };
 
-  const cancelPost = () => {
-    setShowForm(false);
-  };
-
-  const onRefresh = async () => {
+  const onRefresh = () => {
     setRefreshing(true);
-    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    const refreshedPosts = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    setPosts(refreshedPosts);
+    // Simulate a refresh by refetching posts (or any other logic)
     setRefreshing(false);
   };
 
   return (
     <Container>
       <Header>
-        <View className='pt-5'>
-          <Text className='font-rubikbold justify-center'>
-            Aviation News Feed
-          </Text>
-        </View>
+        <Text className='text-center text-lg font-bold flex-1'>Social Media App</Text>
       </Header>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 80 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {posts.map((post, index) => (
-          <Post key={index} post={post} />
-        ))}
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {isCreatingPost ? (
+          <CreateNewPost onSubmit={handleSubmitPost} onCancel={handleCancelPost} />
+        ) : (
+          posts.map((post) => <Post key={post.id} post={post} />)
+        )}
       </ScrollView>
-      <PostButton onPress={() => setShowForm(!showForm)}>
-        <Ionicons name="chevron-down-circle-outline" size={28} color="white" />
-        <PostButtonText>{showForm ? 'Cancel' : 'Create Post'}</PostButtonText>
-      </PostButton>
-      {showForm && <CreateNewPost onSubmit={addPost} onCancel={cancelPost} />}
+      {!isCreatingPost && (
+        <PostButton onPress={handleCreatePost}>
+          <Ionicons name="create" size={24} color="white" />
+          <PostButtonText>Create Post</PostButtonText>
+        </PostButton>
+      )}
     </Container>
   );
 };
 
-export default SocialMediaScreen;
+// Root App Component
+export default function App() {
+  return (
+    <NavigationContainer independent={true}>
+      <Stack.Navigator initialRouteName="MainFeed">
+        <Stack.Screen name="MainFeed" component={MainFeed} options={{ headerShown: false }} />
+        <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}

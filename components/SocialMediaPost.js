@@ -2,6 +2,10 @@ import React from "react";
 import { View, Text, Image, SafeAreaView, ScrollView, TouchableOpacity } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { styled } from "nativewind";
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+
+const Stack = createStackNavigator();
 
 const PostContainer = styled(View, "p- bg-white rounded-2xl shadow-2xl mb-2");
 const PostHeader = styled(View, "flex-row items-center mb-4");
@@ -17,7 +21,21 @@ const ShareButton = styled(TouchableOpacity, 'flex-row items-center');
 
 
 const SocialMediaPost = ({ post }) => {
+  const navigation = useNavigation();
+
+  const onHashtagPress = (hashtag) => {
+    Alert.alert('Hashtag Pressed', `You pressed ${hashtag}`);
+  };
+
+  const onMentionPress = (mention) => {
+    Alert.alert('Mention Pressed', `You pressed ${mention}`);
+  };
+
+  const handlePress = () => {
+    navigation.navigate('FullScreenPost', { post });
+  };
   return (
+    
     <PostContainer>
       <PostHeader>
         <ProfileImage source={{ uri: post.profileImage }} />
@@ -43,6 +61,7 @@ const SocialMediaPost = ({ post }) => {
         </ShareButton>
       </PostFooter>
     </PostContainer>
+  
   );
 };
 

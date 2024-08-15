@@ -9,7 +9,7 @@ const Header = () => {
   const {user}=useUser();
   console.log(user);
   return (
-    <View className="flex-row items-center gap-2">
+    <View className="flex-row items-center gap-2 pt-5">
         <Image source={{uri:user?.imageUrl}} 
           className='rounded-full w-12 h-12'
         />

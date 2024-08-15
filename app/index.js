@@ -45,14 +45,13 @@ const App = () => {
         </View>
 
         <View className="relative py-3">
-          {/* <Text className="font-rubikregular text-2xl text-center color-teal-400 py-5">
-            Where's your next destination?
-          </Text> */}
         </View>
         <View className='pb-5 items-center'>
+        <View>
       <SignedIn>
         <Text>Hello {user?.emailAddresses[0].emailAddress}</Text>
       </SignedIn>
+      </View>
       <SignedOut>
         <Link href="/sign-in">
           <Text>Sign In</Text>
