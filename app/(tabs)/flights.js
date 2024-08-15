@@ -12,6 +12,8 @@ import FullScreenPost from '../../components/FullScreenPost';
 import SocialMediaPost from '../../components/SocialMediaPost';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+// import LiveStream from '/LiveStream'; // Import the new screen
+
 
 
 // Styled components
@@ -277,8 +279,11 @@ const MainFeed = () => {
 
   return (
     <Container>
-      <Header>
-        <Text className='text-center text-lg font-bold flex-1'>Social Media App</Text>
+      <Header className='pt-7'>
+      <View className='flex-row '>
+      <Ionicons name="airplane-outline" size={24} color="black"  />
+        <Text className='text-rubikregular text-center text-lg font-bold flex-1'>Aviation News and Events</Text>
+        </View>
       </Header>
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {isCreatingPost ? (
@@ -304,6 +309,7 @@ export default function App() {
       <Stack.Navigator initialRouteName="MainFeed">
         <Stack.Screen name="MainFeed" component={MainFeed} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
+        {/* <Stack.Screen name="LiveStream" component={LiveStream} options={{ headerShown: false }} /> */}
       </Stack.Navigator>
     </NavigationContainer>
   );
