@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,7 +12,6 @@ import {
   SafeAreaView,
   Modal,
 } from "react-native";
-import React, { useEffect, useState } from "react";
 import { getFirestore, collection, getDocs, addDoc, orderBy } from "firebase/firestore";
 import { app } from "../../firebaseConfig";
 import { Formik } from "formik";
@@ -19,11 +19,10 @@ import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useNavigation } from "@react-navigation/native";
+import { useUser } from "@clerk/clerk-expo";
 import Slider from "../../components/HomeScreen/Slider.js";
 import { Ionicons } from "@expo/vector-icons";
-import { useUser } from "@clerk/clerk-expo";
 import LatestItemList from "../../components/HomeScreen/LatestItemList";
-import bgImage from "../../Assets/images/rsf_backgroundImage.png";
 import { StatusBar } from "expo-status-bar";
 
 const Classifieds = () => {
@@ -36,7 +35,8 @@ const Classifieds = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
-
+  const [selectedPricing, setSelectedPricing] = useState("Basic");
+  
   const db = getFirestore(app);
   const storage = getStorage();
   const { user } = useUser();
@@ -49,30 +49,18 @@ const Classifieds = () => {
   }, []);
 
   const getCategoryList = async () => {
-    setCategoryList([]);
     const querySnapshot = await getDocs(collection(db, "Category"));
-    querySnapshot.forEach((doc) => {
-      setCategoryList((prevList) => [...prevList, doc.data()]);
-    });
+    setCategoryList(querySnapshot.docs.map((doc) => doc.data()));
   };
 
   const getSliders = async () => {
-    setSliderList([]);
     const querySnapshot = await getDocs(collection(db, "Sliders"));
-    querySnapshot.forEach((doc) => {
-      setSliderList((prevList) => [...prevList, doc.data()]);
-    });
+    setSliderList(querySnapshot.docs.map((doc) => doc.data()));
   };
 
   const getLatestItemList = async () => {
-    setLatestItemList([]);
-    const querySnapShot = await getDocs(
-      collection(db, "UserPost"),
-      orderBy("createdAt", "desc")
-    );
-    querySnapShot.forEach((doc) => {
-      setLatestItemList((latestItemList) => [...latestItemList, doc.data()]);
-    });
+    const querySnapshot = await getDocs(collection(db, "UserPost"), orderBy("createdAt", "desc"));
+    setLatestItemList(querySnapshot.docs.map((doc) => doc.data()));
   };
 
   const pickImage = async () => {
@@ -81,7 +69,7 @@ const Classifieds = () => {
       return;
     }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
       aspect: [4, 4],
@@ -93,10 +81,30 @@ const Classifieds = () => {
     }
   };
 
-  const onSubmitMethod = async (value) => {
-    setLoading(true);
-    const imageUrls = [];
+  const processPayment = async (amount) => {
+    // Here you would implement payment processing using a service like Stripe.
+    // For the sake of this example, we'll just simulate successful payment.
+    return new Promise((resolve) => setTimeout(() => resolve(true), 2000));
+  };
 
+  const onSubmitMethod = async (values) => {
+    const pricingPackages = {
+      Basic: 25,
+      Featured: 70,
+      Enhanced: 150,
+    };
+
+    setLoading(true);
+
+    const success = await processPayment(pricingPackages[selectedPricing]);
+
+    if (!success) {
+      Alert.alert("Payment failed. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    const imageUrls = [];
     for (let i = 0; i < images.length; i++) {
       const resp = await fetch(images[i]);
       const blob = await resp.blob();
@@ -107,13 +115,14 @@ const Classifieds = () => {
       imageUrls.push(downloadUrl);
     }
 
-    value.images = imageUrls;
-    value.userName = user.fullName;
-    value.userEmail = user.primaryEmailAddress.emailAddress;
-    value.userImage = user.imageUrl;
+    values.images = imageUrls;
+    values.userName = user.fullName;
+    values.userEmail = user.primaryEmailAddress.emailAddress;
+    values.userImage = user.imageUrl;
+    values.pricingOption = selectedPricing;
 
     try {
-      const docRef = await addDoc(collection(db, "UserPost"), value);
+      const docRef = await addDoc(collection(db, "UserPost"), values);
       if (docRef.id) {
         setLoading(false);
         Alert.alert("Your post was successfully added!");
@@ -197,6 +206,7 @@ const Classifieds = () => {
                   userName: "",
                   userEmail: "",
                   userImage: "",
+                  pricingOption: selectedPricing,
                 }}
                 onSubmit={(value) => onSubmitMethod(value)}
                 validate={(values) => {
@@ -249,7 +259,6 @@ const Classifieds = () => {
                       value={values?.desc}
                       onChangeText={handleChange("desc")}
                       multiline
-                      textWrap={true}
                     />
                     <TextInput
                       className="border rounded-lg p-3 mt-2 mb-1 text-lg"
@@ -260,48 +269,42 @@ const Classifieds = () => {
                     />
                     <TextInput
                       className="border rounded-lg p-3 mt-2 mb-1 text-lg"
-                      placeholder="Location"
+                      placeholder="City, State, Country"
                       value={values?.location}
                       onChangeText={handleChange("location")}
                     />
-                    <TextInput
-                      className="border rounded-lg p-3 mt-2 mb-1 text-lg"
-                      placeholder="User Name"
-                      value={values?.userName}
-                      onChangeText={handleChange("userName")}
-                    />
-                    <TextInput
-                      className="border rounded-lg p-3 mt-2 mb-1 text-lg"
-                      placeholder="Email"
-                      value={values?.userEmail}
-                      onChangeText={handleChange("userEmail")}
-                    />
-                    <View className="border rounded-lg mt-2">
+                    <View className="border rounded-lg p-1 mt-2 mb-1">
                       <Picker
-                        selectedValue={values?.category}
-                        onValueChange={(itemValue) =>
-                          setFieldValue("category", itemValue)
-                        }
+                        selectedValue={selectedCategory}
+                        onValueChange={(itemValue) => {
+                          setSelectedCategory(itemValue);
+                          setFieldValue("category", itemValue);
+                        }}
                       >
-                        {categoryList &&
-                          categoryList.map((item, index) => (
-                            <Picker.Item
-                              key={index}
-                              label={item?.name}
-                              value={item?.name}
-                            />
-                          ))}
+                        <Picker.Item label="Select Category" value="" />
+                        {categoryList.map((category, index) => (
+                          <Picker.Item
+                            label={category.name}
+                            value={category.name}
+                            key={index}
+                          />
+                        ))}
                       </Picker>
                     </View>
                     <TouchableOpacity
+                      className="bg-blue-500 p-3 rounded-lg mb-3 mt-3 items-center"
                       onPress={handleSubmit}
-                      className="p-3 bg-black rounded-full mt-5 items-center"
+                      disabled={loading}
                     >
                       {loading ? (
                         <ActivityIndicator color="#fff" />
                       ) : (
-                        <Text className="text-white text-xl font-bold">
-                          Submit
+                        <Text className="text-white text-lg font-bold">
+                          {selectedPricing === "Basic"
+                            ? "Submit for $25"
+                            : selectedPricing === "Featured"
+                            ? "Submit for $70"
+                            : "Submit for $150"}
                         </Text>
                       )}
                     </TouchableOpacity>
@@ -311,54 +314,61 @@ const Classifieds = () => {
             </View>
           )}
 
-          <View className="text-[24px] text-xl font-rubikbold items-center text-center">
+          {!showForm && (
             <LatestItemList
               latestItemList={filterListings()}
-              heading={"Current Listings"}
-              font="rubikbold"
+              onPress={(item) =>
+                navigation.navigate("HomeScreenDetails", {
+                  item,
+                })
+              }
             />
-          </View>
-
-          {/* Pricing Modal */}
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={modalVisible}
-            onRequestClose={() => setModalVisible(false)}
-          >
-            <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-              <View className="bg-white p-5 rounded-lg w-3/4">
-                <Text className="text-xl font-bold mb-5 text-center">
-                  Pricing Information
-                </Text>
-                <View className="mb-4 p-4 bg-gray-200 rounded-lg">
-                  <Text className="text-lg font-bold">Basic</Text>
-                  <Text>$25 for a 30-day listing</Text>
-                  <Text>Includes up to 10 photos</Text>
-                </View>
-                <View className="mb-4 p-4 bg-yellow-200 rounded-lg">
-                  <Text className="text-lg font-bold">Featured</Text>
-                  <Text>$70 for a 60-day listing</Text>
-                  <Text>Includes up to 20 photos</Text>
-                  <Text>Featured on the homepage</Text>
-                </View>
-                <View className="p-4 bg-blue-200 rounded-lg">
-                  <Text className="text-lg font-bold">Enhanced</Text>
-                  <Text>$150 for a 90-day listing</Text>
-                  <Text>Includes up to 35 photos</Text>
-                  <Text>Video and premium listing</Text>
-                </View>
-                <TouchableOpacity
-                  className="bg-blue-500 p-3 rounded-lg mt-5 items-center"
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text className="text-white font-bold">Close</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
+          )}
         </View>
       </ScrollView>
+
+      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white p-5 rounded-lg w-5/6">
+            <Text className="text-xl font-bold mb-5 text-center">
+              Select a Pricing Option
+            </Text>
+            {[
+              { label: "Basic - $25", value: "Basic" },
+              { label: "Featured - $70", value: "Featured" },
+              { label: "Enhanced - $150", value: "Enhanced" },
+            ].map((option, index) => (
+              <TouchableOpacity
+                key={index}
+                className={`p-3 rounded-lg mb-2 ${
+                  selectedPricing === option.value
+                    ? "bg-blue-500"
+                    : "bg-gray-200"
+                }`}
+                onPress={() => setSelectedPricing(option.value)}
+              >
+                <Text
+                  className={`text-lg font-bold text-center ${
+                    selectedPricing === option.value
+                      ? "text-white"
+                      : "text-gray-800"
+                  }`}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              className="bg-red-500 p-3 rounded-lg items-center mt-3"
+              onPress={() => setModalVisible(false)}
+            >
+              <Text className="text-white text-lg font-bold">Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <StatusBar style="auto" />
     </SafeAreaView>
   );
 };

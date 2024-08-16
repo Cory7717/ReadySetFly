@@ -111,16 +111,7 @@ const TabsLayout = () => {
             ),
           }}
         />
-        <Tabs.Screen
-          name="inbox"
-          options={{
-            title: "Chat",
-            headerShown: false,
-            tabBarIcon: ({ name, icon, color, focused }) => (
-              <Ionicons name="chatbox-outline" size={26} color={color} />
-            ),
-          }}
-        />
+        
         <Tabs.Screen
           name="classifieds"
           options={{

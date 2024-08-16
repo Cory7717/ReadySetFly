@@ -1,4 +1,10 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+/*
+  For Gradle, add the following dependency to your build.gradle and replace with
+  the version number you want to use from:
+  - https://mvnrepository.com/artifact/com.stripe/stripe-java or
+  - https://github.com/stripe/stripe-java/releases/latest
+*/
+implementation "com.stripe:stripe-java:26.0.0"
 
 buildscript {
     ext {

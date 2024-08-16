@@ -1,113 +1,71 @@
+import React from 'react';
 import { StatusBar } from "expo-status-bar";
 import {
   Text,
   View,
   Image,
   ScrollView,
-  ImageBackground,
   TouchableOpacity,
-  TextInput,
 } from "react-native";
-import { router, Link, Redirect } from "expo-router";
+import { Link, Redirect, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { NativeWindStyleSheet } from "nativewind";
-import "react-native-url-polyfill/auto";
-import { sendEmail } from "react-native-email";
-import { useFonts } from "expo-font";
-import { images } from "../constants";
-import CustomButton from "../components/CustomButton";
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-expo';
 import { useGlobalContext } from "../context/GlobalProvider";
-import { NavigationContainer } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
-import { SignedIn, SignedOut, useUser } from '@clerk/clerk-expo'
+import CustomButton from "../components/CustomButton";
+import { images } from "../constants";
 
-
-
-const Stack = createStackNavigator
-
-NativeWindStyleSheet.setOutput({
-  default: "native",
-});
-{
-  /* Index screen will be the initial login/sign up with Google or create account*/
-}
 const App = () => {
-  const { user } = useUser()
-  const { isLoading, isLoggedIn } = useGlobalContext;
+  const { user } = useUser();
+  const { isLoading, isLoggedIn } = useGlobalContext();
+
   if (!isLoading && isLoggedIn) return <Redirect href="/home" />;
+
   return (
-    
-    <SafeAreaView className="bg-white">
-      {/* <ImageBackground source={images.background} className="bg-opacity-75"/> */}
-      <ScrollView contentContainerStyle={{ height: "100%" }}>
-        <View className="w-full min-h-[85px] px-12 py-10">
-          <Image source={images.logo} className="w-[250px] h-[250px] ml-5" />
+    <SafeAreaView className="flex-1 bg-white">
+      <StatusBar style="dark" />
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 20 }}>
+        <View className="items-center mb-10">
+          <Image source={images.logo} className="w-[200px] h-[200px]" />
         </View>
 
-        <View className="relative py-3">
-        </View>
-        <View className='pb-5 items-center'>
-        <View>
-      <SignedIn>
-        <Text>Hello {user?.emailAddresses[0].emailAddress}</Text>
-      </SignedIn>
-      </View>
-      <SignedOut>
-        <Link href="/sign-in">
-          <Text>Sign In</Text>
-        </Link>
-        <Link href="/sign-up">
-          <Text>Sign Up</Text>
-        </Link>
-      </SignedOut>
-    </View>
-        <CustomButton
-          title="Renter - Sign in/up"
-          handlePress={() => router.push("screens/renter_sign_in")}
-          containerStyles="mx-8 mb-5  bg-black"
-        />
-        <CustomButton
-          title="Owner Sign in/up"
-          handlePress={() => router.push("/sign-in")}
-          containerStyles="mx-8 mt-5 bg-black"
-        />
-        <CustomButton
-          title="Click here to view content "
-          handlePress={() => router.push("/home")}
-          containerStyles="mx-10 mt-10 bg-black"
-        />
-        {/* <CustomButton
-          title="Learn to Fly "
-          handlePress={() => router.push("/cfi")}
-          containerStyles="mx-10 mt-10 bg-black"
-        /> */}
-        <View className="flex-row p-5 items-center gap-1 border-radius-15 justify-center">
-          <View className='pt-5'>
-            <Text className="text-[14px] font-rubikblack ">
-              Are you a Certified Flight instructor?
-              {/* <HeaderCFI ></HeaderCFI> */}
-            </Text>
-            <Text className="text-l font-rubikblack text-center justify-center items-center">
-              Create your profile today
-            </Text>
+        <SignedIn>
+          <Text className="text-lg text-center mb-5">Hello, {user?.emailAddresses[0].emailAddress}</Text>
+        </SignedIn>
+        
+        <SignedOut>
+          <View className="mb-8">
+            <Link href="/sign-in">
+              <Text className="text-center text-blue-500 text-lg">Sign In</Text>
+            </Link>
+            <Link href="/sign-up">
+              <Text className="text-center text-blue-500 text-lg mt-2">Sign Up</Text>
+            </Link>
           </View>
-        </View>
-        <TouchableOpacity onPress={() => router.push("./cfi")}>
-          <View className="items-center justify-center rounded-full p-3 ml-5 mr-5 border bg-blue-400">
-            <Text className="text-bold text-l">
-              Create CFI Profile
-              <TextInput
-                className="text-bold"
-                // placeholder="Register"
-              />
-            </Text>
+        </SignedOut>
+
+        <CustomButton
+          title="Renter - Sign In/Up"
+          handlePress={() => router.push("/renter_sign_in")}
+          containerStyles="bg-black py-4 rounded-lg mb-4"
+        />
+        <CustomButton
+          title="Owner - Sign In/Up"
+          handlePress={() => router.push("/owner_sign_in")}
+          containerStyles="bg-black py-4 rounded-lg mb-4"
+        />
+        <CustomButton
+          title="View Content"
+          handlePress={() => router.push("/home")}
+          containerStyles="bg-black py-4 rounded-lg"
+        />
+
+        <TouchableOpacity onPress={() => router.push("/cfi")} className="mt-8">
+          <View className="bg-blue-400 py-4 rounded-full items-center">
+            <Text className="text-white text-lg font-semibold">Create CFI Profile</Text>
           </View>
         </TouchableOpacity>
-        
       </ScrollView>
-     
     </SafeAreaView>
-
   );
 };
 
