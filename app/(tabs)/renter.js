@@ -146,15 +146,15 @@ const BookingCalendar = ({ airplaneId, userId }) => {
             </View>
             <Slider />
           </View>
-        <View className="flex-1 items-center justify-center bg-white">
-          <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">
+        <View className="flex-1 bg-white">
+          <Text className="font-rubikblack text-4xl  text-#404040 px-8">
             Renter Dashboard
           </Text>
         </View>
         <TouchableOpacity onPress={pickImage}>
-          <View className="items-center">
+          <View className='pl-8'>
             <Image
-              className="align-center, content-center"
+              
               source={require("../../Assets/images/Placeholder_view_vector.png")}
               style={{
                 width: 150,
