@@ -135,7 +135,7 @@ const OwnerProfile = ({ ownerId }) => {
               onValueChange={(itemValue) => setAirplaneYear(itemValue)}
             >
               <Picker.Item label="Select Airplane Year" value="" />
-              {[...Array(50).keys()].map((_, index) => {
+              {[...Array(75).keys()].map((_, index) => {
                 const year = new Date().getFullYear() - index;
                 return <Picker.Item label={year.toString()} value={year.toString()} key={index} />;
               })}
