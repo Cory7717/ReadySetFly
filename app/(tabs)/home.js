@@ -6,8 +6,6 @@ import {
   Image,
   TextInput,
   TouchableOpacity,
-  Button,
-  StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -15,10 +13,15 @@ import { db } from "../../firebaseConfig";
 import { collection, getDocs, orderBy } from "firebase/firestore";
 import { Picker } from "@react-native-picker/picker";
 import Slider from "../../components/HomeScreen/Slider.js";
-import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/clerk-expo";
 import Categories from "../../components/Categories";
 import LatestItemList from "../../components/LatestItemList";
+import { useNavigation, navigation, navigate } from "@react-navigation/native";
+import FullScreenRental from "../../components/FullScreenRental";
+
+
+// Inside your Home component, where you're navigating to FullScreenRental
+// navigation.navigate("FullScreenRental", { listing });
 
 const Home = () => {
   const { user } = useUser();
@@ -31,7 +34,9 @@ const Home = () => {
   const [categoryList, setCategoryList] = useState([]);
   const [image, setImage] = useState(null);
   const [latestItemList, setLatestItemList] = useState([]);
-  const [showListings, setShowListings] = useState(false); // State to toggle listings visibility
+  const [showListings, setShowListings] = useState(false);
+  const [showAircraftSection, setShowAircraftSection] = useState(true);
+  const navigation = useNavigation();
 
   useEffect(() => {
     getCategoryList();
@@ -40,7 +45,7 @@ const Home = () => {
   }, []);
 
   const handleAddListing = () => {
-    if (title && description) {
+    if (title && description && photo) {
       const newListing = { title, description, price, photo };
       setListings([...listings, newListing]);
       setTitle("");
@@ -59,7 +64,7 @@ const Home = () => {
     });
 
     if (!result.canceled) {
-      setPhoto(result.uri);
+      setPhoto(result.assets[0].uri);
     }
   };
 
@@ -104,104 +109,136 @@ const Home = () => {
   };
 
   return (
-    <>
-      <SafeAreaView className="flex-1 bg-white">
-        <ScrollView>
-          <View className="flex-row gap-2 pt-3 ml-2">
-            <Image
-              source={{ uri: user?.imageUrl }}
-              className="rounded-full w-12 h-12"
-            />
-            <View>
-              <Text className="text-[16px]">Welcome</Text>
-              <Text className="text-[20px] font-bold">{user?.fullName}</Text>
-            </View>
-            <Slider />
+    <SafeAreaView className="flex-1 bg-white">
+      <ScrollView>
+        <View className="flex-row items-center gap-4 px-4 py-3">
+          <Image
+            source={{ uri: user?.imageUrl }}
+            className="rounded-full w-12 h-12"
+          />
+          <View>
+            <Text className="text-lg">Welcome</Text>
+            <Text className="text-xl font-bold">{user?.fullName}</Text>
           </View>
-          <Categories />
+        </View>
 
-          <Text className="text-2xl px-8 mt-5 text-decoration-line: underline text-center font-rubikbold">
-            List your aircraft
+        <Slider />
+
+        <Categories />
+
+        <TouchableOpacity
+          onPress={() => setShowAircraftSection(!showAircraftSection)}
+          className="mx-4 mt-5 p-3 bg-blue-600 rounded-lg"
+        >
+          <Text className="text-white text-center font-bold">
+            {showAircraftSection ? "Hide" : "Show"} Aircraft Section
           </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity onPress={pickImage}>
-            <View className="items-center">
-              <Image
-                source={require("../../Assets/images/Placeholder_view_vector.png")}
-                style={{
-                  width: 150,
-                  height: 150,
-                  borderRadius: 15,
-                  paddingBottom: 10,
-                  marginBottom: 15,
-                  marginTop: 15,
-                }}
+        {showAircraftSection && (
+          <>
+            <Text className="text-2xl px-8 mt-5 underline text-center font-bold">
+              List your aircraft
+            </Text>
+
+            <TouchableOpacity onPress={pickImage}>
+              <View className="items-center">
+                <Image
+                  source={require("../../Assets/images/Placeholder_view_vector.png")}
+                  style={{
+                    width: 150,
+                    height: 150,
+                    borderRadius: 15,
+                    marginBottom: 15,
+                    marginTop: 15,
+                  }}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <View className="border mb-5">
+              <Picker>
+                <Picker.Item label="Single Engine Prop" value={"Dropdown"} />
+                <Picker.Item label="Twin Engine Prop" value={"Dropdown"} />
+                <Picker.Item label="Turbo Prop" value={"Dropdown"} />
+                <Picker.Item label="Helicopter" value={"Dropdown"} />
+                <Picker.Item label="Jet" value={"Dropdown"} />
+              </Picker>
+            </View>
+
+            <View className="px-4">
+              <TextInput
+                className="border p-2 mb-4 rounded-lg"
+                placeholder="Title"
+                value={title}
+                onChangeText={setTitle}
+              />
+              <TextInput
+                className="border p-2 mb-4 rounded-lg"
+                placeholder="Cost per hour"
+                value={price}
+                keyboardType="numeric"
+                onChangeText={setPrice}
+              />
+              <TextInput
+                className="border p-2 mb-4 rounded-lg"
+                placeholder="Description"
+                value={description}
+                multiline
+                onChangeText={setDescription}
               />
             </View>
-          </TouchableOpacity>
 
-          <View className="border mb-5">
-            <Picker>
-              <Picker.Item label="Single Engine Prop" value={"Dropdown"} />
-              <Picker.Item label="Twin Engine Prop" value={"Dropdown"} />
-              <Picker.Item label="Turbo Prop" value={"Dropdown"} />
-              <Picker.Item label="Helicopter" value={"Dropdown"} />
-              <Picker.Item label="Jet" value={"Dropdown"} />
-            </Picker>
-          </View>
-          <View className="align-text-top">
-            <TextInput
-              className=" p-2 mb-4 border"
-              placeholder="Title"
-              value={title}
-              onChangeText={setTitle}
-            />
-            <TextInput
-              className="p-2 mb-4 border"
-              placeholder="Cost per hour"
-              value={price}
-              keyboardType="numeric"
-              onChangeText={setPrice}
-            />
-            <TextInput
-              className=" p-2 mb-4 border "
-              placeholder="Description"
-              value={description}
-              numberOfLines={5}
-              onChangeText={setDescription}
-            />
-          </View>
-          <TouchableOpacity onPress={handleChoosePhoto} className="mb-4">
-            <View className=" p-4">
-              <Text className="text-center">Choose Photo</Text>
-            </View>
-          </TouchableOpacity>
-          {photo && (
-            <Image
-              source={{ uri: photo }}
-              style={{ width: 100, height: 100, marginBottom: 20 }}
-            />
-          )}
-          <Button title="Add Listing" onPress={handleAddListing} />
+            <TouchableOpacity onPress={handleChoosePhoto} className="mb-4">
+              <View className="p-4 bg-gray-200 rounded-lg">
+                <Text className="text-center text-blue-600 font-bold">
+                  Choose Photo
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-          {/* Button to toggle the visibility of the listings */}
-          <TouchableOpacity
-            onPress={() => setShowListings(!showListings)}
-            style={styles.toggleButton}
-          >
-            <Text style={styles.toggleButtonText}>
-              {showListings ? "Hide Listings" : "Show Listings"}
-            </Text>
-          </TouchableOpacity>
+            {photo && (
+              <Image
+                source={{ uri: photo }}
+                style={{ width: 100, height: 100, marginBottom: 20 }}
+              />
+            )}
 
-          {/* Conditional rendering of the listings */}
-          {showListings && (
-            <View className="mt-8">
-              <Text className="text-xl font-bold mb-4 text-decoration-line: underline text-center">
-                Listings
+            <TouchableOpacity
+              onPress={handleAddListing}
+              className="p-4 bg-blue-600 rounded-lg mx-4 mb-5"
+            >
+              <Text className="text-white text-center font-bold">
+                Add Listing
               </Text>
-              {listings.map((listing, index) => (
-                <View key={index} className=" p-4 mb-4">
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Button to toggle the visibility of the listings */}
+        <TouchableOpacity
+          onPress={() => setShowListings(!showListings)}
+          className="p-4 bg-gray-600 rounded-lg mx-4"
+        >
+          <Text className="text-white text-center font-bold">
+            {showListings ? "Hide Listings" : "Show Listings"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Conditional rendering of the listings */}
+        {showListings && (
+          <View className="mt-8">
+            <Text className="text-xl font-bold mb-4 underline text-center">
+              Listings
+            </Text>
+            {listings.map((listing, index) => (
+              <TouchableOpacity
+                key={index}
+                onPress={() =>
+                  navigation.navigate("FullScreenRental", { listing })
+                }
+              >
+                <View className="p-4 mb-4 border rounded-lg">
                   <Text className="text-lg font-bold">{listing.title}</Text>
                   <Text>{listing.price}</Text>
                   <Text>{listing.description}</Text>
@@ -212,46 +249,18 @@ const Home = () => {
                     />
                   )}
                 </View>
-              ))}
-            </View>
-          )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
-          <LatestItemList
-            latestItemList={latestItemList}
-            heading={"Latest Items"}
-          />
-        </ScrollView>
-      </SafeAreaView>
-    </>
+        {/* <LatestItemList
+          latestItemList={latestItemList}
+          heading={"Latest Items"}
+        /> */}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    paddingHorizontal: 17,
-    fontSize: 17,
-    marginBottom: 5,
-    marginTop: 10,
-    textAlignVertical: "top",
-    justifyContent: "space-evenly",
-    flexDirection: "row",
-    flex: 1,
-    flexWrap: "wrap",
-  },
-  toggleButton: {
-    backgroundColor: "#007BFF",
-    padding: 10,
-    borderRadius: 5,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  toggleButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-  },
-});
 
 export default Home;

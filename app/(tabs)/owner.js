@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   TextInput,
-  Button,
   Alert,
   SafeAreaView,
   ScrollView,
@@ -11,35 +10,17 @@ import {
   Text,
 } from "react-native";
 import { getFirestore, collection, addDoc } from "firebase/firestore";
-import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import * as ImagePicker from "expo-image-picker";
-import { Header } from "../../components";
+import { useUser } from "@clerk/clerk-expo";
+import Slider from "../../components/Slider";
 
-const Tab = createMaterialTopTabNavigator();
-
-const handleChoosePhoto = async () => {
+const pickImage = async (setImage) => {
   let result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsEditing: true,
     aspect: [4, 3],
     quality: 1,
   });
-
-  if (!result.canceled) {
-    setPhoto(result.uri);
-  }
-};
-
-const pickImage = async () => {
-  // No permissions request is necessary for launching the image library
-  let result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.All,
-    allowsEditing: true,
-    aspect: [4, 3],
-    quality: 1,
-  });
-
-  console.log(result);
 
   if (!result.canceled) {
     setImage(result.assets[0].uri);
@@ -50,6 +31,8 @@ const AirplaneUploadForm = ({ ownerId }) => {
   const [airplaneName, setAirplaneName] = useState("");
   const [airplaneModel, setAirplaneModel] = useState("");
   const [availability, setAvailability] = useState("");
+  const [image, setImage] = useState(null);
+  const { user } = useUser();
 
   const handleUpload = async () => {
     if (!airplaneName || !airplaneModel || !availability) {
@@ -73,56 +56,65 @@ const AirplaneUploadForm = ({ ownerId }) => {
   };
 
   return (
-    <SafeAreaView className="bg-white pt-10">
-      <ScrollView className="bg-white">
-      <Header />
-        <View className="flex-1 items-center justify-center bg-white">
-          <Text className="font-rubikblack text-4xl text-center text-#404040 px-8">
-            Owner Dashboard
-          </Text>
-          <TouchableOpacity onPress={pickImage}>
-            <View className="items-center">
-              <Image
-                className="align-center, content-center"
-                source={require("../../Assets/images/Placeholder_view_vector.png")}
-                style={{
-                  width: 150,
-                  height: 150,
-                  borderRadius: 15,
-                  paddingBottom: 10,
-                  marginBottom: 15,
-                  marginTop: 15,
-                }}
-              />
-            </View>
-          </TouchableOpacity>
+    <SafeAreaView className="bg-white flex-1">
+      <ScrollView className="p-4">
+        <View className="flex-row items-center gap-3 mb-6 mt-5">
+          <Image
+            source={{ uri: user?.imageUrl }}
+            className="rounded-full w-12 h-12"
+          />
+          <View>
+            <Text className="text-sm text-gray-600">Welcome</Text>
+            <Text className="text-lg font-semibold">{user?.fullName}</Text>
+          </View>
         </View>
-        <View className="pt-10 gap-5">
+
+        <Text className="text-3xl font-bold text-center text-gray-800 mb-8">
+          Owner Dashboard
+        </Text>
+
+        <View className="items-center mb-8">
+          <TouchableOpacity onPress={() => pickImage(setImage)}>
+            <Image
+              source={
+                image
+                  ? { uri: image }
+                  : require("../../Assets/images/Placeholder_view_vector.png")
+              }
+              className="w-40 h-40 rounded-lg mb-4"
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+          <Text className="text-sm text-gray-500">Tap to choose a photo</Text>
+        </View>
+
+        <View className="space-y-4">
           <TextInput
             placeholder="Airplane Name"
             value={airplaneName}
             onChangeText={setAirplaneName}
+            className="border border-gray-300 rounded-lg p-3"
           />
           <TextInput
             placeholder="Airplane Model"
             value={airplaneModel}
             onChangeText={setAirplaneModel}
+            className="border border-gray-300 rounded-lg p-3"
           />
           <TextInput
             placeholder="Availability"
             value={availability}
             onChangeText={setAvailability}
+            className="border border-gray-300 rounded-lg p-3"
           />
-
           <TouchableOpacity
             onPress={handleUpload}
-            className="p-2 bg-black rounded-full mt-5"
+            className="p-4 bg-blue-600 rounded-full mt-6"
           >
-            <Text className="color-white text-center text-[18px] font-rubikbold">
+            <Text className="text-white text-center text-lg font-semibold">
               List your Aircraft
             </Text>
           </TouchableOpacity>
-          {/* <Button title="Upload Airplane Listing" onPress={handleUpload}/> */}
         </View>
       </ScrollView>
     </SafeAreaView>

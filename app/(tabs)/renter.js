@@ -5,12 +5,11 @@ import {
   Image,
   View,
   Text,
-  Button,
-  Alert,
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Modal,
+  Alert,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import {
@@ -22,14 +21,9 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import UpcomingBookings from "../../components/UpcomingBookings";
-import RenterProfile from "../../components/RenterProfile";
 import { Formik } from "formik";
 import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
-import { getStorage, ref, uploadBytes } from "firebase/storage";
-import { app } from "../../firebaseConfig";
-import renterProfile from "../renterProfile";
 import { useUser } from "@clerk/clerk-expo";
 import Slider from "../../components/Slider";
 
@@ -40,7 +34,6 @@ const BookingCalendar = ({ airplaneId, userId }) => {
   const [bookings, setBookings] = useState({});
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedDates, setSelectedDates] = useState({});
-  const [textInputValue, setTextInputValue] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [image, setImage] = useState(null);
 
@@ -53,10 +46,7 @@ const BookingCalendar = ({ airplaneId, userId }) => {
 
       const db = getFirestore();
       const bookingsCollection = collection(db, "bookings");
-      const q = query(
-        bookingsCollection,
-        where("airplaneId", "==", airplaneId)
-      );
+      const q = query(bookingsCollection, where("airplaneId", "==", airplaneId));
 
       try {
         const querySnapshot = await getDocs(q);
@@ -80,7 +70,6 @@ const BookingCalendar = ({ airplaneId, userId }) => {
   };
 
   const pickImage = async () => {
-    // No permissions request is necessary for launching the image library
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
@@ -128,45 +117,45 @@ const BookingCalendar = ({ airplaneId, userId }) => {
       newSelectedDates[dateKey] = { selected: true, marked: true };
     }
     setSelectedDates(newSelectedDates);
-    const selectedKeys = Object.keys(newSelectedDates);
-    setTextInputValue(selectedKeys.join(", "));
   };
 
   return (
-    <SafeAreaView className="h-full bg-white sand mt-7">
+    <SafeAreaView className="h-full bg-white mt-7">
       <ScrollView>
-      <View className="flex-row gap-2 pt-3 ml-2">
-            <Image
-              source={{ uri: user?.imageUrl }}
-              className="rounded-full w-12 h-12"
-            />
-            <View>
-              <Text className="text-[16px]">Welcome</Text>
-              <Text className="text-[20px] font-bold">{user?.fullName}</Text>
-            </View>
-            <Slider />
+        <View className="flex-row gap-2 pt-3 ml-2">
+          <Image
+            source={{ uri: user?.imageUrl }}
+            className="rounded-full w-12 h-12"
+          />
+          <View>
+            <Text className="text-[16px]">Welcome</Text>
+            <Text className="text-[20px] font-bold">{user?.fullName}</Text>
           </View>
+        </View>
+
+        <Slider />
+
         <View className="flex-1 bg-white">
-          <Text className="font-rubikblack text-4xl  text-#404040 px-8">
+          <Text className="font-rubikblack text-4xl text-gray-800 px-8">
             Renter Dashboard
           </Text>
         </View>
+
         <TouchableOpacity onPress={pickImage}>
-          <View className='pl-8'>
+          <View className="pl-8">
             <Image
-              
               source={require("../../Assets/images/Placeholder_view_vector.png")}
               style={{
                 width: 150,
                 height: 150,
                 borderRadius: 15,
-                paddingBottom: 10,
                 marginBottom: 15,
                 marginTop: 15,
               }}
             />
           </View>
         </TouchableOpacity>
+
         <Formik
           initialValues={{
             name: "",
@@ -183,59 +172,61 @@ const BookingCalendar = ({ airplaneId, userId }) => {
             handleBlur,
             handleSubmit,
             values,
-            handleAddListing,
           }) => (
-            <View>
+            <View className="px-8">
               <TextInput
                 style={styles.input}
                 placeholder="Name"
-                value={values?.name}
+                value={values.name}
                 onChangeText={handleChange("name")}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Certifications"
-                value={values?.certifications}
+                value={values.certifications}
                 numberOfLines={5}
-                onChangeText={handleChange("desc")}
+                onChangeText={handleChange("certifications")}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Contact"
-                value={values?.contact}
+                value={values.contact}
                 onChangeText={handleChange("contact")}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Location"
-                value={values?.address}
-                onChangeText={handleChange("location")}
+                value={values.address}
+                onChangeText={handleChange("address")}
               />
               <Picker
-                selectedValue={values?.category}
-                onValueChange={handleChange("Category")}
-                className="border-spacing-2"
+                selectedValue={values.category}
+                onValueChange={handleChange("category")}
+                style={styles.picker}
               >
-                <Picker.Item label="Single Engine Prop" value={"Dropdown"} />
-                <Picker.Item key={""} label="Turbo Prop" value={"Dropdown"} />
-                <Picker.Item label="Twin Engine Prop" value={"Dropdown"} />
-                <Picker.Item label="Turbo Prop" value={"Dropdown"} />
-                <Picker.Item label="Helicopter" value={"Dropdown"} />
-                <Picker.Item label="Jet" value={"Dropdown"} />
+                <Picker.Item label="Single Engine Prop" value="single_engine" />
+                <Picker.Item label="Twin Engine Prop" value="twin_engine" />
+                <Picker.Item label="Turbo Prop" value="turbo_prop" />
+                <Picker.Item label="Helicopter" value="helicopter" />
+                <Picker.Item label="Jet" value="jet" />
               </Picker>
-              <Button
-                onPress={handleAddListing}
-                className="mt-7"
-                title="submit"
-              />
+              <TouchableOpacity
+                onPress={handleSubmit}
+                style={styles.submitButton}
+              >
+                <Text className="text-white text-center font-bold">
+                  Submit
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </Formik>
+
         <View style={styles.container}>
           <TextInput
             style={styles.input}
             placeholder="Select booking dates"
-            value={textInputValue}
+            value={Object.keys(selectedDates).join(", ")}
             onFocus={() => setModalVisible(true)}
           />
           <Modal
@@ -243,10 +234,11 @@ const BookingCalendar = ({ airplaneId, userId }) => {
             transparent={true}
             animationType="slide"
           >
-          {/* <BookingCalendar airplaneId={airplaneId} userId={yourUserId} /> */}
-
             <View style={styles.modalContainer}>
-              <Calendar onDayPress={onDayPress} markedDates={selectedDates} />
+              <Calendar
+                onDayPress={onDayPress}
+                markedDates={selectedDates}
+              />
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
                 style={styles.closeButton}
@@ -262,14 +254,27 @@ const BookingCalendar = ({ airplaneId, userId }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 10,
-  },
   input: {
     borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 5,
     padding: 10,
+    marginBottom: 15,
+  },
+  container: {
+    padding: 10,
+  },
+  picker: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  submitButton: {
+    backgroundColor: '#1E90FF',
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 10,
   },
   modalContainer: {
     flex: 1,

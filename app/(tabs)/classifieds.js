@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Alert,
   SafeAreaView,
-  Button
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { getFirestore, collection, getDocs, addDoc, orderBy } from "firebase/firestore";
@@ -27,7 +26,7 @@ import bgImage from "../../Assets/images/rsf_backgroundImage.png";
 import { StatusBar } from "expo-status-bar";
 
 const Classifieds = () => {
-  const [image, setImage] = useState(null);
+  const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sliderList, setSliderList] = useState([]);
   const [categoryList, setCategoryList] = useState([]);
@@ -75,6 +74,11 @@ const Classifieds = () => {
   };
 
   const pickImage = async () => {
+    if (images.length >= 7) {
+      Alert.alert("You can only upload up to 7 images.");
+      return;
+    }
+
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
@@ -83,34 +87,39 @@ const Classifieds = () => {
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      setImages([...images, result.assets[0].uri]);
     }
   };
 
   const onSubmitMethod = async (value) => {
     setLoading(true);
-    const resp = await fetch(image);
-    const blob = await resp.blob();
-    const storageRef = ref(storage, "airplane_listings/" + Date.now() + ".jpg");
+    const imageUrls = [];
 
-    uploadBytes(storageRef, blob)
-      .then(() => {
-        console.log("You uploaded an image.");
-      })
-      .then(() => {
-        getDownloadURL(storageRef).then(async (downloadUrl) => {
-          value.image = downloadUrl;
-          value.userName = user.fullName;
-          value.userEmail = user.primaryEmailAddress.emailAddress;
-          value.userImage = user.imageUrl;
+    for (let i = 0; i < images.length; i++) {
+      const resp = await fetch(images[i]);
+      const blob = await resp.blob();
+      const storageRef = ref(storage, "airplane_listings/" + Date.now() + "_" + i + ".jpg");
 
-          const docRef = await addDoc(collection(db, "UserPost"), value);
-          if (docRef.id) {
-            setLoading(false);
-            Alert.alert("Your post was successfully added!");
-          }
-        });
-      });
+      await uploadBytes(storageRef, blob);
+      const downloadUrl = await getDownloadURL(storageRef);
+      imageUrls.push(downloadUrl);
+    }
+
+    value.images = imageUrls;
+    value.userName = user.fullName;
+    value.userEmail = user.primaryEmailAddress.emailAddress;
+    value.userImage = user.imageUrl;
+
+    try {
+      const docRef = await addDoc(collection(db, "UserPost"), value);
+      if (docRef.id) {
+        setLoading(false);
+        Alert.alert("Your post was successfully added!");
+      }
+    } catch (error) {
+      setLoading(false);
+      Alert.alert("There was an error uploading your post.");
+    }
   };
 
   const filterListings = () => {
@@ -175,7 +184,7 @@ const Classifieds = () => {
                   category: "",
                   location: "",
                   price: "",
-                  image: "",
+                  images: [],
                   userName: "",
                   userEmail: "",
                   userImage: "",
@@ -203,21 +212,21 @@ const Classifieds = () => {
                 }) => (
                   <View>
                     <View className="flex-row gap-2">
-                      <Slider sliderList={sliderList}>
+                      <ScrollView horizontal>
+                        {images.map((image, index) => (
+                          <Image
+                            key={index}
+                            source={{ uri: image }}
+                            className="w-24 h-24 rounded-lg mr-2"
+                          />
+                        ))}
                         <TouchableOpacity onPress={pickImage}>
-                          {image ? (
-                            <Image
-                              source={{ uri: image }}
-                              className="w-24 h-24 rounded-lg"
-                            />
-                          ) : (
-                            <Image
-                              source={require("../../Assets/images/Placeholder_view_vector.png")}
-                              className="w-36 h-36 rounded-lg"
-                            />
-                          )}
+                          <Image
+                            source={require("../../Assets/images/Placeholder_view_vector.png")}
+                            className="w-24 h-24 rounded-lg"
+                          />
                         </TouchableOpacity>
-                      </Slider>
+                      </ScrollView>
                     </View>
                     <TextInput
                       className="border rounded-lg p-3 mt-2 mb-1 text-lg"
@@ -230,7 +239,7 @@ const Classifieds = () => {
                       placeholder="Description, Avionics, TTOF, etc.."
                       value={values?.desc}
                       onChangeText={handleChange("desc")}
-                      numberOfLines={10}
+                      multiline
                       textWrap={true}
                     />
                     <TextInput

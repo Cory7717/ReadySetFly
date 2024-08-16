@@ -13,7 +13,7 @@ import SocialMediaPost from '../../components/SocialMediaPost';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 // import LiveStream from '/LiveStream'; // Import the new screen
-
+import FullScreenRental from '../../components/FullScreenRental';
 
 
 // Styled components
@@ -310,6 +310,8 @@ export default function App() {
         <Stack.Screen name="MainFeed" component={MainFeed} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
         {/* <Stack.Screen name="LiveStream" component={LiveStream} options={{ headerShown: false }} /> */}
+        <Stack.Screen name="FullScreenRental" component={FullScreenRental} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );
