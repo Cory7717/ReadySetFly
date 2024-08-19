@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   TextInput,
@@ -10,7 +10,7 @@ import {
   Text,
   Modal,
 } from "react-native";
-import { getFirestore, collection, addDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, doc, getDoc } from "firebase/firestore"; // Add getDoc
 import * as ImagePicker from "expo-image-picker";
 import { useUser } from "@clerk/clerk-expo";
 import { Picker } from "@react-native-picker/picker";
@@ -45,7 +45,25 @@ const OwnerProfile = ({ ownerId }) => {
   const [bankAccountName, setBankAccountName] = useState(""); // Added state
   const [bankAccountNumber, setBankAccountNumber] = useState(""); // Added state
   const [bankRoutingNumber, setBankRoutingNumber] = useState(""); // Added state
+  const [cumulativeEarnings, setCumulativeEarnings] = useState(0); // New state for cumulative earnings
   const { user } = useUser();
+
+  useEffect(() => {
+    const fetchCumulativeEarnings = async () => {
+      const db = getFirestore();
+      const ownerDocRef = doc(db, "owners", ownerId);
+      const ownerDoc = await getDoc(ownerDocRef);
+
+      if (ownerDoc.exists()) {
+        const data = ownerDoc.data();
+        setCumulativeEarnings(data.cumulativeEarnings || 0); // Assuming cumulativeEarnings is stored in the owner's document
+      }
+    };
+
+    if (ownerId) {
+      fetchCumulativeEarnings();
+    }
+  }, [ownerId]);
 
   const pickImages = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -266,6 +284,11 @@ const OwnerProfile = ({ ownerId }) => {
             keyboardType="numeric"
             className="border-gray-300 border rounded-md p-3 mb-4"
           />
+
+          {/* Display Cumulative Earnings */}
+          <StyledText className="text-lg font-semibold text-gray-800 mb-4">
+            Cumulative Earnings: ${cumulativeEarnings.toFixed(2)}
+          </StyledText>
 
           <TouchableButton
             onPress={() => setBankDetailsVisible(false)}
