@@ -17,6 +17,7 @@ import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import DatePicker from "react-native-modern-datepicker"; // Import the date picker
 import { styled } from 'nativewind'; // Import NativeWind's styled utility
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 
 // Styled components with NativeWind
 const SafeView = styled(SafeAreaView);
@@ -133,7 +134,7 @@ const OwnerProfile = ({ ownerId }) => {
             </StyledText>
           </WrapperView>
           <TouchableButton onPress={() => setBankDetailsVisible(true)}>
-            <Ionicons name="settings-outline" size={24} color="gray" />
+            <FontAwesome6 name="comment-dollar" size={32} color="gray" />
           </TouchableButton>
         </WrapperView>
 
