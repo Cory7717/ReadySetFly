@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   TextInput,
   Image,
@@ -8,28 +8,21 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
-} from "react-native";
-import { Calendar } from "react-native-calendars";
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
-import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import { Formik } from "formik";
-import { Picker } from "@react-native-picker/picker";
-import * as ImagePicker from "expo-image-picker";
-import { useUser } from "@clerk/clerk-expo";
-import Slider from "../../components/Slider";
-import { Ionicons } from "@expo/vector-icons";
-
-const Tab = createMaterialTopTabNavigator();
+  RefreshControl, // Import RefreshControl
+} from 'react-native';
+import { Calendar } from 'react-native-calendars';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { Formik } from 'formik';
+import { Picker } from '@react-native-picker/picker';
+import * as ImagePicker from 'expo-image-picker';
+import { useUser } from '@clerk/clerk-expo';
+import Slider from '../../components/Slider';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const BookingCalendar = ({ airplaneId, userId }) => {
   const { user } = useUser();
+  const navigation = useNavigation();
   const [bookings, setBookings] = useState({});
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedDates, setSelectedDates] = useState({});
@@ -43,37 +36,67 @@ const BookingCalendar = ({ airplaneId, userId }) => {
     address: "",
     category: "",
   });
+  const [availableRentals, setAvailableRentals] = useState([]);
+  const [refreshing, setRefreshing] = useState(false); // State for refreshing
+
+  const fetchBookings = async () => {
+    if (!airplaneId) return;
+
+    const db = getFirestore();
+    const bookingsCollection = collection(db, 'bookings');
+    const q = query(bookingsCollection, where('airplaneId', '==', airplaneId));
+
+    try {
+      const querySnapshot = await getDocs(q);
+      let bookingsData = {};
+      querySnapshot.forEach((doc) => {
+        const { startDate, endDate } = doc.data();
+        bookingsData[startDate] = { marked: true, dotColor: 'red' };
+        bookingsData[endDate] = { marked: true, dotColor: 'red' };
+      });
+      setBookings(bookingsData);
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+    }
+  };
 
   useEffect(() => {
-    const fetchBookings = async () => {
-      if (!airplaneId) {
-        console.error("airplaneId is undefined");
-        return;
-      }
-
-      const db = getFirestore();
-      const bookingsCollection = collection(db, "bookings");
-      const q = query(bookingsCollection, where("airplaneId", "==", airplaneId));
-
-      try {
-        const querySnapshot = await getDocs(q);
-        let bookingsData = {};
-        querySnapshot.forEach((doc) => {
-          const { startDate, endDate } = doc.data();
-          bookingsData[startDate] = { marked: true, dotColor: "red" };
-          bookingsData[endDate] = { marked: true, dotColor: "red" };
-        });
-        setBookings(bookingsData);
-      } catch (error) {
-        console.error("Error fetching bookings:", error);
-      }
-    };
-
     fetchBookings();
   }, [airplaneId]);
 
+  useEffect(() => {
+    if (selectedDate) {
+      fetchAvailableRentals(selectedDate);
+    }
+  }, [selectedDate]);
+
+  const fetchAvailableRentals = async (date) => {
+    if (!airplaneId) return;
+
+    const db = getFirestore();
+    const rentalsCollection = collection(db, 'rentals');
+    const q = query(rentalsCollection, where('availableDates', 'array-contains', date));
+    
+    try {
+      const querySnapshot = await getDocs(q);
+      const rentals = [];
+      querySnapshot.forEach((doc) => {
+        rentals.push(doc.data());
+      });
+      setAvailableRentals(rentals);
+    } catch (error) {
+      console.error('Error fetching available rentals:', error);
+    }
+  };
+
   const handleDayPress = (day) => {
     setSelectedDate(day.dateString);
+    setModalVisible(false);
+    // Navigate to confirmation screen
+    navigation.navigate('ConfirmationScreen', {
+      selectedDate: day.dateString,
+      availableRentals,
+    });
   };
 
   const pickImage = async () => {
@@ -95,9 +118,20 @@ const BookingCalendar = ({ airplaneId, userId }) => {
     setProfileModalVisible(false);
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchBookings().then(() => {
+      setRefreshing(false);
+    });
+  };
+
   return (
     <SafeAreaView className="h-full bg-white mt-7">
-      <ScrollView>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header with Welcome and Settings Button */}
         <View className="flex-row justify-between items-center px-4 py-3">
           <View className="flex-row items-center">
@@ -184,9 +218,10 @@ const BookingCalendar = ({ airplaneId, userId }) => {
         <View className="p-4">
           <TextInput
             className="border border-gray-300 rounded-lg p-2 mb-4"
-            placeholder="Select booking dates"
-            value={Object.keys(selectedDates).join(", ")}
+            placeholder="Select booking date"
+            value={selectedDate}
             onFocus={() => setModalVisible(true)}
+            editable={false}
           />
           <Modal
             visible={modalVisible}
@@ -196,7 +231,12 @@ const BookingCalendar = ({ airplaneId, userId }) => {
             <View className="flex-1 justify-center bg-black bg-opacity-50 p-5">
               <Calendar
                 onDayPress={handleDayPress}
-                markedDates={selectedDates}
+                markedDates={bookings}
+                theme={{
+                  selectedDayBackgroundColor: '#007aff',
+                  todayTextColor: '#007aff',
+                  arrowColor: '#007aff',
+                }}
               />
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
@@ -208,10 +248,23 @@ const BookingCalendar = ({ airplaneId, userId }) => {
               </TouchableOpacity>
             </View>
           </Modal>
+
+          {/* Available Rentals Section */}
+          {availableRentals.length > 0 && (
+            <View className="mt-4">
+              <Text className="text-xl font-bold mb-2">Available Rentals</Text>
+              {availableRentals.map((rental, index) => (
+                <View key={index} className="p-4 mb-4 border rounded-lg">
+                  <Text className="text-lg font-bold">{rental.name}</Text>
+                  <Text>{rental.description}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 
-      {/* Profile Modal */}
+      {/* Profile Edit Modal */}
       <Modal
         visible={profileModalVisible}
         transparent={true}
@@ -232,6 +285,7 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                   className="border border-gray-300 rounded-lg p-2 mb-4"
                   placeholder="Certifications"
                   value={values.certifications}
+                  multiline
                   onChangeText={handleChange("certifications")}
                 />
                 <TextInput

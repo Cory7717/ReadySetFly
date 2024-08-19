@@ -38,18 +38,18 @@ const App = () => {
               onPress={() => router.push('/sign-in')} 
               className="bg-blue-500 py-4 rounded-lg mb-4 shadow-lg"
             >
-              <Text className="text-center text-white text-lg">Sign In</Text>
+              <Text className="text-center text-white text-lg">Sign In or Create Account</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            {/* <TouchableOpacity 
               onPress={() => router.push('/sign-up')} 
               className="bg-green-500 py-4 rounded-lg shadow-lg"
             >
               <Text className="text-center text-white text-lg">Sign Up</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </SignedOut>
 
-        <CustomButton
+        {/* <CustomButton
           title="Renter - Sign In/Up"
           handlePress={() => router.push("/renter_sign_in")}
           containerStyles="bg-black py-4 rounded-lg mb-4"
@@ -58,7 +58,7 @@ const App = () => {
           title="Owner - Sign In/Up"
           handlePress={() => router.push("/owner_sign_in")}
           containerStyles="bg-black py-4 rounded-lg mb-4"
-        />
+        /> */}
         <CustomButton
           title="View Content"
           handlePress={() => router.push("/home")}

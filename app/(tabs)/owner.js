@@ -16,6 +16,17 @@ import { useUser } from "@clerk/clerk-expo";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import DatePicker from "react-native-modern-datepicker"; // Import the date picker
+import { styled } from 'nativewind'; // Import NativeWind's styled utility
+
+// Styled components with NativeWind
+const SafeView = styled(SafeAreaView);
+const ScrollContainer = styled(ScrollView);
+const WrapperView = styled(View);
+const TouchableButton = styled(TouchableOpacity);
+const StyledText = styled(Text);
+const StyledImage = styled(Image);
+const StyledTextInput = styled(TextInput);
+const StyledModal = styled(Modal);
 
 const OwnerProfile = ({ ownerId }) => {
   const [airplaneName, setAirplaneName] = useState("");
@@ -88,55 +99,57 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   return (
-    <SafeAreaView className="bg-white flex-1">
-      <ScrollView className="p-4">
-        <View className="flex-row items-center justify-between mb-6 mt-5">
-          <View className="flex-row items-center">
-            <TouchableOpacity onPress={() => pickImages()}>
-              <Image
+    <SafeView className="bg-white flex-1">
+      <ScrollContainer contentContainerStyle={{ padding: 16 }}>
+        <WrapperView className="flex-row items-center justify-between mb-6 mt-5">
+          <WrapperView className="flex-row items-center">
+            <TouchableButton onPress={() => pickImages()}>
+              <StyledImage
                 source={profileImage ? { uri: profileImage } : { uri: user?.imageUrl }}
                 className="rounded-full w-16 h-16"
                 resizeMode="cover"
               />
-            </TouchableOpacity>
-            <Text className="text-xl font-semibold text-gray-800 ml-4">
+            </TouchableButton>
+            <StyledText className="text-xl font-semibold text-gray-800 ml-4">
               Welcome, {user?.fullName || "User"}!
-            </Text>
-          </View>
-          <TouchableOpacity onPress={() => setBankDetailsVisible(true)}>
+            </StyledText>
+          </WrapperView>
+          <TouchableButton onPress={() => setBankDetailsVisible(true)}>
             <Ionicons name="settings-outline" size={24} color="gray" />
-          </TouchableOpacity>
-        </View>
+          </TouchableButton>
+        </WrapperView>
 
-        <TouchableOpacity onPress={pickImages} className="p-4 bg-gray-200 rounded-lg mb-4">
-          <Text className="text-center text-gray-600">Pick up to 7 Aircraft Images</Text>
-        </TouchableOpacity>
+        <TouchableButton onPress={pickImages} className="p-4 bg-gray-200 rounded-md mb-4">
+          <StyledText className="text-center text-gray-600">
+            Pick up to 7 Aircraft Images
+          </StyledText>
+        </TouchableButton>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {aircraftImages.map((uri, index) => (
-            <Image
+            <StyledImage
               key={index}
               source={{ uri }}
-              className="w-32 h-32 mr-2 rounded-lg"
+              className="w-32 h-32 mr-2 rounded-md"
               resizeMode="cover"
             />
           ))}
         </ScrollView>
 
-        <View className="space-y-4">
-          <TextInput
+        <WrapperView className="space-y-4">
+          <StyledTextInput
             placeholder="Name"
             value={user?.fullName}
-            className="border border-gray-300 rounded-lg p-3"
+            className="border-gray-300 border rounded-md p-3"
             editable={false}
           />
-          <TextInput
+          <StyledTextInput
             placeholder="Location (City, State, Country)"
             value={location}
             onChangeText={setLocation}
-            className="border border-gray-300 rounded-lg p-3"
+            className="border-gray-300 border rounded-md p-3"
           />
 
-          <View className="border rounded-lg p-1">
+          <WrapperView className="border-gray-300 border rounded-md p-1">
             <Picker
               selectedValue={airplaneYear}
               onValueChange={(itemValue) => setAirplaneYear(itemValue)}
@@ -147,33 +160,33 @@ const OwnerProfile = ({ ownerId }) => {
                 return <Picker.Item label={year.toString()} value={year.toString()} key={index} />;
               })}
             </Picker>
-          </View>
+          </WrapperView>
 
-          <TextInput
+          <StyledTextInput
             placeholder="Airplane Model"
             value={airplaneModel}
             onChangeText={setAirplaneModel}
-            className="border border-gray-300 rounded-lg p-3"
+            className="border-gray-300 border rounded-md p-3"
           />
 
           {/* Availability Section */}
-          <TouchableOpacity
+          <TouchableButton
             onPress={() => setAvailabilityModalVisible(true)}
-            className="p-4 bg-gray-200 rounded-lg"
+            className="p-4 bg-gray-200 rounded-md"
           >
-            <Text className="text-center text-gray-600">Set Availability</Text>
-          </TouchableOpacity>
+            <StyledText className="text-center text-gray-600">Set Availability</StyledText>
+          </TouchableButton>
 
-          <TextInput
+          <StyledTextInput
             placeholder="Airplane Description"
             value={description}
             onChangeText={setDescription}
             multiline
-            className="border border-gray-300 rounded-lg p-3"
+            className="border-gray-300 border rounded-md p-3"
           />
 
           {/* Is your annual current dropdown */}
-          <View className="border rounded-lg p-1">
+          <WrapperView className="border-gray-300 border rounded-md p-1">
             <Picker
               selectedValue={isAnnualCurrent}
               onValueChange={(itemValue) => setIsAnnualCurrent(itemValue)}
@@ -182,26 +195,26 @@ const OwnerProfile = ({ ownerId }) => {
               <Picker.Item label="Yes" value="Yes" />
               <Picker.Item label="No" value="No" />
             </Picker>
-          </View>
+          </WrapperView>
 
-          <TouchableOpacity
+          <TouchableButton
             onPress={handleUpload}
             className="p-4 bg-blue-600 rounded-full mt-6"
           >
-            <Text className="text-white text-center text-lg font-semibold">
+            <StyledText className="text-white text-center text-lg font-semibold">
               Update Profile and List Aircraft
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+            </StyledText>
+          </TouchableButton>
+        </WrapperView>
+      </ScrollContainer>
 
       {/* Modal for Availability Selection */}
-      <Modal visible={availabilityModalVisible} animationType="slide">
-        <SafeAreaView className="bg-white flex-1 p-4">
-          <TouchableOpacity onPress={() => setAvailabilityModalVisible(false)} className="p-2 mb-4">
+      <StyledModal visible={availabilityModalVisible} animationType="slide">
+        <SafeView className="bg-white flex-1 p-4">
+          <TouchableButton onPress={() => setAvailabilityModalVisible(false)} className="p-2 mb-4">
             <Ionicons name="close-outline" size={24} color="gray" />
-          </TouchableOpacity>
-          <Text className="text-xl font-semibold text-gray-800 mb-4">Select Availability Dates</Text>
+          </TouchableButton>
+          <StyledText className="text-xl font-semibold text-gray-800 mb-4">Select Availability Dates</StyledText>
 
           <DatePicker
             mode="calendar"
@@ -209,7 +222,7 @@ const OwnerProfile = ({ ownerId }) => {
             onDateChange={(date) => setCurrentDate(date)} // Update the currentDate state
           />
 
-          <TouchableOpacity
+          <TouchableButton
             onPress={() => {
               if (currentDate && !selectedDates.includes(currentDate)) {
                 setSelectedDates([...selectedDates, currentDate]);
@@ -218,53 +231,53 @@ const OwnerProfile = ({ ownerId }) => {
             }}
             className="p-4 bg-blue-600 rounded-full mt-6"
           >
-            <Text className="text-white text-center text-lg font-semibold">
+            <StyledText className="text-white text-center text-lg font-semibold">
               Save and Close
-            </Text>
-          </TouchableOpacity>
-        </SafeAreaView>
-      </Modal>
+            </StyledText>
+          </TouchableButton>
+        </SafeView>
+      </StyledModal>
 
       {/* Modal for Bank Details */}
-      <Modal visible={bankDetailsVisible} animationType="slide">
-        <SafeAreaView className="bg-white flex-1 p-4">
-          <TouchableOpacity onPress={() => setBankDetailsVisible(false)} className="p-2 mb-4">
+      <StyledModal visible={bankDetailsVisible} animationType="slide">
+        <SafeView className="bg-white flex-1 p-4">
+          <TouchableButton onPress={() => setBankDetailsVisible(false)} className="p-2 mb-4">
             <Ionicons name="close-outline" size={24} color="gray" />
-          </TouchableOpacity>
-          <Text className="text-xl font-semibold text-gray-800 mb-4">Banking Details</Text>
+          </TouchableButton>
+          <StyledText className="text-xl font-semibold text-gray-800 mb-4">Banking Details</StyledText>
 
-          <TextInput
+          <StyledTextInput
             placeholder="Bank Account Name"
             value={bankAccountName}
             onChangeText={setBankAccountName}
-            className="border border-gray-300 rounded-lg p-3 mb-4"
+            className="border-gray-300 border rounded-md p-3 mb-4"
           />
-          <TextInput
+          <StyledTextInput
             placeholder="Bank Account Number"
             value={bankAccountNumber}
             onChangeText={setBankAccountNumber}
             keyboardType="numeric"
-            className="border border-gray-300 rounded-lg p-3 mb-4"
+            className="border-gray-300 border rounded-md p-3 mb-4"
           />
-          <TextInput
+          <StyledTextInput
             placeholder="Bank Routing Number"
             value={bankRoutingNumber}
             onChangeText={setBankRoutingNumber}
             keyboardType="numeric"
-            className="border border-gray-300 rounded-lg p-3 mb-4"
+            className="border-gray-300 border rounded-md p-3 mb-4"
           />
 
-          <TouchableOpacity
+          <TouchableButton
             onPress={() => setBankDetailsVisible(false)}
             className="p-4 bg-blue-600 rounded-full mt-6"
           >
-            <Text className="text-white text-center text-lg font-semibold">
+            <StyledText className="text-white text-center text-lg font-semibold">
               Save and Close
-            </Text>
-          </TouchableOpacity>
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
+            </StyledText>
+          </TouchableButton>
+        </SafeView>
+      </StyledModal>
+    </SafeView>
   );
 };
 

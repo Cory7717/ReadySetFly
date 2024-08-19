@@ -80,6 +80,7 @@ const SignUp = () => {
         <View className="w-3/4 max-w-md space-y-4">
           {!pendingVerification ? (
             <>
+            <View className='gap-4'>
               <TextInput
                 autoCapitalize="none"
                 value={emailAddress}
@@ -94,6 +95,7 @@ const SignUp = () => {
                 onChangeText={setPassword}
                 className="border border-gray-300 rounded-lg p-3"
               />
+              </View>
               <Picker
                 selectedValue={userType}
                 onValueChange={(itemValue) => setUserType(itemValue)}
