@@ -1,186 +1,148 @@
-import React from 'react';
-import { View, Text, ScrollView, Dimensions, Alert, Image, TextInput, Button } from 'react-native';
-import { useState } from 'react';
-import { Link, router, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React from "react";
+import {
+  View,
+  Text,
+  Image,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
+  
+} from "react-native";
+import { useSignUp } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
 import { images } from "../../constants";
-import FormField from '../../components/FormField';
-import CustomButton from '../../components/CustomButton';
-import { StatusBar } from 'expo-status-bar';
-import { createUser, setUser } from '../../lib/appwrite';
-import { signUp } from '../../lib/appwrite';
-import { useGlobalContext } from '../../context/GlobalProvider';
-import { SignedIn, SignedOut, useUser, useSignUp } from '@clerk/clerk-expo'
-
-
+import { StatusBar } from "expo-status-bar";
+import { Picker } from "@react-native-picker/picker";
 
 const SignUp = () => {
-  const { isLoaded, signUp, setActive } = useSignUp()
-  const router = useRouter()
+  const { signUp, setActive, isLoaded } = useSignUp();
+  const router = useRouter();
 
-  const [emailAddress, setEmailAddress] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [pendingVerification, setPendingVerification] = React.useState(false)
-  const [code, setCode] = React.useState('')
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [userType, setUserType] = React.useState("renter");
+  const [pendingVerification, setPendingVerification] = React.useState(false);
+  const [code, setCode] = React.useState("");
 
-  const onSignUpPress = async () => {
+  const onSignUpPress = React.useCallback(async () => {
     if (!isLoaded) {
-      return
+      return;
     }
 
     try {
       await signUp.create({
         emailAddress,
         password,
-      })
+        publicMetadata: { userType }, // Storing user type in metadata
+      });
 
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
 
-      setPendingVerification(true)
+      setPendingVerification(true);
     } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error(JSON.stringify(err, null, 2))
+      console.error(JSON.stringify(err, null, 2));
     }
-  }
+  }, [isLoaded, emailAddress, password, userType]);
 
-  const onPressVerify = async () => {
+  const onPressVerify = React.useCallback(async () => {
     if (!isLoaded) {
-      return
+      return;
     }
 
     try {
       const completeSignUp = await signUp.attemptEmailAddressVerification({
         code,
-      })
+      });
 
       if (completeSignUp.status === 'complete') {
-        await setActive({ session: completeSignUp.createdSessionId })
-        router.replace('/')
+        await setActive({ session: completeSignUp.createdSessionId });
+        router.replace('/');
       } else {
-        console.error(JSON.stringify(completeSignUp, null, 2))
+        console.error(JSON.stringify(completeSignUp, null, 2));
       }
     } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error(JSON.stringify(err, null, 2))
+      console.error(JSON.stringify(err, null, 2));
     }
-  }
-  
-  
-  
-  
-  // const { setUser, setIsLogged } = useGlobalContext();
-  // const [isSubmitting, setSubmitting] = useState(false)
-  // const [form, setForm] = useState({
-  //   username: "",
-  //   email: "",
-  //   password: "",
-  // });
-
-  
-  
-  // const submit = async () => {
-  //   if(form.email ==="" || form.password ==="") {
-  //     Alert.alert('Error', 'Please fill in the required fields')
-  //   }
-
-  //   setSubmitting(true);
-    
-  //   try {
-  //     const result = await createUser(form.email, form.password, form.username);
-  //     setUser(result);
-  //     setIsLogged(true);
-
-  //     router.replace('/home');
-  //   } catch (error) {
-  //       Alert.alert('Error', error.message)
-  //   }  finally {
-      
-  //     setSubmitting(false);
-  //   }
-  // };
+  }, [isLoaded, code]);
 
   return (
-    <SafeAreaView className="bg-white h-full">
-      <ScrollView> 
-        <View className="w-full justify-center items-center px-4 ">
-          <Image source={images.logo}
-            resizeMode='contain'
-            className='w-[300px] h-[300px]'
-            
-          />
+    <SafeAreaView className="flex-1 bg-white p-4">
+      <StatusBar barStyle="dark-content" />
+      <View className="flex-1 justify-center items-center">
+        <Image
+          source={images.logo}
+          resizeMode="contain"
+          className="w-60 h-80 mb-6"
+        />
+        <Text className="text-2xl font-bold mb-4">
+          Sign up for Ready, Set, Fly!
+        </Text>
+        <View className="w-3/4 max-w-md space-y-4">
+          {!pendingVerification ? (
+            <>
+              <TextInput
+                autoCapitalize="none"
+                value={emailAddress}
+                placeholder="Email"
+                onChangeText={setEmailAddress}
+                className="border border-gray-300 rounded-lg p-3"
+              />
+              <TextInput
+                value={password}
+                placeholder="Password"
+                secureTextEntry
+                onChangeText={setPassword}
+                className="border border-gray-300 rounded-lg p-3"
+              />
+              <Picker
+                selectedValue={userType}
+                onValueChange={(itemValue) => setUserType(itemValue)}
+                className="border border-gray-300 rounded-lg p-3"
+              >
+                <Picker.Item label="Renter" value="renter" />
+                <Picker.Item label="Owner" value="owner" />
+              </Picker>
+              <TouchableOpacity
+                onPress={onSignUpPress}
+                className="bg-blue-500 rounded-lg p-3"
+              >
+                <Text className="text-white text-center text-lg font-semibold">
+                  Sign Up
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TextInput
+                value={code}
+                placeholder="Verification Code"
+                onChangeText={setCode}
+                className="border border-gray-300 rounded-lg p-3"
+              />
+              <TouchableOpacity
+                onPress={onPressVerify}
+                className="bg-green-500 rounded-lg p-3"
+              >
+                <Text className="text-white text-center text-lg font-semibold">
+                  Verify Email
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+          <View className="flex-row justify-center items-center">
+            <Text className="text-lg text-gray-600">
+              Already have an account?
+            </Text>
+            <TouchableOpacity onPress={() => router.push("/sign-in")}>
+              <Text className="text-lg text-blue-600 ml-2 font-semibold">
+                Sign in
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-
-        <View>
-      {!pendingVerification && (
-        <>
-          <TextInput
-            autoCapitalize="none"
-            value={emailAddress}
-            placeholder="Email..."
-            onChangeText={(email) => setEmailAddress(email)}
-          />
-          <TextInput
-            value={password}
-            placeholder="Password..."
-            secureTextEntry={true}
-            onChangeText={(password) => setPassword(password)}
-          />
-          <Button title="Sign Up" onPress={onSignUpPress} />
-        </>
-      )}
-      {pendingVerification && (
-        <>
-          <TextInput value={code} placeholder="Code..." onChangeText={(code) => setCode(code)} />
-          <Button title="Verify Email" onPress={onPressVerify} />
-        </>
-      )}
-    </View>
-
-        {/* <View className=' mt-1 justify-center items-center'>
-          <Text className='text-2xl font-rubikblack justify-center items-center'>
-            Sign up for Ready, Set, Fly!
-          </Text>
-          <FormField
-            title="Username"
-            value={form.username}
-            handleChangeText={(e) => setForm({...form, username: e })}
-            otherStyles='mt-10 mx-5'
-            
-          />   
-          <FormField
-            title="Email"
-            value={form.email}
-            handleChangeText={(e) => setForm({...form, email: e })}
-            otherStyles='mt-7 mx-5'
-            keyboardType="email-address"
-          />     
-          <FormField 
-          title="Password"
-          value={form.password}
-          handleChangeText={(e) => setForm({...form, password: e })}    
-          otherStyles='mt-7 mx-5'
-          /> 
-        <CustomButton
-          title='Sign-Up'
-          handlePress={submit}
-          containerStyles='mt-7 bg-black w-100% ' 
-          isLoading={isSubmitting}         
-           />
-           <View className='justify-center pt-5 flex-row gap-2'>
-           <Text className='text-lg font-rubikregular text-#404040'>
-            Already have an account? 
-           </Text>
-            <Link href='/sign-in' className='text-lg font-rubikbold text-emerald-700'>Sign In
-            </Link>
-           </View>
-         
-        </View> */}
-      </ScrollView>
-      <StatusBar backgroundColor='white' />
+      </View>
     </SafeAreaView>
-  )
-}
+  );
+};
 
-export default SignUp
+export default SignUp;

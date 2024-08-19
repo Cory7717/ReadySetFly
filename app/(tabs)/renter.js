@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  StyleSheet,
   TextInput,
   Image,
   View,
@@ -15,7 +14,6 @@ import { Calendar } from "react-native-calendars";
 import {
   getFirestore,
   collection,
-  addDoc,
   query,
   where,
   getDocs,
@@ -26,6 +24,7 @@ import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import { useUser } from "@clerk/clerk-expo";
 import Slider from "../../components/Slider";
+import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -35,7 +34,15 @@ const BookingCalendar = ({ airplaneId, userId }) => {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedDates, setSelectedDates] = useState({});
   const [modalVisible, setModalVisible] = useState(false);
-  const [image, setImage] = useState(null);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: "",
+    certifications: "",
+    contact: "",
+    address: "",
+    category: "",
+  });
 
   useEffect(() => {
     const fetchBookings = async () => {
@@ -78,59 +85,34 @@ const BookingCalendar = ({ airplaneId, userId }) => {
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      setProfileData({ ...profileData, image: result.assets[0].uri });
     }
   };
 
-  const handleBooking = async () => {
-    if (!selectedDate) {
-      Alert.alert("Please select a date first.");
-      return;
-    }
-
-    if (!userId) {
-      console.error("userId is undefined");
-      return;
-    }
-
-    const db = getFirestore();
-    try {
-      await addDoc(collection(db, "bookings"), {
-        airplaneId,
-        renterId: userId,
-        startDate: selectedDate,
-        endDate: selectedDate,
-        status: "pending",
-      });
-      Alert.alert("Booking request sent!");
-    } catch (error) {
-      console.error("Error adding booking:", error);
-    }
-  };
-
-  const onDayPress = (day) => {
-    const dateKey = day.dateString;
-    let newSelectedDates = { ...selectedDates };
-    if (newSelectedDates[dateKey]) {
-      delete newSelectedDates[dateKey];
-    } else {
-      newSelectedDates[dateKey] = { selected: true, marked: true };
-    }
-    setSelectedDates(newSelectedDates);
+  const handleProfileSubmit = (values) => {
+    setProfileData(values);
+    setProfileSaved(true);
+    setProfileModalVisible(false);
   };
 
   return (
     <SafeAreaView className="h-full bg-white mt-7">
       <ScrollView>
-        <View className="flex-row gap-2 pt-3 ml-2">
-          <Image
-            source={{ uri: user?.imageUrl }}
-            className="rounded-full w-12 h-12"
-          />
-          <View>
-            <Text className="text-[16px]">Welcome</Text>
-            <Text className="text-[20px] font-bold">{user?.fullName}</Text>
+        {/* Header with Welcome and Settings Button */}
+        <View className="flex-row justify-between items-center px-4 py-3">
+          <View className="flex-row items-center">
+            <Image
+              source={{ uri: user?.imageUrl }}
+              className="rounded-full w-12 h-12"
+            />
+            <View className="ml-2">
+              <Text className="text-[16px]">Welcome</Text>
+              <Text className="text-[20px] font-bold">{user?.fullName}</Text>
+            </View>
           </View>
+          <TouchableOpacity onPress={() => setProfileModalVisible(true)}>
+            <Ionicons name="settings-outline" size={28} color="black" />
+          </TouchableOpacity>
         </View>
 
         <Slider />
@@ -141,90 +123,67 @@ const BookingCalendar = ({ airplaneId, userId }) => {
           </Text>
         </View>
 
+        {/* Profile Section */}
+        {profileSaved ? (
+          <View className="px-8 py-4 bg-white">
+            <Text className="text-xl font-bold mb-2">Profile Information</Text>
+            <View className="flex-row mb-2">
+              <Text className="font-bold flex-1">Name:</Text>
+              <Text className="flex-2">{profileData.name}</Text>
+            </View>
+            <View className="flex-row mb-2">
+              <Text className="font-bold flex-1">Certifications:</Text>
+              <Text className="flex-2">{profileData.certifications}</Text>
+            </View>
+            <View className="flex-row mb-2">
+              <Text className="font-bold flex-1">Contact:</Text>
+              <Text className="flex-2">{profileData.contact}</Text>
+            </View>
+            <View className="flex-row mb-2">
+              <Text className="font-bold flex-1">Location:</Text>
+              <Text className="flex-2">{profileData.address}</Text>
+            </View>
+            <View className="flex-row mb-2">
+              <Text className="font-bold flex-1">Category:</Text>
+              <Text className="flex-2">
+                {profileData.category === "single_engine"
+                  ? "Single Engine Prop"
+                  : profileData.category === "twin_engine"
+                  ? "Twin Engine Prop"
+                  : profileData.category === "turbo_prop"
+                  ? "Turbo Prop"
+                  : profileData.category === "helicopter"
+                  ? "Helicopter"
+                  : "Jet"}
+              </Text>
+            </View>
+            {profileData.image && (
+              <Image
+                source={{ uri: profileData.image }}
+                className="w-36 h-36 rounded-lg mt-2"
+              />
+            )}
+          </View>
+        ) : (
+          <View className="px-8 py-4">
+            <Text className="text-xl font-bold mb-2">
+              No Profile Information Available
+            </Text>
+          </View>
+        )}
+
         <TouchableOpacity onPress={pickImage}>
           <View className="pl-8">
             <Image
               source={require("../../Assets/images/Placeholder_view_vector.png")}
-              style={{
-                width: 150,
-                height: 150,
-                borderRadius: 15,
-                marginBottom: 15,
-                marginTop: 15,
-              }}
+              className="w-36 h-36 rounded-lg mt-4"
             />
           </View>
         </TouchableOpacity>
 
-        <Formik
-          initialValues={{
-            name: "",
-            certifications: "",
-            contact: "",
-            address: "",
-            price: "",
-            image: "",
-          }}
-          onSubmit={(value) => onSubmitValue(value)}
-        >
-          {({
-            handleChange,
-            handleBlur,
-            handleSubmit,
-            values,
-          }) => (
-            <View className="px-8">
-              <TextInput
-                style={styles.input}
-                placeholder="Name"
-                value={values.name}
-                onChangeText={handleChange("name")}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Certifications"
-                value={values.certifications}
-                numberOfLines={5}
-                onChangeText={handleChange("certifications")}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Contact"
-                value={values.contact}
-                onChangeText={handleChange("contact")}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Location"
-                value={values.address}
-                onChangeText={handleChange("address")}
-              />
-              <Picker
-                selectedValue={values.category}
-                onValueChange={handleChange("category")}
-                style={styles.picker}
-              >
-                <Picker.Item label="Single Engine Prop" value="single_engine" />
-                <Picker.Item label="Twin Engine Prop" value="twin_engine" />
-                <Picker.Item label="Turbo Prop" value="turbo_prop" />
-                <Picker.Item label="Helicopter" value="helicopter" />
-                <Picker.Item label="Jet" value="jet" />
-              </Picker>
-              <TouchableOpacity
-                onPress={handleSubmit}
-                style={styles.submitButton}
-              >
-                <Text className="text-white text-center font-bold">
-                  Submit
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </Formik>
-
-        <View style={styles.container}>
+        <View className="p-4">
           <TextInput
-            style={styles.input}
+            className="border border-gray-300 rounded-lg p-2 mb-4"
             placeholder="Select booking dates"
             value={Object.keys(selectedDates).join(", ")}
             onFocus={() => setModalVisible(true)}
@@ -234,63 +193,91 @@ const BookingCalendar = ({ airplaneId, userId }) => {
             transparent={true}
             animationType="slide"
           >
-            <View style={styles.modalContainer}>
+            <View className="flex-1 justify-center bg-black bg-opacity-50 p-5">
               <Calendar
-                onDayPress={onDayPress}
+                onDayPress={handleDayPress}
                 markedDates={selectedDates}
               />
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
-                style={styles.closeButton}
+                className="bg-white p-3 mt-3 rounded-lg"
               >
-                <Text style={styles.closeButtonText}>Close</Text>
+                <Text className="text-center text-blue-500 font-bold">
+                  Close
+                </Text>
               </TouchableOpacity>
             </View>
           </Modal>
         </View>
       </ScrollView>
+
+      {/* Profile Modal */}
+      <Modal
+        visible={profileModalVisible}
+        transparent={true}
+        animationType="slide"
+      >
+        <View className="flex-1 justify-center bg-black bg-opacity-50 p-5">
+          <Formik initialValues={profileData} onSubmit={handleProfileSubmit}>
+            {({ handleChange, handleSubmit, values }) => (
+              <View className="bg-white p-5 rounded-lg">
+                <Text className="text-xl font-bold mb-4">Edit Profile</Text>
+                <TextInput
+                  className="border border-gray-300 rounded-lg p-2 mb-4"
+                  placeholder="Name"
+                  value={values.name}
+                  onChangeText={handleChange("name")}
+                />
+                <TextInput
+                  className="border border-gray-300 rounded-lg p-2 mb-4"
+                  placeholder="Certifications"
+                  value={values.certifications}
+                  onChangeText={handleChange("certifications")}
+                />
+                <TextInput
+                  className="border border-gray-300 rounded-lg p-2 mb-4"
+                  placeholder="Contact"
+                  value={values.contact}
+                  onChangeText={handleChange("contact")}
+                />
+                <TextInput
+                  className="border border-gray-300 rounded-lg p-2 mb-4"
+                  placeholder="Location"
+                  value={values.address}
+                  onChangeText={handleChange("address")}
+                />
+                <Picker
+                  selectedValue={values.category}
+                  onValueChange={handleChange("category")}
+                  className="border border-gray-300 rounded-lg mb-4"
+                >
+                  <Picker.Item label="Single Engine Prop" value="single_engine" />
+                  <Picker.Item label="Twin Engine Prop" value="twin_engine" />
+                  <Picker.Item label="Turbo Prop" value="turbo_prop" />
+                  <Picker.Item label="Helicopter" value="helicopter" />
+                  <Picker.Item label="Jet" value="jet" />
+                </Picker>
+                <TouchableOpacity
+                  onPress={handleSubmit}
+                  className="bg-blue-500 p-4 rounded-lg mt-2"
+                >
+                  <Text className="text-center text-white font-bold">
+                    Save Profile
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </Formik>
+          <TouchableOpacity
+            onPress={() => setProfileModalVisible(false)}
+            className="bg-white p-3 mt-3 rounded-lg"
+          >
+            <Text className="text-center text-blue-500 font-bold">Close</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-  },
-  container: {
-    padding: 10,
-  },
-  picker: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 15,
-  },
-  submitButton: {
-    backgroundColor: '#1E90FF',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  closeButton: {
-    backgroundColor: '#fff',
-    padding: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  closeButtonText: {
-    color: '#007AFF',
-    fontSize: 18,
-  },
-});
 
 export default BookingCalendar;

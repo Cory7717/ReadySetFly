@@ -7,14 +7,12 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import { Link, Redirect, router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-expo';
 import { useGlobalContext } from "../context/GlobalProvider";
 import CustomButton from "../components/CustomButton";
 import { images } from "../constants";
-
-
 
 const App = () => {
   const { user } = useUser();
@@ -36,12 +34,18 @@ const App = () => {
         
         <SignedOut>
           <View className="mb-8">
-            <Link href="/sign-in">
-              <Text className="text-center text-blue-500 text-lg">Sign In</Text>
-            </Link>
-            <Link href="/sign-up">
-              <Text className="text-center text-blue-500 text-lg mt-2">Sign Up</Text>
-            </Link>
+            <TouchableOpacity 
+              onPress={() => router.push('/sign-in')} 
+              className="bg-blue-500 py-4 rounded-lg mb-4 shadow-lg"
+            >
+              <Text className="text-center text-white text-lg">Sign In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => router.push('/sign-up')} 
+              className="bg-green-500 py-4 rounded-lg shadow-lg"
+            >
+              <Text className="text-center text-white text-lg">Sign Up</Text>
+            </TouchableOpacity>
           </View>
         </SignedOut>
 

@@ -8,11 +8,14 @@ import {
   TouchableOpacity,
   Image,
   Text,
+  Modal,
 } from "react-native";
 import { getFirestore, collection, addDoc } from "firebase/firestore";
 import * as ImagePicker from "expo-image-picker";
 import { useUser } from "@clerk/clerk-expo";
 import { Picker } from "@react-native-picker/picker";
+import { Ionicons } from "@expo/vector-icons";
+import DatePicker from "react-native-modern-datepicker"; // Import the date picker
 
 const OwnerProfile = ({ ownerId }) => {
   const [airplaneName, setAirplaneName] = useState("");
@@ -21,15 +24,18 @@ const OwnerProfile = ({ ownerId }) => {
   const [location, setLocation] = useState("");
   const [airplaneYear, setAirplaneYear] = useState("");
   const [description, setDescription] = useState("");
+  const [isAnnualCurrent, setIsAnnualCurrent] = useState(""); // New state for annual current dropdown
   const [profileImage, setProfileImage] = useState(null);
-  const [aircraftImages, setAircraftImages] = useState([]); // To hold up to 7 images
-  const [bankDetailsVisible, setBankDetailsVisible] = useState(false); // To toggle banking details section
-  const [bankAccountName, setBankAccountName] = useState("");
-  const [bankAccountNumber, setBankAccountNumber] = useState("");
-  const [bankRoutingNumber, setBankRoutingNumber] = useState("");
+  const [aircraftImages, setAircraftImages] = useState([]);
+  const [bankDetailsVisible, setBankDetailsVisible] = useState(false);
+  const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
+  const [selectedDates, setSelectedDates] = useState([]); // To hold selected dates for availability
+  const [currentDate, setCurrentDate] = useState(""); // To track the currently selected date
+  const [bankAccountName, setBankAccountName] = useState(""); // Added state
+  const [bankAccountNumber, setBankAccountNumber] = useState(""); // Added state
+  const [bankRoutingNumber, setBankRoutingNumber] = useState(""); // Added state
   const { user } = useUser();
 
-  // Function to handle image picking
   const pickImages = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -50,7 +56,8 @@ const OwnerProfile = ({ ownerId }) => {
       !availability ||
       !location ||
       !airplaneYear ||
-      !description
+      !description ||
+      !isAnnualCurrent // Ensure the new field is filled
     ) {
       Alert.alert("Please fill out all fields.");
       return;
@@ -62,15 +69,16 @@ const OwnerProfile = ({ ownerId }) => {
         ownerId,
         airplaneName,
         airplaneModel,
-        availability,
+        availability: selectedDates, // Store selected dates
         location,
         airplaneYear,
         description,
+        isAnnualCurrent, // Included in upload
         profileImage,
-        aircraftImages, // Store selected images
-        bankAccountName,
-        bankAccountNumber,
-        bankRoutingNumber,
+        aircraftImages,
+        bankAccountName, // Included in upload
+        bankAccountNumber, // Included in upload
+        bankRoutingNumber, // Included in upload
         isBookable: true,
       });
       Alert.alert("Profile and airplane listing updated successfully!");
@@ -82,25 +90,24 @@ const OwnerProfile = ({ ownerId }) => {
   return (
     <SafeAreaView className="bg-white flex-1">
       <ScrollView className="p-4">
-        <View className="flex-row items-center gap-3 mb-6 mt-5">
-          <TouchableOpacity onPress={() => pickImages()}>
-            <Image
-              source={profileImage ? { uri: profileImage } : { uri: user?.imageUrl }}
-              className="rounded-full w-16 h-16"
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
-          <View>
-            <Text className="text-sm text-gray-600">Welcome</Text>
-            <Text className="text-lg font-semibold">{user?.fullName}</Text>
+        <View className="flex-row items-center justify-between mb-6 mt-5">
+          <View className="flex-row items-center">
+            <TouchableOpacity onPress={() => pickImages()}>
+              <Image
+                source={profileImage ? { uri: profileImage } : { uri: user?.imageUrl }}
+                className="rounded-full w-16 h-16"
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+            <Text className="text-xl font-semibold text-gray-800 ml-4">
+              Welcome, {user?.fullName || "User"}!
+            </Text>
           </View>
+          <TouchableOpacity onPress={() => setBankDetailsVisible(true)}>
+            <Ionicons name="settings-outline" size={24} color="gray" />
+          </TouchableOpacity>
         </View>
 
-        <Text className="text-3xl font-bold text-center text-gray-800 mb-8">
-          Owner Profile
-        </Text>
-
-        {/* Add Image Picker */}
         <TouchableOpacity onPress={pickImages} className="p-4 bg-gray-200 rounded-lg mb-4">
           <Text className="text-center text-gray-600">Pick up to 7 Aircraft Images</Text>
         </TouchableOpacity>
@@ -148,12 +155,15 @@ const OwnerProfile = ({ ownerId }) => {
             onChangeText={setAirplaneModel}
             className="border border-gray-300 rounded-lg p-3"
           />
-          <TextInput
-            placeholder="Availability"
-            value={availability}
-            onChangeText={setAvailability}
-            className="border border-gray-300 rounded-lg p-3"
-          />
+
+          {/* Availability Section */}
+          <TouchableOpacity
+            onPress={() => setAvailabilityModalVisible(true)}
+            className="p-4 bg-gray-200 rounded-lg"
+          >
+            <Text className="text-center text-gray-600">Set Availability</Text>
+          </TouchableOpacity>
+
           <TextInput
             placeholder="Airplane Description"
             value={description}
@@ -162,39 +172,17 @@ const OwnerProfile = ({ ownerId }) => {
             className="border border-gray-300 rounded-lg p-3"
           />
 
-          <TouchableOpacity
-            onPress={() => setBankDetailsVisible(!bankDetailsVisible)}
-            className="p-4 bg-gray-200 rounded-lg mt-4"
-          >
-            <Text className="text-center text-gray-600">
-              {bankDetailsVisible ? "Hide" : "Show"} Banking Details
-            </Text>
-          </TouchableOpacity>
-
-          {bankDetailsVisible && (
-            <View className="space-y-4">
-              <TextInput
-                placeholder="Bank Account Name"
-                value={bankAccountName}
-                onChangeText={setBankAccountName}
-                className="border border-gray-300 rounded-lg p-3"
-              />
-              <TextInput
-                placeholder="Bank Account Number"
-                value={bankAccountNumber}
-                onChangeText={setBankAccountNumber}
-                keyboardType="numeric"
-                className="border border-gray-300 rounded-lg p-3"
-              />
-              <TextInput
-                placeholder="Bank Routing Number"
-                value={bankRoutingNumber}
-                onChangeText={setBankRoutingNumber}
-                keyboardType="numeric"
-                className="border border-gray-300 rounded-lg p-3"
-              />
-            </View>
-          )}
+          {/* Is your annual current dropdown */}
+          <View className="border rounded-lg p-1">
+            <Picker
+              selectedValue={isAnnualCurrent}
+              onValueChange={(itemValue) => setIsAnnualCurrent(itemValue)}
+            >
+              <Picker.Item label="Is your annual current?" value="" />
+              <Picker.Item label="Yes" value="Yes" />
+              <Picker.Item label="No" value="No" />
+            </Picker>
+          </View>
 
           <TouchableOpacity
             onPress={handleUpload}
@@ -206,6 +194,76 @@ const OwnerProfile = ({ ownerId }) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Modal for Availability Selection */}
+      <Modal visible={availabilityModalVisible} animationType="slide">
+        <SafeAreaView className="bg-white flex-1 p-4">
+          <TouchableOpacity onPress={() => setAvailabilityModalVisible(false)} className="p-2 mb-4">
+            <Ionicons name="close-outline" size={24} color="gray" />
+          </TouchableOpacity>
+          <Text className="text-xl font-semibold text-gray-800 mb-4">Select Availability Dates</Text>
+
+          <DatePicker
+            mode="calendar"
+            selected={currentDate} // Use the currentDate string here
+            onDateChange={(date) => setCurrentDate(date)} // Update the currentDate state
+          />
+
+          <TouchableOpacity
+            onPress={() => {
+              if (currentDate && !selectedDates.includes(currentDate)) {
+                setSelectedDates([...selectedDates, currentDate]);
+              }
+              setAvailabilityModalVisible(false);
+            }}
+            className="p-4 bg-blue-600 rounded-full mt-6"
+          >
+            <Text className="text-white text-center text-lg font-semibold">
+              Save and Close
+            </Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Modal for Bank Details */}
+      <Modal visible={bankDetailsVisible} animationType="slide">
+        <SafeAreaView className="bg-white flex-1 p-4">
+          <TouchableOpacity onPress={() => setBankDetailsVisible(false)} className="p-2 mb-4">
+            <Ionicons name="close-outline" size={24} color="gray" />
+          </TouchableOpacity>
+          <Text className="text-xl font-semibold text-gray-800 mb-4">Banking Details</Text>
+
+          <TextInput
+            placeholder="Bank Account Name"
+            value={bankAccountName}
+            onChangeText={setBankAccountName}
+            className="border border-gray-300 rounded-lg p-3 mb-4"
+          />
+          <TextInput
+            placeholder="Bank Account Number"
+            value={bankAccountNumber}
+            onChangeText={setBankAccountNumber}
+            keyboardType="numeric"
+            className="border border-gray-300 rounded-lg p-3 mb-4"
+          />
+          <TextInput
+            placeholder="Bank Routing Number"
+            value={bankRoutingNumber}
+            onChangeText={setBankRoutingNumber}
+            keyboardType="numeric"
+            className="border border-gray-300 rounded-lg p-3 mb-4"
+          />
+
+          <TouchableOpacity
+            onPress={() => setBankDetailsVisible(false)}
+            className="p-4 bg-blue-600 rounded-full mt-6"
+          >
+            <Text className="text-white text-center text-lg font-semibold">
+              Save and Close
+            </Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
