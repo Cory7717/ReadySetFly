@@ -335,7 +335,7 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                         className="border border-gray-300 rounded-lg p-2 mb-4"
                       >
                         <Text>
-                          {values.logBooks ? "Change Log Books" : "Upload Log Books"}
+                          {values.logBooks ? "Change Log Books" : "Upload Recent Logbook Page"}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity

@@ -50,11 +50,11 @@ const Home = () => {
 
   const handleSearch = () => {
     const lowerCaseQuery = searchQuery.toLowerCase();
-    const filteredData = listings.filter(
-      (listing) =>
-        listing.city.toLowerCase().includes(lowerCaseQuery) ||
-        listing.state.toLowerCase().includes(lowerCaseQuery)
-    );
+    const filteredData = listings.filter((listing) => {
+      const city = listing.city ? listing.city.toLowerCase() : "";
+      const state = listing.state ? listing.state.toLowerCase() : "";
+      return city.includes(lowerCaseQuery) || state.includes(lowerCaseQuery);
+    });
     setFilteredListings(filteredData);
   };
 

@@ -32,7 +32,6 @@ const StyledModal = styled(Modal);
 const OwnerProfile = ({ ownerId }) => {
   const [airplaneName, setAirplaneName] = useState("");
   const [airplaneModel, setAirplaneModel] = useState("");
-  const [availability, setAvailability] = useState("");
   const [location, setLocation] = useState("");
   const [airplaneYear, setAirplaneYear] = useState("");
   const [description, setDescription] = useState("");
@@ -81,15 +80,25 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   const handleUpload = async () => {
+    // Debugging: Log each value to ensure they are populated
+    console.log('airplaneName:', airplaneName);
+    console.log('airplaneModel:', airplaneModel);
+    console.log('location:', location);
+    console.log('airplaneYear:', airplaneYear);
+    console.log('description:', description);
+    console.log('isAnnualCurrent:', isAnnualCurrent);
+    console.log('minRequiredHours:', minRequiredHours);
+    console.log('selectedDates:', selectedDates);
+
     if (
       !airplaneName ||
       !airplaneModel ||
-      !availability ||
       !location ||
       !airplaneYear ||
       !description ||
-      !isAnnualCurrent || // Ensure the new field is filled
-      !minRequiredHours // Ensure the minimum required hours field is filled
+      !isAnnualCurrent ||
+      !minRequiredHours ||
+      selectedDates.length === 0 // Ensure at least one date is selected
     ) {
       Alert.alert("Please fill out all fields.");
       return;
@@ -101,17 +110,17 @@ const OwnerProfile = ({ ownerId }) => {
         ownerId,
         airplaneName,
         airplaneModel,
-        availability: selectedDates, // Store selected dates
+        availability: selectedDates,
         location,
         airplaneYear,
         description,
-        isAnnualCurrent, // Included in upload
-        minRequiredHours, // Included in upload
+        isAnnualCurrent,
+        minRequiredHours,
         profileImage,
         aircraftImages,
-        bankAccountName, // Included in upload
-        bankAccountNumber, // Included in upload
-        bankRoutingNumber, // Included in upload
+        bankAccountName,
+        bankAccountNumber,
+        bankRoutingNumber,
         isBookable: true,
       });
       Alert.alert("Profile and airplane listing updated successfully!");
@@ -230,89 +239,85 @@ const OwnerProfile = ({ ownerId }) => {
 
           <TouchableButton
             onPress={handleUpload}
-            className="p-4 bg-blue-600 rounded-full mt-6"
+            className="p-4 bg-blue-600 rounded-md"
           >
-            <StyledText className="text-white text-center text-lg font-semibold">
-              Update Profile and List Aircraft
-            </StyledText>
+            <StyledText className="text-center text-white">Update Profile and Airplane Listing</StyledText>
           </TouchableButton>
         </WrapperView>
-      </ScrollContainer>
 
-      {/* Modal for Availability Selection */}
-      <StyledModal visible={availabilityModalVisible} animationType="slide">
-        <SafeView className="bg-white flex-1 p-4">
-          <TouchableButton onPress={() => setAvailabilityModalVisible(false)} className="p-2 mb-4">
-            <Ionicons name="close-outline" size={24} color="gray" />
-          </TouchableButton>
-          <StyledText className="text-xl font-semibold text-gray-800 mb-4">Select Availability Dates</StyledText>
+        {/* Modal for Availability */}
+        <StyledModal visible={availabilityModalVisible} animationType="slide">
+          <WrapperView className="flex-1 justify-center items-center bg-white">
+            <StyledText className="text-xl mb-6">Select Availability Dates</StyledText>
+            <DatePicker
+              mode="calendar"
+              selected={selectedDates}
+              onDateChange={(date) => setCurrentDate(date)}
+              options={{
+                backgroundColor: '#ffffff',
+                textHeaderColor: '#000000',
+                textDefaultColor: '#000000',
+                selectedTextColor: '#ffffff',
+                mainColor: '#1E90FF',
+                textSecondaryColor: '#D3D3D3',
+                borderColor: 'rgba(122, 146, 165, 0.1)',
+              }}
+              current={currentDate}
+              selected={selectedDates}
+            />
 
-          <DatePicker
-            mode="calendar"
-            selected={currentDate} // Use the currentDate string here
-            onDateChange={(date) => setCurrentDate(date)} // Update the currentDate state
-          />
-
-          <TouchableButton
-            onPress={() => {
-              if (currentDate && !selectedDates.includes(currentDate)) {
+            <TouchableButton
+              onPress={() => {
                 setSelectedDates([...selectedDates, currentDate]);
-              }
-              setAvailabilityModalVisible(false);
-            }}
-            className="p-4 bg-blue-600 rounded-full mt-6"
-          >
-            <StyledText className="text-white text-center text-lg font-semibold">
-              Save and Close
-            </StyledText>
-          </TouchableButton>
-        </SafeView>
-      </StyledModal>
+                setAvailabilityModalVisible(false);
+              }}
+              className="p-4 bg-blue-600 rounded-md mt-4"
+            >
+              <StyledText className="text-center text-white">Save Availability</StyledText>
+            </TouchableButton>
 
-      {/* Modal for Bank Details */}
-      <StyledModal visible={bankDetailsVisible} animationType="slide">
-        <SafeView className="bg-white flex-1 p-4">
-          <TouchableButton onPress={() => setBankDetailsVisible(false)} className="p-2 mb-4">
-            <Ionicons name="close-outline" size={24} color="gray" />
-          </TouchableButton>
-          <StyledText className="text-xl font-semibold text-gray-800 mb-4">Banking Details</StyledText>
+            <TouchableButton
+              onPress={() => setAvailabilityModalVisible(false)}
+              className="p-4 bg-red-600 rounded-md mt-4"
+            >
+              <StyledText className="text-center text-white">Cancel</StyledText>
+            </TouchableButton>
+          </WrapperView>
+        </StyledModal>
 
-          <StyledTextInput
-            placeholder="Bank Account Name"
-            value={bankAccountName}
-            onChangeText={setBankAccountName}
-            className="border-gray-300 border rounded-md p-3 mb-4"
-          />
-          <StyledTextInput
-            placeholder="Bank Account Number"
-            value={bankAccountNumber}
-            onChangeText={setBankAccountNumber}
-            keyboardType="numeric"
-            className="border-gray-300 border rounded-md p-3 mb-4"
-          />
-          <StyledTextInput
-            placeholder="Bank Routing Number"
-            value={bankRoutingNumber}
-            onChangeText={setBankRoutingNumber}
-            keyboardType="numeric"
-            className="border-gray-300 border rounded-md p-3 mb-4"
-          />
-
-          {/* Display Cumulative Earnings */}
-          <StyledText className="text-lg font-semibold text-gray-800 mb-4">
-            Cumulative Earnings: ${cumulativeEarnings.toFixed(2)}
-          </StyledText>
-
-          <TouchableButton
-            onPress={() => setBankDetailsVisible(false)}
-            className="p-4 bg-blue-600 rounded-full mt-6"
-          >
-            <StyledText className="text-white text-center text-lg font-semibold">
-              Save and Close
-            </StyledText>
-          </TouchableButton>
-        </SafeView>
-      </StyledModal>
+        {/* Modal for Bank Details */}
+        <StyledModal visible={bankDetailsVisible} animationType="slide">
+          <WrapperView className="flex-1 justify-center items-center bg-white">
+            <StyledText className="text-xl mb-6">Enter Bank Details</StyledText>
+            <StyledTextInput
+              placeholder="Bank Account Name"
+              value={bankAccountName}
+              onChangeText={setBankAccountName}
+              className="border-gray-300 border rounded-md p-3 mb-4"
+            />
+            <StyledTextInput
+              placeholder="Bank Account Number"
+              value={bankAccountNumber}
+              onChangeText={setBankAccountNumber}
+              keyboardType="numeric"
+              className="border-gray-300 border rounded-md p-3 mb-4"
+            />
+            <StyledTextInput
+              placeholder="Bank Routing Number"
+              value={bankRoutingNumber}
+              onChangeText={setBankRoutingNumber}
+              keyboardType="numeric"
+              className="border-gray-300 border rounded-md p-3 mb-4"
+            />
+            <TouchableButton
+              onPress={() => setBankDetailsVisible(false)}
+              className="p-4 bg-blue-600 rounded-md"
+            >
+              <StyledText className="text-center text-white">Save Bank Details</StyledText>
+            </TouchableButton>
+          </WrapperView>
+        </StyledModal>
+      </ScrollContainer>
     </SafeView>
   );
 };
