@@ -6,13 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  ToastAndroid,
-  ActivityIndicator,
   Alert,
   SafeAreaView,
   Modal,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import { getFirestore, collection, getDocs, addDoc, orderBy } from "firebase/firestore";
+import { getFirestore, collection, getDocs, orderBy, addDoc } from "firebase/firestore";
 import { app } from "../../firebaseConfig";
 import { Formik } from "formik";
 import { Picker } from "@react-native-picker/picker";
@@ -20,7 +21,6 @@ import * as ImagePicker from "expo-image-picker";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useNavigation } from "@react-navigation/native";
 import { useUser } from "@clerk/clerk-expo";
-import Slider from "../../components/HomeScreen/Slider.js";
 import { Ionicons } from "@expo/vector-icons";
 import LatestItemList from "../../components/HomeScreen/LatestItemList";
 import { StatusBar } from "expo-status-bar";
@@ -30,13 +30,12 @@ const Classifieds = () => {
   const [loading, setLoading] = useState(false);
   const [sliderList, setSliderList] = useState([]);
   const [categoryList, setCategoryList] = useState([]);
-  const [showForm, setShowForm] = useState(false);
   const [latestItemList, setLatestItemList] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPricing, setSelectedPricing] = useState("Basic");
-  
+
   const db = getFirestore(app);
   const storage = getStorage();
   const { user } = useUser();
@@ -44,18 +43,18 @@ const Classifieds = () => {
 
   useEffect(() => {
     getCategoryList();
-    getSliders();
     getLatestItemList();
   }, []);
 
   const getCategoryList = async () => {
-    const querySnapshot = await getDocs(collection(db, "Category"));
-    setCategoryList(querySnapshot.docs.map((doc) => doc.data()));
-  };
-
-  const getSliders = async () => {
-    const querySnapshot = await getDocs(collection(db, "Sliders"));
-    setSliderList(querySnapshot.docs.map((doc) => doc.data()));
+    const categories = [
+      "Single Engine Piston",
+      "Twin Engine Piston",
+      "Turbo Prop",
+      "Helicopter",
+      "Jet",
+    ];
+    setCategoryList(categories);
   };
 
   const getLatestItemList = async () => {
@@ -82,8 +81,6 @@ const Classifieds = () => {
   };
 
   const processPayment = async (amount) => {
-    // Here you would implement payment processing using a service like Stripe.
-    // For the sake of this example, we'll just simulate successful payment.
     return new Promise((resolve) => setTimeout(() => resolve(true), 2000));
   };
 
@@ -126,6 +123,8 @@ const Classifieds = () => {
       if (docRef.id) {
         setLoading(false);
         Alert.alert("Your post was successfully added!");
+        setModalVisible(false);
+        getLatestItemList();
       }
     } catch (error) {
       setLoading(false);
@@ -134,7 +133,7 @@ const Classifieds = () => {
   };
 
   const filterListings = () => {
-    return latestItemList.filter(item => {
+    return latestItemList.filter((item) => {
       const location = item.location || "";
       const category = item.category || "";
 
@@ -149,226 +148,212 @@ const Classifieds = () => {
     <SafeAreaView>
       <ScrollView>
         <View className="pt-2 px-2 bg-white">
+          {/* Header */}
           <View className="flex-row gap-2 ml-2 mt-5 items-center">
-            <Image
-              source={{ uri: user?.imageUrl }}
-              className="rounded-full w-12 h-12"
-            />
+            <Image source={{ uri: user?.imageUrl }} className="rounded-full w-12 h-12" />
             <View>
               <Text className="text-lg">Welcome</Text>
               <Text className="text-xl font-bold">{user?.fullName}</Text>
             </View>
           </View>
 
+          {/* Search Bar */}
           <View className="flex-row items-center bg-white mt-2 rounded-full border border-blue-500 px-4 py-2 self-center mr-3">
             <Ionicons name="search" size={24} color="gray" />
             <TextInput
-              placeholder="Search"
+              placeholder="Search by city, state"
               className="flex-1 ml-3"
               onChangeText={(value) => setSearchTerm(value)}
               value={searchTerm}
             />
           </View>
 
+          {/* Category Slider */}
+          <ScrollView horizontal className="mt-4" showsHorizontalScrollIndicator={false}>
+            {categoryList.map((category, index) => (
+              <TouchableOpacity
+                key={index}
+                onPress={() => setSelectedCategory(category)}
+                style={{
+                  padding: 10,
+                  backgroundColor: selectedCategory === category ? "#007bff" : "lightgray",
+                  borderRadius: 8,
+                  marginHorizontal: 5,
+                }}
+              >
+                <Text style={{ color: selectedCategory === category ? "white" : "black" }}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Aircraft Listings */}
           <Text className="font-bold text-2xl text-center mb-5 pt-5">
             Aircraft Marketplace
           </Text>
 
+          {/* Add Listing Button */}
           <TouchableOpacity
             onPress={() => setModalVisible(true)}
-            className="bg-blue-500 p-2 rounded-lg mb-5 items-center self-center"
+            className="bg-blue-500 rounded-lg p-3 mb-5"
           >
-            <Text className="text-white font-bold">Pricing</Text>
+            <Text className="text-white text-lg text-center">Add Listing</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            className="bg-blue-500 p-3 rounded-lg mb-3 items-center"
-            onPress={() => setShowForm(!showForm)}
-          >
-            <Text className="text-white text-lg font-bold">
-              {showForm ? "Show Listings" : "List your Aircraft for sale!"}
-            </Text>
-          </TouchableOpacity>
+          {/* Aircraft Listings */}
+          <LatestItemList
+            latestItemList={filterListings()}
+            onPress={(item) =>
+              navigation.navigate("HomeScreenDetails", {
+                item,
+              })
+            }
+          />
 
-          {showForm && (
-            <View>
-              <Text className="text-lg text-gray-600 mb-5">
-                List your aircraft
-              </Text>
-              <Formik
-                initialValues={{
-                  title: "",
-                  desc: "",
-                  category: "",
-                  location: "",
-                  price: "",
-                  images: [],
-                  userName: "",
-                  userEmail: "",
-                  userImage: "",
-                  pricingOption: selectedPricing,
-                }}
-                onSubmit={(value) => onSubmitMethod(value)}
-                validate={(values) => {
-                  const errors = {};
-                  if (!values.title) {
-                    ToastAndroid.show(
-                      "You must fill in the title",
-                      ToastAndroid.CENTER
-                    );
-                    errors.title = "You must fill in the Title";
-                  }
-                  return errors;
-                }}
-              >
-                {({
-                  handleChange,
-                  handleBlur,
-                  handleSubmit,
-                  values,
-                  setFieldValue,
-                  errors,
-                }) => (
-                  <View>
-                    <View className="flex-row gap-2">
-                      <ScrollView horizontal>
-                        {images.map((image, index) => (
-                          <Image
-                            key={index}
-                            source={{ uri: image }}
-                            className="w-24 h-24 rounded-lg mr-2"
-                          />
-                        ))}
-                        <TouchableOpacity onPress={pickImage}>
-                          <Image
-                            source={require("../../Assets/images/Placeholder_view_vector.png")}
-                            className="w-24 h-24 rounded-lg"
-                          />
-                        </TouchableOpacity>
-                      </ScrollView>
-                    </View>
-                    <TextInput
-                      className="border rounded-lg p-3 mt-2 mb-1 text-lg"
-                      placeholder="Title"
-                      value={values?.title}
-                      onChangeText={handleChange("title")}
-                    />
-                    <TextInput
-                      className="border rounded-lg p-3 mt-2 mb-1 text-lg"
-                      placeholder="Description, Avionics, TTOF, etc.."
-                      value={values?.desc}
-                      onChangeText={handleChange("desc")}
-                      multiline
-                    />
-                    <TextInput
-                      className="border rounded-lg p-3 mt-2 mb-1 text-lg"
-                      placeholder="Price"
-                      value={values?.price}
-                      keyboardType="numbers-and-punctuation"
-                      onChangeText={handleChange("price")}
-                    />
-                    <TextInput
-                      className="border rounded-lg p-3 mt-2 mb-1 text-lg"
-                      placeholder="City, State, Country"
-                      value={values?.location}
-                      onChangeText={handleChange("location")}
-                    />
-                    <View className="border rounded-lg p-1 mt-2 mb-1">
-                      <Picker
-                        selectedValue={selectedCategory}
-                        onValueChange={(itemValue) => {
-                          setSelectedCategory(itemValue);
-                          setFieldValue("category", itemValue);
-                        }}
-                      >
-                        <Picker.Item label="Select Category" value="" />
-                        {categoryList.map((category, index) => (
-                          <Picker.Item
-                            label={category.name}
-                            value={category.name}
-                            key={index}
-                          />
-                        ))}
-                      </Picker>
-                    </View>
-                    <TouchableOpacity
-                      className="bg-blue-500 p-3 rounded-lg mb-3 mt-3 items-center"
-                      onPress={handleSubmit}
-                      disabled={loading}
+          {/* Submit Listing Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={modalVisible}
+            onRequestClose={() => {
+              setModalVisible(!modalVisible);
+            }}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={{ flex: 1 }}
+            >
+              <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}>
+                <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+                  <View className="bg-white rounded-lg p-5 w-11/12">
+                    <Text className="text-lg font-bold mb-4 text-center">Submit Your Listing</Text>
+
+                    <Formik
+                      initialValues={{
+                        title: "",
+                        desc: "",
+                        category: "",
+                        location: "",
+                        price: "",
+                        images: [],
+                        userName: "",
+                        userEmail: "",
+                        userImage: "",
+                        pricingOption: selectedPricing,
+                      }}
+                      onSubmit={(value) => onSubmitMethod(value)}
+                      validate={(values) => {
+                        const errors = {};
+                        if (!values.title) {
+                          Alert.alert("You must fill in the title");
+                          errors.title = "You must fill in the Title";
+                        }
+                        return errors;
+                      }}
                     >
-                      {loading ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text className="text-white text-lg font-bold">
-                          {selectedPricing === "Basic"
-                            ? "Submit for $25"
-                            : selectedPricing === "Featured"
-                            ? "Submit for $70"
-                            : "Submit for $150"}
-                        </Text>
+                      {({
+                        handleChange,
+                        handleBlur,
+                        handleSubmit,
+                        values,
+                        setFieldValue,
+                        errors,
+                      }) => (
+                        <View>
+                          {/* Form Inputs */}
+                          <TextInput
+                            className="border rounded-lg p-3 mt-2 mb-1 text-lg"
+                            placeholder="Title"
+                            value={values?.title}
+                            onChangeText={handleChange("title")}
+                          />
+                          <TextInput
+                            className="border rounded-lg p-3 mt-2 mb-1 text-lg"
+                            placeholder="Description, Avionics, TTOF, etc.."
+                            value={values?.desc}
+                            onChangeText={handleChange("desc")}
+                            multiline
+                          />
+                          <TextInput
+                            className="border rounded-lg p-3 mt-2 mb-1 text-lg"
+                            placeholder="Location"
+                            value={values?.location}
+                            onChangeText={handleChange("location")}
+                          />
+                          <TextInput
+                            className="border rounded-lg p-3 mt-2 mb-1 text-lg"
+                            placeholder="Price"
+                            value={values?.price}
+                            onChangeText={handleChange("price")}
+                            keyboardType="numeric"
+                          />
+
+                          {/* Category Picker */}
+                          <View className="border rounded-lg p-2 mt-2 mb-1">
+                            <Picker
+                              selectedValue={values?.category}
+                              onValueChange={(value) => setFieldValue("category", value)}
+                            >
+                              <Picker.Item label="Select Category" value="" />
+                              {categoryList.map((category, index) => (
+                                <Picker.Item label={category} value={category} key={index} />
+                              ))}
+                            </Picker>
+                          </View>
+
+                          {/* Pricing Picker */}
+                          <View className="border rounded-lg p-2 mt-2 mb-1">
+                            <Picker
+                              selectedValue={selectedPricing}
+                              onValueChange={(value) => setSelectedPricing(value)}
+                            >
+                              <Picker.Item label="Basic - $25" value="Basic" />
+                              <Picker.Item label="Featured - $70" value="Featured" />
+                              <Picker.Item label="Enhanced - $150" value="Enhanced" />
+                            </Picker>
+                          </View>
+
+                          {/* Image Upload */}
+                          <View className="border rounded-lg p-2 mt-2 mb-1">
+                            <TouchableOpacity
+                              onPress={pickImage}
+                              className="bg-blue-500 rounded-lg p-3 mb-5"
+                            >
+                              <Text className="text-white text-lg text-center">
+                                Add Images ({images.length}/7)
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          {/* Submit Button */}
+                          <TouchableOpacity
+                            onPress={handleSubmit}
+                            className="bg-blue-500 rounded-lg p-3 mb-5"
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <ActivityIndicator color="#fff" />
+                            ) : (
+                              <Text className="text-white text-lg text-center">Submit</Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
                       )}
+                    </Formik>
+                    <TouchableOpacity
+                      className="bg-gray-500 rounded-lg p-3"
+                      onPress={() => setModalVisible(!modalVisible)}
+                    >
+                      <Text className="text-white text-lg text-center">Cancel</Text>
                     </TouchableOpacity>
                   </View>
-                )}
-              </Formik>
-            </View>
-          )}
-
-          {!showForm && (
-            <LatestItemList
-              latestItemList={filterListings()}
-              onPress={(item) =>
-                navigation.navigate("HomeScreenDetails", {
-                  item,
-                })
-              }
-            />
-          )}
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </Modal>
         </View>
       </ScrollView>
-
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white p-5 rounded-lg w-5/6">
-            <Text className="text-xl font-bold mb-5 text-center">
-              Select a Pricing Option
-            </Text>
-            {[
-              { label: "Basic - $25", value: "Basic" },
-              { label: "Featured - $70", value: "Featured" },
-              { label: "Enhanced - $150", value: "Enhanced" },
-            ].map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                className={`p-3 rounded-lg mb-2 ${
-                  selectedPricing === option.value
-                    ? "bg-blue-500"
-                    : "bg-gray-200"
-                }`}
-                onPress={() => setSelectedPricing(option.value)}
-              >
-                <Text
-                  className={`text-lg font-bold text-center ${
-                    selectedPricing === option.value
-                      ? "text-white"
-                      : "text-gray-800"
-                  }`}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              className="bg-red-500 p-3 rounded-lg items-center mt-3"
-              onPress={() => setModalVisible(false)}
-            >
-              <Text className="text-white text-lg font-bold">Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <StatusBar style="auto" />
     </SafeAreaView>
   );
 };
