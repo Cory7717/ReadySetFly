@@ -47,6 +47,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [bankAccountNumber, setBankAccountNumber] = useState(""); // Added state
   const [bankRoutingNumber, setBankRoutingNumber] = useState(""); // Added state
   const [cumulativeEarnings, setCumulativeEarnings] = useState(0); // New state for cumulative earnings
+  const [minRequiredHours, setMinRequiredHours] = useState(""); // New state for minimum required hours
   const { user } = useUser();
 
   useEffect(() => {
@@ -87,7 +88,8 @@ const OwnerProfile = ({ ownerId }) => {
       !location ||
       !airplaneYear ||
       !description ||
-      !isAnnualCurrent // Ensure the new field is filled
+      !isAnnualCurrent || // Ensure the new field is filled
+      !minRequiredHours // Ensure the minimum required hours field is filled
     ) {
       Alert.alert("Please fill out all fields.");
       return;
@@ -104,6 +106,7 @@ const OwnerProfile = ({ ownerId }) => {
         airplaneYear,
         description,
         isAnnualCurrent, // Included in upload
+        minRequiredHours, // Included in upload
         profileImage,
         aircraftImages,
         bankAccountName, // Included in upload
@@ -215,6 +218,15 @@ const OwnerProfile = ({ ownerId }) => {
               <Picker.Item label="No" value="No" />
             </Picker>
           </WrapperView>
+
+          {/* Minimum Required Hours Field */}
+          <StyledTextInput
+            placeholder="Minimum Required Hours"
+            value={minRequiredHours}
+            onChangeText={setMinRequiredHours}
+            keyboardType="numeric"
+            className="border-gray-300 border rounded-md p-3"
+          />
 
           <TouchableButton
             onPress={handleUpload}

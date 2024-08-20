@@ -31,10 +31,12 @@
       "expo-router",
       "expo-font",
       "@react-native-google-signin/google-signin",
+      "expo-document-picker",
       [
         "expo-image-picker",
         {
           "photosPermission": "The app accesses you photos to let you share them with your friends."
+          
         }
       ]
     ]

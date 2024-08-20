@@ -9,12 +9,15 @@ import {
   TouchableOpacity,
   Modal,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { Formik } from 'formik';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useUser } from '@clerk/clerk-expo';
 import Slider from '../../components/Slider';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +34,7 @@ const BookingCalendar = ({ airplaneId, userId }) => {
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileData, setProfileData] = useState({
     name: "",
+    aircraftType: "",
     certifications: "",
     contact: "",
     address: "",
@@ -38,8 +42,10 @@ const BookingCalendar = ({ airplaneId, userId }) => {
     cardNumber: "",
     cardExpiry: "",
     cardCVV: "",
+    logBooks: null,
+    medical: null,
   });
-  const [availableRentals, setAvailableRentals] = useState([]); // Define availableRentals
+  const [availableRentals, setAvailableRentals] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchBookings = async () => {
@@ -74,8 +80,6 @@ const BookingCalendar = ({ airplaneId, userId }) => {
   };
 
   const fetchAvailableRentals = async (date) => {
-    // Fetch rentals based on the selected date
-    // This is just a placeholder, replace with your actual logic to fetch available rentals
     const rentals = [
       { name: "Rental 1", description: "Description of Rental 1" },
       { name: "Rental 2", description: "Description of Rental 2" },
@@ -83,7 +87,6 @@ const BookingCalendar = ({ airplaneId, userId }) => {
 
     setAvailableRentals(rentals);
 
-    // Navigate to confirmation screen if needed
     navigation.navigate('ConfirmationScreen', {
       selectedDate: date,
       availableRentals: rentals,
@@ -100,6 +103,16 @@ const BookingCalendar = ({ airplaneId, userId }) => {
 
     if (!result.canceled) {
       setProfileData({ ...profileData, image: result.assets[0].uri });
+    }
+  };
+
+  const pickDocument = async (field) => {
+    let result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+    });
+
+    if (result.type !== 'cancel') {
+      setProfileData({ ...profileData, [field]: result.uri });
     }
   };
 
@@ -123,7 +136,6 @@ const BookingCalendar = ({ airplaneId, userId }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Header with Welcome and Settings Button */}
         <View className="flex-row justify-between items-center px-4 py-3">
           <View className="flex-row items-center">
             <Image
@@ -148,13 +160,16 @@ const BookingCalendar = ({ airplaneId, userId }) => {
           </Text>
         </View>
 
-        {/* Profile Section */}
         {profileSaved ? (
           <View className="px-8 py-4 bg-white">
             <Text className="text-xl font-bold mb-2">Profile Information</Text>
             <View className="flex-row mb-2">
               <Text className="font-bold flex-1">Name:</Text>
               <Text className="flex-2">{profileData.name}</Text>
+            </View>
+            <View className="flex-row mb-2">
+              <Text className="font-bold flex-1">Aircraft Type:</Text>
+              <Text className="flex-2">{profileData.aircraftType}</Text>
             </View>
             <View className="flex-row mb-2">
               <Text className="font-bold flex-1">Certifications:</Text>
@@ -182,6 +197,16 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                   : "Jet"}
               </Text>
             </View>
+            {profileData.logBooks && (
+              <Text className="flex-2 mb-2">
+                Log Books Uploaded: {profileData.logBooks.split('/').pop()}
+              </Text>
+            )}
+            {profileData.medical && (
+              <Text className="flex-2">
+                Medical Uploaded: {profileData.medical.split('/').pop()}
+              </Text>
+            )}
             {profileData.image && (
               <Image
                 source={{ uri: profileData.image }}
@@ -232,134 +257,115 @@ const BookingCalendar = ({ airplaneId, userId }) => {
               />
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
-                className="bg-white p-3 mt-3 rounded-lg"
+                className="mt-4 p-2 bg-white rounded-lg"
               >
-                <Text className="text-center text-blue-500 font-bold">
-                  Close
-                </Text>
+                <Text className="text-center">Close</Text>
               </TouchableOpacity>
             </View>
           </Modal>
-
-          {/* Available Rentals Section */}
-          {selectedDate && availableRentals.length > 0 ? (
-            <View className="mt-4 bg-white p-4 rounded-lg">
-              <Text className="text-xl font-bold mb-2">
-                Available Rentals for {selectedDate}
-              </Text>
-              {availableRentals.map((rental, index) => (
-                <View key={index} className="flex-row mb-2">
-                  <Text className="flex-1 font-bold">{rental.name}</Text>
-                  <Text className="flex-2">{rental.description}</Text>
-                </View>
-              ))}
-            </View>
-          ) : selectedDate ? (
-            <View className="mt-4 bg-white p-4 rounded-lg">
-              <Text className="text-xl font-bold">
-                No rentals available for {selectedDate}
-              </Text>
-            </View>
-          ) : null}
         </View>
-
-        {/* Profile Form */}
-        <Modal
-          visible={profileModalVisible}
-          transparent={true}
-          animationType="slide"
-        >
-          <View className="flex-1 justify-center bg-black bg-opacity-50 p-5">
-            <Formik
-              initialValues={profileData}
-              onSubmit={(values) => handleProfileSubmit(values)}
-            >
-              {({ handleChange, handleBlur, handleSubmit, values }) => (
-                <View className="bg-white p-6 rounded-lg">
-                  <Text className="text-2xl font-bold mb-4">Update Profile</Text>
-                  <TextInput
-                    placeholder="Name"
-                    onChangeText={handleChange("name")}
-                    onBlur={handleBlur("name")}
-                    value={values.name}
-                    className="border border-gray-300 rounded-lg p-2 mb-4"
-                  />
-                  <TextInput
-                    placeholder="Certifications"
-                    onChangeText={handleChange("certifications")}
-                    onBlur={handleBlur("certifications")}
-                    value={values.certifications}
-                    className="border border-gray-300 rounded-lg p-2 mb-4"
-                  />
-                  <TextInput
-                    placeholder="Contact"
-                    onChangeText={handleChange("contact")}
-                    onBlur={handleBlur("contact")}
-                    value={values.contact}
-                    className="border border-gray-300 rounded-lg p-2 mb-4"
-                  />
-                  <TextInput
-                    placeholder="Location"
-                    onChangeText={handleChange("address")}
-                    onBlur={handleBlur("address")}
-                    value={values.address}
-                    className="border border-gray-300 rounded-lg p-2 mb-4"
-                  />
-                  <Picker
-                    selectedValue={values.category}
-                    onValueChange={handleChange("category")}
-                    style={{ borderWidth: 1, borderColor: 'gray' }}
-                  >
-                    <Picker.Item label="Single Engine Prop" value="single_engine" />
-                    <Picker.Item label="Twin Engine Prop" value="twin_engine" />
-                    <Picker.Item label="Turbo Prop" value="turbo_prop" />
-                    <Picker.Item label="Helicopter" value="helicopter" />
-                    <Picker.Item label="Jet" value="jet" />
-                  </Picker>
-                  <TextInput
-                    placeholder="Card Number"
-                    onChangeText={handleChange("cardNumber")}
-                    onBlur={handleBlur("cardNumber")}
-                    value={values.cardNumber}
-                    className="border border-gray-300 rounded-lg p-2 mb-4"
-                  />
-                  <TextInput
-                    placeholder="Card Expiry"
-                    onChangeText={handleChange("cardExpiry")}
-                    onBlur={handleBlur("cardExpiry")}
-                    value={values.cardExpiry}
-                    className="border border-gray-300 rounded-lg p-2 mb-4"
-                  />
-                  <TextInput
-                    placeholder="Card CVV"
-                    onChangeText={handleChange("cardCVV")}
-                    onBlur={handleBlur("cardCVV")}
-                    value={values.cardCVV}
-                    className="border border-gray-300 rounded-lg p-2 mb-4"
-                  />
-                  <TouchableOpacity
-                    onPress={handleSubmit}
-                    className="bg-blue-500 p-3 rounded-lg"
-                  >
-                    <Text className="text-white text-center font-bold">
-                      Save Profile
-                   
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setProfileModalVisible(false)}
-                    className="bg-gray-500 p-3 rounded-lg mt-3"
-                  >
-                    <Text className="text-white text-center font-bold">
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </Formik>
-          </View>
-        </Modal>
       </ScrollView>
+
+      <Modal visible={profileModalVisible} animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+            <SafeAreaView>
+              <View className="p-4">
+                <Formik
+                  initialValues={profileData}
+                  onSubmit={handleProfileSubmit}
+                >
+                  {({ handleChange, handleBlur, handleSubmit, values }) => (
+                    <View>
+                      <Text className="text-xl font-bold mb-4">
+                        Edit Profile
+                      </Text>
+                      <TextInput
+                        placeholder="Name"
+                        onChangeText={handleChange("name")}
+                        onBlur={handleBlur("name")}
+                        value={values.name}
+                        className="border border-gray-300 rounded-lg p-2 mb-4"
+                      />
+                      <TextInput
+                        placeholder="Aircraft Type"
+                        onChangeText={handleChange("aircraftType")}
+                        onBlur={handleBlur("aircraftType")}
+                        value={values.aircraftType}
+                        className="border border-gray-300 rounded-lg p-2 mb-4"
+                      />
+                      <TextInput
+                        placeholder="Certifications"
+                        onChangeText={handleChange("certifications")}
+                        onBlur={handleBlur("certifications")}
+                        value={values.certifications}
+                        className="border border-gray-300 rounded-lg p-2 mb-4"
+                      />
+                      <TextInput
+                        placeholder="Contact"
+                        onChangeText={handleChange("contact")}
+                        onBlur={handleBlur("contact")}
+                        value={values.contact}
+                        className="border border-gray-300 rounded-lg p-2 mb-4"
+                      />
+                      <TextInput
+                        placeholder="Location"
+                        onChangeText={handleChange("address")}
+                        onBlur={handleBlur("address")}
+                        value={values.address}
+                        className="border border-gray-300 rounded-lg p-2 mb-4"
+                      />
+                      <Text className="font-bold mb-2">Category</Text>
+                      <Picker
+                        selectedValue={values.category}
+                        onValueChange={handleChange("category")}
+                        className="border border-gray-300 rounded-lg mb-4"
+                      >
+                        <Picker.Item label="Single Engine Prop" value="single_engine" />
+                        <Picker.Item label="Twin Engine Prop" value="twin_engine" />
+                        <Picker.Item label="Turbo Prop" value="turbo_prop" />
+                        <Picker.Item label="Helicopter" value="helicopter" />
+                        <Picker.Item label="Jet" value="jet" />
+                      </Picker>
+                      <TouchableOpacity
+                        onPress={() => pickDocument("logBooks")}
+                        className="border border-gray-300 rounded-lg p-2 mb-4"
+                      >
+                        <Text>
+                          {values.logBooks ? "Change Log Books" : "Upload Log Books"}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => pickDocument("medical")}
+                        className="border border-gray-300 rounded-lg p-2 mb-4"
+                      >
+                        <Text>
+                          {values.medical ? "Change Medical" : "Upload Medical"}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleSubmit}
+                        className="bg-blue-500 rounded-lg p-2 mb-4"
+                      >
+                        <Text className="text-white text-center">Save Profile</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setProfileModalVisible(false)}
+                        className="bg-gray-500 rounded-lg p-2"
+                      >
+                        <Text className="text-white text-center">Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </Formik>
+              </View>
+            </SafeAreaView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 };
