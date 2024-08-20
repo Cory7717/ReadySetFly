@@ -223,7 +223,7 @@ const Classifieds = () => {
 
           {/* Aircraft Listings */}
           <View className="p-4">
-            <Text className="text-xl font-bold mb-2 text-white">
+            <Text className="text-2xl font-bold mb-2 text-white text-center">
               Aircraft Marketplace
             </Text>
 
