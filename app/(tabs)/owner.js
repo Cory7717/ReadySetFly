@@ -10,16 +10,15 @@ import {
   Text,
   Modal,
 } from "react-native";
-import { getFirestore, collection, addDoc, doc, getDoc } from "firebase/firestore"; // Add getDoc
+import { getFirestore, collection, addDoc, doc, getDoc } from "firebase/firestore";
 import * as ImagePicker from "expo-image-picker";
 import { useUser } from "@clerk/clerk-expo";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
-import DatePicker from "react-native-modern-datepicker"; // Import the date picker
-import { styled } from 'nativewind'; // Import NativeWind's styled utility
+import DatePicker from "react-native-modern-datepicker";
+import { styled } from 'nativewind';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 
-// Styled components with NativeWind
 const SafeView = styled(SafeAreaView);
 const ScrollContainer = styled(ScrollView);
 const WrapperView = styled(View);
@@ -35,18 +34,18 @@ const OwnerProfile = ({ ownerId }) => {
   const [location, setLocation] = useState("");
   const [airplaneYear, setAirplaneYear] = useState("");
   const [description, setDescription] = useState("");
-  const [isAnnualCurrent, setIsAnnualCurrent] = useState(""); // New state for annual current dropdown
+  const [isAnnualCurrent, setIsAnnualCurrent] = useState(""); 
   const [profileImage, setProfileImage] = useState(null);
   const [aircraftImages, setAircraftImages] = useState([]);
   const [bankDetailsVisible, setBankDetailsVisible] = useState(false);
   const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
-  const [selectedDates, setSelectedDates] = useState([]); // To hold selected dates for availability
-  const [currentDate, setCurrentDate] = useState(""); // To track the currently selected date
-  const [bankAccountName, setBankAccountName] = useState(""); // Added state
-  const [bankAccountNumber, setBankAccountNumber] = useState(""); // Added state
-  const [bankRoutingNumber, setBankRoutingNumber] = useState(""); // Added state
-  const [cumulativeEarnings, setCumulativeEarnings] = useState(0); // New state for cumulative earnings
-  const [minRequiredHours, setMinRequiredHours] = useState(""); // New state for minimum required hours
+  const [selectedDates, setSelectedDates] = useState([]);
+  const [currentDate, setCurrentDate] = useState(""); 
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankRoutingNumber, setBankRoutingNumber] = useState("");
+  const [cumulativeEarnings, setCumulativeEarnings] = useState(0);
+  const [minRequiredHours, setMinRequiredHours] = useState("");
   const { user } = useUser();
 
   useEffect(() => {
@@ -57,7 +56,7 @@ const OwnerProfile = ({ ownerId }) => {
 
       if (ownerDoc.exists()) {
         const data = ownerDoc.data();
-        setCumulativeEarnings(data.cumulativeEarnings || 0); // Assuming cumulativeEarnings is stored in the owner's document
+        setCumulativeEarnings(data.cumulativeEarnings || 0);
       }
     };
 
@@ -69,7 +68,6 @@ const OwnerProfile = ({ ownerId }) => {
   const pickImages = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
       quality: 1,
     });
 
@@ -80,7 +78,6 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   const handleUpload = async () => {
-    // Debugging: Log each value to ensure they are populated
     console.log('airplaneName:', airplaneName);
     console.log('airplaneModel:', airplaneModel);
     console.log('location:', location);
@@ -98,7 +95,7 @@ const OwnerProfile = ({ ownerId }) => {
       !description ||
       !isAnnualCurrent ||
       !minRequiredHours ||
-      selectedDates.length === 0 // Ensure at least one date is selected
+      selectedDates.length === 0
     ) {
       Alert.alert("Please fill out all fields.");
       return;
@@ -200,7 +197,6 @@ const OwnerProfile = ({ ownerId }) => {
             className="border-gray-300 border rounded-md p-3"
           />
 
-          {/* Availability Section */}
           <TouchableButton
             onPress={() => setAvailabilityModalVisible(true)}
             className="p-4 bg-gray-200 rounded-md"
@@ -216,7 +212,6 @@ const OwnerProfile = ({ ownerId }) => {
             className="border-gray-300 border rounded-md p-3"
           />
 
-          {/* Is your annual current dropdown */}
           <WrapperView className="border-gray-300 border rounded-md p-1">
             <Picker
               selectedValue={isAnnualCurrent}
@@ -228,7 +223,6 @@ const OwnerProfile = ({ ownerId }) => {
             </Picker>
           </WrapperView>
 
-          {/* Minimum Required Hours Field */}
           <StyledTextInput
             placeholder="Minimum Required Hours"
             value={minRequiredHours}
@@ -245,13 +239,12 @@ const OwnerProfile = ({ ownerId }) => {
           </TouchableButton>
         </WrapperView>
 
-        {/* Modal for Availability */}
         <StyledModal visible={availabilityModalVisible} animationType="slide">
           <WrapperView className="flex-1 justify-center items-center bg-white">
             <StyledText className="text-xl mb-6">Select Availability Dates</StyledText>
             <DatePicker
               mode="calendar"
-              selected={selectedDates}
+              selected={currentDate}
               onDateChange={(date) => setCurrentDate(date)}
               options={{
                 backgroundColor: '#ffffff',
@@ -263,12 +256,14 @@ const OwnerProfile = ({ ownerId }) => {
                 borderColor: 'rgba(122, 146, 165, 0.1)',
               }}
               current={currentDate}
-              selected={selectedDates}
             />
 
             <TouchableButton
               onPress={() => {
-                setSelectedDates([...selectedDates, currentDate]);
+                if (currentDate) {
+                  setSelectedDates((prevDates) => [...prevDates, currentDate]);
+                  setCurrentDate("");
+                }
                 setAvailabilityModalVisible(false);
               }}
               className="p-4 bg-blue-600 rounded-md mt-4"
@@ -285,7 +280,6 @@ const OwnerProfile = ({ ownerId }) => {
           </WrapperView>
         </StyledModal>
 
-        {/* Modal for Bank Details */}
         <StyledModal visible={bankDetailsVisible} animationType="slide">
           <WrapperView className="flex-1 justify-center items-center bg-white">
             <StyledText className="text-xl mb-6">Enter Bank Details</StyledText>

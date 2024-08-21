@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  ScrollView,
   Text,
   View,
   Image,
@@ -102,81 +101,79 @@ const Home = () => {
       resizeMode="cover"
     >
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView>
-          {/* Header */}
-          <View style={{ flexDirection: "row", padding: 16, alignItems: "center" }}>
-            <Image
-              source={{ uri: user?.imageUrl }}
-              style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
-            />
-            <View>
-              <Text style={{ fontSize: 16, color: "white" }}>Welcome</Text>
-              <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
-                {user?.fullName}
-              </Text>
-            </View>
-          </View>
-
-          {/* Search Bar */}
-          <View style={{ padding: 16 }}>
-            <TextInput
-              placeholder="Search by city, state"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={{
-                backgroundColor: "#f0f0f0",
-                borderRadius: 8,
-                padding: 12,
-                marginBottom: 16,
-              }}
-            />
-            <TouchableOpacity
-              onPress={handleSearch}
-              style={{
-                backgroundColor: "#007bff",
-                padding: 12,
-                borderRadius: 8,
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold" }}>Search</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Categories Slider */}
-          <View style={{ padding: 16 }}>
-            <FlatList
-              data={categories}
-              renderItem={renderCategoryItem}
-              horizontal
-              keyExtractor={(item) => item}
-              showsHorizontalScrollIndicator={false}
-            />
-          </View>
-
-          {/* Listings */}
-          <View style={{ padding: 16 }}>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "bold",
-                marginBottom: 10,
-                color: "white",
-              }}
-            >
-              Available Listings
+        {/* Header */}
+        <View style={{ flexDirection: "row", padding: 16, alignItems: "center" }}>
+          <Image
+            source={{ uri: user?.imageUrl }}
+            style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
+          />
+          <View>
+            <Text style={{ fontSize: 16, color: "white" }}>Welcome</Text>
+            <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
+              {user?.fullName}
             </Text>
-            {filteredListings.length > 0 ? (
-              <FlatList
-                data={filteredListings}
-                renderItem={renderListingItem}
-                keyExtractor={(item, index) => index.toString()}
-              />
-            ) : (
-              <Text style={{ color: "white" }}>No listings available</Text>
-            )}
           </View>
-        </ScrollView>
+        </View>
+
+        {/* Search Bar */}
+        <View style={{ padding: 16 }}>
+          <TextInput
+            placeholder="Search by city, state"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={{
+              backgroundColor: "#f0f0f0",
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          />
+          <TouchableOpacity
+            onPress={handleSearch}
+            style={{
+              backgroundColor: "#007bff",
+              padding: 12,
+              borderRadius: 8,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ color: "white", fontWeight: "bold" }}>Search</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Categories Slider */}
+        <View style={{ padding: 16 }}>
+          <FlatList
+            data={categories}
+            renderItem={renderCategoryItem}
+            horizontal
+            keyExtractor={(item) => item}
+            showsHorizontalScrollIndicator={false}
+          />
+        </View>
+
+        {/* Listings */}
+        <View style={{ flex: 1, padding: 16 }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "bold",
+              marginBottom: 10,
+              color: "white",
+            }}
+          >
+            Available Listings
+          </Text>
+          {filteredListings.length > 0 ? (
+            <FlatList
+              data={filteredListings}
+              renderItem={renderListingItem}
+              keyExtractor={(item, index) => index.toString()}
+            />
+          ) : (
+            <Text style={{ color: "white" }}>No listings available</Text>
+          )}
+        </View>
       </SafeAreaView>
     </ImageBackground>
   );

@@ -60,19 +60,26 @@ const Classifieds = () => {
   }, [user]);
 
   const getLatestItemList = async () => {
-    const q = query(
-      collection(db, "UserPost"),
-      where("userEmail", "==", user.primaryEmailAddress.emailAddress),
-      orderBy("createdAt", "desc")
-    );
-    const querySnapShot = await getDocs(q);
-    const listingsData = [];
-    querySnapShot.forEach((doc) => {
-      listingsData.push(doc.data());
-    });
-    setListings(listingsData);
-    setFilteredListings(listingsData); // Set the filtered listings to show all initially
+    try {
+      const q = query(
+        collection(db, "UserPost"),
+        where("userEmail", "==", user.primaryEmailAddress.emailAddress),
+        orderBy("createdAt", "desc")
+      );
+      const querySnapShot = await getDocs(q);
+      const listingsData = [];
+      querySnapShot.forEach((doc) => {
+        listingsData.push(doc.data());
+      });
+      console.log("Fetched listings:", listingsData); // Add this line to check the fetched data
+      setListings(listingsData);
+      setFilteredListings(listingsData); // Set the filtered listings to show all initially
+    } catch (error) {
+      console.error("Error fetching listings: ", error);
+      Alert.alert("Error", "Failed to load listings. Please try again later.");
+    }
   };
+  
 
   const handleSearch = () => {
     const lowerCaseQuery = searchQuery.toLowerCase();
@@ -108,45 +115,48 @@ const Classifieds = () => {
 
   const onSubmitMethod = async (values) => {
     setLoading(true);
-
+  
     const success = await processPayment(pricingPackages[selectedPricing]);
-
+  
     if (!success) {
       Alert.alert("Payment failed. Please try again.");
       setLoading(false);
       return;
     }
-
+  
     const imageUrls = [];
-    for (let i = 0; i < images.length; i++) {
-      const resp = await fetch(images[i]);
-      const blob = await resp.blob();
-      const storageRef = ref(storage, "airplane_listings/" + Date.now() + "_" + i + ".jpg");
-
-      await uploadBytes(storageRef, blob);
-      const downloadUrl = await getDownloadURL(storageRef);
-      imageUrls.push(downloadUrl);
-    }
-
-    values.images = imageUrls;
-    values.userName = user.fullName;
-    values.userEmail = user.primaryEmailAddress.emailAddress;
-    values.userImage = user.imageUrl;
-    values.pricingOption = selectedPricing;
-
     try {
+      for (let i = 0; i < images.length; i++) {
+        const resp = await fetch(images[i]);
+        const blob = await resp.blob();
+        const storageRef = ref(storage, "airplane_listings/" + Date.now() + "_" + i + ".jpg");
+  
+        await uploadBytes(storageRef, blob);
+        const downloadUrl = await getDownloadURL(storageRef);
+        imageUrls.push(downloadUrl);
+      }
+  
+      values.images = imageUrls;
+      values.userName = user.fullName;
+      values.userEmail = user.primaryEmailAddress.emailAddress;
+      values.userImage = user.imageUrl;
+      values.pricingOption = selectedPricing;
+  
       const docRef = await addDoc(collection(db, "UserPost"), values);
       if (docRef.id) {
         setLoading(false);
         Alert.alert("Your post was successfully added!");
         setModalVisible(false);
-        getLatestItemList();
+        getLatestItemList(); // Refresh the listings
       }
     } catch (error) {
-      setLoading(false);
+      console.error("Error uploading post: ", error);
       Alert.alert("There was an error uploading your post.");
+      setLoading(false);
     }
   };
+  
+  
 
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
@@ -166,9 +176,9 @@ const Classifieds = () => {
       <Text className="text-lg font-bold">{item.title}</Text>
       <Text>${item.price} per hour</Text>
       <Text>{item.description}</Text>
-      {item.photo && (
+      {item.images && item.images[0] && (
         <Image
-          source={{ uri: item.photo }}
+          source={{ uri: item.images[0] }}
           className="w-24 h-24 mt-2"
         />
       )}
@@ -206,6 +216,7 @@ const Classifieds = () => {
                 className="flex-1 ml-3"
                 onChangeText={(value) => setSearchQuery(value)}
                 value={searchQuery}
+                onSubmitEditing={handleSearch} // Trigger search on submit
               />
             </View>
           </View>
