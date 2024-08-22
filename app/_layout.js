@@ -82,6 +82,7 @@ const RootLayout = () => {
           <Stack.Screen name="cfi" options={{ headerShown: false }} />
           {/* <Stack.Screen name="renterProfile" options={{ headerShown: true }} /> */}
         {/* </Stack.Navigator> */}
+        {/* <Stack.Screen name="../PaymentScreen" options={{ headerShown: false }} /> */}
         </Stack>
       </ClerkLoaded>
     </ClerkProvider>

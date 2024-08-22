@@ -14,6 +14,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 // import LiveStream from '/LiveStream'; // Import the new screen
 import FullScreenRental from '../../components/FullScreenRental';
+import PaymentScreen from '../screens/PaymentScreen';
 
 
 // Styled components
@@ -311,7 +312,8 @@ export default function App() {
         <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
         {/* <Stack.Screen name="LiveStream" component={LiveStream} options={{ headerShown: false }} /> */}
         <Stack.Screen name="FullScreenRental" component={FullScreenRental} />
-
+        {/* <Stack.Screen name="Classifieds" component={Classifieds} /> */}
+      <Stack.Screen name="../screens/PaymentScreen" component={PaymentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
