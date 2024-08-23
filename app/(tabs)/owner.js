@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   FlatList,
   ImageBackground,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
@@ -24,8 +25,8 @@ import { Formik } from "formik";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { Calendar } from "react-native-calendars";
 import { FontAwesome } from "@expo/vector-icons";
-import { db } from "../../firebaseConfig";  // Ensure this is correctly imported
-import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";  // Import background image
+import { db } from "../../firebaseConfig";
+import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 
 const SafeView = styled(SafeAreaView);
 const ScrollContainer = styled(ScrollView);
@@ -45,8 +46,8 @@ const OwnerProfile = ({ ownerId }) => {
     profileImage: null,
     aircraftImages: [],
     ratesPerHour: "",
-    minimumHours: "",  // Added for minimum hour requirement
-    boostListing: false, // Added for boosting the listing
+    minimumHours: "",
+    boostListing: false,
   });
   const [images, setImages] = useState([]);
   const [pdfDocuments, setPdfDocuments] = useState([]);
@@ -54,10 +55,11 @@ const OwnerProfile = ({ ownerId }) => {
   const [loading, setLoading] = useState(false);
   const [selectedDates, setSelectedDates] = useState({});
   const [formVisible, setFormVisible] = useState(false);
-  const [calendarVisible, setCalendarVisible] = useState(false);  // Added calendarVisible state
+  const [calendarVisible, setCalendarVisible] = useState(false);
   const [currentOrders, setCurrentOrders] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
-  const [userListings, setUserListings] = useState([]);  // State to hold user's listings
+  const [userListings, setUserListings] = useState([]);
+  const [ratings, setRatings] = useState({});
   const { user } = useUser();
   const storage = getStorage();
 
@@ -110,7 +112,7 @@ const OwnerProfile = ({ ownerId }) => {
       fetchRentalHistory();
       fetchUserListings();
     }
-  }, [ownerId, currentOrders.length, userListings.length]); // Added userListings.length to the dependency array
+  }, [ownerId, currentOrders.length, userListings.length]);
 
   const handleInputChange = (name, value) => {
     setProfileData((prev) => ({ ...prev, [name]: value }));
@@ -156,7 +158,7 @@ const OwnerProfile = ({ ownerId }) => {
     const { dateString } = day;
     const newDates = { ...selectedDates };
     if (newDates[dateString]) {
-      delete newDates[dateString]; // deselect the date
+      delete newDates[dateString];
     } else {
       newDates[dateString] = { selected: true, marked: true };
     }
@@ -199,14 +201,14 @@ const OwnerProfile = ({ ownerId }) => {
 
       const newListing = {
         ...values,
-        ratesPerHour: values.ratesPerHour.replace(/^\$/, ""),  // Remove any leading dollar signs
+        ratesPerHour: values.ratesPerHour.replace(/^\$/, ""),
         userEmail: user.primaryEmailAddress.emailAddress,
         images: imageUrls,
         documents: documentUrls,
         insuranceDocuments: insuranceDocumentUrls,
         availableDates: Object.keys(selectedDates),
-        boostListing: profileData.boostListing,  // Include the boost listing option
-        minimumHours: values.minimumHours, // Added minimum hours to the listing
+        boostListing: profileData.boostListing,
+        minimumHours: values.minimumHours,
       };
 
       await addDoc(collection(db, "airplanes"), newListing);
@@ -220,8 +222,6 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   const handleEditListing = (listing) => {
-    // Logic to edit the listing
-    // You can repurpose the submit form for editing by populating it with the selected listing's details
     Alert.alert("Edit functionality is not yet implemented.");
   };
 
@@ -229,7 +229,7 @@ const OwnerProfile = ({ ownerId }) => {
     try {
       await deleteDoc(doc(db, "airplanes", listingId));
       Alert.alert("Listing Deleted", "Your listing has been deleted.");
-      setUserListings(userListings.filter((listing) => listing.id !== listingId)); // Remove the listing from the local state
+      setUserListings(userListings.filter((listing) => listing.id !== listingId));
     } catch (error) {
       console.error("Error deleting listing: ", error);
       Alert.alert("Error", "Failed to delete listing.");
@@ -255,266 +255,305 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
+  const handleRating = async (orderId, rating) => {
+    try {
+      const orderDocRef = doc(db, "orders", orderId);
+      await updateDoc(orderDocRef, { rating });
+      setRatings((prevRatings) => ({ ...prevRatings, [orderId]: rating }));
+      Alert.alert("Rating Submitted", "Thank you for your feedback!");
+    } catch (error) {
+      console.error("Error submitting rating: ", error);
+      Alert.alert("Error", "Failed to submit rating.");
+    }
+  };
+
   return (
-    <ImageBackground
-      source={wingtipClouds}
-      className="flex-1"
-      resizeMode="cover"
-    >
-      <SafeView className="flex-1 mt-5">
-        <ScrollContainer contentContainerStyle={{ padding: 16 }}>
-          {/* User Header */}
-          <View className="flex items-center mb-4">
-            <Image
-              source={{ uri: user?.profileImageUrl || user?.imageUrl }}
-              className="w-16 h-16 rounded-full"
-            />
-            <Text className="text-xl font-bold mt-2 text-white">{user?.fullName}</Text>
-          </View>
+    <SafeView className="flex-1 bg-white">
+      <ScrollContainer contentContainerStyle={{ padding: 16 }}>
+        <View className="flex items-center mb-6">
+          <Image
+            source={{ uri: user?.profileImageUrl || user?.imageUrl }}
+            className="w-20 h-20 rounded-full"
+          />
+          <Text className="text-2xl font-bold mt-2 text-gray-900">{user?.fullName}</Text>
+        </View>
 
-          {/* Toggle Form Button */}
-          <TouchableOpacity
-            onPress={() => setFormVisible(!formVisible)}
-            className="bg-blue-500 p-2 rounded-lg mb-4"
-          >
-            <Text className="text-white text-center">
-              {formVisible ? "Hide Form" : "Submit Your Listing"}
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setFormVisible(!formVisible)}
+          className="bg-red-500 py-3 px-6 rounded-full mb-4"
+        >
+          <Text className="text-white text-center font-bold">
+            {formVisible ? "Hide Form" : "Submit Your Listing"}
+          </Text>
+        </TouchableOpacity>
 
-          {/* Form View */}
-          {formVisible && (
+        <Modal
+          visible={formVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setFormVisible(false)}
+        >
+          <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
             <KeyboardAvoidingView
               behavior={Platform.OS === "ios" ? "padding" : "height"}
-              className="flex-1 justify-center items-center"
+              className="flex-1 justify-center items-center w-full"
             >
-              <View className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg">
-                <Text className="text-2xl font-bold mb-4 text-center">
-                  Submit Your Listing
-                </Text>
-
-                {/* Calendar Toggle Button */}
-                <TouchableOpacity
-                  onPress={() => setCalendarVisible(!calendarVisible)}
-                  className="bg-gray-300 p-2 rounded-lg mb-4"
-                >
-                  <Text className="text-center text-black">
-                    {calendarVisible ? "Hide Calendar" : "Show Calendar"}
+              <ScrollView className="w-full max-w-lg">
+                <View className="bg-white rounded-3xl p-6 w-full shadow-xl">
+                  <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+                    Submit Your Listing
                   </Text>
-                </TouchableOpacity>
 
-                {/* Calendar View */}
-                {calendarVisible && (
-                  <Calendar
-                    onDayPress={onDayPress}
-                    markedDates={selectedDates}
-                    markingType={"multi-dot"}
-                    style={{ marginBottom: 10 }}
-                  />
-                )}
+                  <TouchableOpacity
+                    onPress={() => setCalendarVisible(!calendarVisible)}
+                    className="bg-gray-100 py-2 px-4 rounded-full mb-6"
+                  >
+                    <Text className="text-center text-gray-800">
+                      {calendarVisible ? "Hide Calendar" : "Show Calendar"}
+                    </Text>
+                  </TouchableOpacity>
 
-                <Formik
-                  initialValues={{
-                    airplaneYear: "",
-                    airplaneModel: "",
-                    description: "",
-                    location: "",
-                    ratesPerHour: "",
-                    minimumHours: "", // Added for minimum hour requirement
-                  }}
-                  onSubmit={onSubmitMethod}
-                >
-                  {({ handleChange, handleBlur, handleSubmit, values }) => (
-                    <>
-                      <Picker
-                        selectedValue={values.airplaneYear}
-                        onValueChange={handleChange("airplaneYear")}
-                        className="border-b border-gray-300 mb-4 p-2"
-                      >
-                        <Picker.Item label="Select Airplane Year" value="" />
-                        {[...Array(75).keys()].map((_, index) => {
-                          const year = new Date().getFullYear() - index;
-                          return <Picker.Item label={year.toString()} value={year.toString()} key={index} />;
-                        })}
-                      </Picker>
-
-                      <TextInput
-                        placeholder="Aircraft Make/Model"
-                        onChangeText={handleChange("airplaneModel")}
-                        onBlur={handleBlur("airplaneModel")}
-                        value={values.airplaneModel}
-                        className="border-b border-gray-300 mb-4 p-2"
-                      />
-                      <TextInput
-                        placeholder="Description"
-                        onChangeText={handleChange("description")}
-                        onBlur={handleBlur("description")}
-                        value={values.description}
-                        multiline
-                        numberOfLines={4}
-                        className="border-b border-gray-300 mb-4 p-2"
-                      />
-                      <TextInput
-                        placeholder="Location (City, State)"
-                        onChangeText={handleChange("location")}
-                        onBlur={handleBlur("location")}
-                        value={values.location}
-                        className="border-b border-gray-300 mb-4 p-2"
-                      />
-                      <TextInput
-                        placeholder="Rates Per Hour ($)"
-                        onChangeText={(text) => handleInputChange('ratesPerHour', text)}
-                        onBlur={handleBlur("ratesPerHour")}
-                        value={profileData.ratesPerHour}  // Use profileData to ensure the correct value is displayed
-                        keyboardType="default"  // Allow dollar sign and punctuation
-                        className="border-b border-gray-300 mb-4 p-2"
-                      />
-
-                      {/* Minimum Hours Requirement */}
-                      <TextInput
-                        placeholder="Minimum Hour Requirement"
-                        onChangeText={handleChange("minimumHours")}
-                        onBlur={handleBlur("minimumHours")}
-                        value={values.minimumHours}
-                        keyboardType="numeric"
-                        className="border-b border-gray-300 mb-4 p-2"
-                      />
-
-                      {/* Boost Listing Option */}
-                      <TouchableOpacity
-                        onPress={() => handleInputChange('boostListing', !profileData.boostListing)}
-                        className="flex-row items-center bg-yellow-400 p-2 rounded-lg mb-4"
-                      >
-                        <FontAwesome name="dollar" size={24} color="black" />
-                        <Text className="ml-2">
-                          {profileData.boostListing ? "Boost Selected ($50)" : "Boost Your Listing ($50)"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <Text className="mb-2 mt-4">Upload Images</Text>
-                      <FlatList
-                        data={images}
-                        horizontal
-                        renderItem={({ item, index }) => (
-                          <Image
-                            key={index}
-                            source={{ uri: item }}
-                            className="w-20 h-20 mr-2 rounded-lg"
-                          />
-                        )}
-                        keyExtractor={(item, index) => index.toString()}
-                      />
-                      <TouchableOpacity
-                        onPress={pickImage}
-                        className="bg-gray-300 p-2 rounded-lg mt-2 mb-4"
-                      >
-                        <Text className="text-center text-black">
-                          {images.length >= 7 ? "Maximum 7 Images" : "Add Image"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* Upload PDF Documents - Proof of Current Annual */}
-                      <TouchableOpacity
-                        onPress={pickDocument}
-                        className="bg-gray-300 p-2 rounded-lg mt-2 mb-4"
-                      >
-                        <Text className="text-center text-black">
-                          Upload PDF Document (Proof of Current Annual)
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* Upload PDF Documents - Proof of Insurance */}
-                      <TouchableOpacity
-                        onPress={pickInsuranceDocument}
-                        className="bg-gray-300 p-2 rounded-lg mt-2 mb-4"
-                      >
-                        <Text className="text-center text-black">
-                          Upload PDF Document (Proof of Insurance)
-                        </Text>
-                      </TouchableOpacity>
-
-                      {loading ? (
-                        <ActivityIndicator size="large" color="#0000ff" />
-                      ) : (
-                        <TouchableOpacity
-                          onPress={handleSubmit}
-                          className="bg-blue-500 p-2 rounded-lg"
-                        >
-                          <Text className="text-white text-center">Submit Listing</Text>
-                        </TouchableOpacity>
-                      )}
-                    </>
+                  {calendarVisible && (
+                    <Calendar
+                      onDayPress={onDayPress}
+                      markedDates={selectedDates}
+                      markingType={"multi-dot"}
+                      style={{ marginBottom: 10 }}
+                    />
                   )}
-                </Formik>
-              </View>
-            </KeyboardAvoidingView>
-          )}
 
-          {/* User's Listings */}
-          <View className="mt-4">
-            <Text className="text-2xl font-bold mb-2 text-white">Your Listings</Text>
-            {userListings.length > 0 ? (
-              userListings.map((listing) => (
-                <View key={listing.id} className="bg-gray-100 p-4 rounded-lg mb-2">
-                  <Text className="font-bold">{listing.airplaneModel}</Text>
-                  <Text>{listing.description}</Text>
-                  <Text>{listing.location}</Text>
-                  <Text>{listing.ratesPerHour}</Text>
-                  <View className="flex-row justify-between mt-4">
-                    <TouchableOpacity
-                      onPress={() => handleEditListing(listing)}
-                      className="bg-green-500 p-2 rounded-lg"
-                    >
-                      <Text className="text-white text-center">Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteListing(listing.id)}
-                      className="bg-red-500 p-2 rounded-lg"
-                    >
-                      <Text className="text-white text-center">Delete</Text>
-                    </TouchableOpacity>
+                  <Formik
+                    initialValues={{
+                      airplaneYear: "",
+                      airplaneModel: "",
+                      description: "",
+                      location: "",
+                      ratesPerHour: "",
+                      minimumHours: "",
+                    }}
+                    onSubmit={onSubmitMethod}
+                  >
+                    {({ handleChange, handleBlur, handleSubmit, values }) => (
+                      <>
+                        <Picker
+                          selectedValue={values.airplaneYear}
+                          onValueChange={handleChange("airplaneYear")}
+                          className="border-b border-gray-300 mb-4 p-2"
+                        >
+                          <Picker.Item label="Select Airplane Year" value="" />
+                          {[...Array(75).keys()].map((_, index) => {
+                            const year = new Date().getFullYear() - index;
+                            return (
+                              <Picker.Item
+                                label={year.toString()}
+                                value={year.toString()}
+                                key={index}
+                              />
+                            );
+                          })}
+                        </Picker>
+
+                        <TextInput
+                          placeholder="Aircraft Make/Model"
+                          onChangeText={handleChange("airplaneModel")}
+                          onBlur={handleBlur("airplaneModel")}
+                          value={values.airplaneModel}
+                          className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        />
+                        <TextInput
+                          placeholder="Description"
+                          onChangeText={handleChange("description")}
+                          onBlur={handleBlur("description")}
+                          value={values.description}
+                          multiline
+                          numberOfLines={4}
+                          className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        />
+                        <TextInput
+                          placeholder="Location (City, State)"
+                          onChangeText={handleChange("location")}
+                          onBlur={handleBlur("location")}
+                          value={values.location}
+                          className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        />
+                        <TextInput
+                          placeholder="Rates Per Hour ($)"
+                          onChangeText={(text) => handleInputChange("ratesPerHour", text)}
+                          onBlur={handleBlur("ratesPerHour")}
+                          value={profileData.ratesPerHour}
+                          keyboardType="default"
+                          className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        />
+
+                        <TextInput
+                          placeholder="Minimum Hour Requirement"
+                          onChangeText={handleChange("minimumHours")}
+                          onBlur={handleBlur("minimumHours")}
+                          value={values.minimumHours}
+                          keyboardType="numeric"
+                          className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        />
+
+                        <TouchableOpacity
+                          onPress={() =>
+                            handleInputChange("boostListing", !profileData.boostListing)
+                          }
+                          className="flex-row items-center bg-yellow-400 py-2 px-4 rounded-full mb-4"
+                        >
+                          <FontAwesome name="dollar" size={24} color="black" />
+                          <Text className="ml-2 text-gray-800">
+                            {profileData.boostListing
+                              ? "Boost Selected ($50)"
+                              : "Boost Your Listing ($50)"}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <Text className="mb-2 mt-4 text-gray-900 font-bold">Upload Images</Text>
+                        <FlatList
+                          data={images}
+                          horizontal
+                          renderItem={({ item, index }) => (
+                            <Image
+                              key={index}
+                              source={{ uri: item }}
+                              className="w-24 h-24 mr-2 rounded-lg"
+                            />
+                          )}
+                          keyExtractor={(item, index) => index.toString()}
+                        />
+                        <TouchableOpacity
+                          onPress={pickImage}
+                          className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                        >
+                          <Text className="text-center text-gray-800">
+                            {images.length >= 7 ? "Maximum 7 Images" : "Add Image"}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={pickDocument}
+                          className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                        >
+                          <Text className="text-center text-gray-800">
+                            Upload PDF Document (Proof of Current Annual)
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={pickInsuranceDocument}
+                          className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                        >
+                          <Text className="text-center text-gray-800">
+                            Upload PDF Document (Proof of Insurance)
+                          </Text>
+                        </TouchableOpacity>
+
+                        {loading ? (
+                          <ActivityIndicator size="large" color="#FF5A5F" />
+                        ) : (
+                          <TouchableOpacity
+                            onPress={handleSubmit}
+                            className="bg-red-500 py-3 px-6 rounded-full"
+                          >
+                            <Text className="text-white text-center font-bold">
+                              Submit Listing
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </>
+                    )}
+                  </Formik>
+
+                  <TouchableOpacity
+                    onPress={() => setFormVisible(false)}
+                    className="mt-4 py-2 rounded-full bg-gray-200"
+                  >
+                    <Text className="text-center text-gray-800">Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
+
+        <View className="mt-8">
+          <Text className="text-2xl font-bold mb-4 text-gray-900">Your Listings</Text>
+          {userListings.length > 0 ? (
+            userListings.map((listing) => (
+              <View key={listing.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
+                <Text className="font-bold text-lg text-gray-900">{listing.airplaneModel}</Text>
+                <Text className="text-gray-700">{listing.description}</Text>
+                <Text className="text-gray-700">{listing.location}</Text>
+                <Text className="text-red-500 font-bold">{listing.ratesPerHour}</Text>
+                <View className="flex-row justify-between mt-4">
+                  <TouchableOpacity
+                    onPress={() => handleEditListing(listing)}
+                    className="bg-green-500 py-2 px-4 rounded-full"
+                  >
+                    <Text className="text-white text-center">Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteListing(listing.id)}
+                    className="bg-red-500 py-2 px-4 rounded-full"
+                  >
+                    <Text className="text-white text-center">Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          ) : (
+            <Text className="text-gray-700">No listings available.</Text>
+          )}
+        </View>
+
+        <View className="mt-8">
+          <Text className="text-2xl font-bold mb-4 text-gray-900">Current Rental Orders</Text>
+          {currentOrders.length > 0 ? (
+            currentOrders.map((order) => (
+              <View key={order.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
+                <Text className="font-bold text-lg text-gray-900">{order.airplaneModel}</Text>
+                <Text className="text-gray-700">{order.rentalPeriod}</Text>
+                <Text className="text-gray-700">{order.renterName}</Text>
+              </View>
+            ))
+          ) : (
+            <Text className="text-gray-700">No current orders.</Text>
+          )}
+        </View>
+
+        <View className="mt-8">
+          <Text className="text-2xl font-bold mb-4 text-gray-900">Rental History</Text>
+          {rentalHistory.length > 0 ? (
+            rentalHistory.map((order) => (
+              <View key={order.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
+                <Text className="font-bold text-lg text-gray-900">{order.airplaneModel}</Text>
+                <Text className="text-gray-700">{order.rentalPeriod}</Text>
+                <Text className="text-gray-700">{order.renterName}</Text>
+                <View className="flex-row justify-between items-center mt-4">
+                  <Text className="text-gray-800">Rate this renter:</Text>
+                  <View className="flex-row">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity
+                        key={star}
+                        onPress={() => handleRating(order.id, star)}
+                      >
+                        <FontAwesome
+                          name={star <= (ratings[order.id] || 0) ? "star" : "star-o"}
+                          size={24}
+                          color="gold"
+                        />
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 </View>
-              ))
-            ) : (
-              <Text className="text-white">No listings available.</Text>
-            )}
-          </View>
-
-          {/* Current Rental Orders */}
-          <View className="mt-4">
-            <Text className="text-2xl font-bold mb-2 text-white">Current Rental Orders</Text>
-            {currentOrders.length > 0 ? (
-              currentOrders.map((order) => (
-                <View key={order.id} className="bg-gray-100 p-4 rounded-lg mb-2">
-                  <Text className="font-bold">{order.airplaneModel}</Text>
-                  <Text>{order.rentalPeriod}</Text>
-                  <Text>{order.renterName}</Text>
-                </View>
-              ))
-            ) : (
-              <Text className="text-white">No current orders.</Text>
-            )}
-          </View>
-
-          {/* Rental History */}
-          <View className="mt-4">
-            <Text className="text-2xl font-bold mb-2 text-white">Rental History</Text>
-            {rentalHistory.length > 0 ? (
-              rentalHistory.map((order) => (
-                <View key={order.id} className="bg-gray-100 p-4 rounded-lg mb-2">
-                  <Text className="font-bold">{order.airplaneModel}</Text>
-                  <Text>{order.rentalPeriod}</Text>
-                  <Text>{order.renterName}</Text>
-                </View>
-              ))
-            ) : (
-              <Text className="text-white">No rental history.</Text>
-            )}
-          </View>
-        </ScrollContainer>
-      </SafeView>
-    </ImageBackground>
+              </View>
+            ))
+          ) : (
+            <Text className="text-gray-700">No rental history.</Text>
+          )}
+        </View>
+      </ScrollContainer>
+    </SafeView>
   );
 };
 
