@@ -17,12 +17,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
-import PropellerImage from "../../Assets/images/wingtip_clouds.jpg";
+import PropellerImage from "../../Assets/images/propeller-image.jpg";
 import { Formik } from "formik";
 import { Calendar } from "react-native-calendars";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getStorage } from "firebase/storage";
 import { collection, addDoc } from "firebase/firestore";
 import { FontAwesome } from "@expo/vector-icons";
 
@@ -46,20 +46,22 @@ const OwnerProfile = ({ ownerId }) => {
   const [selectedDates, setSelectedDates] = useState({});
   const [formVisible, setFormVisible] = useState(false);
   const [calendarVisible, setCalendarVisible] = useState(false);
-  const [currentOrders, setCurrentOrders] = useState([]);
-  const [rentalHistory, setRentalHistory] = useState([]);
   const [userListings, setUserListings] = useState([]);
+  const [rentalHistory, setRentalHistory] = useState([]); // Declaring rentalHistory state
   const [ratings, setRatings] = useState({});
+  const [availableBalance, setAvailableBalance] = useState(5000); // Example balance
+  const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [achModalVisible, setAchModalVisible] = useState(false);
+  const [debitModalVisible, setDebitModalVisible] = useState(false);
   const { user } = useUser();
   const storage = getStorage();
 
   useEffect(() => {
     // Fetch data functions...
-
     if (ownerId) {
-      // Fetch profile data, orders, rental history, and user listings...
+      // Fetch profile data, rental history, and user listings...
     }
-  }, [ownerId, currentOrders.length, userListings.length]);
+  }, [ownerId, userListings.length]);
 
   const handleInputChange = (name, value) => {
     setProfileData((prev) => ({ ...prev, [name]: value }));
@@ -94,12 +96,12 @@ const OwnerProfile = ({ ownerId }) => {
     // Handle delete listing logic...
   };
 
-  const completeRentalTransaction = async (listing, renterDetails) => {
-    // Complete rental transaction logic...
-  };
-
-  const handleRating = async (orderId, rating) => {
-    // Handle rating logic...
+  const handleTransferFunds = (method) => {
+    // Handle fund transfer logic here
+    Alert.alert(`Funds transferred via ${method}`);
+    setTransferModalVisible(false);
+    setAchModalVisible(false);
+    setDebitModalVisible(false);
   };
 
   return (
@@ -112,6 +114,11 @@ const OwnerProfile = ({ ownerId }) => {
           justifyContent: "flex-start",
           paddingTop: 10,
           paddingHorizontal: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.8,
+          shadowRadius: 2,
+          elevation: 5,
         }}
         imageStyle={{ resizeMode: "cover" }}
       >
@@ -143,7 +150,7 @@ const OwnerProfile = ({ ownerId }) => {
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         {/* Listings Section */}
         <View className="mt-8">
-          <Text className="text-2xl font-bold mb-4 text-gray-900">Your Listings</Text>
+          <Text className="text-2xl font-bold mb-4 text-gray-900">Your Current Listings</Text>
           {userListings.length > 0 ? (
             userListings.map((listing) => (
               <View key={listing.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
@@ -169,22 +176,6 @@ const OwnerProfile = ({ ownerId }) => {
             ))
           ) : (
             <Text className="text-gray-700">No listings available.</Text>
-          )}
-        </View>
-
-        {/* Current Rental Orders Section */}
-        <View className="mt-8">
-          <Text className="text-2xl font-bold mb-4 text-gray-900">Current Rental Orders</Text>
-          {currentOrders.length > 0 ? (
-            currentOrders.map((order) => (
-              <View key={order.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
-                <Text className="font-bold text-lg text-gray-900">{order.airplaneModel}</Text>
-                <Text className="text-gray-700">{order.rentalPeriod}</Text>
-                <Text className="text-gray-700">{order.renterName}</Text>
-              </View>
-            ))
-          ) : (
-            <Text className="text-gray-700">No current orders.</Text>
           )}
         </View>
 
@@ -221,6 +212,234 @@ const OwnerProfile = ({ ownerId }) => {
           )}
         </View>
       </ScrollView>
+
+      {/* Available Balance Button */}
+      <View className="absolute bottom-10 left-0 right-0 items-center">
+        <TouchableOpacity
+          onPress={() => setTransferModalVisible(true)}
+          style={{
+            padding: 10,
+            borderRadius: 25,
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.8,
+            shadowRadius: 2,
+            elevation: 5,
+          }}
+        >
+          <Text className="text-gray-900 font-bold">
+            Available Balance: ${availableBalance}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Transfer Funds Modal */}
+      <Modal
+        visible={transferModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setTransferModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
+            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+              Transfer Funds
+            </Text>
+            <TouchableOpacity
+              onPress={() => setAchModalVisible(true)}
+              style={{
+                padding: 10,
+                borderRadius: 25,
+                backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.8,
+                shadowRadius: 2,
+                elevation: 5,
+                marginBottom: 16,
+              }}
+            >
+              <Text className="text-gray-900 font-bold">
+                Transfer via ACH
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setDebitModalVisible(true)}
+              style={{
+                padding: 10,
+                borderRadius: 25,
+                backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.8,
+                shadowRadius: 2,
+                elevation: 5,
+                marginBottom: 16,
+              }}
+            >
+              <Text className="text-gray-900 font-bold">
+                Transfer to Debit Card
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setTransferModalVisible(false)}
+              className="mt-4 py-2 rounded-full bg-gray-200"
+            >
+              <Text className="text-center text-gray-800">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ACH Transfer Modal */}
+      <Modal
+        visible={achModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAchModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
+            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+              Enter Bank Details
+            </Text>
+            <Formik
+              initialValues={{
+                bankAccountNumber: '',
+                bankRoutingNumber: '',
+              }}
+              onSubmit={(values) => {
+                handleTransferFunds('ACH');
+              }}
+            >
+              {({ handleChange, handleBlur, handleSubmit, values }) => (
+                <>
+                  <TextInput
+                    placeholder="Bank Account Number"
+                    onChangeText={handleChange("bankAccountNumber")}
+                    onBlur={handleBlur("bankAccountNumber")}
+                    value={values.bankAccountNumber}
+                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    placeholder="Bank Routing Number"
+                    onChangeText={handleChange("bankRoutingNumber")}
+                    onBlur={handleBlur("bankRoutingNumber")}
+                    value={values.bankRoutingNumber}
+                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    keyboardType="numeric"
+                  />
+                  <TouchableOpacity
+                    onPress={handleSubmit}
+                    style={{
+                      padding: 10,
+                      borderRadius: 25,
+                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.8,
+                      shadowRadius: 2,
+                      elevation: 5,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <Text className="text-gray-900 font-bold text-center">
+                      Submit
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </Formik>
+            <TouchableOpacity
+              onPress={() => setAchModalVisible(false)}
+              className="mt-4 py-2 rounded-full bg-gray-200"
+            >
+              <Text className="text-center text-gray-800">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Debit Card Transfer Modal */}
+      <Modal
+        visible={debitModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setDebitModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
+            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+              Enter Debit Card Details
+            </Text>
+            <Formik
+              initialValues={{
+                cardNumber: '',
+                cardExpiry: '',
+                cardCVC: '',
+              }}
+              onSubmit={(values) => {
+                handleTransferFunds('Debit Card');
+              }}
+            >
+              {({ handleChange, handleBlur, handleSubmit, values }) => (
+                <>
+                  <TextInput
+                    placeholder="Card Number"
+                    onChangeText={handleChange("cardNumber")}
+                    onBlur={handleBlur("cardNumber")}
+                    value={values.cardNumber}
+                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    placeholder="Expiry Date (MM/YY)"
+                    onChangeText={handleChange("cardExpiry")}
+                    onBlur={handleBlur("cardExpiry")}
+                    value={values.cardExpiry}
+                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    placeholder="CVC"
+                    onChangeText={handleChange("cardCVC")}
+                    onBlur={handleBlur("cardCVC")}
+                    value={values.cardCVC}
+                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    keyboardType="numeric"
+                  />
+                  <TouchableOpacity
+                    onPress={handleSubmit}
+                    style={{
+                      padding: 10,
+                      borderRadius: 25,
+                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.8,
+                      shadowRadius: 2,
+                      elevation: 5,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <Text className="text-gray-900 font-bold text-center">
+                      Submit
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </Formik>
+            <TouchableOpacity
+              onPress={() => setDebitModalVisible(false)}
+              className="mt-4 py-2 rounded-full bg-gray-200"
+            >
+              <Text className="text-center text-gray-800">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Submit Your Listing Modal */}
       <Modal
@@ -285,7 +504,6 @@ const OwnerProfile = ({ ownerId }) => {
                         onBlur={handleBlur("description")}
                         value={values.description}
                         multiline
-                        numberOfLines={4}
                         className="border-b border-gray-300 mb-4 p-2 text-gray-900"
                       />
                       <TextInput

@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ImageBackground
 } from 'react-native';
 import { getFirestore, collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { Formik } from 'formik';
@@ -21,8 +22,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
-import { styled } from 'nativewind';
-import RenterProfile from '../../components/RenterProfile';
+import PropellerImage from "../../Assets/images/propeller-image.jpg";
 
 const BookingCalendar = ({ airplaneId, userId }) => {
   const { user } = useUser();
@@ -122,35 +122,56 @@ const BookingCalendar = ({ airplaneId, userId }) => {
         }
         contentContainerStyle={{ paddingBottom: 16 }}
       >
-        {/* Header */}
-        <View className="flex-row p-4 items-center bg-gray-100">
-          <Image
-            source={{ uri: user?.imageUrl }}
-            className="w-12 h-12 rounded-full mr-3"
-          />
-          <View>
-            <Text className="text-sm text-gray-600">Welcome</Text>
-            <Text className="text-lg font-bold text-gray-800">{user?.fullName}</Text>
+        {/* Header with Background Image */}
+        <ImageBackground
+          source={PropellerImage} // Use the imported image as background
+          style={{
+            height: 187.5,
+            justifyContent: "flex-start",
+            paddingTop: 10,
+            paddingHorizontal: 10,
+          }}
+          imageStyle={{ resizeMode: "cover" }}
+        >
+          <View className="flex-row justify-between items-center">
+            <View>
+              <Text className="text-sm text-white">Welcome,</Text>
+              <Text className="text-lg font-bold text-white">{user?.fullName}</Text>
+            </View>
+
+            {/* Settings Button Positioned at Top Right */}
+            <TouchableOpacity
+              onPress={() => setProfileModalVisible(true)}
+              style={{
+                padding: 10,
+                borderRadius: 25,
+                backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.8,
+                shadowRadius: 2,
+                elevation: 5,
+              }}
+            >
+              <Ionicons name="settings-outline" size={28} color="black" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => setProfileModalVisible(true)} className="ml-auto">
-            <Ionicons name="settings-outline" size={28} color="black" />
-          </TouchableOpacity>
-        </View>
+        </ImageBackground>
 
         {/* Section Title */}
-        <View className="px-4 py-3 bg-gray-100">
-          <Text className="text-2xl font-bold text-gray-800">Manage Your Rentals</Text>
+        <View className="px-4 py-3">
+          <Text className="text-2xl font-bold text-gray-900">Manage Your Rentals</Text>
           <Text className="text-md text-gray-600">Update your profile, view rental details, and manage bookings.</Text>
         </View>
 
         {/* Completed Rentals */}
         <View className="px-4 py-3">
-          <Text className="text-xl font-bold mb-4 text-gray-800">Completed Rentals</Text>
+          <Text className="text-xl font-bold mb-4 text-gray-900">Completed Rentals</Text>
           {completedRentals.length > 0 ? (
             completedRentals.map((rental) => (
-              <View key={rental.id} className="bg-white shadow-md p-4 rounded-lg mb-4">
-                <Text className="font-bold text-gray-800">{rental.renterName}</Text>
-                <Text className="text-gray-600">{rental.rentalPeriod}</Text>
+              <View key={rental.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
+                <Text className="font-bold text-gray-900">{rental.renterName}</Text>
+                <Text className="text-gray-700">{rental.rentalPeriod}</Text>
                 <View className="flex-row items-center mt-2">
                   <Text className="text-gray-800">Rate this renter:</Text>
                   <View className="flex-row ml-4">
@@ -177,30 +198,30 @@ const BookingCalendar = ({ airplaneId, userId }) => {
 
         {/* Profile Information */}
         {profileSaved ? (
-          <View className="px-4 py-3 bg-white shadow-md rounded-lg">
-            <Text className="text-xl font-bold mb-2 text-gray-800">Profile Information</Text>
+          <View className="px-4 py-3 bg-white shadow-md rounded-3xl">
+            <Text className="text-xl font-bold mb-2 text-gray-900">Profile Information</Text>
             <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-800">Name:</Text>
+              <Text className="font-bold flex-1 text-gray-900">Name:</Text>
               <Text className="flex-2 text-gray-600">{profileData.name}</Text>
             </View>
             <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-800">Aircraft Type:</Text>
+              <Text className="font-bold flex-1 text-gray-900">Aircraft Type:</Text>
               <Text className="flex-2 text-gray-600">{profileData.aircraftType}</Text>
             </View>
             <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-800">Certifications:</Text>
+              <Text className="font-bold flex-1 text-gray-900">Certifications:</Text>
               <Text className="flex-2 text-gray-600">{profileData.certifications}</Text>
             </View>
             <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-800">Contact:</Text>
+              <Text className="font-bold flex-1 text-gray-900">Contact:</Text>
               <Text className="flex-2 text-gray-600">{profileData.contact}</Text>
             </View>
             <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-800">Location:</Text>
+              <Text className="font-bold flex-1 text-gray-900">Location:</Text>
               <Text className="flex-2 text-gray-600">{profileData.address}</Text>
             </View>
             <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-800">Category:</Text>
+              <Text className="font-bold flex-1 text-gray-900">Category:</Text>
               <Text className="flex-2 text-gray-600">
                 {profileData.category === "single_engine"
                   ? "Single Engine Prop"
@@ -231,20 +252,20 @@ const BookingCalendar = ({ airplaneId, userId }) => {
             )}
           </View>
         ) : (
-          <View className="px-4 py-3 bg-white shadow-md rounded-lg">
-            <Text className="text-xl font-bold mb-2 text-gray-800">No Profile Information Available</Text>
+          <View className="px-4 py-3 bg-white shadow-md rounded-3xl">
+            <Text className="text-xl font-bold mb-2 text-gray-900">No Profile Information Available</Text>
           </View>
         )}
       </ScrollView>
 
       {/* Profile Modal */}
       <Modal visible={profileModalVisible} animationType="slide">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1 bg-gray-100"
-        >
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-            <SafeAreaView>
+        <SafeAreaView className="flex-1 bg-gray-100">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            className="flex-1"
+          >
+            <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
               <View className="p-4">
                 <Formik
                   initialValues={profileData}
@@ -252,47 +273,47 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                 >
                   {({ handleChange, handleBlur, handleSubmit, values }) => (
                     <View>
-                      <Text className="text-xl font-bold mb-4 text-gray-800">Edit Profile</Text>
+                      <Text className="text-xl font-bold mb-4 text-gray-900">Edit Profile</Text>
                       <TextInput
                         placeholder="Name"
                         onChangeText={handleChange("name")}
                         onBlur={handleBlur("name")}
                         value={values.name}
-                        className="border border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
                       />
                       <TextInput
                         placeholder="Aircraft Type"
                         onChangeText={handleChange("aircraftType")}
                         onBlur={handleBlur("aircraftType")}
                         value={values.aircraftType}
-                        className="border border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
                       />
                       <TextInput
                         placeholder="Certifications"
                         onChangeText={handleChange("certifications")}
                         onBlur={handleBlur("certifications")}
                         value={values.certifications}
-                        className="border border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
                       />
                       <TextInput
                         placeholder="Contact"
                         onChangeText={handleChange("contact")}
                         onBlur={handleBlur("contact")}
                         value={values.contact}
-                        className="border border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
                       />
                       <TextInput
                         placeholder="Location"
                         onChangeText={handleChange("address")}
                         onBlur={handleBlur("address")}
                         value={values.address}
-                        className="border border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
                       />
-                      <Text className="font-bold mb-2 text-gray-800">Category</Text>
+                      <Text className="font-bold mb-2 text-gray-900">Category</Text>
                       <Picker
                         selectedValue={values.category}
                         onValueChange={handleChange("category")}
-                        className="border border-gray-300 rounded-lg mb-4 bg-white"
+                        className="border-b border-gray-300 mb-4 bg-white"
                       >
                         <Picker.Item label="Single Engine Prop" value="single_engine" />
                         <Picker.Item label="Twin Engine Prop" value="twin_engine" />
@@ -302,7 +323,7 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                       </Picker>
                       <TouchableOpacity
                         onPress={() => pickDocument("logBooks")}
-                        className="border border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        className="border-b border-gray-300 rounded-lg p-2 mb-4 bg-white"
                       >
                         <Text className="text-gray-800">
                           {values.logBooks ? "Change Log Books" : "Upload Recent Logbook Page"}
@@ -310,7 +331,7 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => pickDocument("medical")}
-                        className="border border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        className="border-b border-gray-300 rounded-lg p-2 mb-4 bg-white"
                       >
                         <Text className="text-gray-800">
                           {values.medical ? "Change Medical" : "Upload Medical"}
@@ -318,13 +339,13 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={handleSubmit}
-                        className="bg-blue-500 rounded-lg p-2 mb-4"
+                        className="bg-blue-500 py-3 px-6 rounded-full mb-4"
                       >
                         <Text className="text-white text-center">Save Profile</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => setProfileModalVisible(false)}
-                        className="bg-gray-500 rounded-lg p-2"
+                        className="bg-gray-500 py-3 px-6 rounded-full"
                       >
                         <Text className="text-white text-center">Cancel</Text>
                       </TouchableOpacity>
@@ -332,9 +353,9 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                   )}
                 </Formik>
               </View>
-            </SafeAreaView>
-          </ScrollView>
-        </KeyboardAvoidingView>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
