@@ -22,6 +22,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { styled } from 'nativewind';
+import RenterProfile from '../../components/RenterProfile';
 
 const BookingCalendar = ({ airplaneId, userId }) => {
   const { user } = useUser();

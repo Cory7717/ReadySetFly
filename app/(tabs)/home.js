@@ -2,20 +2,19 @@ import React, { useEffect, useState } from "react";
 import {
   Text,
   View,
-  Image,
   TextInput,
   TouchableOpacity,
   FlatList,
   Modal,
-  ScrollView,
-  Alert,
+  ImageBackground,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { AntDesign, MaterialIcons } from "@expo/vector-icons";
-import { styled } from "nativewind"; // Import NativeWind
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
+import PropellerImage from "../../Assets/images/propeller-image.jpg"; // Import your image
 
 const Home = () => {
   const { user } = useUser();
@@ -23,20 +22,17 @@ const Home = () => {
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [showFilters, setShowFilters] = useState(true);
   const [selectedListing, setSelectedListing] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
-  const [totalHours, setTotalHours] = useState("");
-  const [priceBreakdown, setPriceBreakdown] = useState({
-    totalCost: 0,
-    bookingFee: 0,
-    salesTax: 0,
-    processingFee: 0,
-    grandTotal: 0,
+  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 37.78825,
+    longitude: -122.4324,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
   });
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+  // Define the categories array
   const categories = [
     "Single Engine Piston",
     "Twin Engine Piston",
@@ -46,170 +42,151 @@ const Home = () => {
   ];
 
   useEffect(() => {
-    getLatestItemList();
+    const unsubscribe = subscribeToListings();
+    return () => unsubscribe();
   }, []);
 
-  const getLatestItemList = async () => {
-    try {
-      const listingsRef = collection(db, "airplanes");
-      const q = query(listingsRef, orderBy("createdAt", "desc"), limit(10));
-      const querySnapShot = await getDocs(q);
+  const subscribeToListings = () => {
+    const listingsRef = collection(db, "airplanes");
+    const q = query(listingsRef, orderBy("createdAt", "desc"));
 
-      const listingsData = [];
-      querySnapShot.forEach((doc) => {
-        listingsData.push({ id: doc.id, ...doc.data() });
-      });
+    return onSnapshot(q, (snapshot) => {
+      const listingsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
       setListings(listingsData);
       setFilteredListings(listingsData);
-    } catch (error) {
-      console.error("Error fetching listings:", error);
-      Alert.alert("Error", "Failed to load listings.");
-    }
+    });
   };
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     const lowerCaseQuery = searchQuery.toLowerCase();
     const filteredData = listings.filter((listing) => {
       const location = listing.location ? listing.location.toLowerCase() : "";
       return location.includes(lowerCaseQuery);
     });
     setFilteredListings(filteredData);
+
+    // Geocode the city/state input to get coordinates
+    try {
+      const geocodedLocation = await geocodeLocation(searchQuery);
+      if (geocodedLocation) {
+        setMapRegion({
+          latitude: geocodedLocation.latitude,
+          longitude: geocodedLocation.longitude,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        });
+      } else {
+        Alert.alert("Location not found", "Please enter a valid city or state.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to find location.");
+    }
+  };
+
+  const geocodeLocation = async (locationName) => {
+    try {
+      let geocodedLocations = await Location.geocodeAsync(locationName);
+      if (geocodedLocations.length > 0) {
+        return geocodedLocations[0];
+      }
+      return null;
+    } catch (error) {
+      console.error("Geocoding error: ", error);
+      return null;
+    }
   };
 
   const handleListingPress = (listing) => {
     setSelectedListing(listing);
-    setCurrentImageIndex(0);
     setModalVisible(true);
-  };
-
-  const handlePurchase = () => {
-    setModalVisible(false);
-    setPurchaseModalVisible(true);
-  };
-
-  const handleCompletePurchase = () => {
-    Alert.alert("Purchase Completed", "Thank you for your purchase!");
-    setPurchaseModalVisible(false);
-  };
-
-  const calculateTotalCost = (hours) => {
-    if (selectedListing && hours) {
-      const ratePerHour = parseFloat(selectedListing.ratesPerHour);
-      const totalHoursCost = ratePerHour * parseFloat(hours);
-      const bookingFee = totalHoursCost * 0.06;
-      const processingFee = totalHoursCost * 0.03;
-      const salesTax = totalHoursCost * 0.0825;
-      const grandTotal = totalHoursCost + bookingFee + processingFee + salesTax;
-
-      setPriceBreakdown({
-        totalCost: totalHoursCost.toFixed(2),
-        bookingFee: bookingFee.toFixed(2),
-        processingFee: processingFee.toFixed(2),
-        salesTax: salesTax.toFixed(2),
-        grandTotal: grandTotal.toFixed(2),
-      });
-    } else {
-      setPriceBreakdown({
-        totalCost: 0,
-        bookingFee: 0,
-        processingFee: 0,
-        salesTax: 0,
-        grandTotal: 0,
-      });
-    }
-  };
-
-  const handleNextImage = () => {
-    if (selectedListing && currentImageIndex < selectedListing.images.length - 1) {
-      setCurrentImageIndex(currentImageIndex + 1);
-    }
-  };
-
-  const handlePreviousImage = () => {
-    if (currentImageIndex > 0) {
-      setCurrentImageIndex(currentImageIndex - 1);
-    }
   };
 
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       key={item}
       onPress={() => setSelectedCategory(item)}
-      className={`p-2 rounded-lg mr-2 ${
-        selectedCategory === item ? "bg-red-500" : "bg-gray-200"
+      className={`p-1.5 rounded-lg mr-2 ${
+        selectedCategory === item ? "bg-[#007AFF]" : "bg-[#F2F2F2]"
       }`}
+      style={{ height: 24 }}  // This is 50% of the previous height (48)
     >
-      <Text className="text-sm font-bold text-gray-700">{item}</Text>
+      <Text className={`text-xs font-bold ${selectedCategory === item ? "text-white" : "text-gray-700"}`}>
+        {item}
+      </Text>
     </TouchableOpacity>
   );
 
   const renderListingItem = ({ item }) => (
     <TouchableOpacity
       onPress={() => handleListingPress(item)}
-      className="flex-row justify-between items-center p-4 bg-white rounded-lg mb-3 shadow-sm"
+      className="flex-row justify-between items-center p-4 bg-[#F9F9F9] rounded-lg mb-3 shadow-md"
     >
       <View className="flex-1 mr-3">
         <Text className="text-lg font-bold text-gray-800">{item.airplaneModel}</Text>
-        <Text className="text-red-500">${item.ratesPerHour} per hour</Text>
+        <Text className="text-[#FF3B30]">${item.ratesPerHour} per hour</Text>
         <Text className="text-gray-600">{item.description}</Text>
       </View>
-      {item.images && item.images[0] && (
-        <Image source={{ uri: item.images[0] }} className="w-20 h-20 rounded-lg" />
-      )}
+      <View className="flex-row items-center">
+        {item.images && item.images[0] && (
+          <Image source={{ uri: item.images[0] }} className="w-20 h-20 rounded-lg mr-2" />
+        )}
+      </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Header */}
-      <View className="flex-row p-4 items-center">
-        <Image
-          source={{ uri: user?.imageUrl }}
-          className="w-10 h-10 rounded-full mr-3"
-        />
-        <View>
-          <Text className="text-sm text-gray-500">Welcome</Text>
-          <Text className="text-lg font-bold text-gray-800">{user?.fullName}</Text>
-        </View>
-      </View>
-
-      {/* Toggle Button */}
-      <TouchableOpacity
-        onPress={() => setShowFilters(!showFilters)}
-        className="self-center mb-4 bg-white w-1/2 p-2 rounded-full items-center shadow-sm"
+    <SafeAreaView className="flex-1 bg-[#fff]">
+      {/* Header with Background Image */}
+      <ImageBackground
+        source={PropellerImage} // Use the imported image as background
+        style={{
+          height: 187.5,
+          justifyContent: "flex-start",
+          paddingTop: 10,
+          paddingHorizontal: 10,
+        }}
+        imageStyle={{ resizeMode: "cover" }}
       >
-        <AntDesign name={showFilters ? "up" : "down"} size={24} color="gray" />
-      </TouchableOpacity>
-
-      {showFilters && (
-        <>
-          {/* Search Bar */}
-          <View className="p-4">
-            <TextInput
-              placeholder="Search by city, state"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              className="bg-gray-200 rounded-lg p-3 mb-4"
-            />
-            <TouchableOpacity onPress={handleSearch} className="bg-red-500 p-3 rounded-lg items-center">
-              <Text className="text-white font-bold">Search</Text>
-            </TouchableOpacity>
+        <View className="flex-row justify-between items-center">
+          <View>
+            <Text className="text-sm text-white">Good Morning,</Text>
+            <Text className="text-lg font-bold text-white">{user?.fullName}</Text>
           </View>
 
-          {/* Categories Slider */}
-          <FlatList
-            data={categories}
-            renderItem={renderCategoryItem}
-            horizontal
-            keyExtractor={(item) => item}
-            showsHorizontalScrollIndicator={false}
-            className="p-4"
-          />
-        </>
-      )}
+          {/* Search Button Positioned at Top Right */}
+          <TouchableOpacity
+            onPress={() => setMapModalVisible(true)} // Open the map modal
+            style={{
+              padding: 10,
+              borderRadius: 25,
+              backgroundColor: 'rgba(255, 255, 255, 0.7)',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.8,
+              shadowRadius: 2,
+              elevation: 5,
+            }}
+          >
+            <Text className="text-gray-900 font-bold">Search by City, State</Text>
+          </TouchableOpacity>
+        </View>
+      </ImageBackground>
 
-      {/* Listings */}
-      <View className="flex-1 p-4">
+      {/* Categories Slider */}
+      <FlatList
+        data={categories}
+        renderItem={renderCategoryItem}
+        horizontal
+        keyExtractor={(item) => item}
+        showsHorizontalScrollIndicator={false}
+        className="p-2"  // Reduced the height
+      />
+
+      {/* Listings Section Moved Up */}
+      <View className="p-4">
         <Text className="text-lg font-bold mb-2 text-gray-800">Available Listings</Text>
         {filteredListings.length > 0 ? (
           <FlatList
@@ -222,146 +199,47 @@ const Home = () => {
         )}
       </View>
 
-      {/* Listing Detail Modal */}
+      {/* Map Modal */}
       <Modal
         animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        transparent={false}
+        visible={mapModalVisible}
+        onRequestClose={() => setMapModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-lg p-6 w-11/12 shadow-lg">
-            {selectedListing && (
-              <ScrollView>
-                <Text className="text-xl font-bold mb-4 text-center text-gray-800">
-                  {selectedListing.airplaneModel}
-                </Text>
-
-                <View className="relative w-full h-64 mb-4">
-                  <Image
-                    source={{ uri: selectedListing.images[currentImageIndex] }}
-                    className="w-full h-full rounded-lg"
-                    resizeMode="cover"
-                  />
-                  {currentImageIndex > 0 && (
-                    <TouchableOpacity
-                      onPress={handlePreviousImage}
-                      className="absolute left-0 top-1/2 -mt-6 bg-black bg-opacity-50 p-2 rounded-full"
-                    >
-                      <AntDesign name="left" size={24} color="white" />
-                    </TouchableOpacity>
-                  )}
-                  {currentImageIndex < selectedListing.images.length - 1 && (
-                    <TouchableOpacity
-                      onPress={handleNextImage}
-                      className="absolute right-0 top-1/2 -mt-6 bg-black bg-opacity-50 p-2 rounded-full"
-                    >
-                      <AntDesign name="right" size={24} color="white" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                <Text className="text-lg text-gray-800 mb-2">Location: {selectedListing.location}</Text>
-                <Text className="text-lg text-gray-800 mb-2">
-                  Rate: ${selectedListing.ratesPerHour} per hour
-                </Text>
-                <Text className="text-lg text-gray-600 mb-4">{selectedListing.description}</Text>
-
-                <TouchableOpacity onPress={handlePurchase} className="bg-red-500 p-3 rounded-lg">
-                  <Text className="text-white text-center font-bold">Purchase</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setModalVisible(false)}
-                  className="mt-4 p-2 rounded-lg bg-gray-200"
-                >
-                  <Text className="text-center text-gray-600">Close</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
+        <View className="flex-1">
+          {/* Search Bar on Top */}
+          <View className="p-4 bg-white">
+            <TextInput
+              placeholder="Search by city, state"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              className="bg-gray-200 rounded-lg p-3 mb-4 shadow-sm"
+            />
+            <TouchableOpacity onPress={handleSearch} className="bg-[#007AFF] p-3 rounded-lg items-center shadow-sm">
+              <Text className="text-white font-bold">Search</Text>
+            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
 
-      {/* Purchase Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={purchaseModalVisible}
-        onRequestClose={() => setPurchaseModalVisible(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-lg p-6 w-11/12 shadow-lg">
-            <ScrollView showsHorizontalScrollIndicator={false}>
-              <Text className="text-xl font-bold mb-4 text-center text-gray-800">
-                Complete Your Purchase
-              </Text>
+          {/* Map View */}
+          <MapView
+            style={{ flex: 1 }}
+            region={mapRegion}
+          >
+            {/* Example Marker */}
+            <Marker
+              coordinate={{ latitude: mapRegion.latitude, longitude: mapRegion.longitude }}
+              title={"Example Location"}
+              description={"This is an example marker."}
+            />
+          </MapView>
 
-              <TextInput
-                placeholder="Total Estimated Hours"
-                keyboardType="numeric"
-                value={totalHours}
-                onChangeText={(text) => {
-                  setTotalHours(text);
-                  calculateTotalCost(text);
-                }}
-                className="bg-gray-200 rounded-lg p-3 mb-4"
-              />
-
-              <Text className="text-lg font-bold mb-2 text-gray-800">Price Breakdown:</Text>
-              <Text className="text-gray-600 mb-2">
-                Price per hour: ${selectedListing?.ratesPerHour}
-              </Text>
-              <Text className="text-gray-600 mb-2">Total estimated hours: {totalHours}</Text>
-              <Text className="text-gray-600 mb-2">
-                3% Credit Card Processing Fee: ${priceBreakdown.processingFee}
-              </Text>
-              <Text className="text-gray-600 mb-2">6% Booking Fee: ${priceBreakdown.bookingFee}</Text>
-              <Text className="text-gray-600 mb-2">8.25% Sales Tax: ${priceBreakdown.salesTax}</Text>
-              <Text className="text-lg font-bold mb-4 text-red-500">
-                Grand Total: ${priceBreakdown.grandTotal}
-              </Text>
-
-              <TextInput
-                placeholder="Dates Required (e.g., 2024-08-25)"
-                className="bg-gray-200 rounded-lg p-3 mb-4"
-              />
-              <Text className="text-lg font-bold mb-2 text-gray-800">Renter Details</Text>
-              <Text className="text-gray-600 mb-2">Name: {user.fullName}</Text>
-              <Text className="text-gray-600 mb-4">Email: {user.primaryEmailAddress.emailAddress}</Text>
-
-              <Text className="text-lg font-bold mb-2 text-gray-800">Payment Information</Text>
-              <TextInput
-                placeholder="Credit Card Number"
-                keyboardType="numeric"
-                className="bg-gray-200 rounded-lg p-3 mb-4"
-              />
-              <TextInput
-                placeholder="Expiration Date (MM/YY)"
-                keyboardType="numeric"
-                className="bg-gray-200 rounded-lg p-3 mb-4"
-              />
-              <TextInput
-                placeholder="CVV"
-                keyboardType="numeric"
-                className="bg-gray-200 rounded-lg p-3 mb-4"
-              />
-              <TextInput
-                placeholder="Billing Zip Code"
-                keyboardType="numeric"
-                className="bg-gray-200 rounded-lg p-3 mb-4"
-              />
-
-              <TouchableOpacity onPress={handleCompletePurchase} className="bg-red-500 p-3 rounded-lg">
-                <Text className="text-white text-center font-bold">Complete Purchase</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setPurchaseModalVisible(false)}
-                className="mt-4 p-2 rounded-lg bg-gray-200"
-              >
-                <Text className="text-center text-gray-600">Cancel</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+          {/* Close Button */}
+          <TouchableOpacity
+            onPress={() => setMapModalVisible(false)}
+            className="p-4 bg-[#007AFF] items-center"
+          >
+            <Text className="text-white font-bold">Close</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
     </SafeAreaView>
