@@ -13,6 +13,8 @@ import {
   FlatList,
   ImageBackground,
   Modal,
+  StatusBar,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
@@ -24,8 +26,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
-import PropellerImage from "../../Assets/images/propeller-image.jpg"; // Import your image
-import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg"; // Import background image
+import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 
 const OwnerProfile = ({ ownerId }) => {
   const [profileData, setProfileData] = useState({
@@ -50,6 +51,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [achModalVisible, setAchModalVisible] = useState(false);
   const [debitModalVisible, setDebitModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { user } = useUser();
   const storage = getStorage();
 
@@ -122,14 +124,12 @@ const OwnerProfile = ({ ownerId }) => {
   const onSubmitMethod = async (values) => {
     setLoading(true);
     try {
-      // Upload images
       const uploadedImages = [];
       for (const image of images) {
         const downloadURL = await uploadFile(image, "airplaneImages");
         uploadedImages.push(downloadURL);
       }
 
-      // Upload PDFs
       const annualProofURL = currentAnnualPdf
         ? await uploadFile(currentAnnualPdf, "documents")
         : null;
@@ -137,7 +137,6 @@ const OwnerProfile = ({ ownerId }) => {
         ? await uploadFile(insurancePdf, "documents")
         : null;
 
-      // Add listing to Firestore
       await addDoc(collection(db, "airplanes"), {
         ...values,
         images: uploadedImages,
@@ -147,13 +146,12 @@ const OwnerProfile = ({ ownerId }) => {
         createdAt: new Date(),
       });
 
-      // Update local listings state
       const updatedListings = [
         ...userListings,
         {
           ...values,
           images: uploadedImages,
-          id: Math.random().toString(), // Temporary ID for frontend purposes
+          id: Math.random().toString(),
         },
       ];
       setUserListings(updatedListings);
@@ -186,32 +184,49 @@ const OwnerProfile = ({ ownerId }) => {
     setDebitModalVisible(false);
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Fetch the latest data...
+    setRefreshing(false);
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Header with Background Image */}
-      <ImageBackground
-        source={wingtipClouds}
-        className="h-56"
-        resizeMode="cover"
+    <View className="flex-1 bg-white">
+      <SafeAreaView className="bg-white">
+        <StatusBar barStyle="light-content" />
+      </SafeAreaView>
+
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        contentContainerStyle={{ paddingBottom: 16 }}
       >
-        <View className="flex-row justify-between items-center p-4">
-          <View>
-            <Text className="text-sm text-white">Good Morning</Text>
-            <Text className="text-lg font-bold text-white">{user?.fullName}</Text>
+        <ImageBackground
+          source={wingtipClouds}
+          className="h-56"
+          resizeMode="cover"
+          style={{
+            paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+          }}
+        >
+          <View className="flex-row justify-between items-center p-4">
+            <View>
+              <Text className="text-sm text-white">Good Morning</Text>
+              <Text className="text-lg font-bold text-white">
+                {user?.fullName}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setFormVisible(true)}
+              className="bg-white bg-opacity-50 rounded-full px-4 py-2"
+            >
+              <Text className="text-gray-900 font-bold">Submit Your Listing</Text>
+            </TouchableOpacity>
           </View>
+        </ImageBackground>
 
-          {/* Submit Your Listing Button Positioned at Top Right */}
-          <TouchableOpacity
-            onPress={() => setFormVisible(true)}
-            className="bg-white bg-opacity-50 rounded-full px-4 py-2"
-          >
-            <Text className="text-gray-900 font-bold">Submit Your Listing</Text>
-          </TouchableOpacity>
-        </View>
-      </ImageBackground>
-
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {/* Listings Section */}
         <View className="mt-8">
           <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
             Your Current Listings
@@ -247,11 +262,12 @@ const OwnerProfile = ({ ownerId }) => {
               </View>
             ))
           ) : (
-            <Text className="text-gray-700 text-center">No listings available.</Text>
+            <Text className="text-gray-700 text-center">
+              No listings available.
+            </Text>
           )}
         </View>
 
-        {/* Rental History Section */}
         <View className="mt-8">
           <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
             Rental History
@@ -296,7 +312,6 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </ScrollView>
 
-      {/* Available Balance Button */}
       <View className="absolute bottom-10 left-0 right-0 items-center">
         <TouchableOpacity
           onPress={() => setTransferModalVisible(true)}
@@ -317,7 +332,7 @@ const OwnerProfile = ({ ownerId }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Transfer Funds Modal */}
+      {/* Transfer Modal */}
       <Modal
         visible={transferModalVisible}
         animationType="slide"
@@ -353,7 +368,7 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* ACH Transfer Modal */}
+      {/* ACH Modal */}
       <Modal
         visible={achModalVisible}
         animationType="slide"
@@ -413,7 +428,7 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* Debit Card Transfer Modal */}
+      {/* Debit Card Modal */}
       <Modal
         visible={debitModalVisible}
         animationType="slide"
@@ -482,7 +497,7 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* Submit Your Listing Modal */}
+      {/* Form Modal */}
       <Modal
         visible={formVisible}
         animationType="slide"
@@ -682,7 +697,7 @@ const OwnerProfile = ({ ownerId }) => {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

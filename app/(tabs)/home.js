@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import PropellerImage from "../../Assets/images/propeller-image.jpg";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from 'expo-document-picker';
 import { Formik } from "formik";
 
 const Home = ({ navigation }) => {
@@ -36,6 +37,7 @@ const Home = ({ navigation }) => {
   const [mapModalVisible, setMapModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [addListingModalVisible, setAddListingModalVisible] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [mapRegion, setMapRegion] = useState({
     latitude: 37.78825,
     longitude: -122.4324,
@@ -48,6 +50,17 @@ const Home = ({ navigation }) => {
   });
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [rentalHours, setRentalHours] = useState(1);
+  const [totalCost, setTotalCost] = useState({
+    rentalCost: "0.00",
+    bookingFee: "0.00",
+    transactionFee: "0.00",
+    salesTax: "0.00",
+    total: "0.00",
+  });
+
+  const [recentAnnualPdf, setRecentAnnualPdf] = useState(null);
+  const [insurancePdf, setInsurancePdf] = useState(null);
 
   const categories = [
     "Single Engine Piston",
@@ -62,6 +75,12 @@ const Home = ({ navigation }) => {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (selectedListing && rentalHours > 0) {
+      calculateTotalCost(rentalHours);
+    }
+  }, [selectedListing, rentalHours]);
+
   const subscribeToListings = () => {
     const listingsRef = collection(db, "airplanes");
     const q = query(listingsRef, orderBy("createdAt", "desc"));
@@ -73,6 +92,25 @@ const Home = ({ navigation }) => {
       }));
       setListings(listingsData);
       setFilteredListings(listingsData);
+    });
+  };
+
+  const calculateTotalCost = (hours) => {
+    if (!selectedListing) return;
+
+    const pricePerHour = parseFloat(selectedListing.ratesPerHour);
+    const rentalCost = pricePerHour * hours;
+    const bookingFee = rentalCost * 0.06;
+    const transactionFee = rentalCost * 0.03;
+    const salesTax = rentalCost * 0.0825;
+    const total = rentalCost + bookingFee + transactionFee + salesTax;
+
+    setTotalCost({
+      rentalCost: rentalCost.toFixed(2),
+      bookingFee: bookingFee.toFixed(2),
+      transactionFee: transactionFee.toFixed(2),
+      salesTax: salesTax.toFixed(2),
+      total: total.toFixed(2),
     });
   };
 
@@ -95,6 +133,11 @@ const Home = ({ navigation }) => {
     setModalVisible(true);
   };
 
+  const handleCompleteRental = () => {
+    setModalVisible(false);
+    setPaymentModalVisible(true);
+  };
+
   const pickImage = async () => {
     if (images.length >= 7) {
       Alert.alert("You can only upload up to 7 images.");
@@ -113,6 +156,16 @@ const Home = ({ navigation }) => {
     }
   };
 
+  const pickDocument = async (setDocument) => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "application/pdf",
+    });
+
+    if (result.type === "success") {
+      setDocument(result.uri);
+    }
+  };
+
   const handleAddListing = async (values) => {
     setLoading(true);
     try {
@@ -126,6 +179,8 @@ const Home = ({ navigation }) => {
         ...values,
         ownerId: user.id,
         images: uploadedImages,
+        recentAnnualPdf,
+        insurancePdf,
         createdAt: new Date(),
       };
 
@@ -145,6 +200,18 @@ const Home = ({ navigation }) => {
       Alert.alert("Error", "There was an error submitting your listing.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendRentalRequestEmail = async () => {
+    try {
+      // Replace with your email-sending logic
+      Alert.alert("Rental Request Sent", "Your rental request has been sent to the owner.");
+    } catch (error) {
+      console.error("Error sending rental request: ", error);
+      Alert.alert("Error", "There was an error sending your rental request.");
+    } finally {
+      setPaymentModalVisible(false);
     }
   };
 
@@ -310,6 +377,7 @@ const Home = ({ navigation }) => {
                     description: "",
                     location: "",
                     ratesPerHour: "",
+                    email: "",
                   }}
                   onSubmit={handleAddListing}
                 >
@@ -351,6 +419,15 @@ const Home = ({ navigation }) => {
                         keyboardType="numeric"
                         className="border-b border-gray-300 mb-4 p-2 text-gray-900"
                       />
+                      <TextInput
+                        placeholder="Email (Required)"
+                        onChangeText={handleChange("email")}
+                        onBlur={handleBlur("email")}
+                        value={values.email}
+                        keyboardType="email-address"
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        required
+                      />
 
                       <Text className="mb-2 mt-4 text-gray-900 font-bold">
                         Upload Images
@@ -375,6 +452,30 @@ const Home = ({ navigation }) => {
                           {images.length >= 7
                             ? "Maximum 7 Images"
                             : "Add Image"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
+                        Upload Recent Annual Inspection PDF
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => pickDocument(setRecentAnnualPdf)}
+                        className="bg-gray-100 py-2 px-4 rounded-full mb-4"
+                      >
+                        <Text className="text-center text-gray-800">
+                          {recentAnnualPdf ? "PDF Uploaded" : "Upload PDF"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
+                        Upload Proof of Insurance PDF
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => pickDocument(setInsurancePdf)}
+                        className="bg-gray-100 py-2 px-4 rounded-full mb-4"
+                      >
+                        <Text className="text-center text-gray-800">
+                          {insurancePdf ? "PDF Uploaded" : "Upload PDF"}
                         </Text>
                       </TouchableOpacity>
 
@@ -415,29 +516,6 @@ const Home = ({ navigation }) => {
       >
         <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
           <View className="bg-white rounded-3xl p-6 w-11/12">
-            <View className="flex-row justify-between">
-              <TouchableOpacity
-                onPress={() =>
-                  setSelectedListing(
-                    (selectedListing - 1 + selectedListing.images.length) %
-                      selectedListing.images.length
-                  )
-                }
-                className="p-2"
-              >
-                <Ionicons name="arrow-back-circle" size={32} color="gray" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() =>
-                  setSelectedListing(
-                    (selectedListing + 1) % selectedListing.images.length
-                  )
-                }
-                className="p-2"
-              >
-                <Ionicons name="arrow-forward-circle" size={32} color="gray" />
-              </TouchableOpacity>
-            </View>
             {selectedListing && (
               <>
                 <Text className="text-xl font-bold mb-4">
@@ -448,7 +526,7 @@ const Home = ({ navigation }) => {
                   className="w-full h-64 rounded-lg mb-4"
                 />
                 <Text className="text-lg mb-2">
-                  Price: ${selectedListing.ratesPerHour}
+                  Price: ${selectedListing.ratesPerHour} per hour
                 </Text>
                 <Text className="text-lg mb-2">
                   Description: {selectedListing.description}
@@ -458,23 +536,75 @@ const Home = ({ navigation }) => {
                 </Text>
                 <View className="flex-row justify-between mt-4">
                   <TouchableOpacity
-                    onPress={() => {}}
+                    onPress={handleCompleteRental}
                     className="bg-green-500 p-3 rounded-lg"
                   >
-                    <Text className="text-white text-center">Edit</Text>
+                    <Text className="text-white text-center">Rent Now</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => {}}
-                    className="bg-red-500 p-3 rounded-lg"
+                    onPress={() => setModalVisible(false)}
+                    className="bg-gray-300 p-3 rounded-lg"
                   >
-                    <Text className="text-white text-center">Delete</Text>
+                    <Text className="text-gray-800 text-center">Close</Text>
                   </TouchableOpacity>
                 </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rental Request Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={paymentModalVisible}
+        onRequestClose={() => setPaymentModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-3xl p-6 w-11/12">
+            <Text className="text-xl font-bold mb-4">Complete Your Rental Request</Text>
+            {selectedListing && totalCost && (
+              <>
+                <Text className="text-lg mb-2">
+                  Aircraft: {selectedListing.airplaneModel}
+                </Text>
+                <TextInput
+                  placeholder="Number of Hours"
+                  value={rentalHours.toString()}
+                  onChangeText={(value) => setRentalHours(Number(value))}
+                  keyboardType="numeric"
+                  className="border-b border-gray-300 mb-4 p-2"
+                />
+                <Text className="text-lg mb-2">
+                  Rate per Hour: ${selectedListing.ratesPerHour}
+                </Text>
+                <Text className="text-lg mb-2">
+                  Rental Cost: ${totalCost.rentalCost}
+                </Text>
+                <Text className="text-lg mb-2">
+                  6% Booking Fee: ${totalCost.bookingFee}
+                </Text>
+                <Text className="text-lg mb-2">
+                  3% Credit Card Processing Fee: ${totalCost.transactionFee}
+                </Text>
+                <Text className="text-lg mb-2">
+                  8.25% Sales Tax: ${totalCost.salesTax}
+                </Text>
+                <Text className="text-lg font-bold mb-4">
+                  Total Cost: ${totalCost.total}
+                </Text>
                 <TouchableOpacity
-                  onPress={() => setModalVisible(false)}
-                  className="mt-4"
+                  onPress={sendRentalRequestEmail}
+                  className="bg-blue-500 p-3 rounded-lg mt-4"
                 >
-                  <Text className="text-center text-gray-500">Close</Text>
+                  <Text className="text-white text-center">Submit Rental Request</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setPaymentModalVisible(false)}
+                  className="bg-gray-300 p-3 rounded-lg mt-4"
+                >
+                  <Text className="text-gray-800 text-center">Cancel</Text>
                 </TouchableOpacity>
               </>
             )}
