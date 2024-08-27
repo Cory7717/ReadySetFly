@@ -7,6 +7,9 @@ import {
   FlatList,
   Modal,
   ImageBackground,
+  ScrollView,
+  Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
@@ -104,16 +107,60 @@ const Home = () => {
     setModalVisible(true);
   };
 
+  const getUserLocation = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert("Permission denied", "Permission to access location was denied");
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+      const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+
+      if (address) {
+        const city = address.city;
+        const state = address.region;
+        const geocodedLocation = await geocodeLocation(`${city}, ${state}`);
+        if (geocodedLocation) {
+          setMapRegion({
+            latitude: geocodedLocation.latitude,
+            longitude: geocodedLocation.longitude,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          });
+        }
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to get user location.");
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    if (mapModalVisible) {
+      getUserLocation();
+    }
+  }, [mapModalVisible]);
+
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       key={item}
       onPress={() => setSelectedCategory(item)}
-      className={`p-1.5 rounded-lg mr-2 ${
-        selectedCategory === item ? "bg-[#007AFF]" : "bg-[#F2F2F2]"
-      }`}
-      style={{ height: 24 }}  // This is 50% of the previous height (48)
+      style={{
+        padding: 6,
+        borderRadius: 10,
+        marginRight: 8,
+        backgroundColor: selectedCategory === item ? "#007AFF" : "#F2F2F2",
+        height: 24,
+      }}
     >
-      <Text className={`text-xs font-bold ${selectedCategory === item ? "text-white" : "text-gray-700"}`}>
+      <Text style={{
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: selectedCategory === item ? "white" : "gray",
+      }}>
         {item}
       </Text>
     </TouchableOpacity>
@@ -122,23 +169,39 @@ const Home = () => {
   const renderListingItem = ({ item }) => (
     <TouchableOpacity
       onPress={() => handleListingPress(item)}
-      className="flex-row justify-between items-center p-4 bg-[#F9F9F9] rounded-lg mb-3 shadow-md"
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 16,
+        backgroundColor: "#F9F9F9",
+        borderRadius: 10,
+        marginBottom: 12,
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+      }}
     >
-      <View className="flex-1 mr-3">
-        <Text className="text-lg font-bold text-gray-800">{item.airplaneModel}</Text>
-        <Text className="text-[#FF3B30]">${item.ratesPerHour} per hour</Text>
-        <Text className="text-gray-600">{item.description}</Text>
+      <View style={{ flex: 1, marginRight: 12 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: "#333" }}>
+          {item.airplaneModel}
+        </Text>
+        <Text style={{ color: "#FF3B30", marginBottom: 4 }}>
+          ${item.ratesPerHour} per hour
+        </Text>
+        <Text style={{ color: "#666" }}>{item.description}</Text>
       </View>
-      <View className="flex-row items-center">
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
         {item.images && item.images[0] && (
-          <Image source={{ uri: item.images[0] }} className="w-20 h-20 rounded-lg mr-2" />
+          <Image source={{ uri: item.images[0] }} style={{ width: 80, height: 80, borderRadius: 10 }} />
         )}
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#fff]">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       {/* Header with Background Image */}
       <ImageBackground
         source={PropellerImage} // Use the imported image as background
@@ -150,10 +213,10 @@ const Home = () => {
         }}
         imageStyle={{ resizeMode: "cover" }}
       >
-        <View className="flex-row justify-between items-center">
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <View>
-            <Text className="text-sm text-white">Good Morning,</Text>
-            <Text className="text-lg font-bold text-white">{user?.fullName}</Text>
+            <Text style={{ fontSize: 14, color: "white" }}>Good Morning,</Text>
+            <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>{user?.fullName}</Text>
           </View>
 
           {/* Search Button Positioned at Top Right */}
@@ -170,34 +233,39 @@ const Home = () => {
               elevation: 5,
             }}
           >
-            <Text className="text-gray-900 font-bold">Search by City, State</Text>
+            <Text style={{ color: "#333", fontWeight: "bold" }}>Search by City, State</Text>
           </TouchableOpacity>
         </View>
       </ImageBackground>
 
-      {/* Categories Slider */}
-      <FlatList
-        data={categories}
-        renderItem={renderCategoryItem}
-        horizontal
-        keyExtractor={(item) => item}
-        showsHorizontalScrollIndicator={false}
-        className="p-2"  // Reduced the height
-      />
-
-      {/* Listings Section Moved Up */}
-      <View className="p-4">
-        <Text className="text-lg font-bold mb-2 text-gray-800">Available Listings</Text>
-        {filteredListings.length > 0 ? (
+      {/* Scrollable Area for Sliders and Listings */}
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        {/* Categories Slider */}
+        <View style={{ maxHeight: 60 }}>
           <FlatList
-            data={filteredListings}
-            renderItem={renderListingItem}
-            keyExtractor={(item) => item.id}
+            data={categories}
+            renderItem={renderCategoryItem}
+            horizontal
+            keyExtractor={(item) => item}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ padding: 8 }}
           />
-        ) : (
-          <Text className="text-center text-gray-500 mt-4">No listings available</Text>
-        )}
-      </View>
+        </View>
+
+        {/* Listings Section */}
+        <View style={{ padding: 16 }}>
+          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8, color: "#333" }}>Available Listings</Text>
+          {filteredListings.length > 0 ? (
+            <FlatList
+              data={filteredListings}
+              renderItem={renderListingItem}
+              keyExtractor={(item) => item.id}
+            />
+          ) : (
+            <Text style={{ textAlign: "center", color: "gray", marginTop: 16 }}>No listings available</Text>
+          )}
+        </View>
+      </ScrollView>
 
       {/* Map Modal */}
       <Modal
@@ -206,17 +274,60 @@ const Home = () => {
         visible={mapModalVisible}
         onRequestClose={() => setMapModalVisible(false)}
       >
-        <View className="flex-1">
-          {/* Search Bar on Top */}
-          <View className="p-4 bg-white">
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+          <ImageBackground
+            source={PropellerImage} // Reuse background image for consistency
+            style={{
+              height: 187.5,
+              justifyContent: "flex-start",
+              paddingTop: 10,
+              paddingHorizontal: 10,
+            }}
+            imageStyle={{ resizeMode: "cover" }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View>
+                <Text style={{ fontSize: 14, color: "white" }}>Map View</Text>
+              </View>
+
+              {/* Close Button Positioned at Top Right */}
+              <TouchableOpacity
+                onPress={() => setMapModalVisible(false)}
+                style={{
+                  padding: 10,
+                  borderRadius: 25,
+                  backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.8,
+                  shadowRadius: 2,
+                  elevation: 5,
+                }}
+              >
+                <Text style={{ color: "#333", fontWeight: "bold" }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </ImageBackground>
+
+          {/* Search Bar */}
+          <View style={{ padding: 16, backgroundColor: "#fff" }}>
             <TextInput
               placeholder="Search by city, state"
               value={searchQuery}
               onChangeText={setSearchQuery}
-              className="bg-gray-200 rounded-lg p-3 mb-4 shadow-sm"
+              style={{
+                backgroundColor: "#e0e0e0",
+                borderRadius: 10,
+                padding: 12,
+                marginBottom: 16,
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 2,
+              }}
             />
-            <TouchableOpacity onPress={handleSearch} className="bg-[#007AFF] p-3 rounded-lg items-center shadow-sm">
-              <Text className="text-white font-bold">Search</Text>
+            <TouchableOpacity onPress={handleSearch} style={{ backgroundColor: "#007AFF", padding: 12, borderRadius: 10, alignItems: "center", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+              <Text style={{ color: "white", fontWeight: "bold" }}>Search</Text>
             </TouchableOpacity>
           </View>
 
@@ -232,15 +343,7 @@ const Home = () => {
               description={"This is an example marker."}
             />
           </MapView>
-
-          {/* Close Button */}
-          <TouchableOpacity
-            onPress={() => setMapModalVisible(false)}
-            className="p-4 bg-[#007AFF] items-center"
-          >
-            <Text className="text-white font-bold">Close</Text>
-          </TouchableOpacity>
-        </View>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );

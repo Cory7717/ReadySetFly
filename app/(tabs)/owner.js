@@ -22,34 +22,30 @@ import { Formik } from "formik";
 import { Calendar } from "react-native-calendars";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { getStorage } from "firebase/storage";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc } from "firebase/firestore";
 import { FontAwesome } from "@expo/vector-icons";
 
 const OwnerProfile = ({ ownerId }) => {
   const [profileData, setProfileData] = useState({
-    airplaneName: "",
     airplaneModel: "",
-    location: "",
-    airplaneYear: "",
     description: "",
-    profileImage: null,
-    aircraftImages: [],
+    location: "",
     ratesPerHour: "",
     minimumHours: "",
     boostListing: false,
   });
   const [images, setImages] = useState([]);
-  const [pdfDocuments, setPdfDocuments] = useState([]);
-  const [insuranceDocuments, setInsuranceDocuments] = useState([]);
+  const [currentAnnualPdf, setCurrentAnnualPdf] = useState(null);
+  const [insurancePdf, setInsurancePdf] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedDates, setSelectedDates] = useState({});
   const [formVisible, setFormVisible] = useState(false);
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [userListings, setUserListings] = useState([]);
-  const [rentalHistory, setRentalHistory] = useState([]); // Declaring rentalHistory state
+  const [rentalHistory, setRentalHistory] = useState([]);
   const [ratings, setRatings] = useState({});
-  const [availableBalance, setAvailableBalance] = useState(5000); // Example balance
+  const [availableBalance, setAvailableBalance] = useState(5000);
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [achModalVisible, setAchModalVisible] = useState(false);
   const [debitModalVisible, setDebitModalVisible] = useState(false);
@@ -57,7 +53,6 @@ const OwnerProfile = ({ ownerId }) => {
   const storage = getStorage();
 
   useEffect(() => {
-    // Fetch data functions...
     if (ownerId) {
       // Fetch profile data, rental history, and user listings...
     }
@@ -68,24 +63,111 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   const pickImage = async () => {
-    // Image picker logic...
+    if (images.length >= 7) {
+      Alert.alert("You can only upload up to 7 images.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setImages([...images, result.uri]);
+    }
   };
 
   const pickDocument = async () => {
-    // Document picker logic...
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "application/pdf",
+    });
+
+    if (result.type === "success") {
+      setCurrentAnnualPdf(result.uri);
+    }
   };
 
   const pickInsuranceDocument = async () => {
-    // Insurance document picker logic...
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "application/pdf",
+    });
+
+    if (result.type === "success") {
+      setInsurancePdf(result.uri);
+    }
   };
 
   const onDayPress = (day) => {
-    // Handle day press logic for calendar...
+    const selected = !selectedDates[day.dateString];
+    setSelectedDates({
+      ...selectedDates,
+      [day.dateString]: selected
+        ? { selected: true, marked: true, dotColor: "red" }
+        : undefined,
+    });
+  };
+
+  const uploadFile = async (uri, folder) => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const filename = uri.substring(uri.lastIndexOf("/") + 1);
+    const storageRef = ref(storage, `${folder}/${filename}`);
+    await uploadBytes(storageRef, blob);
+    return await getDownloadURL(storageRef);
   };
 
   const onSubmitMethod = async (values) => {
     setLoading(true);
-    // Submit method logic...
+    try {
+      // Upload images
+      const uploadedImages = [];
+      for (const image of images) {
+        const downloadURL = await uploadFile(image, "airplaneImages");
+        uploadedImages.push(downloadURL);
+      }
+
+      // Upload PDFs
+      const annualProofURL = currentAnnualPdf
+        ? await uploadFile(currentAnnualPdf, "documents")
+        : null;
+      const insuranceProofURL = insurancePdf
+        ? await uploadFile(insurancePdf, "documents")
+        : null;
+
+      // Add listing to Firestore
+      await addDoc(collection(db, "airplanes"), {
+        ...values,
+        images: uploadedImages,
+        currentAnnualPdf: annualProofURL,
+        insurancePdf: insuranceProofURL,
+        ownerId: user.id,
+        createdAt: new Date(),
+      });
+
+      // Update local listings state
+      const updatedListings = [
+        ...userListings,
+        {
+          ...values,
+          images: uploadedImages,
+          id: Math.random().toString(), // Temporary ID for frontend purposes
+        },
+      ];
+      setUserListings(updatedListings);
+
+      Alert.alert("Success", "Your listing has been submitted.");
+      setFormVisible(false);
+    } catch (error) {
+      console.error("Error submitting listing: ", error);
+      Alert.alert(
+        "Error",
+        `There was an error submitting your listing: ${error.message}`
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEditListing = (listing) => {
@@ -97,7 +179,6 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   const handleTransferFunds = (method) => {
-    // Handle fund transfer logic here
     Alert.alert(`Funds transferred via ${method}`);
     setTransferModalVisible(false);
     setAchModalVisible(false);
@@ -108,13 +189,13 @@ const OwnerProfile = ({ ownerId }) => {
     <SafeAreaView className="flex-1 bg-white">
       {/* Header with Background Image */}
       <ImageBackground
-        source={PropellerImage} // Use the imported image as background
+        source={PropellerImage}
         style={{
           height: 187.5,
           justifyContent: "flex-start",
           paddingTop: 10,
           paddingHorizontal: 10,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.8,
           shadowRadius: 2,
@@ -130,12 +211,12 @@ const OwnerProfile = ({ ownerId }) => {
 
           {/* Submit Your Listing Button Positioned at Top Right */}
           <TouchableOpacity
-            onPress={() => setFormVisible(true)} // Open the submit your listing modal
+            onPress={() => setFormVisible(true)}
             style={{
               padding: 10,
               borderRadius: 25,
-              backgroundColor: 'rgba(255, 255, 255, 0.7)',
-              shadowColor: '#000',
+              backgroundColor: "rgba(255, 255, 255, 0.7)",
+              shadowColor: "#000",
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.8,
               shadowRadius: 2,
@@ -150,14 +231,23 @@ const OwnerProfile = ({ ownerId }) => {
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         {/* Listings Section */}
         <View className="mt-8">
-          <Text className="text-2xl font-bold mb-4 text-gray-900">Your Current Listings</Text>
+          <Text className="text-2xl font-bold mb-4 text-gray-900">
+            Your Current Listings
+          </Text>
           {userListings.length > 0 ? (
             userListings.map((listing) => (
-              <View key={listing.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
-                <Text className="font-bold text-lg text-gray-900">{listing.airplaneModel}</Text>
+              <View
+                key={listing.id}
+                className="bg-gray-100 p-4 rounded-2xl mb-4"
+              >
+                <Text className="font-bold text-lg text-gray-900">
+                  {listing.airplaneModel}
+                </Text>
                 <Text className="text-gray-700">{listing.description}</Text>
                 <Text className="text-gray-700">{listing.location}</Text>
-                <Text className="text-red-500 font-bold">{listing.ratesPerHour}</Text>
+                <Text className="text-red-500 font-bold">
+                  {listing.ratesPerHour}
+                </Text>
                 <View className="flex-row justify-between mt-4">
                   <TouchableOpacity
                     onPress={() => handleEditListing(listing)}
@@ -181,11 +271,18 @@ const OwnerProfile = ({ ownerId }) => {
 
         {/* Rental History Section */}
         <View className="mt-8">
-          <Text className="text-2xl font-bold mb-4 text-gray-900">Rental History</Text>
+          <Text className="text-2xl font-bold mb-4 text-gray-900">
+            Rental History
+          </Text>
           {rentalHistory.length > 0 ? (
             rentalHistory.map((order) => (
-              <View key={order.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
-                <Text className="font-bold text-lg text-gray-900">{order.airplaneModel}</Text>
+              <View
+                key={order.id}
+                className="bg-gray-100 p-4 rounded-2xl mb-4"
+              >
+                <Text className="font-bold text-lg text-gray-900">
+                  {order.airplaneModel}
+                </Text>
                 <Text className="text-gray-700">{order.rentalPeriod}</Text>
                 <Text className="text-gray-700">{order.renterName}</Text>
                 <View className="flex-row justify-between items-center mt-4">
@@ -197,7 +294,11 @@ const OwnerProfile = ({ ownerId }) => {
                         onPress={() => handleRating(order.id, star)}
                       >
                         <FontAwesome
-                          name={star <= (ratings[order.id] || 0) ? "star" : "star-o"}
+                          name={
+                            star <= (ratings[order.id] || 0)
+                              ? "star"
+                              : "star-o"
+                          }
                           size={24}
                           color="gold"
                         />
@@ -220,8 +321,8 @@ const OwnerProfile = ({ ownerId }) => {
           style={{
             padding: 10,
             borderRadius: 25,
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-            shadowColor: '#000',
+            backgroundColor: "rgba(255, 255, 255, 0.7)",
+            shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.8,
             shadowRadius: 2,
@@ -251,8 +352,8 @@ const OwnerProfile = ({ ownerId }) => {
               style={{
                 padding: 10,
                 borderRadius: 25,
-                backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                shadowColor: '#000',
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.8,
                 shadowRadius: 2,
@@ -260,17 +361,15 @@ const OwnerProfile = ({ ownerId }) => {
                 marginBottom: 16,
               }}
             >
-              <Text className="text-gray-900 font-bold">
-                Transfer via ACH
-              </Text>
+              <Text className="text-gray-900 font-bold">Transfer via ACH</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setDebitModalVisible(true)}
               style={{
                 padding: 10,
                 borderRadius: 25,
-                backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                shadowColor: '#000',
+                backgroundColor: "rgba(255, 255, 255, 0.7)",
+                shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.8,
                 shadowRadius: 2,
@@ -306,11 +405,11 @@ const OwnerProfile = ({ ownerId }) => {
             </Text>
             <Formik
               initialValues={{
-                bankAccountNumber: '',
-                bankRoutingNumber: '',
+                bankAccountNumber: "",
+                bankRoutingNumber: "",
               }}
               onSubmit={(values) => {
-                handleTransferFunds('ACH');
+                handleTransferFunds("ACH");
               }}
             >
               {({ handleChange, handleBlur, handleSubmit, values }) => (
@@ -336,8 +435,8 @@ const OwnerProfile = ({ ownerId }) => {
                     style={{
                       padding: 10,
                       borderRadius: 25,
-                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                      shadowColor: '#000',
+                      backgroundColor: "rgba(255, 255, 255, 0.7)",
+                      shadowColor: "#000",
                       shadowOffset: { width: 0, height: 2 },
                       shadowOpacity: 0.8,
                       shadowRadius: 2,
@@ -376,12 +475,12 @@ const OwnerProfile = ({ ownerId }) => {
             </Text>
             <Formik
               initialValues={{
-                cardNumber: '',
-                cardExpiry: '',
-                cardCVC: '',
+                cardNumber: "",
+                cardExpiry: "",
+                cardCVC: "",
               }}
               onSubmit={(values) => {
-                handleTransferFunds('Debit Card');
+                handleTransferFunds("Debit Card");
               }}
             >
               {({ handleChange, handleBlur, handleSubmit, values }) => (
@@ -415,8 +514,8 @@ const OwnerProfile = ({ ownerId }) => {
                     style={{
                       padding: 10,
                       borderRadius: 25,
-                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                      shadowColor: '#000',
+                      backgroundColor: "rgba(255, 255, 255, 0.7)",
+                      shadowColor: "#000",
                       shadowOffset: { width: 0, height: 2 },
                       shadowOpacity: 0.8,
                       shadowRadius: 2,
@@ -455,7 +554,6 @@ const OwnerProfile = ({ ownerId }) => {
           >
             <ScrollView className="w-full max-w-lg">
               <View className="bg-white rounded-3xl p-6 w-full shadow-xl">
-             
                 <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
                   Submit Your Listing
                 </Text>
@@ -480,7 +578,6 @@ const OwnerProfile = ({ ownerId }) => {
 
                 <Formik
                   initialValues={{
-                    airplaneYear: "",
                     airplaneModel: "",
                     description: "",
                     location: "",
@@ -489,7 +586,12 @@ const OwnerProfile = ({ ownerId }) => {
                   }}
                   onSubmit={onSubmitMethod}
                 >
-                  {({ handleChange, handleBlur, handleSubmit, values }) => (
+                  {({
+                    handleChange,
+                    handleBlur,
+                    handleSubmit,
+                    values,
+                  }) => (
                     <>
                       <TextInput
                         placeholder="Aircraft Make/Model"
@@ -515,7 +617,9 @@ const OwnerProfile = ({ ownerId }) => {
                       />
                       <TextInput
                         placeholder="Rates Per Hour ($)"
-                        onChangeText={(text) => handleInputChange("ratesPerHour", text)}
+                        onChangeText={(text) =>
+                          handleInputChange("ratesPerHour", text)
+                        }
                         onBlur={handleBlur("ratesPerHour")}
                         value={profileData.ratesPerHour}
                         keyboardType="default"
@@ -532,11 +636,18 @@ const OwnerProfile = ({ ownerId }) => {
 
                       <TouchableOpacity
                         onPress={() =>
-                          handleInputChange("boostListing", !profileData.boostListing)
+                          handleInputChange(
+                            "boostListing",
+                            !profileData.boostListing
+                          )
                         }
                         className="flex-row items-center bg-yellow-400 py-2 px-4 rounded-full mb-4"
                       >
-                        <FontAwesome name="dollar" size={24} color="black" />
+                        <FontAwesome
+                          name="dollar"
+                          size={24}
+                          color="black"
+                        />
                         <Text className="ml-2 text-gray-800">
                           {profileData.boostListing
                             ? "Boost Selected ($50)"
@@ -544,7 +655,9 @@ const OwnerProfile = ({ ownerId }) => {
                         </Text>
                       </TouchableOpacity>
 
-                      <Text className="mb-2 mt-4 text-gray-900 font-bold">Upload Images</Text>
+                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
+                        Upload Images
+                      </Text>
                       <FlatList
                         data={images}
                         horizontal
@@ -562,9 +675,25 @@ const OwnerProfile = ({ ownerId }) => {
                         className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
                       >
                         <Text className="text-center text-gray-800">
-                          {images.length >= 7 ? "Maximum 7 Images" : "Add Image"}
+                          {images.length >= 7
+                            ? "Maximum 7 Images"
+                            : "Add Image"}
                         </Text>
                       </TouchableOpacity>
+
+                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
+                        Uploaded PDF Documents
+                      </Text>
+                      {currentAnnualPdf && (
+                        <Text className="text-gray-700">
+                          Proof of Current Annual: {currentAnnualPdf.split("/").pop()}
+                        </Text>
+                      )}
+                      {insurancePdf && (
+                        <Text className="text-gray-700">
+                          Proof of Insurance: {insurancePdf.split("/").pop()}
+                        </Text>
+                      )}
 
                       <TouchableOpacity
                         onPress={pickDocument}
