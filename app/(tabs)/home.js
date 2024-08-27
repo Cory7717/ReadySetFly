@@ -10,32 +10,45 @@ import {
   ScrollView,
   Image,
   Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, addDoc } from "firebase/firestore";
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
-import PropellerImage from "../../Assets/images/propeller-image.jpg"; // Import your image
+import { Ionicons } from "@expo/vector-icons";
+import PropellerImage from "../../Assets/images/propeller-image.jpg";
+import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
+import * as ImagePicker from "expo-image-picker";
+import { Formik } from "formik";
 
-const Home = () => {
+const Home = ({ navigation }) => {
   const { user } = useUser();
-  const [searchQuery, setSearchQuery] = useState("");
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedListing, setSelectedListing] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [addListingModalVisible, setAddListingModalVisible] = useState(false);
   const [mapRegion, setMapRegion] = useState({
     latitude: 37.78825,
     longitude: -122.4324,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
+  const [filter, setFilter] = useState({
+    make: "",
+    location: "",
+  });
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Define the categories array
   const categories = [
     "Single Engine Piston",
     "Twin Engine Piston",
@@ -63,43 +76,18 @@ const Home = () => {
     });
   };
 
-  const handleSearch = async () => {
-    const lowerCaseQuery = searchQuery.toLowerCase();
-    const filteredData = listings.filter((listing) => {
-      const location = listing.location ? listing.location.toLowerCase() : "";
-      return location.includes(lowerCaseQuery);
-    });
+  const applyFilter = () => {
+    const lowerCaseMake = filter.make.toLowerCase();
+    const lowerCaseLocation = filter.location.toLowerCase();
+
+    const filteredData = listings.filter(
+      (listing) =>
+        listing.airplaneModel.toLowerCase().includes(lowerCaseMake) &&
+        (listing.location?.toLowerCase().includes(lowerCaseLocation))
+    );
+
     setFilteredListings(filteredData);
-
-    // Geocode the city/state input to get coordinates
-    try {
-      const geocodedLocation = await geocodeLocation(searchQuery);
-      if (geocodedLocation) {
-        setMapRegion({
-          latitude: geocodedLocation.latitude,
-          longitude: geocodedLocation.longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        });
-      } else {
-        Alert.alert("Location not found", "Please enter a valid city or state.");
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to find location.");
-    }
-  };
-
-  const geocodeLocation = async (locationName) => {
-    try {
-      let geocodedLocations = await Location.geocodeAsync(locationName);
-      if (geocodedLocations.length > 0) {
-        return geocodedLocations[0];
-      }
-      return null;
-    } catch (error) {
-      console.error("Geocoding error: ", error);
-      return null;
-    }
+    setFilterModalVisible(false);
   };
 
   const handleListingPress = (listing) => {
@@ -107,165 +95,392 @@ const Home = () => {
     setModalVisible(true);
   };
 
-  const getUserLocation = async () => {
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert("Permission denied", "Permission to access location was denied");
-        return;
-      }
+  const pickImage = async () => {
+    if (images.length >= 7) {
+      Alert.alert("You can only upload up to 7 images.");
+      return;
+    }
 
-      let location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-      const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
 
-      if (address) {
-        const city = address.city;
-        const state = address.region;
-        const geocodedLocation = await geocodeLocation(`${city}, ${state}`);
-        if (geocodedLocation) {
-          setMapRegion({
-            latitude: geocodedLocation.latitude,
-            longitude: geocodedLocation.longitude,
-            latitudeDelta: 0.0922,
-            longitudeDelta: 0.0421,
-          });
-        }
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to get user location.");
-      console.error(error);
+    if (!result.canceled) {
+      setImages([...images, result.assets[0].uri]);
     }
   };
 
-  useEffect(() => {
-    if (mapModalVisible) {
-      getUserLocation();
+  const handleAddListing = async (values) => {
+    setLoading(true);
+    try {
+      const uploadedImages = [];
+      for (const image of images) {
+        // Upload image logic here
+        uploadedImages.push(image); // Replace with the actual upload logic
+      }
+
+      const newListing = {
+        ...values,
+        ownerId: user.id,
+        images: uploadedImages,
+        createdAt: new Date(),
+      };
+
+      await addDoc(collection(db, "airplanes"), newListing);
+
+      Alert.alert("Success", "Your listing has been submitted.");
+      setAddListingModalVisible(false);
+
+      // Navigate to UserProfile to show the listing
+      if (navigation && typeof navigation.navigate === 'function') {
+        navigation.navigate("UserProfile");
+      } else {
+        console.error("Navigation is undefined or not a function");
+      }
+    } catch (error) {
+      console.error("Error submitting listing: ", error);
+      Alert.alert("Error", "There was an error submitting your listing.");
+    } finally {
+      setLoading(false);
     }
-  }, [mapModalVisible]);
+  };
 
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       key={item}
       onPress={() => setSelectedCategory(item)}
-      style={{
-        padding: 6,
-        borderRadius: 10,
-        marginRight: 8,
-        backgroundColor: selectedCategory === item ? "#007AFF" : "#F2F2F2",
-        height: 24,
-      }}
+      className={`p-2 ${
+        selectedCategory === item ? "bg-gray-500" : "bg-gray-200"
+      } rounded-md mr-2`}
     >
-      <Text style={{
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: selectedCategory === item ? "white" : "gray",
-      }}>
-        {item}
-      </Text>
+      <Text className="text-sm font-bold">{item}</Text>
     </TouchableOpacity>
   );
 
   const renderListingItem = ({ item }) => (
     <TouchableOpacity
       onPress={() => handleListingPress(item)}
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 16,
-        backgroundColor: "#F9F9F9",
-        borderRadius: 10,
-        marginBottom: 12,
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 2,
-      }}
+      className="flex-row justify-between items-center p-4 bg-gray-200 rounded-md mb-2"
     >
-      <View style={{ flex: 1, marginRight: 12 }}>
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: "#333" }}>
-          {item.airplaneModel}
-        </Text>
-        <Text style={{ color: "#FF3B30", marginBottom: 4 }}>
-          ${item.ratesPerHour} per hour
-        </Text>
-        <Text style={{ color: "#666" }}>{item.description}</Text>
+      <View className="flex-1">
+        <Text className="text-lg font-bold">{item.airplaneModel}</Text>
+        <Text>${item.ratesPerHour} per hour</Text>
+        <Text>{item.description}</Text>
       </View>
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        {item.images && item.images[0] && (
-          <Image source={{ uri: item.images[0] }} style={{ width: 80, height: 80, borderRadius: 10 }} />
-        )}
-      </View>
+      {item.images && item.images[0] && (
+        <Image
+          source={{ uri: item.images[0] }}
+          className="w-24 h-24 ml-3 rounded-lg"
+        />
+      )}
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <SafeAreaView className="flex-1 bg-white">
       {/* Header with Background Image */}
       <ImageBackground
-        source={PropellerImage} // Use the imported image as background
-        style={{
-          height: 187.5,
-          justifyContent: "flex-start",
-          paddingTop: 10,
-          paddingHorizontal: 10,
-        }}
-        imageStyle={{ resizeMode: "cover" }}
+        source={wingtipClouds}
+        className="h-56"
+        resizeMode="cover"
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <View className="flex-row justify-between items-center p-4">
           <View>
-            <Text style={{ fontSize: 14, color: "white" }}>Good Morning,</Text>
-            <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>{user?.fullName}</Text>
+            <Text className="text-sm text-white">Good Morning</Text>
+            <Text className="text-lg font-bold text-white">
+              {user?.fullName}
+            </Text>
           </View>
-
-          {/* Search Button Positioned at Top Right */}
           <TouchableOpacity
-            onPress={() => setMapModalVisible(true)} // Open the map modal
-            style={{
-              padding: 10,
-              borderRadius: 25,
-              backgroundColor: 'rgba(255, 255, 255, 0.7)',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.8,
-              shadowRadius: 2,
-              elevation: 5,
-            }}
+            onPress={() => setAddListingModalVisible(true)}
+            className="bg-white bg-opacity-50 rounded-full px-4 py-2"
           >
-            <Text style={{ color: "#333", fontWeight: "bold" }}>Search by City, State</Text>
+            <Text className="text-gray-900">List Your Aircraft</Text>
           </TouchableOpacity>
         </View>
       </ImageBackground>
 
-      {/* Scrollable Area for Sliders and Listings */}
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        {/* Categories Slider */}
-        <View style={{ maxHeight: 60 }}>
-          <FlatList
-            data={categories}
-            renderItem={renderCategoryItem}
-            horizontal
-            keyExtractor={(item) => item}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ padding: 8 }}
-          />
+      <ScrollView contentContainerStyle={{ padding: 16 }}>
+        {/* Filter Button */}
+        <View className="flex-row justify-between mb-4">
+          <Text className="text-lg text-gray-800">
+            Filter by location or Aircraft Make
+          </Text>
+          <TouchableOpacity
+            onPress={() => setFilterModalVisible(true)}
+            className="bg-gray-200 p-2 rounded-full"
+          >
+            <Ionicons name="filter" size={24} color="gray" />
+          </TouchableOpacity>
         </View>
 
-        {/* Listings Section */}
-        <View style={{ padding: 16 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8, color: "#333" }}>Available Listings</Text>
-          {filteredListings.length > 0 ? (
-            <FlatList
-              data={filteredListings}
-              renderItem={renderListingItem}
-              keyExtractor={(item) => item.id}
-            />
-          ) : (
-            <Text style={{ textAlign: "center", color: "gray", marginTop: 16 }}>No listings available</Text>
-          )}
-        </View>
+        {/* Categories Slider */}
+        <FlatList
+          data={categories}
+          renderItem={renderCategoryItem}
+          horizontal
+          keyExtractor={(item) => item}
+          showsHorizontalScrollIndicator={false}
+          className="mb-4"
+        />
+
+        <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
+          Available Listings
+        </Text>
+
+        {filteredListings.length > 0 ? (
+          <FlatList
+            data={filteredListings}
+            renderItem={renderListingItem}
+            keyExtractor={(item) => item.id}
+          />
+        ) : (
+          <Text className="text-center text-gray-700">No listings available</Text>
+        )}
       </ScrollView>
+
+      {/* Filter Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={filterModalVisible}
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-3xl p-6 w-11/12 max-w-lg">
+            <Text className="text-2xl font-bold mb-4 text-center">
+              Filter Listings
+            </Text>
+            <TextInput
+              placeholder="Aircraft Make"
+              onChangeText={(value) => setFilter({ ...filter, make: value })}
+              value={filter.make}
+              className="border-b border-gray-300 mb-4 p-2"
+            />
+            <TextInput
+              placeholder="Location (City, State or Airport Identifier)"
+              onChangeText={(value) =>
+                setFilter({ ...filter, location: value })
+              }
+              value={filter.location}
+              className="border-b border-gray-300 mb-4 p-2"
+            />
+            <View className="flex-row justify-between">
+              <TouchableOpacity
+                onPress={() => setFilterModalVisible(false)}
+                className="bg-gray-300 p-3 rounded-lg"
+              >
+                <Text className="text-center text-gray-700">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={applyFilter}
+                className="bg-blue-500 p-3 rounded-lg"
+              >
+                <Text className="text-center text-white">Apply Filters</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Listing Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={addListingModalVisible}
+        onRequestClose={() => setAddListingModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            className="flex-1 justify-center items-center w-full"
+          >
+            <ScrollView className="w-full max-w-lg">
+              <View className="bg-white rounded-3xl p-6 w-full shadow-xl">
+                <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+                  List Your Aircraft
+                </Text>
+
+                <Formik
+                  initialValues={{
+                    airplaneModel: "",
+                    description: "",
+                    location: "",
+                    ratesPerHour: "",
+                  }}
+                  onSubmit={handleAddListing}
+                >
+                  {({
+                    handleChange,
+                    handleBlur,
+                    handleSubmit,
+                    values,
+                  }) => (
+                    <>
+                      <TextInput
+                        placeholder="Aircraft Make/Model"
+                        onChangeText={handleChange("airplaneModel")}
+                        onBlur={handleBlur("airplaneModel")}
+                        value={values.airplaneModel}
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                      />
+                      <TextInput
+                        placeholder="Description"
+                        onChangeText={handleChange("description")}
+                        onBlur={handleBlur("description")}
+                        value={values.description}
+                        multiline
+                        numberOfLines={4}
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                      />
+                      <TextInput
+                        placeholder="Location (City, State)"
+                        onChangeText={handleChange("location")}
+                        onBlur={handleBlur("location")}
+                        value={values.location}
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                      />
+                      <TextInput
+                        placeholder="Rates Per Hour ($)"
+                        onChangeText={handleChange("ratesPerHour")}
+                        onBlur={handleBlur("ratesPerHour")}
+                        value={values.ratesPerHour}
+                        keyboardType="numeric"
+                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                      />
+
+                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
+                        Upload Images
+                      </Text>
+                      <FlatList
+                        data={images}
+                        horizontal
+                        renderItem={({ item, index }) => (
+                          <Image
+                            key={index}
+                            source={{ uri: item }}
+                            className="w-24 h-24 mr-2 rounded-lg"
+                          />
+                        )}
+                        keyExtractor={(item, index) => index.toString()}
+                      />
+                      <TouchableOpacity
+                        onPress={pickImage}
+                        className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                      >
+                        <Text className="text-center text-gray-800">
+                          {images.length >= 7
+                            ? "Maximum 7 Images"
+                            : "Add Image"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {loading ? (
+                        <ActivityIndicator size="large" color="#FF5A5F" />
+                      ) : (
+                        <TouchableOpacity
+                          onPress={handleSubmit}
+                          className="bg-red-500 py-3 px-6 rounded-full"
+                        >
+                          <Text className="text-white text-center font-bold">
+                            Submit Listing
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </Formik>
+
+                <TouchableOpacity
+                  onPress={() => setAddListingModalVisible(false)}
+                  className="mt-4 py-2 rounded-full bg-gray-200"
+                >
+                  <Text className="text-center text-gray-800">Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* Listing Details Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-3xl p-6 w-11/12">
+            <View className="flex-row justify-between">
+              <TouchableOpacity
+                onPress={() =>
+                  setSelectedListing(
+                    (selectedListing - 1 + selectedListing.images.length) %
+                      selectedListing.images.length
+                  )
+                }
+                className="p-2"
+              >
+                <Ionicons name="arrow-back-circle" size={32} color="gray" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() =>
+                  setSelectedListing(
+                    (selectedListing + 1) % selectedListing.images.length
+                  )
+                }
+                className="p-2"
+              >
+                <Ionicons name="arrow-forward-circle" size={32} color="gray" />
+              </TouchableOpacity>
+            </View>
+            {selectedListing && (
+              <>
+                <Text className="text-xl font-bold mb-4">
+                  {selectedListing.airplaneModel}
+                </Text>
+                <Image
+                  source={{ uri: selectedListing.images[0] }}
+                  className="w-full h-64 rounded-lg mb-4"
+                />
+                <Text className="text-lg mb-2">
+                  Price: ${selectedListing.ratesPerHour}
+                </Text>
+                <Text className="text-lg mb-2">
+                  Description: {selectedListing.description}
+                </Text>
+                <Text className="text-lg mb-2">
+                  Location: {selectedListing.location}
+                </Text>
+                <View className="flex-row justify-between mt-4">
+                  <TouchableOpacity
+                    onPress={() => {}}
+                    className="bg-green-500 p-3 rounded-lg"
+                  >
+                    <Text className="text-white text-center">Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {}}
+                    className="bg-red-500 p-3 rounded-lg"
+                  >
+                    <Text className="text-white text-center">Delete</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setModalVisible(false)}
+                  className="mt-4"
+                >
+                  <Text className="text-center text-gray-500">Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Map Modal */}
       <Modal
@@ -274,66 +489,42 @@ const Home = () => {
         visible={mapModalVisible}
         onRequestClose={() => setMapModalVisible(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+        <SafeAreaView className="flex-1 bg-white">
           <ImageBackground
-            source={PropellerImage} // Reuse background image for consistency
-            style={{
-              height: 187.5,
-              justifyContent: "flex-start",
-              paddingTop: 10,
-              paddingHorizontal: 10,
-            }}
-            imageStyle={{ resizeMode: "cover" }}
+            source={PropellerImage}
+            className="h-56"
+            resizeMode="cover"
           >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View className="flex-row justify-between items-center p-4">
               <View>
-                <Text style={{ fontSize: 14, color: "white" }}>Map View</Text>
+                <Text className="text-sm text-white">Map View</Text>
               </View>
-
-              {/* Close Button Positioned at Top Right */}
               <TouchableOpacity
                 onPress={() => setMapModalVisible(false)}
-                style={{
-                  padding: 10,
-                  borderRadius: 25,
-                  backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.8,
-                  shadowRadius: 2,
-                  elevation: 5,
-                }}
+                className="bg-white bg-opacity-50 rounded-full px-4 py-2"
               >
-                <Text style={{ color: "#333", fontWeight: "bold" }}>Close</Text>
+                <Text className="text-gray-900">Close</Text>
               </TouchableOpacity>
             </View>
           </ImageBackground>
 
-          {/* Search Bar */}
-          <View style={{ padding: 16, backgroundColor: "#fff" }}>
+          <View className="p-4 bg-white">
             <TextInput
               placeholder="Search by city, state"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={{
-                backgroundColor: "#e0e0e0",
-                borderRadius: 10,
-                padding: 12,
-                marginBottom: 16,
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                shadowOffset: { width: 0, height: 2 },
-                elevation: 2,
-              }}
+              value={filter.location}
+              onChangeText={(value) => setFilter({ ...filter, location: value })}
+              className="bg-gray-200 rounded-full p-4 mb-4"
             />
-            <TouchableOpacity onPress={handleSearch} style={{ backgroundColor: "#007AFF", padding: 12, borderRadius: 10, alignItems: "center", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-              <Text style={{ color: "white", fontWeight: "bold" }}>Search</Text>
+            <TouchableOpacity
+              onPress={applyFilter}
+              className="bg-blue-500 py-3 px-6 rounded-full"
+            >
+              <Text className="text-white text-center font-bold">Search</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Map View */}
           <MapView
-            style={{ flex: 1 }}
+            className="flex-1"
             region={mapRegion}
           >
             {/* Example Marker */}

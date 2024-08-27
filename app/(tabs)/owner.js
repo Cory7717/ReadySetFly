@@ -17,14 +17,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
-import PropellerImage from "../../Assets/images/propeller-image.jpg";
 import { Formik } from "formik";
 import { Calendar } from "react-native-calendars";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc } from "firebase/firestore";
-import { FontAwesome } from "@expo/vector-icons";
+import { FontAwesome, Ionicons } from "@expo/vector-icons";
+import PropellerImage from "../../Assets/images/propeller-image.jpg"; // Import your image
+import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg"; // Import background image
 
 const OwnerProfile = ({ ownerId }) => {
   const [profileData, setProfileData] = useState({
@@ -189,39 +190,20 @@ const OwnerProfile = ({ ownerId }) => {
     <SafeAreaView className="flex-1 bg-white">
       {/* Header with Background Image */}
       <ImageBackground
-        source={PropellerImage}
-        style={{
-          height: 187.5,
-          justifyContent: "flex-start",
-          paddingTop: 10,
-          paddingHorizontal: 10,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.8,
-          shadowRadius: 2,
-          elevation: 5,
-        }}
-        imageStyle={{ resizeMode: "cover" }}
+        source={wingtipClouds}
+        className="h-56"
+        resizeMode="cover"
       >
-        <View className="flex-row justify-between items-center">
+        <View className="flex-row justify-between items-center p-4">
           <View>
-            <Text className="text-sm text-white">Good Morning,</Text>
+            <Text className="text-sm text-white">Good Morning</Text>
             <Text className="text-lg font-bold text-white">{user?.fullName}</Text>
           </View>
 
           {/* Submit Your Listing Button Positioned at Top Right */}
           <TouchableOpacity
             onPress={() => setFormVisible(true)}
-            style={{
-              padding: 10,
-              borderRadius: 25,
-              backgroundColor: "rgba(255, 255, 255, 0.7)",
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.8,
-              shadowRadius: 2,
-              elevation: 5,
-            }}
+            className="bg-white bg-opacity-50 rounded-full px-4 py-2"
           >
             <Text className="text-gray-900 font-bold">Submit Your Listing</Text>
           </TouchableOpacity>
@@ -231,7 +213,7 @@ const OwnerProfile = ({ ownerId }) => {
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         {/* Listings Section */}
         <View className="mt-8">
-          <Text className="text-2xl font-bold mb-4 text-gray-900">
+          <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
             Your Current Listings
           </Text>
           {userListings.length > 0 ? (
@@ -246,7 +228,7 @@ const OwnerProfile = ({ ownerId }) => {
                 <Text className="text-gray-700">{listing.description}</Text>
                 <Text className="text-gray-700">{listing.location}</Text>
                 <Text className="text-red-500 font-bold">
-                  {listing.ratesPerHour}
+                  ${listing.ratesPerHour} per hour
                 </Text>
                 <View className="flex-row justify-between mt-4">
                   <TouchableOpacity
@@ -265,13 +247,13 @@ const OwnerProfile = ({ ownerId }) => {
               </View>
             ))
           ) : (
-            <Text className="text-gray-700">No listings available.</Text>
+            <Text className="text-gray-700 text-center">No listings available.</Text>
           )}
         </View>
 
         {/* Rental History Section */}
         <View className="mt-8">
-          <Text className="text-2xl font-bold mb-4 text-gray-900">
+          <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
             Rental History
           </Text>
           {rentalHistory.length > 0 ? (
@@ -309,7 +291,7 @@ const OwnerProfile = ({ ownerId }) => {
               </View>
             ))
           ) : (
-            <Text className="text-gray-700">No rental history.</Text>
+            <Text className="text-gray-700 text-center">No rental history.</Text>
           )}
         </View>
       </ScrollView>
@@ -349,33 +331,13 @@ const OwnerProfile = ({ ownerId }) => {
             </Text>
             <TouchableOpacity
               onPress={() => setAchModalVisible(true)}
-              style={{
-                padding: 10,
-                borderRadius: 25,
-                backgroundColor: "rgba(255, 255, 255, 0.7)",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.8,
-                shadowRadius: 2,
-                elevation: 5,
-                marginBottom: 16,
-              }}
+              className="bg-white bg-opacity-50 rounded-full px-4 py-2 mb-4 shadow-md"
             >
               <Text className="text-gray-900 font-bold">Transfer via ACH</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setDebitModalVisible(true)}
-              style={{
-                padding: 10,
-                borderRadius: 25,
-                backgroundColor: "rgba(255, 255, 255, 0.7)",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.8,
-                shadowRadius: 2,
-                elevation: 5,
-                marginBottom: 16,
-              }}
+              className="bg-white bg-opacity-50 rounded-full px-4 py-2 mb-4 shadow-md"
             >
               <Text className="text-gray-900 font-bold">
                 Transfer to Debit Card
@@ -383,7 +345,7 @@ const OwnerProfile = ({ ownerId }) => {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setTransferModalVisible(false)}
-              className="mt-4 py-2 rounded-full bg-gray-200"
+              className="bg-gray-200 py-2 rounded-full mt-4"
             >
               <Text className="text-center text-gray-800">Cancel</Text>
             </TouchableOpacity>
@@ -432,17 +394,7 @@ const OwnerProfile = ({ ownerId }) => {
                   />
                   <TouchableOpacity
                     onPress={handleSubmit}
-                    style={{
-                      padding: 10,
-                      borderRadius: 25,
-                      backgroundColor: "rgba(255, 255, 255, 0.7)",
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.8,
-                      shadowRadius: 2,
-                      elevation: 5,
-                      marginBottom: 16,
-                    }}
+                    className="bg-white bg-opacity-50 rounded-full px-4 py-2 mb-4 shadow-md"
                   >
                     <Text className="text-gray-900 font-bold text-center">
                       Submit
@@ -453,7 +405,7 @@ const OwnerProfile = ({ ownerId }) => {
             </Formik>
             <TouchableOpacity
               onPress={() => setAchModalVisible(false)}
-              className="mt-4 py-2 rounded-full bg-gray-200"
+              className="bg-gray-200 py-2 rounded-full mt-4"
             >
               <Text className="text-center text-gray-800">Cancel</Text>
             </TouchableOpacity>
@@ -511,17 +463,7 @@ const OwnerProfile = ({ ownerId }) => {
                   />
                   <TouchableOpacity
                     onPress={handleSubmit}
-                    style={{
-                      padding: 10,
-                      borderRadius: 25,
-                      backgroundColor: "rgba(255, 255, 255, 0.7)",
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.8,
-                      shadowRadius: 2,
-                      elevation: 5,
-                      marginBottom: 16,
-                    }}
+                    className="bg-white bg-opacity-50 rounded-full px-4 py-2 mb-4 shadow-md"
                   >
                     <Text className="text-gray-900 font-bold text-center">
                       Submit
@@ -532,7 +474,7 @@ const OwnerProfile = ({ ownerId }) => {
             </Formik>
             <TouchableOpacity
               onPress={() => setDebitModalVisible(false)}
-              className="mt-4 py-2 rounded-full bg-gray-200"
+              className="bg-gray-200 py-2 rounded-full mt-4"
             >
               <Text className="text-center text-gray-800">Cancel</Text>
             </TouchableOpacity>
@@ -572,7 +514,7 @@ const OwnerProfile = ({ ownerId }) => {
                     onDayPress={onDayPress}
                     markedDates={selectedDates}
                     markingType={"multi-dot"}
-                    style={{ marginBottom: 10 }}
+                    className="mb-4"
                   />
                 )}
 

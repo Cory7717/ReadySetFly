@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
-  ScrollView,
-  Text,
   View,
+  Text,
   Image,
   TextInput,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ScrollView
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
@@ -327,7 +327,7 @@ const Classifieds = () => {
         </View>
       </ImageBackground>
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <View className="flex-1 p-4">
         {/* Filter Button */}
         <View className="flex-row justify-between mb-4">
           <Text className="text-lg text-gray-800">
@@ -349,6 +349,7 @@ const Classifieds = () => {
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
           className="mb-4"
+          nestedScrollEnabled={true}
         />
 
         <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
@@ -367,11 +368,12 @@ const Classifieds = () => {
             data={filteredListings}
             renderItem={renderListingItem}
             keyExtractor={(item, index) => index.toString()}
+            nestedScrollEnabled={true}
           />
         ) : (
           <Text className="text-center text-gray-700">No listings available</Text>
         )}
-      </ScrollView>
+      </View>
 
       {/* Filter Modal */}
       <Modal
@@ -429,7 +431,7 @@ const Classifieds = () => {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             className="flex-1 justify-center items-center w-full"
           >
-            <ScrollView className="w-full max-w-lg">
+            <ScrollView className="w-full max-w-lg" nestedScrollEnabled={true}>
               <View className="bg-white rounded-3xl p-6 w-full shadow-xl">
                 <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
                   Submit Your Listing
@@ -519,6 +521,7 @@ const Classifieds = () => {
                         keyExtractor={(item) => item}
                         showsHorizontalScrollIndicator={false}
                         className="mb-4"
+                        nestedScrollEnabled={true}
                       />
 
                       <Text className="mb-2 mt-4 text-gray-900 font-bold">
@@ -535,6 +538,7 @@ const Classifieds = () => {
                           />
                         )}
                         keyExtractor={(item, index) => index.toString()}
+                        nestedScrollEnabled={true}
                       />
                       <TouchableOpacity
                         onPress={pickImage}
@@ -691,6 +695,7 @@ const Classifieds = () => {
               alignItems: "center",
             }}
             className="w-11/12"
+            nestedScrollEnabled={true}
           >
             <View className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg">
               <Text className="text-2xl font-bold mb-4 text-center">
@@ -797,6 +802,7 @@ const Classifieds = () => {
               alignItems: "center",
             }}
             className="w-11/12"
+            nestedScrollEnabled={true}
           >
             <View className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg">
               <Text className="text-2xl font-bold mb-4 text-center">
@@ -846,7 +852,6 @@ const Classifieds = () => {
                       onBlur={handleBlur("description")}
                       value={values.description}
                       multiline
-                      numberOfLines={4}
                       className="border-b border-gray-300 mb-4 p-2"
                     />
                     <TextInput
@@ -887,6 +892,7 @@ const Classifieds = () => {
                       horizontal
                       keyExtractor={(item) => item}
                       showsHorizontalScrollIndicator={false}
+                      nestedScrollEnabled={true}
                     />
 
                     <Text className="mb-2 mt-4">Upload Images</Text>
@@ -901,6 +907,7 @@ const Classifieds = () => {
                         />
                       )}
                       keyExtractor={(item, index) => index.toString()}
+                      nestedScrollEnabled={true}
                     />
                     <TouchableOpacity
                       onPress={pickImage}

@@ -12,10 +12,8 @@ import FullScreenPost from '../../components/FullScreenPost';
 import SocialMediaPost from '../../components/SocialMediaPost';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-// import LiveStream from '/LiveStream'; // Import the new screen
 import FullScreenRental from '../../components/FullScreenRental';
 import PaymentScreen from '../screens/PaymentScreen';
-
 
 // Styled components
 const Container = styled(SafeAreaView, 'flex-1 bg-gray-100');
@@ -185,7 +183,6 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
         <View className='pt-3'>
         <TouchableOpacity onPress={onCancel} style={{ marginTop: 10 }}>
         <Feather name="x-circle" size={32} color="white" />
-          {/* <Text style={{ color: 'red', textAlign: 'center' }}>Cancel</Text> */}
         </TouchableOpacity>
         </View>
       </PostContainer>
@@ -206,19 +203,23 @@ const Post = ({ post }) => {
   };
 
   const handlePress = () => {
-    navigation.navigate('FullScreenPost', { post });
+    if (post) {
+      navigation.navigate('FullScreenPost', { post });
+    } else {
+      console.error('Post object is undefined or null');
+    }
   };
 
   return (
     <TouchableOpacity onPress={handlePress}>
       <PostContainer>
         <View className="flex-row items-center mb-2">
-          <ProfileImage source={{ uri: post.profileImage }} />
-          <Text className="ml-2 text-lg font-bold">{post.userName}</Text>
+          <ProfileImage source={{ uri: post?.profileImage }} />
+          <Text className="ml-2 text-lg font-bold">{post?.userName}</Text>
         </View>
         {/* Post text now appears above the image */}
-        <Text className="mt-2">{parseContent(post.content, onHashtagPress, onMentionPress)}</Text>
-        {post.image && <PostImage source={{ uri: post.image }} />}
+        <Text className="mt-2">{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
+        {post?.image && <PostImage source={{ uri: post?.image }} />}
         <PostActions>
           <ActionButton>
             <FontAwesome name="thumbs-up" size={20} color="gray" />
@@ -310,10 +311,8 @@ export default function App() {
       <Stack.Navigator initialRouteName="MainFeed">
         <Stack.Screen name="MainFeed" component={MainFeed} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
-        {/* <Stack.Screen name="LiveStream" component={LiveStream} options={{ headerShown: false }} /> */}
         <Stack.Screen name="FullScreenRental" component={FullScreenRental} />
-        {/* <Stack.Screen name="Classifieds" component={Classifieds} /> */}
-      <Stack.Screen name="../screens/PaymentScreen" component={PaymentScreen} />
+        <Stack.Screen name="PaymentScreen" component={PaymentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
