@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
-import { collection, onSnapshot, query, orderBy, addDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, doc } from "firebase/firestore";
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from "@expo/vector-icons";
@@ -26,9 +26,11 @@ import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from 'expo-document-picker';
 import { Formik } from "formik";
+import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
 
 const Home = ({ navigation }) => {
   const { user } = useUser();
+  const stripe = useStripe();
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -203,15 +205,57 @@ const Home = ({ navigation }) => {
     }
   };
 
-  const sendRentalRequestEmail = async () => {
+  const sendRentalRequestNotification = async () => {
+    if (!selectedListing || !user) return;
+
     try {
-      // Replace with your email-sending logic
-      Alert.alert("Rental Request Sent", "Your rental request has been sent to the owner.");
+      // Add a notification to the owner's notifications collection
+      await addDoc(collection(db, "notifications"), {
+        ownerId: selectedListing.ownerId,
+        message: `You have a new rental request for ${selectedListing.airplaneModel}. Please review the request.`,
+        confirmed: false,
+        renter: {
+          renterId: user.id,
+          renterName: user.fullName,
+          rentalHours,
+          totalCost: totalCost.total,
+        },
+        createdAt: new Date(),
+      });
+
+      Alert.alert("Rental Request Sent", "Your rental request has been sent to the owner for review.");
     } catch (error) {
-      console.error("Error sending rental request: ", error);
+      console.error("Error sending notification: ", error);
       Alert.alert("Error", "There was an error sending your rental request.");
     } finally {
       setPaymentModalVisible(false);
+    }
+  };
+
+  const confirmRentalRequest = async (notificationId) => {
+    try {
+      // Update notification to confirmed
+      const notificationRef = doc(db, "notifications", notificationId);
+      await updateDoc(notificationRef, { confirmed: true });
+
+      // Process payment using Stripe
+      const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
+        amount: parseInt(totalCost.total * 100), // Amount in cents
+        currency: 'usd',
+        paymentMethodTypes: ['card'],
+        confirm: true,
+      });
+
+      if (paymentIntent.status === 'succeeded') {
+        Alert.alert("Payment Successful", "The rental request has been confirmed and payment processed.");
+        // Transfer funds to the owner using Stripe
+        // (You would handle this server-side in a real application)
+      } else {
+        Alert.alert("Payment Failed", "The payment could not be completed. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error confirming rental request: ", error);
+      Alert.alert("Error", "There was an error confirming the rental request.");
     }
   };
 
@@ -219,9 +263,7 @@ const Home = ({ navigation }) => {
     <TouchableOpacity
       key={item}
       onPress={() => setSelectedCategory(item)}
-      className={`p-2 ${
-        selectedCategory === item ? "bg-gray-500" : "bg-gray-200"
-      } rounded-md mr-2`}
+      className={`p-2 ${selectedCategory === item ? "bg-gray-500" : "bg-gray-200"} rounded-md mr-2`}
     >
       <Text className="text-sm font-bold">{item}</Text>
     </TouchableOpacity>
@@ -595,7 +637,7 @@ const Home = ({ navigation }) => {
                   Total Cost: ${totalCost.total}
                 </Text>
                 <TouchableOpacity
-                  onPress={sendRentalRequestEmail}
+                  onPress={sendRentalRequestNotification}
                   className="bg-blue-500 p-3 rounded-lg mt-4"
                 >
                   <Text className="text-white text-center">Submit Rental Request</Text>

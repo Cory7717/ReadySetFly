@@ -24,11 +24,19 @@ import { Calendar } from "react-native-calendars";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { collection, addDoc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  doc,
+  setDoc,
+  onSnapshot,
+  updateDoc,
+} from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
+import { useStripe } from '@stripe/stripe-react-native';
 
-const OwnerProfile = ({ ownerId }) => {
+const OwnerProfile = ({ ownerId, navigation }) => {
   const [profileData, setProfileData] = useState({
     airplaneModel: "",
     description: "",
@@ -52,14 +60,42 @@ const OwnerProfile = ({ ownerId }) => {
   const [achModalVisible, setAchModalVisible] = useState(false);
   const [debitModalVisible, setDebitModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [messageModalVisible, setMessageModalVisible] = useState(false);
+  const [newMessage, setNewMessage] = useState("");
+  const [rentalRequests, setRentalRequests] = useState([]);
+  const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
   const { user } = useUser();
   const storage = getStorage();
+  const stripe = useStripe();
 
   useEffect(() => {
     if (ownerId) {
-      // Fetch profile data, rental history, and user listings...
+      const messagesRef = collection(db, "owners", ownerId, "messages");
+      const unsubscribeMessages = onSnapshot(messagesRef, (snapshot) => {
+        const messagesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setMessages(messagesData);
+      });
+
+      const rentalRequestsRef = collection(db, "owners", ownerId, "rentalRequests");
+      const unsubscribeRequests = onSnapshot(rentalRequestsRef, (snapshot) => {
+        const requestsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setRentalRequests(requestsData);
+      });
+
+      return () => {
+        unsubscribeMessages();
+        unsubscribeRequests();
+      };
     }
-  }, [ownerId, userListings.length]);
+  }, [ownerId]);
 
   const handleInputChange = (name, value) => {
     setProfileData((prev) => ({ ...prev, [name]: value }));
@@ -137,22 +173,24 @@ const OwnerProfile = ({ ownerId }) => {
         ? await uploadFile(insurancePdf, "documents")
         : null;
 
-      await addDoc(collection(db, "airplanes"), {
+      const newListing = {
         ...values,
         images: uploadedImages,
         currentAnnualPdf: annualProofURL,
         insurancePdf: insuranceProofURL,
         ownerId: user.id,
         createdAt: new Date(),
-      });
+        boosted: profileData.boostListing,
+      };
+
+      await addDoc(collection(db, "airplanes"), newListing);
+
+      // Posting the listing directly to the Home screen
+      navigation.navigate("Home", { newListing });
 
       const updatedListings = [
         ...userListings,
-        {
-          ...values,
-          images: uploadedImages,
-          id: Math.random().toString(),
-        },
+        { ...newListing, id: Math.random().toString() },
       ];
       setUserListings(updatedListings);
 
@@ -169,19 +207,71 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  const handleEditListing = (listing) => {
-    Alert.alert("Edit functionality is not yet implemented.");
+  const handleSendMessage = async () => {
+    if (newMessage.trim() === "") {
+      Alert.alert("Message is empty", "Please enter a message to send.");
+      return;
+    }
+
+    try {
+      const messageData = {
+        senderId: user.id,
+        senderName: user.fullName,
+        message: newMessage,
+        createdAt: new Date(),
+      };
+
+      await addDoc(collection(db, "owners", ownerId, "messages"), messageData);
+
+      setNewMessage("");
+      setMessageModalVisible(false);
+      Alert.alert("Message Sent", "Your message has been sent to the owner.");
+    } catch (error) {
+      console.error("Error sending message: ", error);
+      Alert.alert(
+        "Error",
+        `There was an error sending your message: ${error.message}`
+      );
+    }
   };
 
-  const handleDeleteListing = async (listingId) => {
-    // Handle delete listing logic...
+  const handleApproveRentalRequest = async (request) => {
+    try {
+      const notificationRef = doc(db, "owners", ownerId, "rentalRequests", request.id);
+      await updateDoc(notificationRef, { status: "approved" });
+
+      // Process payment using Stripe
+      const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
+        amount: parseInt(request.totalCost * 100), // Amount in cents
+        currency: 'usd',
+        paymentMethodTypes: ['card'],
+        confirm: true,
+      });
+
+      if (paymentIntent.status === 'succeeded') {
+        Alert.alert("Payment Successful", "The rental request has been approved and payment processed.");
+      } else {
+        Alert.alert("Payment Failed", "The payment could not be completed. Please try again.");
+      }
+
+      setRentalRequestModalVisible(false);
+    } catch (error) {
+      console.error("Error approving rental request: ", error);
+      Alert.alert("Error", "There was an error approving the rental request.");
+    }
   };
 
-  const handleTransferFunds = (method) => {
-    Alert.alert(`Funds transferred via ${method}`);
-    setTransferModalVisible(false);
-    setAchModalVisible(false);
-    setDebitModalVisible(false);
+  const handleDenyRentalRequest = async (request) => {
+    try {
+      const notificationRef = doc(db, "owners", ownerId, "rentalRequests", request.id);
+      await updateDoc(notificationRef, { status: "denied" });
+
+      Alert.alert("Request Denied", "The rental request has been denied.");
+      setRentalRequestModalVisible(false);
+    } catch (error) {
+      console.error("Error denying rental request: ", error);
+      Alert.alert("Error", "There was an error denying the rental request.");
+    }
   };
 
   const onRefresh = () => {
@@ -222,7 +312,9 @@ const OwnerProfile = ({ ownerId }) => {
               onPress={() => setFormVisible(true)}
               className="bg-white bg-opacity-50 rounded-full px-4 py-2"
             >
-              <Text className="text-gray-900 font-bold">Submit Your Listing</Text>
+              <Text className="text-gray-900 font-bold">
+                Submit Your Listing
+              </Text>
             </TouchableOpacity>
           </View>
         </ImageBackground>
@@ -240,25 +332,14 @@ const OwnerProfile = ({ ownerId }) => {
                 <Text className="font-bold text-lg text-gray-900">
                   {listing.airplaneModel}
                 </Text>
+                {listing.boosted && (
+                  <Text className="text-yellow-600 font-bold">Sponsored Listing</Text>
+                )}
                 <Text className="text-gray-700">{listing.description}</Text>
                 <Text className="text-gray-700">{listing.location}</Text>
                 <Text className="text-red-500 font-bold">
                   ${listing.ratesPerHour} per hour
                 </Text>
-                <View className="flex-row justify-between mt-4">
-                  <TouchableOpacity
-                    onPress={() => handleEditListing(listing)}
-                    className="bg-green-500 py-2 px-4 rounded-full"
-                  >
-                    <Text className="text-white text-center">Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDeleteListing(listing.id)}
-                    className="bg-red-500 py-2 px-4 rounded-full"
-                  >
-                    <Text className="text-white text-center">Delete</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             ))
           ) : (
@@ -274,10 +355,7 @@ const OwnerProfile = ({ ownerId }) => {
           </Text>
           {rentalHistory.length > 0 ? (
             rentalHistory.map((order) => (
-              <View
-                key={order.id}
-                className="bg-gray-100 p-4 rounded-2xl mb-4"
-              >
+              <View key={order.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
                 <Text className="font-bold text-lg text-gray-900">
                   {order.airplaneModel}
                 </Text>
@@ -293,9 +371,7 @@ const OwnerProfile = ({ ownerId }) => {
                       >
                         <FontAwesome
                           name={
-                            star <= (ratings[order.id] || 0)
-                              ? "star"
-                              : "star-o"
+                            star <= (ratings[order.id] || 0) ? "star" : "star-o"
                           }
                           size={24}
                           color="gold"
@@ -307,7 +383,9 @@ const OwnerProfile = ({ ownerId }) => {
               </View>
             ))
           ) : (
-            <Text className="text-gray-700 text-center">No rental history.</Text>
+            <Text className="text-gray-700 text-center">
+              No rental history.
+            </Text>
           )}
         </View>
       </ScrollView>
@@ -543,12 +621,7 @@ const OwnerProfile = ({ ownerId }) => {
                   }}
                   onSubmit={onSubmitMethod}
                 >
-                  {({
-                    handleChange,
-                    handleBlur,
-                    handleSubmit,
-                    values,
-                  }) => (
+                  {({ handleChange, handleBlur, handleSubmit, values }) => (
                     <>
                       <TextInput
                         placeholder="Aircraft Make/Model"
@@ -600,11 +673,7 @@ const OwnerProfile = ({ ownerId }) => {
                         }
                         className="flex-row items-center bg-yellow-400 py-2 px-4 rounded-full mb-4"
                       >
-                        <FontAwesome
-                          name="dollar"
-                          size={24}
-                          color="black"
-                        />
+                        <FontAwesome name="dollar" size={24} color="black" />
                         <Text className="ml-2 text-gray-800">
                           {profileData.boostListing
                             ? "Boost Selected ($50)"
@@ -643,7 +712,8 @@ const OwnerProfile = ({ ownerId }) => {
                       </Text>
                       {currentAnnualPdf && (
                         <Text className="text-gray-700">
-                          Proof of Current Annual: {currentAnnualPdf.split("/").pop()}
+                          Proof of Current Annual:{" "}
+                          {currentAnnualPdf.split("/").pop()}
                         </Text>
                       )}
                       {insurancePdf && (
@@ -695,6 +765,92 @@ const OwnerProfile = ({ ownerId }) => {
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* Message Modal */}
+      <Modal
+        visible={messageModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setMessageModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
+            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+              Send a Message to the Owner
+            </Text>
+            <TextInput
+              placeholder="Type your message here"
+              value={newMessage}
+              onChangeText={(text) => setNewMessage(text)}
+              multiline
+              className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+            />
+            <TouchableOpacity
+              onPress={handleSendMessage}
+              className="bg-blue-500 py-3 px-6 rounded-full"
+            >
+              <Text className="text-white text-center font-bold">
+                Send Message
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setMessageModalVisible(false)}
+              className="bg-gray-200 py-2 rounded-full mt-4"
+            >
+              <Text className="text-center text-gray-800">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rental Request Modal */}
+      <Modal
+        visible={rentalRequestModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setRentalRequestModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
+            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+              Rental Request
+            </Text>
+            {selectedRequest && (
+              <>
+                <Text className="text-lg mb-2">
+                  Renter: {selectedRequest.renterName}
+                </Text>
+                <Text className="text-lg mb-2">
+                  Aircraft: {selectedRequest.airplaneModel}
+                </Text>
+                <Text className="text-lg mb-2">
+                  Total Cost: ${selectedRequest.totalCost}
+                </Text>
+                <View className="flex-row justify-between mt-4">
+                  <TouchableOpacity
+                    onPress={() => handleApproveRentalRequest(selectedRequest)}
+                    className="bg-green-500 p-3 rounded-lg"
+                  >
+                    <Text className="text-white text-center">Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDenyRentalRequest(selectedRequest)}
+                    className="bg-red-500 p-3 rounded-lg"
+                  >
+                    <Text className="text-white text-center">Deny</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+            <TouchableOpacity
+              onPress={() => setRentalRequestModalVisible(false)}
+              className="bg-gray-200 py-2 rounded-full mt-4"
+            >
+              <Text className="text-center text-gray-800">Cancel</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
