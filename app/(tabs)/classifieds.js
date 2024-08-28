@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  ScrollView
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
@@ -31,7 +31,7 @@ import {
 import { Formik } from "formik";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
-import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg"; // Import background image
+import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import * as MailComposer from "expo-mail-composer";
 
 const Classifieds = () => {
@@ -293,7 +293,7 @@ const Classifieds = () => {
       <View className="flex-1">
         <Text className="text-lg font-bold">{item.title}</Text>
         <Text>${item.price} per hour</Text>
-        <Text>{item.description}</Text>
+        <Text numberOfLines={4}>{item.description}</Text>
       </View>
       {item.images && item.images[0] && (
         <Image
@@ -642,15 +642,17 @@ const Classifieds = () => {
                   source={{ uri: selectedListing.images[currentImageIndex] }}
                   className="w-full h-64 rounded-lg mb-4"
                 />
-                <Text className="text-lg mb-2">
-                  Price: ${selectedListing.price}
-                </Text>
-                <Text className="text-lg mb-2">
-                  Description: {selectedListing.description}
-                </Text>
-                <Text className="text-lg mb-2">
-                  Location: {selectedListing.city}, {selectedListing.state}
-                </Text>
+                <ScrollView className="h-64">
+                  <Text className="text-lg mb-2">
+                    Price: ${selectedListing.price}
+                  </Text>
+                  <Text className="text-lg mb-2">
+                    Description: {selectedListing.description}
+                  </Text>
+                  <Text className="text-lg mb-2">
+                    Location: {selectedListing.city}, {selectedListing.state}
+                  </Text>
+                </ScrollView>
                 <View className="flex-row justify-between mt-4">
                   <TouchableOpacity
                     onPress={handleEditListing}

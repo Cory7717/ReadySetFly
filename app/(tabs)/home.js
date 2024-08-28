@@ -17,11 +17,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, doc } from "firebase/firestore";
-import MapView, { Marker } from 'react-native-maps';
-import * as Location from 'expo-location';
+import { collection, onSnapshot, query, orderBy, where, addDoc, updateDoc, doc } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
-import PropellerImage from "../../Assets/images/propeller-image.jpg";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from 'expo-document-picker';
@@ -85,7 +82,16 @@ const Home = ({ navigation }) => {
 
   const subscribeToListings = () => {
     const listingsRef = collection(db, "airplanes");
-    const q = query(listingsRef, orderBy("createdAt", "desc"));
+
+    let q = query(listingsRef, orderBy("createdAt", "desc"));
+
+    if (filter.make) {
+      q = query(q, where("airplaneModel", "==", filter.make.toLowerCase()));
+    }
+
+    if (filter.location) {
+      q = query(q, where("location", "==", filter.location.toLowerCase()));
+    }
 
     return onSnapshot(q, (snapshot) => {
       const listingsData = snapshot.docs.map((doc) => ({
@@ -173,8 +179,7 @@ const Home = ({ navigation }) => {
     try {
       const uploadedImages = [];
       for (const image of images) {
-        // Upload image logic here
-        uploadedImages.push(image); // Replace with the actual upload logic
+        uploadedImages.push(image);
       }
 
       const newListing = {
@@ -191,7 +196,6 @@ const Home = ({ navigation }) => {
       Alert.alert("Success", "Your listing has been submitted.");
       setAddListingModalVisible(false);
 
-      // Navigate to UserProfile to show the listing
       if (navigation && typeof navigation.navigate === 'function') {
         navigation.navigate("UserProfile");
       } else {
@@ -209,7 +213,6 @@ const Home = ({ navigation }) => {
     if (!selectedListing || !user) return;
 
     try {
-      // Add a notification to the owner's notifications collection
       await addDoc(collection(db, "notifications"), {
         ownerId: selectedListing.ownerId,
         message: `You have a new rental request for ${selectedListing.airplaneModel}. Please review the request.`,
@@ -234,13 +237,11 @@ const Home = ({ navigation }) => {
 
   const confirmRentalRequest = async (notificationId) => {
     try {
-      // Update notification to confirmed
       const notificationRef = doc(db, "notifications", notificationId);
       await updateDoc(notificationRef, { confirmed: true });
 
-      // Process payment using Stripe
       const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
-        amount: parseInt(totalCost.total * 100), // Amount in cents
+        amount: parseInt(totalCost.total * 100),
         currency: 'usd',
         paymentMethodTypes: ['card'],
         confirm: true,
@@ -248,8 +249,6 @@ const Home = ({ navigation }) => {
 
       if (paymentIntent.status === 'succeeded') {
         Alert.alert("Payment Successful", "The rental request has been confirmed and payment processed.");
-        // Transfer funds to the owner using Stripe
-        // (You would handle this server-side in a real application)
       } else {
         Alert.alert("Payment Failed", "The payment could not be completed. Please try again.");
       }
@@ -277,7 +276,7 @@ const Home = ({ navigation }) => {
       <View className="flex-1">
         <Text className="text-lg font-bold">{item.airplaneModel}</Text>
         <Text>${item.ratesPerHour} per hour</Text>
-        <Text>{item.description}</Text>
+        <Text numberOfLines={4}>{item.description}</Text>
       </View>
       {item.images && item.images[0] && (
         <Image
@@ -290,7 +289,6 @@ const Home = ({ navigation }) => {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {/* Header with Background Image */}
       <ImageBackground
         source={wingtipClouds}
         className="h-56"
@@ -313,7 +311,6 @@ const Home = ({ navigation }) => {
       </ImageBackground>
 
       <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {/* Filter Button */}
         <View className="flex-row justify-between mb-4">
           <Text className="text-lg text-gray-800">
             Filter by location or Aircraft Make
@@ -326,7 +323,6 @@ const Home = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Categories Slider */}
         <FlatList
           data={categories}
           renderItem={renderCategoryItem}
@@ -567,15 +563,17 @@ const Home = ({ navigation }) => {
                   source={{ uri: selectedListing.images[0] }}
                   className="w-full h-64 rounded-lg mb-4"
                 />
-                <Text className="text-lg mb-2">
-                  Price: ${selectedListing.ratesPerHour} per hour
-                </Text>
-                <Text className="text-lg mb-2">
-                  Description: {selectedListing.description}
-                </Text>
-                <Text className="text-lg mb-2">
-                  Location: {selectedListing.location}
-                </Text>
+                <ScrollView className="h-64">
+                  <Text className="text-lg mb-2">
+                    Price: ${selectedListing.ratesPerHour} per hour
+                  </Text>
+                  <Text className="text-lg mb-2">
+                    Description: {selectedListing.description}
+                  </Text>
+                  <Text className="text-lg mb-2">
+                    Location: {selectedListing.location}
+                  </Text>
+                </ScrollView>
                 <View className="flex-row justify-between mt-4">
                   <TouchableOpacity
                     onPress={handleCompleteRental}
@@ -652,61 +650,6 @@ const Home = ({ navigation }) => {
             )}
           </View>
         </View>
-      </Modal>
-
-      {/* Map Modal */}
-      <Modal
-        animationType="slide"
-        transparent={false}
-        visible={mapModalVisible}
-        onRequestClose={() => setMapModalVisible(false)}
-      >
-        <SafeAreaView className="flex-1 bg-white">
-          <ImageBackground
-            source={PropellerImage}
-            className="h-56"
-            resizeMode="cover"
-          >
-            <View className="flex-row justify-between items-center p-4">
-              <View>
-                <Text className="text-sm text-white">Map View</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setMapModalVisible(false)}
-                className="bg-white bg-opacity-50 rounded-full px-4 py-2"
-              >
-                <Text className="text-gray-900">Close</Text>
-              </TouchableOpacity>
-            </View>
-          </ImageBackground>
-
-          <View className="p-4 bg-white">
-            <TextInput
-              placeholder="Search by city, state"
-              value={filter.location}
-              onChangeText={(value) => setFilter({ ...filter, location: value })}
-              className="bg-gray-200 rounded-full p-4 mb-4"
-            />
-            <TouchableOpacity
-              onPress={applyFilter}
-              className="bg-blue-500 py-3 px-6 rounded-full"
-            >
-              <Text className="text-white text-center font-bold">Search</Text>
-            </TouchableOpacity>
-          </View>
-
-          <MapView
-            className="flex-1"
-            region={mapRegion}
-          >
-            {/* Example Marker */}
-            <Marker
-              coordinate={{ latitude: mapRegion.latitude, longitude: mapRegion.longitude }}
-              title={"Example Location"}
-              description={"This is an example marker."}
-            />
-          </MapView>
-        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );

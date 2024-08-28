@@ -165,14 +165,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         const downloadURL = await uploadFile(image, "airplaneImages");
         uploadedImages.push(downloadURL);
       }
-
+  
       const annualProofURL = currentAnnualPdf
         ? await uploadFile(currentAnnualPdf, "documents")
         : null;
       const insuranceProofURL = insurancePdf
         ? await uploadFile(insurancePdf, "documents")
         : null;
-
+  
       const newListing = {
         ...values,
         images: uploadedImages,
@@ -182,26 +182,34 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         createdAt: new Date(),
         boosted: profileData.boostListing,
       };
-
+  
       await addDoc(collection(db, "airplanes"), newListing);
-
+  
       // Posting the listing directly to the Home screen
       navigation.navigate("Home", { newListing });
-
+  
       const updatedListings = [
         ...userListings,
         { ...newListing, id: Math.random().toString() },
       ];
       setUserListings(updatedListings);
-
+  
       Alert.alert("Success", "Your listing has been submitted.");
       setFormVisible(false);
     } catch (error) {
       console.error("Error submitting listing: ", error);
-      Alert.alert(
-        "Error",
-        `There was an error submitting your listing: ${error.message}`
-      );
+  
+      if (error.message.includes('Network request failed')) {
+        Alert.alert(
+          "Network Error",
+          "There was an error submitting your listing due to network issues. Please check your internet connection and try again."
+        );
+      } else {
+        Alert.alert(
+          "Error",
+          `There was an error submitting your listing: ${error.message}`
+        );
+      }
     } finally {
       setLoading(false);
     }
