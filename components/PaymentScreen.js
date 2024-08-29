@@ -1,12 +1,12 @@
-import { View, Text } from 'react-native'
-import React from 'react'
+// import { View, Text } from 'react-native'
+// import React from 'react'
 
-const PaymentScreen = () => {
-  return (
-    <View>
-      <Text>PaymentScreen</Text>
-    </View>
-  )
-}
+// const PaymentScreen = () => {
+//   return (
+//     <View>
+//       <Text>PaymentScreen</Text>
+//     </View>
+//   )
+// }
 
-export default PaymentScreen
+// export default PaymentScreen

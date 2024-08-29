@@ -323,20 +323,35 @@ const OwnerProfile = ({ ownerId, navigation }) => {
               </Text>
             </View>
 
-            <TouchableOpacity
-              onPress={() => setFormVisible(true)}
-              style={{
-                backgroundColor: "white",
-                opacity: 0.5,
-                borderRadius: 50,
-                paddingVertical: 8,
-                paddingHorizontal: 16,
-              }}
-            >
-              <Text style={{ color: "#2d3748", fontWeight: "bold" }}>
-                Submit Your Listing
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity
+                onPress={() => setMessageModalVisible(true)}
+                style={{
+                  backgroundColor: "white",
+                  opacity: 0.5,
+                  borderRadius: 50,
+                  padding: 8,
+                  marginRight: 10,
+                }}
+              >
+                <Ionicons name="chatbox-ellipses-outline" size={28} color="black" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setFormVisible(true)}
+                style={{
+                  backgroundColor: "white",
+                  opacity: 0.5,
+                  borderRadius: 50,
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                }}
+              >
+                <Text style={{ color: "#2d3748", fontWeight: "bold" }}>
+                  Submit Your Listing
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ImageBackground>
 

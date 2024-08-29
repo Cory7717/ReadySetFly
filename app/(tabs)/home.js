@@ -25,11 +25,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Formik } from "formik";
 import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
 
-const Home = ({ navigation }) => {
+const Home = ({ route, navigation }) => {
   const { user } = useUser();
   const stripe = useStripe();
   const [listings, setListings] = useState([]);
-  const [filteredListings, setFilteredListings] = useState([]);
+  const [filteredListings, setFilteredListings] = useState([]); // Initialize filteredListings
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedListing, setSelectedListing] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -99,7 +99,7 @@ const Home = ({ navigation }) => {
         ...doc.data(),
       }));
       setListings(listingsData);
-      setFilteredListings(listingsData);
+      setFilteredListings(listingsData); // Initialize filteredListings with the fetched data
     });
   };
 
