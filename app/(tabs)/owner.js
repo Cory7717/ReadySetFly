@@ -317,7 +317,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             }}
           >
             <View>
-              <Text style={{ fontSize: 14, color: "white" }}>Good Morning</Text>
+              <Text style={{ fontSize: 14, color: "white", marginTop: 1, }}>Good Morning</Text>
               <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
                 {user?.fullName}
               </Text>

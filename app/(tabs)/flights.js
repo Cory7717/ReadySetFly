@@ -10,22 +10,23 @@ import {
   Alert, 
   FlatList, 
   Linking, 
-  RefreshControl 
+  RefreshControl, 
+  Modal,
+  Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Ionicons, FontAwesome, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import { useUser } from '@clerk/clerk-expo';
 import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Text as RNText } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import FullScreenPost from '../../components/FullScreenPost';
-import SocialMediaPost from '../../components/SocialMediaPost';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import FullScreenRental from '../../components/FullScreenRental';
 import PaymentScreen from '../screens/PaymentScreen';
+import FullScreenPost from '../../components/FullScreenPost';
 
 // Styled components
 const Container = styled(SafeAreaView, 'flex-1 bg-gray-100');
@@ -205,6 +206,7 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
 // Post Component
 const Post = ({ post }) => {
   const navigation = useNavigation();
+  const [modalVisible, setModalVisible] = useState(false);
 
   const onHashtagPress = (hashtag) => {
     Alert.alert('Hashtag Pressed', `You pressed ${hashtag}`);
@@ -216,38 +218,66 @@ const Post = ({ post }) => {
 
   const handlePress = () => {
     if (post) {
-      navigation.navigate('FullScreenPost', { post });
+      setModalVisible(true);
     } else {
       console.error('Post object is undefined or null');
     }
   };
 
   return (
-    <TouchableOpacity onPress={handlePress}>
-      <PostContainer>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <ProfileImage source={{ uri: post?.profileImage }} />
-          <Text style={{ marginLeft: 10, fontSize: 18, fontWeight: 'bold' }}>{post?.userName}</Text>
+    <>
+      <TouchableOpacity onPress={handlePress}>
+        <PostContainer>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <ProfileImage source={{ uri: post?.profileImage }} />
+            <Text style={{ marginLeft: 10, fontSize: 18, fontWeight: 'bold' }}>{post?.userName}</Text>
+          </View>
+          {/* Post text now appears above the image */}
+          <Text style={{ marginTop: 10 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
+          {post?.image && <PostImage source={{ uri: post?.image }} />}
+          <PostActions>
+            <ActionButton>
+              <FontAwesome name="thumbs-up" size={20} color="gray" />
+              <ActionText>Like</ActionText>
+            </ActionButton>
+            <ActionButton>
+              <FontAwesome name="comment" size={20} color="gray" />
+              <ActionText>Comment</ActionText>
+            </ActionButton>
+            <ActionButton>
+              <Ionicons name="share-social-outline" size={24} color="black" />
+              <ActionText>Share</ActionText>
+            </ActionButton>
+          </PostActions>
+        </PostContainer>
+      </TouchableOpacity>
+
+      {/* Modal for FullScreenPost */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <View style={{ width: '90%', backgroundColor: 'white', borderRadius: 10, padding: 20 }}>
+            <ScrollView>
+              <Text style={{ marginBottom: 10, fontSize: 18 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
+              {post?.image && (
+                <Image
+                  source={{ uri: post?.image }}
+                  style={{ width: '100%', height: 300, borderRadius: 10, marginBottom: 10 }}
+                  resizeMode="cover"
+                />
+              )}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={{ alignSelf: 'center', marginTop: 20 }}>
+              <Text style={{ color: 'blue' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        {/* Post text now appears above the image */}
-        <Text style={{ marginTop: 10 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
-        {post?.image && <PostImage source={{ uri: post?.image }} />}
-        <PostActions>
-          <ActionButton>
-            <FontAwesome name="thumbs-up" size={20} color="gray" />
-            <ActionText>Like</ActionText>
-          </ActionButton>
-          <ActionButton>
-            <FontAwesome name="comment" size={20} color="gray" />
-            <ActionText>Comment</ActionText>
-          </ActionButton>
-          <ActionButton>
-            <Ionicons name="share-social-outline" size={24} color="black" />
-            <ActionText>Share</ActionText>
-          </ActionButton>
-        </PostActions>
-      </PostContainer>
-    </TouchableOpacity>
+      </Modal>
+    </>
   );
 };
 

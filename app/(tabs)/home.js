@@ -269,7 +269,7 @@ const Home = ({ navigation }) => {
   );
 
   const renderListingItem = ({ item }) => (
-    <View style={{ marginBottom: 10 }}>
+    <View style={{ marginBottom: 10 }} key={item.id}>
       <TouchableOpacity
         onPress={() => handleListingPress(item)}
         className="flex-row justify-between items-center p-4 bg-gray-200 rounded-md"
