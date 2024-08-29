@@ -34,7 +34,7 @@ import {
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
-import { useStripe } from '@stripe/stripe-react-native';
+import { useStripe } from "@stripe/stripe-react-native";
 
 const OwnerProfile = ({ ownerId, navigation }) => {
   const [profileData, setProfileData] = useState({
@@ -114,7 +114,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     });
 
     if (!result.canceled) {
-      setImages([...images, result.uri]);
+      setImages([...images, result.assets[0].uri]);
     }
   };
 
@@ -289,8 +289,8 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <SafeAreaView className="bg-white">
+    <View style={{ flex: 1, backgroundColor: "white" }}>
+      <SafeAreaView style={{ backgroundColor: "white" }}>
         <StatusBar barStyle="light-content" />
       </SafeAreaView>
 
@@ -302,76 +302,94 @@ const OwnerProfile = ({ ownerId, navigation }) => {
       >
         <ImageBackground
           source={wingtipClouds}
-          className="h-56"
-          resizeMode="cover"
           style={{
+            height: 224,
             paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
           }}
+          resizeMode="cover"
         >
-          <View className="flex-row justify-between items-center p-4">
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: 16,
+            }}
+          >
             <View>
-              <Text className="text-sm text-white">Good Morning</Text>
-              <Text className="text-lg font-bold text-white">
+              <Text style={{ fontSize: 14, color: "white" }}>Good Morning</Text>
+              <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
                 {user?.fullName}
               </Text>
             </View>
 
             <TouchableOpacity
               onPress={() => setFormVisible(true)}
-              className="bg-white bg-opacity-50 rounded-full px-4 py-2"
+              style={{
+                backgroundColor: "white",
+                opacity: 0.5,
+                borderRadius: 50,
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+              }}
             >
-              <Text className="text-gray-900 font-bold">
+              <Text style={{ color: "#2d3748", fontWeight: "bold" }}>
                 Submit Your Listing
               </Text>
             </TouchableOpacity>
           </View>
         </ImageBackground>
 
-        <View className="mt-8">
-          <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
+        <View style={{ marginTop: 32 }}>
+          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, color: "#2d3748", textAlign: "center" }}>
             Your Current Listings
           </Text>
           {userListings.length > 0 ? (
             userListings.map((listing) => (
               <View
                 key={listing.id}
-                className="bg-gray-100 p-4 rounded-2xl mb-4"
+                style={{
+                  backgroundColor: "#edf2f7",
+                  padding: 16,
+                  borderRadius: 16,
+                  marginBottom: 16,
+                }}
               >
-                <Text className="font-bold text-lg text-gray-900">
+                <Text style={{ fontSize: 18, fontWeight: "bold", color: "#2d3748" }}>
                   {listing.airplaneModel}
                 </Text>
                 {listing.boosted && (
-                  <Text className="text-yellow-600 font-bold">Sponsored Listing</Text>
+                  <Text style={{ color: "#d69e2e", fontWeight: "bold" }}>Sponsored Listing</Text>
                 )}
-                <Text className="text-gray-700">{listing.description}</Text>
-                <Text className="text-gray-700">{listing.location}</Text>
-                <Text className="text-red-500 font-bold">
+                <Text style={{ color: "#4a5568" }}>{listing.description}</Text>
+                <Text style={{ color: "#4a5568" }}>{listing.location}</Text>
+                <Text style={{ color: "#e53e3e", fontWeight: "bold" }}>
                   ${listing.ratesPerHour} per hour
                 </Text>
               </View>
             ))
           ) : (
-            <Text className="text-gray-700 text-center">
+            <Text style={{ color: "#4a5568", textAlign: "center" }}>
               No listings available.
             </Text>
           )}
         </View>
 
-        <View className="mt-8">
-          <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
+        <View style={{ marginTop: 32 }}>
+          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, color: "#2d3748", textAlign: "center" }}>
             Rental History
           </Text>
           {rentalHistory.length > 0 ? (
             rentalHistory.map((order) => (
-              <View key={order.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
-                <Text className="font-bold text-lg text-gray-900">
+              <View key={order.id} style={{ backgroundColor: "#edf2f7", padding: 16, borderRadius: 16, marginBottom: 16 }}>
+                <Text style={{ fontSize: 18, fontWeight: "bold", color: "#2d3748" }}>
                   {order.airplaneModel}
                 </Text>
-                <Text className="text-gray-700">{order.rentalPeriod}</Text>
-                <Text className="text-gray-700">{order.renterName}</Text>
-                <View className="flex-row justify-between items-center mt-4">
-                  <Text className="text-gray-800">Rate this renter:</Text>
-                  <View className="flex-row">
+                <Text style={{ color: "#4a5568" }}>{order.rentalPeriod}</Text>
+                <Text style={{ color: "#4a5568" }}>{order.renterName}</Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+                  <Text style={{ color: "#2d3748" }}>Rate this renter:</Text>
+                  <View style={{ flexDirection: "row" }}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <TouchableOpacity
                         key={star}
@@ -391,14 +409,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
               </View>
             ))
           ) : (
-            <Text className="text-gray-700 text-center">
+            <Text style={{ color: "#4a5568", textAlign: "center" }}>
               No rental history.
             </Text>
           )}
         </View>
       </ScrollView>
 
-      <View className="absolute bottom-10 left-0 right-0 items-center">
+      <View style={{ position: "absolute", bottom: 40, left: 0, right: 0, alignItems: "center" }}>
         <TouchableOpacity
           onPress={() => setTransferModalVisible(true)}
           style={{
@@ -412,7 +430,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             elevation: 5,
           }}
         >
-          <Text className="text-gray-900 font-bold">
+          <Text style={{ color: "#2d3748", fontWeight: "bold" }}>
             Available Balance: ${availableBalance}
           </Text>
         </TouchableOpacity>
@@ -425,30 +443,34 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         transparent={true}
         onRequestClose={() => setTransferModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
-            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
+          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
               Transfer Funds
             </Text>
             <TouchableOpacity
               onPress={() => setAchModalVisible(true)}
-              className="bg-white bg-opacity-50 rounded-full px-4 py-2 mb-4 shadow-md"
+              style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", borderRadius: 50, paddingVertical: 12, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}
             >
-              <Text className="text-gray-900 font-bold">Transfer via ACH</Text>
+              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
+                Transfer via ACH
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setDebitModalVisible(true)}
-              className="bg-white bg-opacity-50 rounded-full px-4 py-2 mb-4 shadow-md"
+              style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", borderRadius: 50, paddingVertical: 12, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}
             >
-              <Text className="text-gray-900 font-bold">
+              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
                 Transfer to Debit Card
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setTransferModalVisible(false)}
-              className="bg-gray-200 py-2 rounded-full mt-4"
+              style={{ backgroundColor: "#e2e8f0", paddingVertical: 12, borderRadius: 50, marginTop: 16 }}
             >
-              <Text className="text-center text-gray-800">Cancel</Text>
+              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -461,9 +483,9 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         transparent={true}
         onRequestClose={() => setAchModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
-            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
+          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
               Enter Bank Details
             </Text>
             <Formik
@@ -482,7 +504,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     onChangeText={handleChange("bankAccountNumber")}
                     onBlur={handleBlur("bankAccountNumber")}
                     value={values.bankAccountNumber}
-                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
                   <TextInput
@@ -490,14 +512,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     onChangeText={handleChange("bankRoutingNumber")}
                     onBlur={handleBlur("bankRoutingNumber")}
                     value={values.bankRoutingNumber}
-                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
                   <TouchableOpacity
                     onPress={handleSubmit}
-                    className="bg-white bg-opacity-50 rounded-full px-4 py-2 mb-4 shadow-md"
+                    style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", borderRadius: 50, paddingVertical: 12, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}
                   >
-                    <Text className="text-gray-900 font-bold text-center">
+                    <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
                       Submit
                     </Text>
                   </TouchableOpacity>
@@ -506,9 +528,11 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             </Formik>
             <TouchableOpacity
               onPress={() => setAchModalVisible(false)}
-              className="bg-gray-200 py-2 rounded-full mt-4"
+              style={{ backgroundColor: "#e2e8f0", paddingVertical: 12, borderRadius: 50, marginTop: 16 }}
             >
-              <Text className="text-center text-gray-800">Cancel</Text>
+              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -521,9 +545,9 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         transparent={true}
         onRequestClose={() => setDebitModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
-            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
+          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
               Enter Debit Card Details
             </Text>
             <Formik
@@ -543,7 +567,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     onChangeText={handleChange("cardNumber")}
                     onBlur={handleBlur("cardNumber")}
                     value={values.cardNumber}
-                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
                   <TextInput
@@ -551,7 +575,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     onChangeText={handleChange("cardExpiry")}
                     onBlur={handleBlur("cardExpiry")}
                     value={values.cardExpiry}
-                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
                   <TextInput
@@ -559,14 +583,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     onChangeText={handleChange("cardCVC")}
                     onBlur={handleBlur("cardCVC")}
                     value={values.cardCVC}
-                    className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
                   <TouchableOpacity
                     onPress={handleSubmit}
-                    className="bg-white bg-opacity-50 rounded-full px-4 py-2 mb-4 shadow-md"
+                    style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", borderRadius: 50, paddingVertical: 12, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}
                   >
-                    <Text className="text-gray-900 font-bold text-center">
+                    <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
                       Submit
                     </Text>
                   </TouchableOpacity>
@@ -575,9 +599,11 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             </Formik>
             <TouchableOpacity
               onPress={() => setDebitModalVisible(false)}
-              className="bg-gray-200 py-2 rounded-full mt-4"
+              style={{ backgroundColor: "#e2e8f0", paddingVertical: 12, borderRadius: 50, marginTop: 16 }}
             >
-              <Text className="text-center text-gray-800">Cancel</Text>
+              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -590,22 +616,29 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         transparent={true}
         onRequestClose={() => setFormVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            className="flex-1 justify-center items-center w-full"
+            style={{ flex: 1, justifyContent: "center", alignItems: "center", width: "100%" }}
           >
-            <ScrollView className="w-full max-w-lg">
-              <View className="bg-white rounded-3xl p-6 w-full shadow-xl">
-                <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              style={{ width: "100%", maxWidth: 320 }}
+            >
+              <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
+                <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
                   Submit Your Listing
                 </Text>
 
                 <TouchableOpacity
                   onPress={() => setCalendarVisible(!calendarVisible)}
-                  className="bg-gray-100 py-2 px-4 rounded-full mb-6"
+                  style={{ backgroundColor: "#edf2f7", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginBottom: 24 }}
                 >
-                  <Text className="text-center text-gray-800">
+                  <Text style={{ color: "#2d3748", textAlign: "center" }}>
                     {calendarVisible ? "Hide Calendar" : "Show Calendar"}
                   </Text>
                 </TouchableOpacity>
@@ -615,7 +648,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     onDayPress={onDayPress}
                     markedDates={selectedDates}
                     markingType={"multi-dot"}
-                    className="mb-4"
+                    style={{ marginBottom: 24 }}
                   />
                 )}
 
@@ -636,7 +669,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                         onChangeText={handleChange("airplaneModel")}
                         onBlur={handleBlur("airplaneModel")}
                         value={values.airplaneModel}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
                         placeholder="Description"
@@ -644,14 +677,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                         onBlur={handleBlur("description")}
                         value={values.description}
                         multiline
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
                         placeholder="Location (City, State)"
                         onChangeText={handleChange("location")}
                         onBlur={handleBlur("location")}
                         value={values.location}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
                         placeholder="Rates Per Hour ($)"
@@ -661,7 +694,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                         onBlur={handleBlur("ratesPerHour")}
                         value={profileData.ratesPerHour}
                         keyboardType="default"
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
                         placeholder="Minimum Hour Requirement"
@@ -669,7 +702,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                         onBlur={handleBlur("minimumHours")}
                         value={values.minimumHours}
                         keyboardType="numeric"
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
 
                       <TouchableOpacity
@@ -679,17 +712,17 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                             !profileData.boostListing
                           )
                         }
-                        className="flex-row items-center bg-yellow-400 py-2 px-4 rounded-full mb-4"
+                        style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#d69e2e", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginBottom: 16 }}
                       >
                         <FontAwesome name="dollar" size={24} color="black" />
-                        <Text className="ml-2 text-gray-800">
+                        <Text style={{ marginLeft: 8, color: "#2d3748" }}>
                           {profileData.boostListing
                             ? "Boost Selected ($50)"
                             : "Boost Your Listing ($50)"}
                         </Text>
                       </TouchableOpacity>
 
-                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
+                      <Text style={{ marginBottom: 8, marginTop: 24, color: "#2d3748", fontWeight: "bold" }}>
                         Upload Images
                       </Text>
                       <FlatList
@@ -699,51 +732,57 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                           <Image
                             key={index}
                             source={{ uri: item }}
-                            className="w-24 h-24 mr-2 rounded-lg"
+                            style={{
+                              width: 96,
+                              height: 96,
+                              marginRight: 8,
+                              borderRadius: 8,
+                            }}
                           />
                         )}
                         keyExtractor={(item, index) => index.toString()}
+                        style={{ marginBottom: 16 }}
                       />
                       <TouchableOpacity
                         onPress={pickImage}
-                        className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                        style={{ backgroundColor: "#edf2f7", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginTop: 8, marginBottom: 16 }}
                       >
-                        <Text className="text-center text-gray-800">
+                        <Text style={{ color: "#2d3748", textAlign: "center" }}>
                           {images.length >= 7
                             ? "Maximum 7 Images"
                             : "Add Image"}
                         </Text>
                       </TouchableOpacity>
 
-                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
+                      <Text style={{ marginBottom: 8, marginTop: 24, color: "#2d3748", fontWeight: "bold" }}>
                         Uploaded PDF Documents
                       </Text>
                       {currentAnnualPdf && (
-                        <Text className="text-gray-700">
+                        <Text style={{ color: "#4a5568" }}>
                           Proof of Current Annual:{" "}
                           {currentAnnualPdf.split("/").pop()}
                         </Text>
                       )}
                       {insurancePdf && (
-                        <Text className="text-gray-700">
+                        <Text style={{ color: "#4a5568" }}>
                           Proof of Insurance: {insurancePdf.split("/").pop()}
                         </Text>
                       )}
 
                       <TouchableOpacity
                         onPress={pickDocument}
-                        className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                        style={{ backgroundColor: "#edf2f7", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginTop: 8, marginBottom: 16 }}
                       >
-                        <Text className="text-center text-gray-800">
+                        <Text style={{ color: "#2d3748", textAlign: "center" }}>
                           Upload PDF Document (Proof of Current Annual)
                         </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
                         onPress={pickInsuranceDocument}
-                        className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                        style={{ backgroundColor: "#edf2f7", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginTop: 8, marginBottom: 16 }}
                       >
-                        <Text className="text-center text-gray-800">
+                        <Text style={{ color: "#2d3748", textAlign: "center" }}>
                           Upload PDF Document (Proof of Insurance)
                         </Text>
                       </TouchableOpacity>
@@ -753,9 +792,9 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                       ) : (
                         <TouchableOpacity
                           onPress={handleSubmit}
-                          className="bg-red-500 py-3 px-6 rounded-full"
+                          style={{ backgroundColor: "#e53e3e", paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
                         >
-                          <Text className="text-white text-center font-bold">
+                          <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
                             Submit Listing
                           </Text>
                         </TouchableOpacity>
@@ -766,9 +805,11 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
                 <TouchableOpacity
                   onPress={() => setFormVisible(false)}
-                  className="mt-4 py-2 rounded-full bg-gray-200"
+                  style={{ marginTop: 24, paddingVertical: 12, borderRadius: 50, backgroundColor: "#e2e8f0" }}
                 >
-                  <Text className="text-center text-gray-800">Cancel</Text>
+                  <Text style={{ color: "#2d3748", textAlign: "center", fontWeight: "bold" }}>
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -783,9 +824,9 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         transparent={true}
         onRequestClose={() => setMessageModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
-            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
+          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
               Send a Message to the Owner
             </Text>
             <TextInput
@@ -793,21 +834,23 @@ const OwnerProfile = ({ ownerId, navigation }) => {
               value={newMessage}
               onChangeText={(text) => setNewMessage(text)}
               multiline
-              className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+              style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
             />
             <TouchableOpacity
               onPress={handleSendMessage}
-              className="bg-blue-500 py-3 px-6 rounded-full"
+              style={{ backgroundColor: "#3182ce", paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
             >
-              <Text className="text-white text-center font-bold">
+              <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
                 Send Message
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setMessageModalVisible(false)}
-              className="bg-gray-200 py-2 rounded-full mt-4"
+              style={{ marginTop: 24, paddingVertical: 12, borderRadius: 50, backgroundColor: "#e2e8f0" }}
             >
-              <Text className="text-center text-gray-800">Cancel</Text>
+              <Text style={{ color: "#2d3748", textAlign: "center", fontWeight: "bold" }}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -820,43 +863,45 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         transparent={true}
         onRequestClose={() => setRentalRequestModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl">
-            <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
+          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
               Rental Request
             </Text>
             {selectedRequest && (
               <>
-                <Text className="text-lg mb-2">
+                <Text style={{ fontSize: 18, marginBottom: 8 }}>
                   Renter: {selectedRequest.renterName}
                 </Text>
-                <Text className="text-lg mb-2">
+                <Text style={{ fontSize: 18, marginBottom: 8 }}>
                   Aircraft: {selectedRequest.airplaneModel}
                 </Text>
-                <Text className="text-lg mb-2">
+                <Text style={{ fontSize: 18, marginBottom: 8 }}>
                   Total Cost: ${selectedRequest.totalCost}
                 </Text>
-                <View className="flex-row justify-between mt-4">
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
                   <TouchableOpacity
                     onPress={() => handleApproveRentalRequest(selectedRequest)}
-                    className="bg-green-500 p-3 rounded-lg"
+                    style={{ backgroundColor: "#48bb78", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
                   >
-                    <Text className="text-white text-center">Approve</Text>
+                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Approve</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => handleDenyRentalRequest(selectedRequest)}
-                    className="bg-red-500 p-3 rounded-lg"
+                    style={{ backgroundColor: "#e53e3e", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
                   >
-                    <Text className="text-white text-center">Deny</Text>
+                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Deny</Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
             <TouchableOpacity
               onPress={() => setRentalRequestModalVisible(false)}
-              className="bg-gray-200 py-2 rounded-full mt-4"
+              style={{ marginTop: 24, paddingVertical: 12, borderRadius: 50, backgroundColor: "#e2e8f0" }}
             >
-              <Text className="text-center text-gray-800">Cancel</Text>
+              <Text style={{ color: "#2d3748", textAlign: "center", fontWeight: "bold" }}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

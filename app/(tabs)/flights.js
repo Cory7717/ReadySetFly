@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, ScrollView, View, Image, Text, TextInput, TouchableOpacity, Alert, FlatList, Linking, RefreshControl } from 'react-native';
+import { 
+  SafeAreaView, 
+  ScrollView, 
+  View, 
+  Image, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  Alert, 
+  FlatList, 
+  Linking, 
+  RefreshControl 
+} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, FontAwesome, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { styled } from 'nativewind';
@@ -17,7 +29,7 @@ import PaymentScreen from '../screens/PaymentScreen';
 
 // Styled components
 const Container = styled(SafeAreaView, 'flex-1 bg-gray-100');
-const Header = styled(View, 'p-4 bg-white flex-row items-center');
+const Header = styled(View, 'p-4 bg-white flex-row items-center justify-between');
 const ProfileImage = styled(Image, 'w-12 h-12 rounded-full');
 const WelcomeText = styled(View, 'pl-3 pb-5');
 const WelcomeMessage = styled(Text, 'text-base');
@@ -151,11 +163,11 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
   };
 
   return (
-    <View className='pt-1'>
-      <View className='pt-1 flex-row items-center'>
+    <View style={{ paddingTop: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <ProfileImage source={{ uri: user?.imageUrl }} />
         <WelcomeText>
-          <Text className='font-rubikregular'>Posting as</Text>
+          <Text style={{ fontFamily: 'RubikRegular' }}>Posting as</Text>
           <UserName>{user?.fullName}</UserName>
         </WelcomeText>
       </View>
@@ -170,20 +182,20 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
         {showAutocomplete && (
           <Autocomplete data={autocompleteData} onSelect={handleSelectUser} />
         )}
-        <View className='pb-5'>
-        <TouchableOpacity onPress={pickImage} className="p-2 bg-gray-200 rounded mb-4">
-          <Text className="text-center text-gray-700">Upload Image</Text>
-        </TouchableOpacity>
+        <View style={{ paddingBottom: 10 }}>
+          <TouchableOpacity onPress={pickImage} style={{ padding: 10, backgroundColor: '#E2E8F0', borderRadius: 5, marginBottom: 10 }}>
+            <Text style={{ textAlign: 'center', color: '#4A5568' }}>Upload Image</Text>
+          </TouchableOpacity>
         </View>
         {image && <PostImage source={{ uri: image }} />}
         <PostButton onPress={handleSubmit}>
           <Ionicons name="send" size={26} color="white" />
           <PostButtonText>Post</PostButtonText>
         </PostButton>
-        <View className='pt-3'>
-        <TouchableOpacity onPress={onCancel} style={{ marginTop: 10 }}>
-        <Feather name="x-circle" size={32} color="white" />
-        </TouchableOpacity>
+        <View style={{ paddingTop: 10 }}>
+          <TouchableOpacity onPress={onCancel} style={{ marginTop: 10 }}>
+            <Feather name="x-circle" size={32} color="white" />
+          </TouchableOpacity>
         </View>
       </PostContainer>
     </View>
@@ -213,12 +225,12 @@ const Post = ({ post }) => {
   return (
     <TouchableOpacity onPress={handlePress}>
       <PostContainer>
-        <View className="flex-row items-center mb-2">
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
           <ProfileImage source={{ uri: post?.profileImage }} />
-          <Text className="ml-2 text-lg font-bold">{post?.userName}</Text>
+          <Text style={{ marginLeft: 10, fontSize: 18, fontWeight: 'bold' }}>{post?.userName}</Text>
         </View>
         {/* Post text now appears above the image */}
-        <Text className="mt-2">{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
+        <Text style={{ marginTop: 10 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
         {post?.image && <PostImage source={{ uri: post?.image }} />}
         <PostActions>
           <ActionButton>
@@ -281,11 +293,11 @@ const MainFeed = () => {
 
   return (
     <Container>
-      <Header className='pt-7'>
-      <View className='flex-row '>
-      <Ionicons name="airplane-outline" size={24} color="black"  />
-        <Text className='text-rubikregular text-center text-lg font-bold flex-1'>Aviation News and Events</Text>
-        </View>
+      <Header>
+        <Ionicons name="airplane-outline" size={24} color="black" />
+        <Text style={{ fontFamily: 'RubikRegular', textAlign: 'center', fontSize: 20, fontWeight: 'bold', flex: 1 }}>
+          Aviation News and Events
+        </Text>
       </Header>
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {isCreatingPost ? (

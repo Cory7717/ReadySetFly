@@ -1,27 +1,62 @@
-import { View, Text, TouchableOpacity, Image } from 'react-native'
-import React from 'react'
-import { useNavigation } from '@react-navigation/native'
+import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import React from 'react';
+import { useNavigation } from '@react-navigation/native';
 
-export default function PostItem({item}) {
-
-  const navigation=useNavigation();
+export default function PostItem({ item }) {
+  const navigation = useNavigation();
 
   return (
-    <TouchableOpacity className="flex-1 m-2 p-2 rounded-lg 
-    border-[1px] border-slate-200"
-    onPress={()=>navigation.push('product-detail',
-    {
-        product:item
-    })}
+    <TouchableOpacity
+      style={styles.container}
+      onPress={() => navigation.push('product-detail', { product: item })}
     >
-        <Image source={{uri:item.image}}
-        className="w-full h-[140px] rounded-lg"/>
-        <View >
-          <Text className="text-[15px] font-bold mt-2">{item.title}</Text>
-          <Text className="text-[20px] font-bold text-blue-500">$ {item.price}</Text>
-          <Text className="text-blue-500 bg-blue-200 mt-1 p-[2px] text-center rounded-full px-1 text-[10px] w-[70px]">{item.category}</Text>
-
-        </View>
+      <Image source={{ uri: item.image }} style={styles.image} />
+      <View style={styles.textContainer}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.price}>$ {item.price}</Text>
+        <Text style={styles.category}>{item.category}</Text>
+      </View>
     </TouchableOpacity>
-  )
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    margin: 8,
+    padding: 8,
+    borderRadius: 8,
+    borderColor: '#94a3b8', // Equivalent to slate-200
+    borderWidth: 1,
+    backgroundColor: '#ffffff',
+  },
+  image: {
+    width: '100%',
+    height: 140,
+    borderRadius: 8,
+  },
+  textContainer: {
+    marginTop: 8,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  price: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#3b82f6', // Equivalent to blue-500
+  },
+  category: {
+    fontSize: 10,
+    color: '#3b82f6', // Equivalent to blue-500
+    backgroundColor: '#bfdbfe', // Equivalent to blue-200
+    marginTop: 4,
+    paddingVertical: 2,
+    textAlign: 'center',
+    borderRadius: 16,
+    paddingHorizontal: 4,
+    alignSelf: 'flex-start',
+  },
+});

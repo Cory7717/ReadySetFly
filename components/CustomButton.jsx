@@ -1,35 +1,39 @@
-import { ActivityIndicator, Text, TouchableOpacity } from "react-native";
+import React from 'react';
+import { ActivityIndicator, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
-const CustomButton = ({
-  title,
-  handlePress,
-  containerStyles,
-  textStyles,
-  isLoading,
-}) => {
+const CustomButton = ({ title, handlePress, containerStyles, textStyles, isLoading }) => {
   return (
     <TouchableOpacity
       onPress={handlePress}
       activeOpacity={0.5}
-      className={`rounded-2xl min-h-[36px] flex flex-row justify-center items-center ${containerStyles} ${
-        isLoading ? "opacity-50" : ""
-      }`}
+      style={[styles.buttonContainer, containerStyles, isLoading && styles.disabled]}
       disabled={isLoading}
     >
-      <Text className={`text-primary font-rubikregular text-lg ${textStyles}`}>
-        {title}
-      </Text>
-
-      {isLoading && (
-        <ActivityIndicator
-          animating={isLoading}
-          color="#fff"
-          size="small"
-          className="ml-2"
-        />
-      )}
+      <Text style={[styles.buttonText, textStyles]}>{title}</Text>
+      {isLoading && <ActivityIndicator animating={isLoading} color="#fff" size="small" style={styles.indicator} />}
     </TouchableOpacity>
   );
 };
+
+const styles = StyleSheet.create({
+  buttonContainer: {
+    borderRadius: 20, // rounded-2xl
+    minHeight: 36,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#007bff', // Change this to the color you want for your text
+    fontFamily: 'Rubik-Regular', // Make sure this font is loaded in your app
+    fontSize: 18, // text-lg
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  indicator: {
+    marginLeft: 8, // ml-2
+  },
+});
 
 export default CustomButton;

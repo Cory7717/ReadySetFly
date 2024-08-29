@@ -5,8 +5,9 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
+  StatusBar,
+  StyleSheet,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
 import { useSignUp } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 
@@ -60,12 +61,10 @@ const OwnerSignup = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white p-4">
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <View className="flex-1 justify-center items-center">
-        <Text className="text-2xl font-bold mb-6">
-          Owner Account Verification
-        </Text>
+      <View style={styles.innerContainer}>
+        <Text style={styles.title}>Owner Account Verification</Text>
 
         {step === 1 && (
           <>
@@ -75,21 +74,19 @@ const OwnerSignup = () => {
               onChangeText={(text) =>
                 setProfile({ ...profile, firstName: text })
               }
-              className="border border-gray-300 rounded-lg p-3 mb-4"
+              style={styles.input}
             />
             <TextInput
               placeholder="Last Name"
               value={profile.lastName}
               onChangeText={(text) => setProfile({ ...profile, lastName: text })}
-              className="border border-gray-300 rounded-lg p-3 mb-4"
+              style={styles.input}
             />
             <TouchableOpacity
               onPress={onCreateProfilePress}
-              className="bg-blue-500 rounded-lg p-3"
+              style={styles.button}
             >
-              <Text className="text-white text-center text-lg font-semibold">
-                Create Profile
-              </Text>
+              <Text style={styles.buttonText}>Create Profile</Text>
             </TouchableOpacity>
           </>
         )}
@@ -100,15 +97,13 @@ const OwnerSignup = () => {
               placeholder="Phone Number"
               value={phoneNumber}
               onChangeText={setPhoneNumber}
-              className="border border-gray-300 rounded-lg p-3 mb-4"
+              style={styles.input}
             />
             <TouchableOpacity
               onPress={onVerifyPhonePress}
-              className="bg-blue-500 rounded-lg p-3"
+              style={styles.button}
             >
-              <Text className="text-white text-center text-lg font-semibold">
-                Verify Phone Number
-              </Text>
+              <Text style={styles.buttonText}>Verify Phone Number</Text>
             </TouchableOpacity>
           </>
         )}
@@ -119,15 +114,13 @@ const OwnerSignup = () => {
               placeholder="Email Address"
               value={emailAddress}
               onChangeText={setEmailAddress}
-              className="border border-gray-300 rounded-lg p-3 mb-4"
+              style={styles.input}
             />
             <TouchableOpacity
               onPress={onVerifyEmailPress}
-              className="bg-blue-500 rounded-lg p-3"
+              style={styles.button}
             >
-              <Text className="text-white text-center text-lg font-semibold">
-                Verify Email Address
-              </Text>
+              <Text style={styles.buttonText}>Verify Email Address</Text>
             </TouchableOpacity>
           </>
         )}
@@ -138,15 +131,13 @@ const OwnerSignup = () => {
               placeholder="Verification Code"
               value={verificationCode}
               onChangeText={setVerificationCode}
-              className="border border-gray-300 rounded-lg p-3 mb-4"
+              style={styles.input}
             />
             <TouchableOpacity
               onPress={onPressVerify}
-              className="bg-green-500 rounded-lg p-3"
+              style={[styles.button, { backgroundColor: '#10B981' }]}
             >
-              <Text className="text-white text-center text-lg font-semibold">
-                Complete Verification
-              </Text>
+              <Text style={styles.buttonText}>Complete Verification</Text>
             </TouchableOpacity>
           </>
         )}
@@ -154,5 +145,45 @@ const OwnerSignup = () => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 16,
+  },
+  innerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 24,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    width: '100%',
+    maxWidth: 400,
+  },
+  button: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 8,
+    padding: 12,
+    width: '100%',
+    maxWidth: 400,
+  },
+  buttonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+});
 
 export default OwnerSignup;

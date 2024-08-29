@@ -1,115 +1,142 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, TextInput, Button, Image, TouchableOpacity, Text, Animated } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
-import { styled } from 'nativewind';
-import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
+// import React, { useState, useEffect, useRef } from 'react';
+// import { View, TextInput, Button, Image, TouchableOpacity, Text, Animated, StyleSheet, Alert } from 'react-native';
+// import * as ImagePicker from 'expo-image-picker';
+// import * as Location from 'expo-location';
+// import { Ionicons } from '@expo/vector-icons';
 
-const Container = styled(View, 'p-4 bg-white rounded-lg shadow-md mb-4');
-const Input = styled(TextInput, 'border border-gray-300 p-2 rounded-lg mb-4');
-const UploadButton = styled(TouchableOpacity, 'flex flex-row items-center justify-center bg-blue-500 p-2 rounded-lg mb-4');
-const UploadButtonText = styled(Text, 'text-white text-center ml-2');
-const SubmitButton = styled(Button, 'bg-blue-500 p-2 rounded-lg');
-const ShowFormButton = styled(TouchableOpacity, 'bg-green-500 p-2 rounded-lg mt-4');
+// const CreateNewPost = ({ onSubmit }) => {
+//   const [content, setContent] = useState('');
+//   const [image, setImage] = useState(null);
+//   const [showForm, setShowForm] = useState(false);
 
-const CreateNewPost = ({ onSubmit }) => {
-  const [content, setContent] = useState('');
-  const [image, setImage] = useState(null);
-  const [tags, setTags] = useState('');
-  const [showForm, setShowForm] = useState(false);
+//   const buttonSize = useRef(new Animated.Value(150)).current;
 
-  const buttonSize = useRef(new Animated.Value(150)).current; // Initial size of button
-  const scrollY = useRef(new Animated.Value(0)).current; // Corrected initialization
+//   useEffect(() => {
+//     Animated.timing(buttonSize, {
+//       toValue: showForm ? 200 : 150,
+//       duration: 300,
+//       useNativeDriver: false,
+//     }).start();
+//   }, [showForm]);
 
-  useEffect(() => {
-    Animated.timing(buttonSize, {
-      toValue: showForm ? 200 : 150, // Expand when showing form, shrink otherwise
-      duration: 300, // Duration of the animation
-      useNativeDriver: false, // Not using native driver since we're animating width and height
-    }).start();
-  }, [showForm]);
+//   useEffect(() => {
+//     (async () => {
+//       let { status } = await Location.requestForegroundPermissionsAsync();
+//       if (status !== 'granted') {
+//         Alert.alert('Permission to access location was denied');
+//         return;
+//       }
 
-  useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Permission to access location was denied');
-        return;
-      }
+//       await Location.getCurrentPositionAsync({});
+//     })();
+//   }, []);
 
-      let location = await Location.getCurrentPositionAsync({});
-      // Assuming you need to use the location
-    })();
-  }, []);
+//   const pickImage = async () => {
+//     const result = await ImagePicker.launchImageLibraryAsync({
+//       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+//       allowsEditing: true,
+//       aspect: [4, 3],
+//       quality: 1,
+//     });
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+//     if (!result.canceled) {
+//       setImage(result.assets[0].uri);
+//     }
+//   };
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-    }
-  };
+//   const handleSubmit = () => {
+//     const newPost = {
+//       userName: 'Current User',
+//       profileImage: 'https://example.com/current-user-profile.jpg', // Replace with actual profile image URL
+//       time: 'Just now',
+//       content,
+//       image,
+//       likes: 0,
+//       comments: 0,
+//     };
 
-  const handleSubmit = () => {
-    const tagsArray = (tags || '').split(',').map(tag => tag.trim());
+//     onSubmit(newPost);
+//     setContent('');
+//     setImage(null);
+//     setShowForm(false);
+//   };
 
-    const newPost = {
-      userName: 'Current User',
-      profileImage: 'https://example.com/current-user-profile.jpg', // Replace with actual profile image URL
-      time: 'Just now',
-      content,
-      image,
-      tags: tagsArray,
-      likes: 0,
-      comments: 0,
-    };
+//   return (
+//     <View style={styles.container}>
+//       <Animated.View style={{ width: buttonSize, height: showForm ? null : buttonSize }}>
+//         {showForm ? (
+//           <View>
+//             <TextInput
+//               style={styles.input}
+//               placeholder="What's on your mind?"
+//               value={content}
+//               onChangeText={setContent}
+//               multiline
+//             />
+//             <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+//               <Ionicons name="camera-outline" size={24} color="white" />
+//               <Text style={styles.uploadButtonText}>Upload Image</Text>
+//             </TouchableOpacity>
+//             {image && <Image source={{ uri: image }} style={styles.image} />}
+//             <Button title="Submit" onPress={handleSubmit} />
+//           </View>
+//         ) : (
+//           <TouchableOpacity style={styles.showFormButton} onPress={() => setShowForm(true)}>
+//             <Text style={styles.showFormButtonText}>Create New Post</Text>
+//           </TouchableOpacity>
+//         )}
+//       </Animated.View>
+//     </View>
+//   );
+// };
 
-    onSubmit(newPost);
-    setContent('');
-    setImage(null);
-    setTags('');
-    setShowForm(false); // Hide the form after submission
-  };
+// const styles = StyleSheet.create({
+//   container: {
+//     padding: 16,
+//     backgroundColor: 'white',
+//     borderRadius: 8,
+//     shadowColor: '#000',
+//     shadowOffset: { width: 0, height: 2 },
+//     shadowOpacity: 0.1,
+//     shadowRadius: 4,
+//     marginBottom: 16,
+//   },
+//   input: {
+//     borderWidth: 1,
+//     borderColor: '#ccc',
+//     padding: 8,
+//     borderRadius: 8,
+//     marginBottom: 8,
+//   },
+//   uploadButton: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//     backgroundColor: '#007bff',
+//     padding: 10,
+//     borderRadius: 8,
+//     marginBottom: 8,
+//   },
+//   uploadButtonText: {
+//     color: 'white',
+//     marginLeft: 8,
+//   },
+//   image: {
+//     width: '100%',
+//     height: 200,
+//     marginBottom: 10,
+//     borderRadius: 8,
+//   },
+//   showFormButton: {
+//     backgroundColor: '#28a745',
+//     padding: 10,
+//     borderRadius: 8,
+//     alignItems: 'center',
+//   },
+//   showFormButtonText: {
+//     color: 'white',
+//     fontSize: 16,
+//   },
+// });
 
-  return (
-    <Container>
-      <Animated.View style={{ width: buttonSize, height: buttonSize }}>
-        {showForm ? (
-          <View>
-            <Input
-              placeholder="What's on your mind?"
-              value={content}
-              onChangeText={setContent}
-              multiline
-            />
-            {/* <Input
-              placeholder="Tag users (comma separated)"
-              value={tags}
-              onChangeText={setTags}
-            /> */}
-            <View className='flex-1'>
-              <UploadButton onPress={pickImage}>
-                <Ionicons name="camera-outline" size={36} color="green" />
-                {/* <FontAwesome6 name="user-tag" size={24} color="green" /> */}
-                <UploadButtonText>Upload Image</UploadButtonText>
-              </UploadButton>
-            </View>
-            {image && <Image source={{ uri: image }} style={{ width: '100%', height: 200, marginBottom: 10 }} />}
-            
-          </View>
-        ) : (
-          <ShowFormButton onPress={() => setShowForm(true)}>
-            <Text style={{ color: 'green', textAlign: 'center' }}>Create New Post</Text>
-          </ShowFormButton>
-        )}
-      </Animated.View>
-    </Container>
-  );
-};
-
-export default CreateNewPost;
+// export default CreateNewPost;

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { TextInput, Button, View, TouchableOpacity, Text, Picker } from 'react-native';
+import { TextInput, View, TouchableOpacity, Text, StyleSheet, Picker } from 'react-native';
 import { useSignUp } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 
@@ -55,7 +55,7 @@ export default function RenterSignUp() {
   };
 
   return (
-    <View style={{ padding: 20 }}>
+    <View style={styles.container}>
       {!pendingVerification && (
         <>
           <TextInput
@@ -63,20 +63,20 @@ export default function RenterSignUp() {
             value={emailAddress}
             placeholder="Email..."
             onChangeText={(email) => setEmailAddress(email)}
-            style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 10 }}
+            style={styles.input}
           />
           <TextInput
             value={password}
             placeholder="Password..."
             secureTextEntry={true}
             onChangeText={(password) => setPassword(password)}
-            style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 10 }}
+            style={styles.input}
           />
 
           <Picker
             selectedValue={userType}
             onValueChange={(itemValue) => setUserType(itemValue)}
-            style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, marginBottom: 20 }}
+            style={styles.picker}
           >
             <Picker.Item label="Renter" value="renter" />
             <Picker.Item label="Owner" value="owner" />
@@ -84,9 +84,9 @@ export default function RenterSignUp() {
 
           <TouchableOpacity 
             onPress={onSignUpPress} 
-            style={{ backgroundColor: '#007bff', padding: 15, borderRadius: 8, alignItems: 'center', marginBottom: 20 }}
+            style={styles.signUpButton}
           >
-            <Text style={{ color: '#fff', fontSize: 16 }}>Sign Up</Text>
+            <Text style={styles.buttonText}>Sign Up</Text>
           </TouchableOpacity>
         </>
       )}
@@ -96,16 +96,54 @@ export default function RenterSignUp() {
             value={code} 
             placeholder="Verification Code..." 
             onChangeText={(code) => setCode(code)} 
-            style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 20 }}
+            style={styles.input}
           />
           <TouchableOpacity 
             onPress={onPressVerify} 
-            style={{ backgroundColor: '#28a745', padding: 15, borderRadius: 8, alignItems: 'center' }}
+            style={styles.verifyButton}
           >
-            <Text style={{ color: '#fff', fontSize: 16 }}>Verify Email</Text>
+            <Text style={styles.buttonText}>Verify Email</Text>
           </TouchableOpacity>
         </>
       )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 20,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  picker: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  signUpButton: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  verifyButton: {
+    backgroundColor: '#28a745',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+});

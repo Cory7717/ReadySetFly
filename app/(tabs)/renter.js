@@ -20,10 +20,9 @@ import { Formik } from 'formik';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useUser } from '@clerk/clerk-expo';
-import { Ionicons } from '@expo/vector-icons';
-import { FontAwesome } from '@expo/vector-icons';
+import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import PropellerImage from '../../Assets/images/propeller-image.jpg';
-import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg"; // Import background image
+import wingtipClouds from '../../Assets/images/wingtip_clouds.jpg';
 
 const BookingCalendar = ({ airplaneId, userId }) => {
   const { user } = useUser();
@@ -37,7 +36,7 @@ const BookingCalendar = ({ airplaneId, userId }) => {
     address: '',
     logBooks: null,
     medical: null,
-    insurance: null, // New field for insurance
+    insurance: null,
   });
   const [refreshing, setRefreshing] = useState(false);
   const [completedRentals, setCompletedRentals] = useState([]);
@@ -113,9 +112,8 @@ const BookingCalendar = ({ airplaneId, userId }) => {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      {/* Ensure StatusBar is correctly managed */}
-      <SafeAreaView className="bg-white">
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      <SafeAreaView style={{ backgroundColor: 'white' }}>
         <StatusBar barStyle="light-content" />
       </SafeAreaView>
 
@@ -125,45 +123,70 @@ const BookingCalendar = ({ airplaneId, userId }) => {
         }
         contentContainerStyle={{ paddingBottom: 16 }}
       >
-        {/* Header with Background Image */}
         <ImageBackground
           source={wingtipClouds}
-          className="h-56"
+          style={{
+            height: 224,
+            paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+          }}
           resizeMode="cover"
-          style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }}
         >
-          <View className="flex-row justify-between items-center p-1">
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: 16,
+            }}
+          >
             <View>
-              <Text className="text-sm text-white">Welcome,</Text>
-              <Text className="text-lg font-bold text-white">{user?.fullName}</Text>
+              <Text style={{ fontSize: 14, color: 'white' }}>Welcome,</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white' }}>
+                {user?.fullName}
+              </Text>
             </View>
 
             <TouchableOpacity
               onPress={() => setProfileModalVisible(true)}
-              className="bg-white bg-opacity-50 rounded-full p-3"
+              style={{
+                backgroundColor: 'white',
+                opacity: 0.5,
+                borderRadius: 50,
+                padding: 8,
+              }}
             >
               <Ionicons name="settings-outline" size={28} color="black" />
             </TouchableOpacity>
           </View>
         </ImageBackground>
 
-        {/* Section Title */}
-        <View className="px-4 py-3">
-          <Text className="text-2xl font-bold text-gray-900">Manage Your Rentals</Text>
-          <Text className="text-md text-gray-600">Update your profile, view rental details, and manage bookings.</Text>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#2d3748' }}>Manage Your Rentals</Text>
+          <Text style={{ fontSize: 14, color: '#718096' }}>
+            Update your profile, view rental details, and manage bookings.
+          </Text>
         </View>
 
-        {/* Completed Rentals */}
-        <View className="px-4 py-3">
-          <Text className="text-xl font-bold mb-4 text-gray-900">Completed Rentals</Text>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#2d3748', marginBottom: 16 }}>
+            Completed Rentals
+          </Text>
           {completedRentals.length > 0 ? (
             completedRentals.map((rental) => (
-              <View key={rental.id} className="bg-gray-100 p-4 rounded-2xl mb-4">
-                <Text className="font-bold text-gray-900">{rental.renterName}</Text>
-                <Text className="text-gray-700">{rental.rentalPeriod}</Text>
-                <View className="flex-row items-center mt-2">
-                  <Text className="text-gray-800">Rate this renter:</Text>
-                  <View className="flex-row ml-4">
+              <View
+                key={rental.id}
+                style={{
+                  backgroundColor: '#edf2f7',
+                  padding: 16,
+                  borderRadius: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ fontWeight: 'bold', color: '#2d3748' }}>{rental.renterName}</Text>
+                <Text style={{ color: '#4a5568' }}>{rental.rentalPeriod}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                  <Text style={{ color: '#2d3748' }}>Rate this renter:</Text>
+                  <View style={{ flexDirection: 'row', marginLeft: 16 }}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <TouchableOpacity
                         key={star}
@@ -181,73 +204,123 @@ const BookingCalendar = ({ airplaneId, userId }) => {
               </View>
             ))
           ) : (
-            <Text className="text-center text-gray-600">No completed rentals available.</Text>
+            <Text style={{ textAlign: 'center', color: '#718096' }}>
+              No completed rentals available.
+            </Text>
           )}
         </View>
 
-        {/* Profile Information */}
         {profileSaved ? (
-          <View className="px-4 py-3 bg-white shadow-md rounded-3xl">
-            <Text className="text-xl font-bold mb-2 text-gray-900">Profile Information</Text>
-            <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-900">Name:</Text>
-              <Text className="flex-2 text-gray-600">{profileData.name}</Text>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              backgroundColor: 'white',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.22,
+              shadowRadius: 2.22,
+              elevation: 3,
+              borderRadius: 24,
+              marginBottom: 16,
+            }}
+          >
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#2d3748', marginBottom: 8 }}>
+              Profile Information
+            </Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              <Text style={{ fontWeight: 'bold', color: '#2d3748', flex: 1 }}>Name:</Text>
+              <Text style={{ color: '#718096', flex: 2 }}>{profileData.name}</Text>
             </View>
-            <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-900">Aircraft Type:</Text>
-              <Text className="flex-2 text-gray-600">{profileData.aircraftType}</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              <Text style={{ fontWeight: 'bold', color: '#2d3748', flex: 1 }}>Aircraft Type:</Text>
+              <Text style={{ color: '#718096', flex: 2 }}>{profileData.aircraftType}</Text>
             </View>
-            <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-900">Certifications:</Text>
-              <Text className="flex-2 text-gray-600">{profileData.certifications}</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              <Text style={{ fontWeight: 'bold', color: '#2d3748', flex: 1 }}>Certifications:</Text>
+              <Text style={{ color: '#718096', flex: 2 }}>{profileData.certifications}</Text>
             </View>
-            <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-900">Contact:</Text>
-              <Text className="flex-2 text-gray-600">{profileData.contact}</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              <Text style={{ fontWeight: 'bold', color: '#2d3748', flex: 1 }}>Contact:</Text>
+              <Text style={{ color: '#718096', flex: 2 }}>{profileData.contact}</Text>
             </View>
-            <View className="flex-row mb-2">
-              <Text className="font-bold flex-1 text-gray-900">Location:</Text>
-              <Text className="flex-2 text-gray-600">{profileData.address}</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              <Text style={{ fontWeight: 'bold', color: '#2d3748', flex: 1 }}>Location:</Text>
+              <Text style={{ color: '#718096', flex: 2 }}>{profileData.address}</Text>
             </View>
             {profileData.logBooks && (
-              <Text className="flex-2 mb-2 text-gray-600">
+              <Text style={{ color: '#718096', marginBottom: 8 }}>
                 Log Books Uploaded: {profileData.logBooks.split('/').pop()}
               </Text>
             )}
             {profileData.medical && (
-              <Text className="flex-2 text-gray-600">
+              <Text style={{ color: '#718096', marginBottom: 8 }}>
                 Medical Uploaded: {profileData.medical.split('/').pop()}
               </Text>
             )}
             {profileData.insurance && (
-              <Text className="flex-2 text-gray-600">
+              <Text style={{ color: '#718096', marginBottom: 8 }}>
                 Insurance Uploaded: {profileData.insurance.split('/').pop()}
               </Text>
             )}
             {profileData.image && (
               <Image
                 source={{ uri: profileData.image }}
-                className="w-36 h-36 rounded-lg mt-2"
+                style={{ width: 144, height: 144, borderRadius: 8, marginTop: 8 }}
               />
             )}
           </View>
         ) : (
-          <View className="px-4 py-3 bg-white shadow-md rounded-3xl">
-            <Text className="text-xl font-bold mb-2 text-gray-900">No Profile Information Available</Text>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              backgroundColor: 'white',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.22,
+              shadowRadius: 2.22,
+              elevation: 3,
+              borderRadius: 24,
+              marginBottom: 16,
+            }}
+          >
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#2d3748', marginBottom: 8 }}>
+              No Profile Information Available
+            </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Profile Modal */}
       <Modal visible={profileModalVisible} animationType="slide">
-        <SafeAreaView className="flex-1 bg-gray-100">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f7fafc' }}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            className="flex-1 justify-center items-center bg-black bg-opacity-50"
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
           >
-            <ScrollView className="w-full max-w-lg">
-              <View className="bg-white rounded-3xl p-6 w-full shadow-xl">
-                <Text className="text-2xl font-bold mb-6 text-center text-gray-900">Edit Profile</Text>
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              style={{ width: '100%', maxWidth: 320 }}
+            >
+              <View
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: 24,
+                  padding: 24,
+                  width: '100%',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                }}
+              >
+                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: '#2d3748' }}>
+                  Edit Profile
+                </Text>
                 <Formik
                   initialValues={profileData}
                   onSubmit={handleProfileSubmit}
@@ -259,71 +332,75 @@ const BookingCalendar = ({ airplaneId, userId }) => {
                         onChangeText={handleChange('name')}
                         onBlur={handleBlur('name')}
                         value={values.name}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
                       />
                       <TextInput
                         placeholder="Aircraft Type"
                         onChangeText={handleChange('aircraftType')}
                         onBlur={handleBlur('aircraftType')}
                         value={values.aircraftType}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
                       />
                       <TextInput
                         placeholder="Certifications"
                         onChangeText={handleChange('certifications')}
                         onBlur={handleBlur('certifications')}
                         value={values.certifications}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
                       />
                       <TextInput
                         placeholder="Contact"
                         onChangeText={handleChange('contact')}
                         onBlur={handleBlur('contact')}
                         value={values.contact}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
                       />
                       <TextInput
                         placeholder="Location"
                         onChangeText={handleChange('address')}
                         onBlur={handleBlur('address')}
                         value={values.address}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
                       />
                       <TouchableOpacity
                         onPress={() => pickDocument('logBooks')}
-                        className="border-b border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', padding: 8, backgroundColor: 'white', borderRadius: 8, marginBottom: 16 }}
                       >
-                        <Text className="text-gray-800">
+                        <Text style={{ color: '#2d3748' }}>
                           {values.logBooks ? `Logbook Uploaded: ${values.logBooks.split('/').pop()}` : 'Upload Recent Logbook Page'}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => pickDocument('medical')}
-                        className="border-b border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', padding: 8, backgroundColor: 'white', borderRadius: 8, marginBottom: 16 }}
                       >
-                        <Text className="text-gray-800">
+                        <Text style={{ color: '#2d3748' }}>
                           {values.medical ? `Medical Uploaded: ${values.medical.split('/').pop()}` : 'Upload Medical'}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => pickDocument('insurance')}
-                        className="border-b border-gray-300 rounded-lg p-2 mb-4 bg-white"
+                        style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', padding: 8, backgroundColor: 'white', borderRadius: 8, marginBottom: 16 }}
                       >
-                        <Text className="text-gray-800">
+                        <Text style={{ color: '#2d3748' }}>
                           {values.insurance ? `Insurance Uploaded: ${values.insurance.split('/').pop()}` : 'Upload Proof of Insurance'}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={handleSubmit}
-                        className="bg-blue-500 py-3 px-6 rounded-full mb-4"
+                        style={{ backgroundColor: '#3182ce', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50, marginBottom: 16 }}
                       >
-                        <Text className="text-white text-center">Save Profile</Text>
+                        <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                          Save Profile
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => setProfileModalVisible(false)}
-                        className="bg-gray-500 py-3 px-6 rounded-full"
+                        style={{ backgroundColor: '#718096', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
                       >
-                        <Text className="text-white text-center">Cancel</Text>
+                        <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                          Cancel
+                        </Text>
                       </TouchableOpacity>
                     </>
                   )}

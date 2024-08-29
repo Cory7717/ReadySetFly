@@ -6,13 +6,13 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
-  
+  StatusBar,
+  Platform,
+  Picker,
 } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { images } from "../../constants";
-import { StatusBar } from "expo-status-bar";
-import { Picker } from "@react-native-picker/picker";
 
 const SignUp = () => {
   const { signUp, setActive, isLoaded } = useSignUp();
@@ -33,7 +33,7 @@ const SignUp = () => {
       await signUp.create({
         emailAddress,
         password,
-        publicMetadata: { userType }, // Storing user type in metadata
+        publicMetadata: { userType },
       });
 
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
@@ -66,49 +66,70 @@ const SignUp = () => {
   }, [isLoaded, code]);
 
   return (
-    <SafeAreaView className="flex-1 bg-white p-4">
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'white', padding: 16 }}>
       <StatusBar barStyle="dark-content" />
-      <View className="flex-1 justify-center items-center">
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <Image
           source={images.logo}
           resizeMode="contain"
-          className="w-60 h-80 mb-6"
+          style={{ width: 240, height: 160, marginBottom: 24 }}
         />
-        <Text className="text-2xl font-bold mb-4">
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>
           Sign up for Ready, Set, Fly!
         </Text>
-        <View className="w-3/4 max-w-md space-y-4">
+        <View style={{ width: '75%', maxWidth: 400, gap: 16 }}>
           {!pendingVerification ? (
             <>
-            <View className='gap-4'>
               <TextInput
                 autoCapitalize="none"
                 value={emailAddress}
                 placeholder="Email"
                 onChangeText={setEmailAddress}
-                className="border border-gray-300 rounded-lg p-3"
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#ccc',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 16,
+                }}
               />
               <TextInput
                 value={password}
                 placeholder="Password"
                 secureTextEntry
                 onChangeText={setPassword}
-                className="border border-gray-300 rounded-lg p-3"
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#ccc',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 16,
+                }}
               />
-              </View>
               <Picker
                 selectedValue={userType}
                 onValueChange={(itemValue) => setUserType(itemValue)}
-                className="border border-gray-300 rounded-lg p-3"
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#ccc',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 16,
+                  height: Platform.OS === 'ios' ? 200 : undefined, // Fix for iOS to show the picker properly
+                }}
               >
                 <Picker.Item label="Renter" value="renter" />
                 <Picker.Item label="Owner" value="owner" />
               </Picker>
               <TouchableOpacity
                 onPress={onSignUpPress}
-                className="bg-blue-500 rounded-lg p-3"
+                style={{
+                  backgroundColor: '#3b82f6',
+                  borderRadius: 8,
+                  padding: 12,
+                }}
               >
-                <Text className="text-white text-center text-lg font-semibold">
+                <Text style={{ color: 'white', textAlign: 'center', fontSize: 18, fontWeight: '600' }}>
                   Sign Up
                 </Text>
               </TouchableOpacity>
@@ -119,24 +140,34 @@ const SignUp = () => {
                 value={code}
                 placeholder="Verification Code"
                 onChangeText={setCode}
-                className="border border-gray-300 rounded-lg p-3"
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#ccc',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 16,
+                }}
               />
               <TouchableOpacity
                 onPress={onPressVerify}
-                className="bg-green-500 rounded-lg p-3"
+                style={{
+                  backgroundColor: '#10b981',
+                  borderRadius: 8,
+                  padding: 12,
+                }}
               >
-                <Text className="text-white text-center text-lg font-semibold">
+                <Text style={{ color: 'white', textAlign: 'center', fontSize: 18, fontWeight: '600' }}>
                   Verify Email
                 </Text>
               </TouchableOpacity>
             </>
           )}
-          <View className="flex-row justify-center items-center">
-            <Text className="text-lg text-gray-600">
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 16 }}>
+            <Text style={{ fontSize: 18, color: '#4b5563' }}>
               Already have an account?
             </Text>
             <TouchableOpacity onPress={() => router.push("/sign-in")}>
-              <Text className="text-lg text-blue-600 ml-2 font-semibold">
+              <Text style={{ fontSize: 18, color: '#3b82f6', marginLeft: 8, fontWeight: '600' }}>
                 Sign in
               </Text>
             </TouchableOpacity>

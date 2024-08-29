@@ -1,24 +1,7 @@
 import React from "react";
-import { View, Text, Image, SafeAreaView, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, Image, TouchableOpacity, Alert } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import { styled } from "nativewind";
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-
-const Stack = createStackNavigator();
-
-const PostContainer = styled(View, "p- bg-white rounded-2xl shadow-2xl mb-2");
-const PostHeader = styled(View, "flex-row items-center mb-4");
-const ProfileImage = styled(Image, "w-10 h-10 rounded-full mr-4");
-const UserName = styled(Text, "font-bold text-lg");
-const PostTime = styled(Text, "text-gray-200 text-sm");
-const PostContent = styled(Text, "mb-4");
-const PostImage = styled(Image, "w-full h-60 rounded-lg");
-const PostFooter = styled(View, "flex-row justify-between mt-4");
-const LikeButton = styled(TouchableOpacity, 'flex-row items-center');
-const CommentButton = styled(TouchableOpacity, 'flex-row items-center');
-const ShareButton = styled(TouchableOpacity, 'flex-row items-center');
-
+import { useNavigation } from '@react-navigation/native';
 
 const SocialMediaPost = ({ post }) => {
   const navigation = useNavigation();
@@ -35,58 +18,95 @@ const SocialMediaPost = ({ post }) => {
     navigation.navigate('FullScreenPost', { post });
   };
 
-  const handleEdit = () => {
-    setIsEditing(true);
-  };
-
-  const handleSaveEdit = async () => {
-    try {
-      const postRef = doc(db, 'posts', post.id);
-      await updateDoc(postRef, {
-        content: editedContent,
-        image: editedImage,
-      });
-      setIsEditing(false);
-    } catch (error) {
-      Alert.alert('Error', 'Could not update the post.');
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditedContent(post.content);
-    setEditedImage(post.image);
-  };
-
   return (
-    
-    <PostContainer>
-      <PostHeader>
-        <ProfileImage source={{ uri: post.profileImage }} />
+    <View style={styles.postContainer}>
+      <View style={styles.postHeader}>
+        <Image source={{ uri: post.profileImage }} style={styles.profileImage} />
         <View>
-          <UserName>{post.userName}</UserName>
-          <PostTime>{post.time}</PostTime>
+          <Text style={styles.userName}>{post.userName}</Text>
+          <Text style={styles.postTime}>{post.time}</Text>
         </View>
-      </PostHeader>
-      <PostContent>{post.content}</PostContent>
-      {post.image && <PostImage source={{ uri: post.image }} />}
-      <PostFooter>
-        <LikeButton onPress={() => console.log("Liked!")}>
+      </View>
+      <Text style={styles.postContent}>{post.content}</Text>
+      {post.image && <Image source={{ uri: post.image }} style={styles.postImage} />}
+      <View style={styles.postFooter}>
+        <TouchableOpacity style={styles.likeButton} onPress={() => console.log("Liked!")}>
           <FontAwesome name="heart-o" size={24} color="black" />
-          <Text className="ml-2">{post.likes}</Text>
-        </LikeButton>
-        <CommentButton onPress={() => console.log("Post your comment!")} className="p-5">
+          <Text style={styles.iconText}>{post.likes}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.commentButton} onPress={() => console.log("Post your comment!")}>
           <FontAwesome name="comment-o" size={24} color="black" />
-          <Text className="ml-2 p-2">{post.comments}</Text>
-        </CommentButton>
-        <ShareButton onPress={() => console.log("Share with your friends!!")}>
+          <Text style={styles.iconText}>{post.comments}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.shareButton} onPress={() => console.log("Share with your friends!!")}>
           <FontAwesome name="share" size={24} color="black" />
-          <Text className="ml-2">Share</Text>
-        </ShareButton>
-      </PostFooter>
-    </PostContainer>
-  
+          <Text style={styles.iconText}>Share</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
+};
+
+const styles = {
+  postContainer: {
+    padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    marginBottom: 16,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 16,
+  },
+  userName: {
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  postTime: {
+    color: '#888',
+    fontSize: 14,
+  },
+  postContent: {
+    marginBottom: 16,
+    fontSize: 16,
+  },
+  postImage: {
+    width: '100%',
+    height: 240,
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+  postFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  likeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconText: {
+    marginLeft: 8,
+    fontSize: 16,
+  },
 };
 
 export default SocialMediaPost;

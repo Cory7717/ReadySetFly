@@ -1,23 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
-import { styled } from 'nativewind';
-import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { View, Text, TextInput, TouchableOpacity, FlatList, Alert, StyleSheet } from 'react-native';
+import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { FontAwesome } from '@expo/vector-icons';
-
-// Styled components
-const Container = styled(View, 'flex-1 bg-gray-100 p-4');
-const CommentContainer = styled(View, 'bg-white p-4 mb-2 rounded-lg shadow');
-const CommentInput = styled(TextInput, 'border border-gray-300 p-2 rounded-lg mb-2');
-const CommentButton = styled(TouchableOpacity, 'bg-blue-500 p-2 rounded-lg');
-const CommentButtonText = styled(Text, 'text-white text-center');
 
 // CommentsScreen Component
 const CommentsScreen = () => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
-  const navigation = useNavigation();
   const route = useRoute();
   const { postId } = route.params;
 
@@ -56,30 +46,70 @@ const CommentsScreen = () => {
   };
 
   const renderItem = ({ item }) => (
-    <CommentContainer>
-      <Text style={{ fontWeight: 'bold' }}>{item.userName}</Text>
+    <View style={styles.commentContainer}>
+      <Text style={styles.commentUserName}>{item.userName}</Text>
       <Text>{item.text}</Text>
-    </CommentContainer>
+    </View>
   );
 
   return (
-    <Container>
+    <View style={styles.container}>
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListEmptyComponent={<Text>No comments yet.</Text>}
       />
-      <CommentInput
+      <TextInput
+        style={styles.commentInput}
         placeholder="Add a comment..."
         value={newComment}
         onChangeText={setNewComment}
       />
-      <CommentButton onPress={handleAddComment}>
-        <CommentButtonText>Add Comment</CommentButtonText>
-      </CommentButton>
-    </Container>
+      <TouchableOpacity style={styles.commentButton} onPress={handleAddComment}>
+        <Text style={styles.commentButtonText}>Add Comment</Text>
+      </TouchableOpacity>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f3f3f3',
+    padding: 16,
+  },
+  commentContainer: {
+    backgroundColor: 'white',
+    padding: 16,
+    marginBottom: 10,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  commentUserName: {
+    fontWeight: 'bold',
+  },
+  commentInput: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  commentButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  commentButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+});
 
 export default CommentsScreen;

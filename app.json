@@ -5,27 +5,33 @@
     "version": "1.0.0",
     "scheme": "scheme",
     "orientation": "portrait",
-    "icon": "./Assets/icon.png/",
+    "icon": "./Assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./Assets/images/fulllogo_transparent.png",
       "resizeMode": "contain",
-      "backgroundColor": "#fff"
+      "backgroundColor": "#ffffff"
     },
-
     "assetBundlePatterns": ["**/*"],
-
     "ios": {
-      "supportsTablet": true
-     
+      "supportsTablet": true,
+      "bundleIdentifier": "com.readysetfly.rsf",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to allow you to share photos with your friends."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundImage": "./Assets//images/fulllogo_transparent.png",
-        "foregroundImage": "",
-        "backgroundColor": "#fff"
+        "foregroundImage": "./Assets/icon.png",
+        "backgroundImage": "./Assets/images/fulllogo_transparent.png",
+        "backgroundColor": "#ffffff"
       },
-      "package": "com.readysetfly.rsf"
+      "package": "com.readysetfly.rsf",
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -35,10 +41,10 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses you photos to let you share them with your friends."
-          
+          "photosPermission": "The app accesses your photos to let you share them with your friends."
         }
       ]
-    ]
+    ],
+    "jsEngine": "hermes"
   }
 }

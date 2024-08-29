@@ -85,8 +85,8 @@ const Classifieds = () => {
 
     const currentTime = new Date();
 
-    querySnapshot.forEach(async (doc) => {
-      const listing = doc.data();
+    querySnapshot.forEach(async (document) => {
+      const listing = document.data();
       const createdAt = listing.createdAt ? listing.createdAt.toDate() : null;
 
       if (createdAt) {
@@ -96,7 +96,7 @@ const Classifieds = () => {
         );
 
         if (currentTime > expiryDate) {
-          await deleteDoc(doc.ref);
+          await deleteDoc(document.ref);
         }
       }
     });
@@ -146,19 +146,19 @@ const Classifieds = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 4],
       quality: 1,
     });
 
     if (!result.canceled) {
-      setImages([...images, result.assets[0].uri]);
+      setImages([...images, result.uri]);
     }
   };
 
   const onSubmitMethod = (values) => {
-    setLoading(false);
+    setLoading(true);
     const selectedPackagePrice = pricingPackages[selectedPricing];
     const totalWithTax = (selectedPackagePrice * 1.0825).toFixed(2);
     setTotalCost(totalWithTax);
@@ -168,8 +168,6 @@ const Classifieds = () => {
 
   const handleCompletePayment = async () => {
     try {
-      setLoading(true);
-
       const newListing = {
         ...listingDetails,
         price: listingDetails.price,
@@ -258,7 +256,7 @@ const Classifieds = () => {
     const { name, email, phone, description, location } = values;
 
     const emailOptions = {
-      recipients: ["coryarmer@gmail.com"],
+      recipients: ["broker@example.com"],
       subject: "Contact Broker Form Submission",
       body: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nDescription: ${description}\nLocation: ${location}`,
     };
@@ -277,67 +275,107 @@ const Classifieds = () => {
     <TouchableOpacity
       key={item}
       onPress={() => setSelectedCategory(item)}
-      className={`p-2 ${
-        selectedCategory === item ? "bg-gray-500" : "bg-gray-200"
-      } rounded-md mr-2`}
+      style={{
+        padding: 8,
+        backgroundColor:
+          selectedCategory === item ? "#a0aec0" : "#e2e8f0",
+        borderRadius: 8,
+        marginRight: 8,
+      }}
     >
-      <Text className="text-sm font-bold">{item}</Text>
+      <Text style={{ fontSize: 14, fontWeight: "bold" }}>{item}</Text>
     </TouchableOpacity>
   );
 
   const renderListingItem = ({ item }) => (
     <TouchableOpacity
       onPress={() => handleListingPress(item)}
-      className="flex-row justify-between items-center p-4 bg-gray-200 rounded-md mb-2"
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 16,
+        backgroundColor: "#e2e8f0",
+        borderRadius: 8,
+        marginBottom: 8,
+      }}
     >
-      <View className="flex-1">
-        <Text className="text-lg font-bold">{item.title}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.title}</Text>
         <Text>${item.price} per hour</Text>
         <Text numberOfLines={4}>{item.description}</Text>
       </View>
       {item.images && item.images[0] && (
         <Image
           source={{ uri: item.images[0] }}
-          className="w-24 h-24 ml-3 rounded-lg"
+          style={{
+            width: 96,
+            height: 96,
+            marginLeft: 12,
+            borderRadius: 8,
+          }}
         />
       )}
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
       <ImageBackground
         source={wingtipClouds}
-        className="h-56"
+        style={{ height: 224 }}
         resizeMode="cover"
       >
-        <View className="flex-row justify-between items-center p-4">
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: 16,
+          }}
+        >
           <View>
-            <Text className="text-sm text-white">Welcome</Text>
-            <Text className="text-lg font-bold text-white">
+            <Text style={{ fontSize: 14, color: "white" }}>Welcome</Text>
+            <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
               {user?.fullName}
             </Text>
           </View>
           <TouchableOpacity
             onPress={() => setContactModalVisible(true)}
-            className="bg-white bg-opacity-50 rounded-full px-4 py-2"
+            style={{
+              backgroundColor: "white",
+              opacity: 0.5,
+              borderRadius: 50,
+              paddingVertical: 8,
+              paddingHorizontal: 16,
+            }}
           >
-            <Text className="text-gray-900">Contact Broker</Text>
+            <Text style={{ color: "#2d3748" }}>Contact Broker</Text>
           </TouchableOpacity>
         </View>
       </ImageBackground>
 
-      <View className="flex-1 p-4">
+      <View style={{ flex: 1, padding: 16 }}>
         {/* Filter Button */}
-        <View className="flex-row justify-between mb-4">
-          <Text className="text-lg text-gray-800">
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
+          <Text style={{ fontSize: 18, color: "#2d3748" }}>
             Filter by location or Aircraft Make
           </Text>
           <TouchableOpacity
             onPress={() => setFilterModalVisible(true)}
-            className="bg-gray-200 p-2 rounded-full"
+            style={{
+              backgroundColor: "#e2e8f0",
+              padding: 8,
+              borderRadius: 50,
+            }}
           >
-            <Ionicons name="filter" size={24} color="gray" />
+            <Ionicons name="filter" size={24} color="#4a5568" />
           </TouchableOpacity>
         </View>
 
@@ -348,19 +386,33 @@ const Classifieds = () => {
           horizontal
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
-          className="mb-4"
-          nestedScrollEnabled={true}
+          style={{ marginBottom: 16 }}
         />
 
-        <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
+        <Text
+          style={{
+            fontSize: 24,
+            fontWeight: "bold",
+            marginBottom: 16,
+            color: "#2d3748",
+            textAlign: "center",
+          }}
+        >
           Aircraft Marketplace
         </Text>
 
         <TouchableOpacity
           onPress={() => setModalVisible(true)}
-          className="bg-red-500 rounded-full py-3 mb-6"
+          style={{
+            backgroundColor: "#f56565",
+            borderRadius: 50,
+            paddingVertical: 12,
+            marginBottom: 24,
+          }}
         >
-          <Text className="text-white text-center font-bold">Add Listing</Text>
+          <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+            Add Listing
+          </Text>
         </TouchableOpacity>
 
         {filteredListings.length > 0 ? (
@@ -371,7 +423,9 @@ const Classifieds = () => {
             nestedScrollEnabled={true}
           />
         ) : (
-          <Text className="text-center text-gray-700">No listings available</Text>
+          <Text style={{ textAlign: "center", color: "#4a5568" }}>
+            No listings available
+          </Text>
         )}
       </View>
 
@@ -382,37 +436,68 @@ const Classifieds = () => {
         visible={filterModalVisible}
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-11/12 max-w-lg">
-            <Text className="text-2xl font-bold mb-4 text-center">
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 24,
+              padding: 24,
+              width: "90%",
+              maxWidth: 320,
+            }}
+          >
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
               Filter Listings
             </Text>
             <TextInput
               placeholder="Aircraft Make"
               onChangeText={(value) => setFilter({ ...filter, make: value })}
               value={filter.make}
-              className="border-b border-gray-300 mb-4 p-2"
+              style={{
+                borderBottomWidth: 1,
+                borderBottomColor: "#cbd5e0",
+                marginBottom: 16,
+                padding: 8,
+              }}
             />
             <TextInput
               placeholder="Location (City, State or Airport Identifier)"
-              onChangeText={(value) =>
-                setFilter({ ...filter, location: value })
-              }
+              onChangeText={(value) => setFilter({ ...filter, location: value })}
               value={filter.location}
-              className="border-b border-gray-300 mb-4 p-2"
+              style={{
+                borderBottomWidth: 1,
+                borderBottomColor: "#cbd5e0",
+                marginBottom: 16,
+                padding: 8,
+              }}
             />
-            <View className="flex-row justify-between">
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <TouchableOpacity
                 onPress={() => setFilterModalVisible(false)}
-                className="bg-gray-300 p-3 rounded-lg"
+                style={{
+                  backgroundColor: "#e2e8f0",
+                  padding: 12,
+                  borderRadius: 8,
+                }}
               >
-                <Text className="text-center text-gray-700">Cancel</Text>
+                <Text style={{ textAlign: "center", color: "#4a5568" }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={applyFilter}
-                className="bg-blue-500 p-3 rounded-lg"
+                style={{
+                  backgroundColor: "#3182ce",
+                  padding: 12,
+                  borderRadius: 8,
+                }}
               >
-                <Text className="text-center text-white">Apply Filters</Text>
+                <Text style={{ textAlign: "center", color: "white" }}>Apply Filters</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -426,14 +511,40 @@ const Classifieds = () => {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}
+        >
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            className="flex-1 justify-center items-center w-full"
+            style={{ flex: 1, justifyContent: "center", alignItems: "center", width: "100%" }}
           >
-            <ScrollView className="w-full max-w-lg" nestedScrollEnabled={true}>
-              <View className="bg-white rounded-3xl p-6 w-full shadow-xl">
-                <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              style={{ width: "100%", maxWidth: 320 }}
+              nestedScrollEnabled={true}
+            >
+              <View
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: 24,
+                  padding: 24,
+                  width: "100%",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                }}
+              >
+                <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
                   Submit Your Listing
                 </Text>
 
@@ -463,7 +574,13 @@ const Classifieds = () => {
                         onChangeText={handleChange("title")}
                         onBlur={handleBlur("title")}
                         value={values.title}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
                       />
                       <TextInput
                         placeholder="Price"
@@ -471,7 +588,13 @@ const Classifieds = () => {
                         onBlur={handleBlur("price")}
                         value={values.price}
                         keyboardType="default"
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
                       />
                       <TextInput
                         placeholder="Description"
@@ -480,21 +603,39 @@ const Classifieds = () => {
                         value={values.description}
                         multiline
                         numberOfLines={4}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
                       />
                       <TextInput
                         placeholder="City"
                         onChangeText={handleChange("city")}
                         onBlur={handleBlur("city")}
                         value={values.city}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
                       />
                       <TextInput
                         placeholder="State"
                         onChangeText={handleChange("state")}
                         onBlur={handleBlur("state")}
                         value={values.state}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
                       />
                       <TextInput
                         placeholder="Contact Email (Required)"
@@ -502,7 +643,13 @@ const Classifieds = () => {
                         onBlur={handleBlur("email")}
                         value={values.email}
                         keyboardType="email-address"
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
                       />
                       <TextInput
                         placeholder="Phone Number (Optional)"
@@ -510,21 +657,29 @@ const Classifieds = () => {
                         onBlur={handleBlur("phone")}
                         value={values.phone}
                         keyboardType="phone-pad"
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
                       />
 
-                      <Text className="mb-2">Category</Text>
+                      <Text style={{ marginBottom: 8, color: "#2d3748", fontWeight: "bold" }}>
+                        Category
+                      </Text>
                       <FlatList
                         data={categories}
                         renderItem={renderCategoryItem}
                         horizontal
                         keyExtractor={(item) => item}
                         showsHorizontalScrollIndicator={false}
-                        className="mb-4"
+                        style={{ marginBottom: 16 }}
                         nestedScrollEnabled={true}
                       />
 
-                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
+                      <Text style={{ marginBottom: 8, marginTop: 16, color: "#2d3748", fontWeight: "bold" }}>
                         Upload Images
                       </Text>
                       <FlatList
@@ -534,7 +689,12 @@ const Classifieds = () => {
                           <Image
                             key={index}
                             source={{ uri: item }}
-                            className="w-24 h-24 mr-2 rounded-lg"
+                            style={{
+                              width: 96,
+                              height: 96,
+                              marginRight: 8,
+                              borderRadius: 8,
+                            }}
                           />
                         )}
                         keyExtractor={(item, index) => index.toString()}
@@ -542,31 +702,42 @@ const Classifieds = () => {
                       />
                       <TouchableOpacity
                         onPress={pickImage}
-                        className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                        style={{
+                          backgroundColor: "#edf2f7",
+                          paddingVertical: 8,
+                          paddingHorizontal: 16,
+                          borderRadius: 50,
+                          marginTop: 8,
+                          marginBottom: 16,
+                        }}
                       >
-                        <Text className="text-center text-gray-800">
+                        <Text style={{ textAlign: "center", color: "#2d3748" }}>
                           {images.length >= 7
                             ? "Maximum 7 Images"
                             : "Add Image"}
                         </Text>
                       </TouchableOpacity>
 
-                      <Text className="mb-2 text-gray-900 font-bold">
+                      <Text style={{ marginBottom: 8, color: "#2d3748", fontWeight: "bold" }}>
                         Select Pricing Package
                       </Text>
-                      <View className="flex-row justify-between mb-4">
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
                         {Object.keys(pricingPackages).map((key) => (
                           <TouchableOpacity
                             key={key}
                             onPress={() => setSelectedPricing(key)}
-                            className={`p-2 border rounded-lg ${
-                              selectedPricing === key
-                                ? "border-blue-500"
-                                : "border-gray-300"
-                            }`}
+                            style={{
+                              padding: 8,
+                              borderWidth: 1,
+                              borderRadius: 8,
+                              borderColor:
+                                selectedPricing === key
+                                  ? "#3182ce"
+                                  : "#cbd5e0",
+                            }}
                           >
-                            <Text className="text-center">{key}</Text>
-                            <Text className="text-center">
+                            <Text style={{ textAlign: "center" }}>{key}</Text>
+                            <Text style={{ textAlign: "center" }}>
                               ${pricingPackages[key]}
                             </Text>
                           </TouchableOpacity>
@@ -578,9 +749,13 @@ const Classifieds = () => {
                       ) : (
                         <TouchableOpacity
                           onPress={handleSubmit}
-                          className="bg-red-500 py-3 px-6 rounded-full"
+                          style={{
+                            backgroundColor: "#f56565",
+                            paddingVertical: 12,
+                            borderRadius: 50,
+                          }}
                         >
-                          <Text className="text-white text-center font-bold">
+                          <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
                             Submit Listing
                           </Text>
                         </TouchableOpacity>
@@ -591,9 +766,16 @@ const Classifieds = () => {
 
                 <TouchableOpacity
                   onPress={() => setModalVisible(false)}
-                  className="mt-4 py-2 rounded-full bg-gray-200"
+                  style={{
+                    marginTop: 16,
+                    paddingVertical: 8,
+                    borderRadius: 50,
+                    backgroundColor: "#e2e8f0",
+                  }}
                 >
-                  <Text className="text-center text-gray-800">Cancel</Text>
+                  <Text style={{ textAlign: "center", color: "#2d3748" }}>
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -608,9 +790,23 @@ const Classifieds = () => {
         visible={detailsModalVisible}
         onRequestClose={() => setDetailsModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-11/12">
-            <View className="flex-row justify-between">
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 24,
+              padding: 24,
+              width: "90%",
+            }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <TouchableOpacity
                 onPress={() =>
                   setCurrentImageIndex(
@@ -618,9 +814,9 @@ const Classifieds = () => {
                       selectedListing.images.length
                   )
                 }
-                className="p-2"
+                style={{ padding: 8 }}
               >
-                <Ionicons name="arrow-back-circle" size={32} color="gray" />
+                <Ionicons name="arrow-back-circle" size={32} color="#4a5568" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() =>
@@ -628,50 +824,69 @@ const Classifieds = () => {
                     (currentImageIndex + 1) % selectedListing.images.length
                   )
                 }
-                className="p-2"
+                style={{ padding: 8 }}
               >
-                <Ionicons name="arrow-forward-circle" size={32} color="gray" />
+                <Ionicons
+                  name="arrow-forward-circle"
+                  size={32}
+                  color="#4a5568"
+                />
               </TouchableOpacity>
             </View>
             {selectedListing && (
               <>
-                <Text className="text-xl font-bold mb-4">
+                <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 16 }}>
                   {selectedListing.title}
                 </Text>
                 <Image
                   source={{ uri: selectedListing.images[currentImageIndex] }}
-                  className="w-full h-64 rounded-lg mb-4"
+                  style={{
+                    width: "100%",
+                    height: 256,
+                    borderRadius: 8,
+                    marginBottom: 16,
+                  }}
                 />
-                <ScrollView className="h-64">
-                  <Text className="text-lg mb-2">
+                <ScrollView style={{ height: 256 }}>
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
                     Price: ${selectedListing.price}
                   </Text>
-                  <Text className="text-lg mb-2">
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
                     Description: {selectedListing.description}
                   </Text>
-                  <Text className="text-lg mb-2">
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
                     Location: {selectedListing.city}, {selectedListing.state}
                   </Text>
                 </ScrollView>
-                <View className="flex-row justify-between mt-4">
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
                   <TouchableOpacity
                     onPress={handleEditListing}
-                    className="bg-green-500 p-3 rounded-lg"
+                    style={{
+                      backgroundColor: "#48bb78",
+                      padding: 12,
+                      borderRadius: 8,
+                    }}
                   >
-                    <Text className="text-white text-center">Edit</Text>
+                    <Text style={{ color: "white", textAlign: "center" }}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleDeleteListing}
-                    className="bg-red-500 p-3 rounded-lg"
+                    style={{
+                      backgroundColor: "#f56565",
+                      padding: 12,
+                      borderRadius: 8,
+                    }}
                   >
-                    <Text className="text-white text-center">Delete</Text>
+                    <Text style={{ color: "white", textAlign: "center" }}>Delete</Text>
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity
                   onPress={() => setDetailsModalVisible(false)}
-                  className="mt-4"
+                  style={{ marginTop: 16 }}
                 >
-                  <Text className="text-center text-gray-500">Close</Text>
+                  <Text style={{ textAlign: "center", color: "#a0aec0" }}>
+                    Close
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
@@ -688,7 +903,7 @@ const Classifieds = () => {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1 justify-center items-center"
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
           <ScrollView
             contentContainerStyle={{
@@ -696,11 +911,23 @@ const Classifieds = () => {
               justifyContent: "center",
               alignItems: "center",
             }}
-            className="w-11/12"
+            style={{ width: "90%" }}
             nestedScrollEnabled={true}
           >
-            <View className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg">
-              <Text className="text-2xl font-bold mb-4 text-center">
+            <View
+              style={{
+                backgroundColor: "white",
+                borderRadius: 16,
+                padding: 24,
+                width: "100%",
+                maxWidth: 320,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+              }}
+            >
+              <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
                 Contact Broker
               </Text>
 
@@ -726,7 +953,12 @@ const Classifieds = () => {
                       onChangeText={handleChange("name")}
                       onBlur={handleBlur("name")}
                       value={values.name}
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="Email"
@@ -734,7 +966,12 @@ const Classifieds = () => {
                       onBlur={handleBlur("email")}
                       value={values.email}
                       keyboardType="email-address"
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="Phone Number"
@@ -742,7 +979,12 @@ const Classifieds = () => {
                       onBlur={handleBlur("phone")}
                       value={values.phone}
                       keyboardType="phone-pad"
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="Brief Description of Aircraft"
@@ -751,14 +993,24 @@ const Classifieds = () => {
                       value={values.description}
                       multiline
                       numberOfLines={3}
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="Location (Home Airport)"
                       onChangeText={handleChange("location")}
                       onBlur={handleBlur("location")}
                       value={values.location}
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
 
                     {loading ? (
@@ -766,17 +1018,25 @@ const Classifieds = () => {
                     ) : (
                       <TouchableOpacity
                         onPress={handleSubmit}
-                        className="bg-blue-500 p-2 rounded-lg"
+                        style={{
+                          backgroundColor: "#3182ce",
+                          padding: 12,
+                          borderRadius: 8,
+                        }}
                       >
-                        <Text className="text-white text-center">Submit</Text>
+                        <Text style={{ color: "white", textAlign: "center" }}>
+                          Submit
+                        </Text>
                       </TouchableOpacity>
                     )}
 
                     <TouchableOpacity
                       onPress={() => setContactModalVisible(false)}
-                      className="mt-4"
+                      style={{ marginTop: 16 }}
                     >
-                      <Text className="text-center text-gray-500">Cancel</Text>
+                      <Text style={{ textAlign: "center", color: "#a0aec0" }}>
+                        Cancel
+                      </Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -795,7 +1055,7 @@ const Classifieds = () => {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1 justify-center items-center"
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
           <ScrollView
             contentContainerStyle={{
@@ -803,11 +1063,23 @@ const Classifieds = () => {
               justifyContent: "center",
               alignItems: "center",
             }}
-            className="w-11/12"
+            style={{ width: "90%" }}
             nestedScrollEnabled={true}
           >
-            <View className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg">
-              <Text className="text-2xl font-bold mb-4 text-center">
+            <View
+              style={{
+                backgroundColor: "white",
+                borderRadius: 16,
+                padding: 24,
+                width: "100%",
+                maxWidth: 320,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+              }}
+            >
+              <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
                 Edit Your Listing
               </Text>
 
@@ -838,7 +1110,12 @@ const Classifieds = () => {
                       onChangeText={handleChange("title")}
                       onBlur={handleBlur("title")}
                       value={values.title}
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="Price"
@@ -846,7 +1123,12 @@ const Classifieds = () => {
                       onBlur={handleBlur("price")}
                       value={values.price}
                       keyboardType="default"
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="Description"
@@ -854,21 +1136,36 @@ const Classifieds = () => {
                       onBlur={handleBlur("description")}
                       value={values.description}
                       multiline
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="City"
                       onChangeText={handleChange("city")}
                       onBlur={handleBlur("city")}
                       value={values.city}
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="State"
                       onChangeText={handleChange("state")}
                       onBlur={handleBlur("state")}
                       value={values.state}
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="Contact Email (Required)"
@@ -876,7 +1173,12 @@ const Classifieds = () => {
                       onBlur={handleBlur("email")}
                       value={values.email}
                       keyboardType="email-address"
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
                     <TextInput
                       placeholder="Phone Number (Optional)"
@@ -884,10 +1186,15 @@ const Classifieds = () => {
                       onBlur={handleBlur("phone")}
                       value={values.phone}
                       keyboardType="phone-pad"
-                      className="border-b border-gray-300 mb-4 p-2"
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#cbd5e0",
+                        marginBottom: 16,
+                        padding: 8,
+                      }}
                     />
 
-                    <Text className="mb-2">Category</Text>
+                    <Text style={{ marginBottom: 8 }}>Category</Text>
                     <FlatList
                       data={categories}
                       renderItem={renderCategoryItem}
@@ -897,7 +1204,7 @@ const Classifieds = () => {
                       nestedScrollEnabled={true}
                     />
 
-                    <Text className="mb-2 mt-4">Upload Images</Text>
+                    <Text style={{ marginBottom: 8, marginTop: 16 }}>Upload Images</Text>
                     <FlatList
                       data={images}
                       horizontal
@@ -905,7 +1212,12 @@ const Classifieds = () => {
                         <Image
                           key={index}
                           source={{ uri: item }}
-                          className="w-20 h-20 mr-2 rounded-lg"
+                          style={{
+                            width: 80,
+                            height: 80,
+                            marginRight: 8,
+                            borderRadius: 8,
+                          }}
                         />
                       )}
                       keyExtractor={(item, index) => index.toString()}
@@ -913,9 +1225,15 @@ const Classifieds = () => {
                     />
                     <TouchableOpacity
                       onPress={pickImage}
-                      className="bg-gray-300 p-2 rounded-lg mt-2 mb-4"
+                      style={{
+                        backgroundColor: "#e2e8f0",
+                        padding: 8,
+                        borderRadius: 8,
+                        marginTop: 8,
+                        marginBottom: 16,
+                      }}
                     >
-                      <Text className="text-center text-black">
+                      <Text style={{ textAlign: "center", color: "#2d3748" }}>
                         {images.length >= 7 ? "Maximum 7 Images" : "Add Image"}
                       </Text>
                     </TouchableOpacity>
@@ -925,9 +1243,13 @@ const Classifieds = () => {
                     ) : (
                       <TouchableOpacity
                         onPress={handleSubmit}
-                        className="bg-blue-500 p-2 rounded-lg"
+                        style={{
+                          backgroundColor: "#3182ce",
+                          padding: 12,
+                          borderRadius: 8,
+                        }}
                       >
-                        <Text className="text-white text-center">
+                        <Text style={{ color: "white", textAlign: "center" }}>
                           Save Changes
                         </Text>
                       </TouchableOpacity>
@@ -935,9 +1257,11 @@ const Classifieds = () => {
 
                     <TouchableOpacity
                       onPress={() => setEditModalVisible(false)}
-                      className="mt-4"
+                      style={{ marginTop: 16 }}
                     >
-                      <Text className="text-center text-gray-500">Cancel</Text>
+                      <Text style={{ textAlign: "center", color: "#a0aec0" }}>
+                        Cancel
+                      </Text>
                     </TouchableOpacity>
                   </>
                 )}

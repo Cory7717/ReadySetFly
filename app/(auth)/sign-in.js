@@ -5,12 +5,13 @@ import {
   Image,
   TextInput,
   TouchableOpacity,
-  SafeAreaView
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
 } from "react-native";
 import { useSignIn } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { images } from "../../constants";
-import { StatusBar } from "expo-status-bar";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -42,46 +43,46 @@ const SignIn = () => {
   }, [isLoaded, emailAddress, password]);
 
   return (
-    <SafeAreaView className="flex-1 bg-white p-4">
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <View className="flex-1 justify-center items-center">
+      <View style={styles.content}>
         <Image
           source={images.logo}
           resizeMode="contain"
-          className="w-80 h-80 mb-6"
+          style={styles.logo}
         />
-        <Text className="text-2xl font-bold mb-4">
+        <Text style={styles.title}>
           Login to Ready, Set, Fly!
         </Text>
-        <View className="w-3/4 max-w-md space-y-4">
+        <View style={styles.inputContainer}>
           <TextInput
             autoCapitalize="none"
             value={emailAddress}
             placeholder="Email"
             onChangeText={setEmailAddress}
-            className="border border-gray-300 rounded-lg p-3"
+            style={styles.input}
           />
           <TextInput
             value={password}
             placeholder="Password"
             secureTextEntry
             onChangeText={setPassword}
-            className="border border-gray-300 rounded-lg p-3"
+            style={styles.input}
           />
           <TouchableOpacity
             onPress={onSignInPress}
-            className="bg-blue-500 rounded-lg p-3"
+            style={styles.signInButton}
           >
-            <Text className="text-white text-center text-lg font-semibold">
+            <Text style={styles.signInButtonText}>
               Sign In
             </Text>
           </TouchableOpacity>
-          <View className="flex-row justify-center items-center">
-            <Text className="text-lg text-gray-600">
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
               Don't have an account?
             </Text>
             <TouchableOpacity onPress={() => router.push("/sign-up")}>
-              <Text className="text-lg text-blue-600 ml-2 font-semibold">
+              <Text style={styles.signUpText}>
                 Sign up
               </Text>
             </TouchableOpacity>
@@ -91,5 +92,67 @@ const SignIn = () => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 16,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logo: {
+    width: 320,
+    height: 320,
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  inputContainer: {
+    width: '75%',
+    maxWidth: 400,
+    gap: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  signInButton: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 8,
+    padding: 12,
+  },
+  signInButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  footerText: {
+    fontSize: 18,
+    color: '#4b5563',
+  },
+  signUpText: {
+    fontSize: 18,
+    color: '#3b82f6',
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+});
 
 export default SignIn;

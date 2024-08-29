@@ -1,32 +1,56 @@
-import { router } from "expo-router";
-import { View, Text, Image } from "react-native";
+// import React from 'react';
+// import { View, Text, Image, StyleSheet } from 'react-native';
+// import { useNavigation } from '@react-navigation/native';
+// import CustomButton from './CustomButton'; // Uncomment if CustomButton is needed
 
-import { images } from "../constants";
+// import { images } from '../constants';
 
+// const EmptyState = ({ title, subtitle }) => {
+//   const navigation = useNavigation();
 
-{/*import CustomButton from "./CustomButton";*/}
+//   return (
+//     <View style={styles.container}>
+//       <Image source={images.empty} resizeMode="contain" style={styles.image} />
 
-const EmptyState = ({ title, subtitle }) => {
-  return (
-    <View className="flex justify-center items-center px-4">
-      <Image
-        source={images.empty}
-        resizeMode="contain"
-        className="w-[270px] h-[216px]"
-      />
+//       <Text style={styles.title}>{title}</Text>
+//       <Text style={styles.subtitle}>{subtitle}</Text>
 
-      <Text className="text-sm font-pmedium text-gray-100">{title}</Text>
-      <Text className="text-xl text-center font-psemibold text-white mt-2">
-        {subtitle}
-      </Text>
+//       <CustomButton
+//         title="Back to Explore"
+//         handlePress={() => navigation.navigate('Home')}
+//         containerStyles={styles.buttonContainer}
+//       />
+//     </View>
+//   );
+// };
 
-      <CustomButton
-        title="Back to Explore"
-        handlePress={() => router.push("/home")}
-        containerStyles="w-full my-5"
-      />
-    </View>
-  );
-};
+// const styles = StyleSheet.create({
+//   container: {
+//     flex: 1,
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//     paddingHorizontal: 16,
+//   },
+//   image: {
+//     width: 270,
+//     height: 216,
+//   },
+//   title: {
+//     fontSize: 14,
+//     fontFamily: 'Rubik-Medium', // Ensure this font is loaded in your app
+//     color: '#A0AEC0', // Equivalent to text-gray-100
+//   },
+//   subtitle: {
+//     fontSize: 20,
+//     textAlign: 'center',
+//     fontFamily: 'Rubik-SemiBold', // Ensure this font is loaded in your app
+//     color: '#FFFFFF',
+//     marginTop: 8,
+//   },
+//   buttonContainer: {
+//     width: '100%',
+//     marginVertical: 20,
+//   },
+// });
 
-export default EmptyState;
+// export default EmptyState;

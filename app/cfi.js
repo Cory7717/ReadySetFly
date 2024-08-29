@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,10 +8,8 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker } from "react-native-maps"; // Import Marker directly
-import { styled } from "nativewind";
+import MapView, { Marker } from "react-native-maps";
 import { Feather } from "@expo/vector-icons";
 
 const CFI = () => {
@@ -20,10 +19,6 @@ const CFI = () => {
     latitudeDelta: 1,
     longitudeDelta: 1,
   };
-
-  const StyledView = styled(View);
-  const StyledText = styled(Text);
-  const StyledTextInput = styled(TextInput);
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -39,39 +34,35 @@ const CFI = () => {
   );
 
   return (
-    <SafeAreaView className="h-full bg-white sand">
-      <ScrollView contentContainerStyle={{ height: "100%" }}>
-        <StyledView className="flex-row p-5 items-center gap-1">
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.header}>
           <TouchableOpacity>
             <Image
               source={require("../Assets/images/icononly_nobuffer.png")}
-              className="w-12 h-12 rounded-full"
+              style={styles.logo}
             />
           </TouchableOpacity>
           <View>
-            <StyledText className="text-[14px] font-rubikblack ml-5 ">
-              Search for flight instructors
-            </StyledText>
-            <StyledText className="text-xl font-rubikblack ml-5">
-              in your area!
-            </StyledText>
+            <Text style={styles.titleSmall}>Search for flight instructors</Text>
+            <Text style={styles.titleLarge}>in your area!</Text>
           </View>
-        </StyledView>
+        </View>
 
         <TouchableOpacity>
-          <StyledView className="flex-row gap-1 bg-gray-50 rounded-full p-2 ml-5 mr-5 border-gray-300 border-[1px]">
-            <Feather name="search" size={24} color="grey" className="justify-center" />
-            <StyledTextInput
-              className="text-[20px]"
+          <View style={styles.searchContainer}>
+            <Feather name="search" size={24} color="grey" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
               placeholder="Search"
               value={searchQuery}
               onChangeText={(value) => setSearchQuery(value)}
             />
-          </StyledView>
+          </View>
         </TouchableOpacity>
 
-        <StyledView className="flex-1 pt-5">
-          <MapView initialRegion={INITIAL_REGION} className="flex-1 mb-10">
+        <View style={styles.mapContainer}>
+          <MapView initialRegion={INITIAL_REGION} style={styles.map}>
             {filteredSchools.map((school) => (
               <Marker
                 key={school.id}
@@ -80,10 +71,65 @@ const CFI = () => {
               />
             ))}
           </MapView>
-        </StyledView>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    padding: 20,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  titleSmall: {
+    fontSize: 14,
+    fontFamily: 'Rubik-Black',
+    marginLeft: 20,
+  },
+  titleLarge: {
+    fontSize: 20,
+    fontFamily: 'Rubik-Black',
+    marginLeft: 20,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+    padding: 10,
+    marginHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 18,
+  },
+  mapContainer: {
+    flex: 1,
+    paddingTop: 20,
+  },
+  map: {
+    flex: 1,
+    height: 400,
+  },
+});
 
 export default CFI;

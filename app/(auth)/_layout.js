@@ -1,47 +1,37 @@
-import { View, Text, Image, ScrollView } from 'react-native'
+import React from 'react';
+import { View, Text, Image, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import React from 'react'
-import { Stack, Redirect } from 'expo-router'
-import { StatusBar } from 'expo-status-bar';
+import { Stack, Redirect } from 'expo-router';
 import { ClerkProvider } from '@clerk/clerk-expo';
-import { useAuth } from '@clerk/clerk-expo'
-
+import { useAuth } from '@clerk/clerk-expo';
 
 const AuthLayout = () => {
-  const { isSignedIn } = useAuth()
+  const { isSignedIn } = useAuth();
 
   if (isSignedIn) {
-    return <Redirect href={'app\(tabs)\home.js'} />
+    return <Redirect href="app(tabs)/home.js" />;
   }
 
   return (
-   
     <>
-    
-    
-    <Stack>
-    {/* <Stack.Screen
-      name="renter_sign_in"
-      options={{
-        headerShown: false
-      }} /> */}
-      <Stack.Screen
-      name="sign-in"
-      options={{
-        headerShown: false
-      }} />
-      <Stack.Screen
-      name="sign-up"
-      options={{
-        headerShown: false
-      }} />
-    </Stack>
-   
-    <StatusBar backgroundColor='white' />
-  
+      <Stack>
+        <Stack.Screen
+          name="sign-in"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="sign-up"
+          options={{
+            headerShown: false,
+          }}
+        />
+      </Stack>
+      {/* Setting the StatusBar for both iOS and Android */}
+      <StatusBar barStyle="dark-content" backgroundColor="white" />
     </>
-   
-  )
-}
+  );
+};
 
-export default AuthLayout
+export default AuthLayout;

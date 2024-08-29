@@ -1,17 +1,17 @@
-import { View, Text } from 'react-native'
-import React from 'react'
+// import { View, Text } from 'react-native'
+// import React from 'react'
 
-const [bankAccountName, setBankAccountName] = useState("");
-const [bankAccountNumber, setBankAccountNumber] = useState("");
-const [bankRoutingNumber, setBankRoutingNumber] = useState("");
+// const [bankAccountName, setBankAccountName] = useState("");
+// const [bankAccountNumber, setBankAccountNumber] = useState("");
+// const [bankRoutingNumber, setBankRoutingNumber] = useState("");
 
 
-const OwnerProfile = () => {
-  return (
-    <View>
-      <Text>OwnerProfile</Text>
-    </View>
-  )
-}
+// const OwnerProfile = () => {
+//   return (
+//     <View>
+//       <Text>OwnerProfile</Text>
+//     </View>
+//   )
+// }
 
-export default OwnerProfile
+// export default OwnerProfile

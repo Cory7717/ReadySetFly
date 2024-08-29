@@ -1,47 +1,44 @@
+import React, { useEffect } from "react";
 import { Text, View, Image } from "react-native";
-import { useEffect } from "react";
-import { SplashScreen, Stack, Tabs } from "expo-router";
+import { SplashScreen, Stack } from "expo-router";
 import { useFonts } from "expo-font";
-import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/stack";
-import GlobalProvider from "../context/GlobalProvider";
 import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
-import { Slot } from "expo-router"
-import RenterSignin from "../components/RenterSignin";
+import GlobalProvider from "../context/GlobalProvider";
+import * as SecureStore from "expo-secure-store";
 
-
+// Ensure the publishable key is set
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 if (!publishableKey) {
-  throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env')
+  throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env');
 }
+
+// Token cache implementation
 const tokenCache = {
   async getToken(key) {
     try {
-      const item = await SecureStore.getItemAsync(key)
+      const item = await SecureStore.getItemAsync(key);
       if (item) {
-        console.log(`${key} was used 🔐 \n`)
+        console.log(`${key} was used 🔐 \n`);
       } else {
-        console.log('No values stored under key: ' + key)
+        console.log('No values stored under key: ' + key);
       }
-      return item
+      return item;
     } catch (error) {
-      console.error('SecureStore get item error: ', error)
-      await SecureStore.deleteItemAsync(key)
-      return null
+      console.error('SecureStore get item error: ', error);
+      await SecureStore.deleteItemAsync(key);
+      return null;
     }
   },
   async saveToken(key, value) {
     try {
-      return SecureStore.setItemAsync(key, value)
+      return SecureStore.setItemAsync(key, value);
     } catch (err) {
-      return
+      console.error('SecureStore save item error: ', err);
     }
   },
-}
+};
 
 SplashScreen.preventAutoHideAsync();
-
-const App = () => {};
 
 const RootLayout = () => {
   const [fontsLoaded, error] = useFonts({
@@ -61,31 +58,18 @@ const RootLayout = () => {
 
   return (
     <GlobalProvider>
-    <ClerkProvider publishableKey={publishableKey}>
-      <ClerkLoaded>
-      <Stack>
-        {/* <Stack.Navigator> */}
-        
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="(tabs)"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="screens/renter_sign_in"  options={{ headerShown: false }} />
-          <Stack.Screen
-            name="search/[query]"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="cfi" options={{ headerShown: false }} />
-          {/* <Stack.Screen name="renterProfile" options={{ headerShown: true }} /> */}
-        {/* </Stack.Navigator> */}
-        {/* <Stack.Screen name="../PaymentScreen" options={{ headerShown: false }} /> */}
-        </Stack>
-      </ClerkLoaded>
-    </ClerkProvider>
+      <ClerkProvider publishableKey={publishableKey}>
+        <ClerkLoaded>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="screens/renter_sign_in" options={{ headerShown: false }} />
+            <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
+            <Stack.Screen name="cfi" options={{ headerShown: false }} />
+          </Stack>
+        </ClerkLoaded>
+      </ClerkProvider>
     </GlobalProvider>
   );
 };
