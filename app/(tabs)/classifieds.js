@@ -302,7 +302,8 @@ const Classifieds = () => {
     >
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.title}</Text>
-        <Text>${item.price} per hour</Text>
+        {/* Removed 'per hour' text here */}
+        <Text>${item.price}</Text>
         <Text numberOfLines={4}>{item.description}</Text>
       </View>
       {item.images && item.images[0] && (
@@ -848,6 +849,7 @@ const Classifieds = () => {
                   }}
                 />
                 <ScrollView style={{ height: 256 }}>
+                  {/* Removed 'per hour' text here */}
                   <Text style={{ fontSize: 18, marginBottom: 8 }}>
                     Price: ${selectedListing.price}
                   </Text>

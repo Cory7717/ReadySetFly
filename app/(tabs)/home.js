@@ -269,22 +269,24 @@ const Home = ({ navigation }) => {
   );
 
   const renderListingItem = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => handleListingPress(item)}
-      className="flex-row justify-between items-center p-4 bg-gray-200 rounded-md mb-2"
-    >
-      <View className="flex-1">
-        <Text className="text-lg font-bold">{item.airplaneModel}</Text>
-        <Text>${item.ratesPerHour} per hour</Text>
-        <Text numberOfLines={4}>{item.description}</Text>
-      </View>
-      {item.images && item.images[0] && (
-        <Image
-          source={{ uri: item.images[0] }}
-          className="w-24 h-24 ml-3 rounded-lg"
-        />
-      )}
-    </TouchableOpacity>
+    <View style={{ marginBottom: 10 }}>
+      <TouchableOpacity
+        onPress={() => handleListingPress(item)}
+        className="flex-row justify-between items-center p-4 bg-gray-200 rounded-md"
+      >
+        <View className="flex-1">
+          <Text className="text-lg font-bold">{item.airplaneModel}</Text>
+          <Text>${item.ratesPerHour} per hour</Text>
+          <Text numberOfLines={4}>{item.description}</Text>
+        </View>
+        {item.images && item.images[0] && (
+          <Image
+            source={{ uri: item.images[0] }}
+            className="w-24 h-24 ml-3 rounded-lg"
+          />
+        )}
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -337,11 +339,7 @@ const Home = ({ navigation }) => {
         </Text>
 
         {filteredListings.length > 0 ? (
-          <FlatList
-            data={filteredListings}
-            renderItem={renderListingItem}
-            keyExtractor={(item) => item.id}
-          />
+          filteredListings.map((item) => renderListingItem({ item }))
         ) : (
           <Text className="text-center text-gray-700">No listings available</Text>
         )}
