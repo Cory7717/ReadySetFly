@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
-import { collection, onSnapshot, query, orderBy, where, addDoc, updateDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where, addDoc } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import * as ImagePicker from "expo-image-picker";
@@ -29,7 +29,6 @@ const Home = ({ route, navigation }) => {
   const { user } = useUser();
   const stripe = useStripe();
   const [listings, setListings] = useState([]);
-  const [filteredListings, setFilteredListings] = useState([]); // Initialize filteredListings
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedListing, setSelectedListing] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -99,7 +98,6 @@ const Home = ({ route, navigation }) => {
         ...doc.data(),
       }));
       setListings(listingsData);
-      setFilteredListings(listingsData); // Initialize filteredListings with the fetched data
     });
   };
 
@@ -122,172 +120,79 @@ const Home = ({ route, navigation }) => {
     });
   };
 
-  const applyFilter = () => {
-    const lowerCaseMake = filter.make.toLowerCase();
-    const lowerCaseLocation = filter.location.toLowerCase();
+  const handleRentalRequestSubmit = async (rentalDetails) => {
+    try {
+      const messageData = {
+        senderId: user.id,
+        senderName: user.fullName,
+        message: `
+          Rental Request from ${user.fullName}:
+          Aircraft: ${rentalDetails.airplaneModel}
+          Rental Period: ${rentalDetails.rentalPeriod}
+          Total Cost: $${rentalDetails.totalCost}
+          Contact: ${user.email}
+        `,
+        createdAt: new Date(),
+      };
 
-    const filteredData = listings.filter(
-      (listing) =>
-        listing.airplaneModel.toLowerCase().includes(lowerCaseMake) &&
-        (listing.location?.toLowerCase().includes(lowerCaseLocation))
-    );
+      await addDoc(collection(db, "owners", rentalDetails.ownerId, "messages"), messageData);
 
-    setFilteredListings(filteredData);
-    setFilterModalVisible(false);
+      Alert.alert("Request Sent", "Your rental request has been sent to the owner.");
+    } catch (error) {
+      console.error("Error sending rental request: ", error);
+      Alert.alert("Error", "Failed to send rental request to the owner.");
+    }
   };
 
-  const handleListingPress = (listing) => {
-    setSelectedListing(listing);
-    setModalVisible(true);
-  };
+  const handleCompleteRental = async () => {
+    const rentalDetails = {
+      airplaneModel: selectedListing.airplaneModel,
+      rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
+      totalCost: totalCost.total,
+      ownerId: selectedListing.ownerId,
+    };
 
-  const handleCompleteRental = () => {
+    await handleRentalRequestSubmit(rentalDetails);
+
     setModalVisible(false);
     setPaymentModalVisible(true);
   };
 
-  const pickImage = async () => {
-    if (images.length >= 7) {
-      Alert.alert("You can only upload up to 7 images.");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setImages([...images, result.assets[0].uri]);
-    }
-  };
-
-  const pickDocument = async (setDocument) => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "application/pdf",
-    });
-
-    if (result.type === "success") {
-      setDocument(result.uri);
-    }
-  };
-
-  const handleAddListing = async (values) => {
+  const onSubmitListing = async (values) => {
     setLoading(true);
     try {
       const uploadedImages = [];
       for (const image of images) {
-        uploadedImages.push(image);
+        const downloadURL = await uploadFile(image, "airplaneImages");
+        uploadedImages.push(downloadURL);
       }
+
+      const annualProofURL = recentAnnualPdf
+        ? await uploadFile(recentAnnualPdf, "documents")
+        : null;
+      const insuranceProofURL = insurancePdf
+        ? await uploadFile(insurancePdf, "documents")
+        : null;
 
       const newListing = {
         ...values,
-        ownerId: user.id,
         images: uploadedImages,
-        recentAnnualPdf,
-        insurancePdf,
+        currentAnnualPdf: annualProofURL,
+        insurancePdf: insuranceProofURL,
+        ownerId: user.id,
         createdAt: new Date(),
       };
 
       await addDoc(collection(db, "airplanes"), newListing);
-
       Alert.alert("Success", "Your listing has been submitted.");
       setAddListingModalVisible(false);
-
-      if (navigation && typeof navigation.navigate === 'function') {
-        navigation.navigate("UserProfile");
-      } else {
-        console.error("Navigation is undefined or not a function");
-      }
     } catch (error) {
       console.error("Error submitting listing: ", error);
-      Alert.alert("Error", "There was an error submitting your listing.");
+      Alert.alert("Error", `There was an error submitting your listing: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
-
-  const sendRentalRequestNotification = async () => {
-    if (!selectedListing || !user) return;
-
-    try {
-      await addDoc(collection(db, "notifications"), {
-        ownerId: selectedListing.ownerId,
-        message: `You have a new rental request for ${selectedListing.airplaneModel}. Please review the request.`,
-        confirmed: false,
-        renter: {
-          renterId: user.id,
-          renterName: user.fullName,
-          rentalHours,
-          totalCost: totalCost.total,
-        },
-        createdAt: new Date(),
-      });
-
-      Alert.alert("Rental Request Sent", "Your rental request has been sent to the owner for review.");
-    } catch (error) {
-      console.error("Error sending notification: ", error);
-      Alert.alert("Error", "There was an error sending your rental request.");
-    } finally {
-      setPaymentModalVisible(false);
-    }
-  };
-
-  const confirmRentalRequest = async (notificationId) => {
-    try {
-      const notificationRef = doc(db, "notifications", notificationId);
-      await updateDoc(notificationRef, { confirmed: true });
-
-      const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
-        amount: parseInt(totalCost.total * 100),
-        currency: 'usd',
-        paymentMethodTypes: ['card'],
-        confirm: true,
-      });
-
-      if (paymentIntent.status === 'succeeded') {
-        Alert.alert("Payment Successful", "The rental request has been confirmed and payment processed.");
-      } else {
-        Alert.alert("Payment Failed", "The payment could not be completed. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error confirming rental request: ", error);
-      Alert.alert("Error", "There was an error confirming the rental request.");
-    }
-  };
-
-  const renderCategoryItem = ({ item }) => (
-    <TouchableOpacity
-      key={item}
-      onPress={() => setSelectedCategory(item)}
-      className={`p-2 ${selectedCategory === item ? "bg-gray-500" : "bg-gray-200"} rounded-md mr-2`}
-    >
-      <Text className="text-sm font-bold">{item}</Text>
-    </TouchableOpacity>
-  );
-
-  const renderListingItem = ({ item }) => (
-    <View style={{ marginBottom: 10 }} key={item.id}>
-      <TouchableOpacity
-        onPress={() => handleListingPress(item)}
-        className="flex-row justify-between items-center p-4 bg-gray-200 rounded-md"
-      >
-        <View className="flex-1">
-          <Text className="text-lg font-bold">{item.airplaneModel}</Text>
-          <Text>${item.ratesPerHour} per hour</Text>
-          <Text numberOfLines={4}>{item.description}</Text>
-        </View>
-        {item.images && item.images[0] && (
-          <Image
-            source={{ uri: item.images[0] }}
-            className="w-24 h-24 ml-3 rounded-lg"
-          />
-        )}
-      </TouchableOpacity>
-    </View>
-  );
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -327,7 +232,15 @@ const Home = ({ route, navigation }) => {
 
         <FlatList
           data={categories}
-          renderItem={renderCategoryItem}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              key={item}
+              onPress={() => setSelectedCategory(item)}
+              className={`p-2 ${selectedCategory === item ? "bg-gray-500" : "bg-gray-200"} rounded-md mr-2`}
+            >
+              <Text className="text-sm font-bold">{item}</Text>
+            </TouchableOpacity>
+          )}
           horizontal
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
@@ -338,53 +251,75 @@ const Home = ({ route, navigation }) => {
           Available Listings
         </Text>
 
-        {filteredListings.length > 0 ? (
-          filteredListings.map((item) => renderListingItem({ item }))
+        {listings.length > 0 ? (
+          listings.map((item) => (
+            <View style={{ marginBottom: 10 }} key={item.id}>
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedListing(item);
+                  setModalVisible(true);
+                }}
+                className="flex-row justify-between items-center p-4 bg-gray-200 rounded-md"
+              >
+                <View className="flex-1">
+                  <Text className="text-lg font-bold">{item.airplaneModel}</Text>
+                  <Text>${item.ratesPerHour} per hour</Text>
+                  <Text numberOfLines={4}>{item.description}</Text>
+                </View>
+                {item.images && item.images[0] && (
+                  <Image
+                    source={{ uri: item.images[0] }}
+                    className="w-24 h-24 ml-3 rounded-lg"
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+          ))
         ) : (
           <Text className="text-center text-gray-700">No listings available</Text>
         )}
       </ScrollView>
 
-      {/* Filter Modal */}
+      {/* Listing Details Modal */}
       <Modal
         animationType="slide"
         transparent={true}
-        visible={filterModalVisible}
-        onRequestClose={() => setFilterModalVisible(false)}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
       >
         <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-11/12 max-w-lg">
-            <Text className="text-2xl font-bold mb-4 text-center">
-              Filter Listings
-            </Text>
-            <TextInput
-              placeholder="Aircraft Make"
-              onChangeText={(value) => setFilter({ ...filter, make: value })}
-              value={filter.make}
-              className="border-b border-gray-300 mb-4 p-2"
-            />
-            <TextInput
-              placeholder="Location (City, State or Airport Identifier)"
-              onChangeText={(value) =>
-                setFilter({ ...filter, location: value })
-              }
-              value={filter.location}
-              className="border-b border-gray-300 mb-4 p-2"
-            />
-            <View className="flex-row justify-between">
-              <TouchableOpacity
-                onPress={() => setFilterModalVisible(false)}
-                className="bg-gray-300 p-3 rounded-lg"
-              >
-                <Text className="text-center text-gray-700">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={applyFilter}
-                className="bg-blue-500 p-3 rounded-lg"
-              >
-                <Text className="text-center text-white">Apply Filters</Text>
-              </TouchableOpacity>
+          <View className="bg-white rounded-lg p-6">
+            <Text className="text-2xl font-bold mb-4">{selectedListing?.airplaneModel}</Text>
+            <Text className="mb-2">${selectedListing?.ratesPerHour} per hour</Text>
+            <Text className="mb-4">{selectedListing?.description}</Text>
+
+            <View className="flex-row items-center justify-between">
+              <Text className="font-bold text-lg">Rental Hours</Text>
+              <TextInput
+                value={String(rentalHours)}
+                onChangeText={(text) => setRentalHours(Number(text))}
+                keyboardType="numeric"
+                className="border border-gray-300 p-2 rounded-md"
+              />
             </View>
+
+            <View className="mt-4">
+              <Text className="font-bold">Total Cost</Text>
+              <Text>Rental Cost: ${totalCost.rentalCost}</Text>
+              <Text>Booking Fee: ${totalCost.bookingFee}</Text>
+              <Text>Transaction Fee: ${totalCost.transactionFee}</Text>
+              <Text>Sales Tax: ${totalCost.salesTax}</Text>
+              <Text className="font-bold">Total: ${totalCost.total}</Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleCompleteRental}
+              className="bg-blue-500 p-4 rounded-lg mt-4"
+            >
+              <Text className="text-white text-center font-bold">
+                Complete Your Rental Request
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -396,15 +331,22 @@ const Home = ({ route, navigation }) => {
         visible={addListingModalVisible}
         onRequestClose={() => setAddListingModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            className="flex-1 justify-center items-center w-full"
+            style={{ flex: 1, justifyContent: "center", alignItems: "center", width: "100%" }}
           >
-            <ScrollView className="w-full max-w-lg">
-              <View className="bg-white rounded-3xl p-6 w-full shadow-xl">
-                <Text className="text-2xl font-bold mb-6 text-center text-gray-900">
-                  List Your Aircraft
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              style={{ width: "100%", maxWidth: 320 }}
+            >
+              <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
+                <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
+                  Submit Your Listing
                 </Text>
 
                 <Formik
@@ -413,23 +355,18 @@ const Home = ({ route, navigation }) => {
                     description: "",
                     location: "",
                     ratesPerHour: "",
-                    email: "",
+                    minimumHours: "",
                   }}
-                  onSubmit={handleAddListing}
+                  onSubmit={onSubmitListing}
                 >
-                  {({
-                    handleChange,
-                    handleBlur,
-                    handleSubmit,
-                    values,
-                  }) => (
+                  {({ handleChange, handleBlur, handleSubmit, values }) => (
                     <>
                       <TextInput
                         placeholder="Aircraft Make/Model"
                         onChangeText={handleChange("airplaneModel")}
                         onBlur={handleBlur("airplaneModel")}
                         value={values.airplaneModel}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
                         placeholder="Description"
@@ -437,216 +374,55 @@ const Home = ({ route, navigation }) => {
                         onBlur={handleBlur("description")}
                         value={values.description}
                         multiline
-                        numberOfLines={4}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
                         placeholder="Location (City, State)"
                         onChangeText={handleChange("location")}
                         onBlur={handleBlur("location")}
                         value={values.location}
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
                         placeholder="Rates Per Hour ($)"
                         onChangeText={handleChange("ratesPerHour")}
                         onBlur={handleBlur("ratesPerHour")}
                         value={values.ratesPerHour}
-                        keyboardType="numeric"
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
+                        keyboardType="default"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
-                        placeholder="Email (Required)"
-                        onChangeText={handleChange("email")}
-                        onBlur={handleBlur("email")}
-                        value={values.email}
-                        keyboardType="email-address"
-                        className="border-b border-gray-300 mb-4 p-2 text-gray-900"
-                        required
+                        placeholder="Minimum Hour Requirement"
+                        onChangeText={handleChange("minimumHours")}
+                        onBlur={handleBlur("minimumHours")}
+                        value={values.minimumHours}
+                        keyboardType="numeric"
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
 
-                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
-                        Upload Images
-                      </Text>
-                      <FlatList
-                        data={images}
-                        horizontal
-                        renderItem={({ item, index }) => (
-                          <Image
-                            key={index}
-                            source={{ uri: item }}
-                            className="w-24 h-24 mr-2 rounded-lg"
-                          />
-                        )}
-                        keyExtractor={(item, index) => index.toString()}
-                      />
                       <TouchableOpacity
-                        onPress={pickImage}
-                        className="bg-gray-100 py-2 px-4 rounded-full mt-2 mb-4"
+                        onPress={handleSubmit}
+                        style={{ backgroundColor: "#e53e3e", paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
                       >
-                        <Text className="text-center text-gray-800">
-                          {images.length >= 7
-                            ? "Maximum 7 Images"
-                            : "Add Image"}
+                        <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                          Submit Listing
                         </Text>
                       </TouchableOpacity>
-
-                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
-                        Upload Recent Annual Inspection PDF
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => pickDocument(setRecentAnnualPdf)}
-                        className="bg-gray-100 py-2 px-4 rounded-full mb-4"
-                      >
-                        <Text className="text-center text-gray-800">
-                          {recentAnnualPdf ? "PDF Uploaded" : "Upload PDF"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <Text className="mb-2 mt-4 text-gray-900 font-bold">
-                        Upload Proof of Insurance PDF
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => pickDocument(setInsurancePdf)}
-                        className="bg-gray-100 py-2 px-4 rounded-full mb-4"
-                      >
-                        <Text className="text-center text-gray-800">
-                          {insurancePdf ? "PDF Uploaded" : "Upload PDF"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      {loading ? (
-                        <ActivityIndicator size="large" color="#FF5A5F" />
-                      ) : (
-                        <TouchableOpacity
-                          onPress={handleSubmit}
-                          className="bg-red-500 py-3 px-6 rounded-full"
-                        >
-                          <Text className="text-white text-center font-bold">
-                            Submit Listing
-                          </Text>
-                        </TouchableOpacity>
-                      )}
                     </>
                   )}
                 </Formik>
 
                 <TouchableOpacity
                   onPress={() => setAddListingModalVisible(false)}
-                  className="mt-4 py-2 rounded-full bg-gray-200"
+                  style={{ marginTop: 24, paddingVertical: 12, borderRadius: 50, backgroundColor: "#e2e8f0" }}
                 >
-                  <Text className="text-center text-gray-800">Cancel</Text>
+                  <Text style={{ color: "#2d3748", textAlign: "center", fontWeight: "bold" }}>
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
-      {/* Listing Details Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-11/12">
-            {selectedListing && (
-              <>
-                <Text className="text-xl font-bold mb-4">
-                  {selectedListing.airplaneModel}
-                </Text>
-                <Image
-                  source={{ uri: selectedListing.images[0] }}
-                  className="w-full h-64 rounded-lg mb-4"
-                />
-                <ScrollView className="h-64">
-                  <Text className="text-lg mb-2">
-                    Price: ${selectedListing.ratesPerHour} per hour
-                  </Text>
-                  <Text className="text-lg mb-2">
-                    Description: {selectedListing.description}
-                  </Text>
-                  <Text className="text-lg mb-2">
-                    Location: {selectedListing.location}
-                  </Text>
-                </ScrollView>
-                <View className="flex-row justify-between mt-4">
-                  <TouchableOpacity
-                    onPress={handleCompleteRental}
-                    className="bg-green-500 p-3 rounded-lg"
-                  >
-                    <Text className="text-white text-center">Rent Now</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setModalVisible(false)}
-                    className="bg-gray-300 p-3 rounded-lg"
-                  >
-                    <Text className="text-gray-800 text-center">Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Rental Request Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={paymentModalVisible}
-        onRequestClose={() => setPaymentModalVisible(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-3xl p-6 w-11/12">
-            <Text className="text-xl font-bold mb-4">Complete Your Rental Request</Text>
-            {selectedListing && totalCost && (
-              <>
-                <Text className="text-lg mb-2">
-                  Aircraft: {selectedListing.airplaneModel}
-                </Text>
-                <TextInput
-                  placeholder="Number of Hours"
-                  value={rentalHours.toString()}
-                  onChangeText={(value) => setRentalHours(Number(value))}
-                  keyboardType="numeric"
-                  className="border-b border-gray-300 mb-4 p-2"
-                />
-                <Text className="text-lg mb-2">
-                  Rate per Hour: ${selectedListing.ratesPerHour}
-                </Text>
-                <Text className="text-lg mb-2">
-                  Rental Cost: ${totalCost.rentalCost}
-                </Text>
-                <Text className="text-lg mb-2">
-                  6% Booking Fee: ${totalCost.bookingFee}
-                </Text>
-                <Text className="text-lg mb-2">
-                  3% Credit Card Processing Fee: ${totalCost.transactionFee}
-                </Text>
-                <Text className="text-lg mb-2">
-                  8.25% Sales Tax: ${totalCost.salesTax}
-                </Text>
-                <Text className="text-lg font-bold mb-4">
-                  Total Cost: ${totalCost.total}
-                </Text>
-                <TouchableOpacity
-                  onPress={sendRentalRequestNotification}
-                  className="bg-blue-500 p-3 rounded-lg mt-4"
-                >
-                  <Text className="text-white text-center">Submit Rental Request</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setPaymentModalVisible(false)}
-                  className="bg-gray-300 p-3 rounded-lg mt-4"
-                >
-                  <Text className="text-gray-800 text-center">Cancel</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
         </View>
       </Modal>
     </SafeAreaView>

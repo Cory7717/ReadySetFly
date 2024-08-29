@@ -15,16 +15,15 @@ import {
   ImageBackground,
   StatusBar,
 } from 'react-native';
-import { getFirestore, collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { Formik } from 'formik';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import PropellerImage from '../../Assets/images/propeller-image.jpg';
 import wingtipClouds from '../../Assets/images/wingtip_clouds.jpg';
 
-const BookingCalendar = ({ airplaneId, userId }) => {
+const BookingCalendar = ({ airplaneId, ownerId }) => {
   const { user } = useUser();
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
@@ -49,7 +48,7 @@ const BookingCalendar = ({ airplaneId, userId }) => {
   const fetchCompletedRentals = async () => {
     const db = getFirestore();
     const rentalsRef = collection(db, 'orders');
-    const q = query(rentalsRef, where('ownerId', '==', userId), where('status', '==', 'completed'));
+    const q = query(rentalsRef, where('ownerId', '==', ownerId), where('status', '==', 'completed'));
 
     try {
       const querySnapshot = await getDocs(q);
@@ -105,6 +104,31 @@ const BookingCalendar = ({ airplaneId, userId }) => {
     setProfileModalVisible(false);
   };
 
+  const handleSendMessageToOwner = async (rentalDetails) => {
+    const db = getFirestore();
+    try {
+      const message = `
+        Renter Name: ${user.fullName}
+        Contact: ${profileData.contact || 'N/A'}
+        Aircraft: ${rentalDetails.airplaneModel}
+        Rental Period: ${rentalDetails.rentalPeriod}
+        Total Cost: $${rentalDetails.totalCost}
+      `;
+
+      await addDoc(collection(db, 'owners', ownerId, 'messages'), {
+        senderId: user.id,
+        senderName: user.fullName,
+        message,
+        createdAt: new Date(),
+      });
+
+      Alert.alert('Message Sent', 'Your rental request has been sent to the owner.');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Error', 'Failed to send message to the owner.');
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchCompletedRentals();
@@ -131,33 +155,36 @@ const BookingCalendar = ({ airplaneId, userId }) => {
           }}
           resizeMode="cover"
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: 16,
-            }}
-          >
-            <View>
-              <Text style={{ fontSize: 14, color: 'white' }}>Welcome,</Text>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white' }}>
-                {user?.fullName}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => setProfileModalVisible(true)}
+          <SafeAreaView style={{ flex: 1 }}>
+            <View
               style={{
-                backgroundColor: 'white',
-                opacity: 0.5,
-                borderRadius: 50,
-                padding: 8,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingTop: 8, // Add some padding at the top
               }}
             >
-              <Ionicons name="settings-outline" size={28} color="black" />
-            </TouchableOpacity>
-          </View>
+              <View>
+                <Text style={{ fontSize: 14, color: 'white' }}>Welcome,</Text>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white' }}>
+                  {user?.fullName}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setProfileModalVisible(true)}
+                style={{
+                  backgroundColor: 'white',
+                  opacity: 0.5,
+                  borderRadius: 50,
+                  padding: 8,
+                }}
+              >
+                <Ionicons name="settings-outline" size={28} color="black" />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
         </ImageBackground>
 
         <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>

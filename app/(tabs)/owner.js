@@ -27,10 +27,9 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   collection,
   addDoc,
-  doc,
-  setDoc,
   onSnapshot,
   updateDoc,
+  doc,
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -60,27 +59,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   const [achModalVisible, setAchModalVisible] = useState(false);
   const [debitModalVisible, setDebitModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [messageModalVisible, setMessageModalVisible] = useState(false);
-  const [newMessage, setNewMessage] = useState("");
   const [rentalRequests, setRentalRequests] = useState([]);
   const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState(null);
   const { user } = useUser();
   const storage = getStorage();
   const stripe = useStripe();
 
   useEffect(() => {
     if (ownerId) {
-      const messagesRef = collection(db, "owners", ownerId, "messages");
-      const unsubscribeMessages = onSnapshot(messagesRef, (snapshot) => {
-        const messagesData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setMessages(messagesData);
-      });
-
       const rentalRequestsRef = collection(db, "owners", ownerId, "rentalRequests");
       const unsubscribeRequests = onSnapshot(rentalRequestsRef, (snapshot) => {
         const requestsData = snapshot.docs.map((doc) => ({
@@ -91,7 +77,6 @@ const OwnerProfile = ({ ownerId, navigation }) => {
       });
 
       return () => {
-        unsubscribeMessages();
         unsubscribeRequests();
       };
     }
@@ -181,6 +166,8 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         ownerId: user.id,
         createdAt: new Date(),
         boosted: profileData.boostListing,
+        ratesPerHour: profileData.ratesPerHour,
+        minimumHours: profileData.minimumHours,
       };
   
       await addDoc(collection(db, "airplanes"), newListing);
@@ -212,34 +199,6 @@ const OwnerProfile = ({ ownerId, navigation }) => {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (newMessage.trim() === "") {
-      Alert.alert("Message is empty", "Please enter a message to send.");
-      return;
-    }
-
-    try {
-      const messageData = {
-        senderId: user.id,
-        senderName: user.fullName,
-        message: newMessage,
-        createdAt: new Date(),
-      };
-
-      await addDoc(collection(db, "owners", ownerId, "messages"), messageData);
-
-      setNewMessage("");
-      setMessageModalVisible(false);
-      Alert.alert("Message Sent", "Your message has been sent to the owner.");
-    } catch (error) {
-      console.error("Error sending message: ", error);
-      Alert.alert(
-        "Error",
-        `There was an error sending your message: ${error.message}`
-      );
     }
   };
 
@@ -317,26 +276,13 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             }}
           >
             <View>
-              <Text style={{ fontSize: 14, color: "white", marginTop: 1, }}>Good Morning</Text>
+              <Text style={{ fontSize: 14, color: "white", marginTop: 1 }}>Good Morning</Text>
               <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
                 {user?.fullName}
               </Text>
             </View>
 
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity
-                onPress={() => setMessageModalVisible(true)}
-                style={{
-                  backgroundColor: "white",
-                  opacity: 0.5,
-                  borderRadius: 50,
-                  padding: 8,
-                  marginRight: 10,
-                }}
-              >
-                <Ionicons name="chatbox-ellipses-outline" size={28} color="black" />
-              </TouchableOpacity>
-
               <TouchableOpacity
                 onPress={() => setFormVisible(true)}
                 style={{
@@ -354,6 +300,39 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             </View>
           </View>
         </ImageBackground>
+
+        {/* Pressable Area for Viewing Rental Requests */}
+        <TouchableOpacity
+          onPress={() => setRentalRequestModalVisible(true)}
+          style={{
+            marginVertical: 20,
+            paddingVertical: 15,
+            paddingHorizontal: 20,
+            backgroundColor: "#2d3748",
+            borderRadius: 8,
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "center",
+            marginHorizontal: 16,
+          }}
+        >
+          <Text style={{ color: "white", fontWeight: "bold" }}>View Rental Requests</Text>
+          {rentalRequests.length > 0 && (
+            <View
+              style={{
+                backgroundColor: "#e53e3e",
+                borderRadius: 50,
+                marginLeft: 10,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+              }}
+            >
+              <Text style={{ color: "white", fontWeight: "bold" }}>
+                {rentalRequests.length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         <View style={{ marginTop: 32 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, color: "#2d3748", textAlign: "center" }}>
@@ -832,45 +811,6 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         </View>
       </Modal>
 
-      {/* Message Modal */}
-      <Modal
-        visible={messageModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setMessageModalVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
-          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
-              Send a Message to the Owner
-            </Text>
-            <TextInput
-              placeholder="Type your message here"
-              value={newMessage}
-              onChangeText={(text) => setNewMessage(text)}
-              multiline
-              style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-            />
-            <TouchableOpacity
-              onPress={handleSendMessage}
-              style={{ backgroundColor: "#3182ce", paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
-            >
-              <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-                Send Message
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setMessageModalVisible(false)}
-              style={{ marginTop: 24, paddingVertical: 12, borderRadius: 50, backgroundColor: "#e2e8f0" }}
-            >
-              <Text style={{ color: "#2d3748", textAlign: "center", fontWeight: "bold" }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* Rental Request Modal */}
       <Modal
         visible={rentalRequestModalVisible}
@@ -883,32 +823,38 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
               Rental Request
             </Text>
-            {selectedRequest && (
-              <>
-                <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                  Renter: {selectedRequest.renterName}
-                </Text>
-                <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                  Aircraft: {selectedRequest.airplaneModel}
-                </Text>
-                <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                  Total Cost: ${selectedRequest.totalCost}
-                </Text>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
-                  <TouchableOpacity
-                    onPress={() => handleApproveRentalRequest(selectedRequest)}
-                    style={{ backgroundColor: "#48bb78", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
-                  >
-                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Approve</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDenyRentalRequest(selectedRequest)}
-                    style={{ backgroundColor: "#e53e3e", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
-                  >
-                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Deny</Text>
-                  </TouchableOpacity>
+            {rentalRequests.length > 0 ? (
+              rentalRequests.map((request) => (
+                <View key={request.id} style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                    Renter: {request.renterName}
+                  </Text>
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                    Aircraft: {request.airplaneModel}
+                  </Text>
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                    Total Cost: ${request.totalCost}
+                  </Text>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
+                    <TouchableOpacity
+                      onPress={() => handleApproveRentalRequest(request)}
+                      style={{ backgroundColor: "#48bb78", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
+                    >
+                      <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDenyRentalRequest(request)}
+                      style={{ backgroundColor: "#e53e3e", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
+                    >
+                      <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Deny</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </>
+              ))
+            ) : (
+              <Text style={{ color: "#4a5568", textAlign: "center" }}>
+                No rental requests available.
+              </Text>
             )}
             <TouchableOpacity
               onPress={() => setRentalRequestModalVisible(false)}
