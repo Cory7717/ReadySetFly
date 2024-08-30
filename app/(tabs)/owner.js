@@ -43,6 +43,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     ratesPerHour: "",
     minimumHours: "",
     boostListing: false,
+    boostedListing: false, // New state for boosted listing
   });
   const [images, setImages] = useState([]);
   const [currentAnnualPdf, setCurrentAnnualPdf] = useState(null);
@@ -134,12 +135,31 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   };
 
   const uploadFile = async (uri, folder) => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const filename = uri.substring(uri.lastIndexOf("/") + 1);
-    const storageRef = ref(storage, `${folder}/${filename}`);
-    await uploadBytes(storageRef, blob);
-    return await getDownloadURL(storageRef);
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const filename = uri.substring(uri.lastIndexOf("/") + 1);
+      const storageRef = ref(storage, `${folder}/${filename}`);
+      await uploadBytes(storageRef, blob);
+      return await getDownloadURL(storageRef);
+    } catch (error) {
+      if (error.code === "storage/unauthorized") {
+        Alert.alert("Error", "You do not have permission to upload this file.");
+      } else {
+        console.error("Error uploading file: ", error);
+        throw error;
+      }
+    }
+  };
+
+  const sanitizeData = (data) => {
+    const sanitizedData = {};
+    for (const key in data) {
+      if (data[key] !== undefined && data[key] !== null) {
+        sanitizedData[key] = data[key];
+      }
+    }
+    return sanitizedData;
   };
 
   const onSubmitMethod = async (values) => {
@@ -150,42 +170,44 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         const downloadURL = await uploadFile(image, "airplaneImages");
         uploadedImages.push(downloadURL);
       }
-  
+
       const annualProofURL = currentAnnualPdf
         ? await uploadFile(currentAnnualPdf, "documents")
-        : null;
+        : "";
       const insuranceProofURL = insurancePdf
         ? await uploadFile(insurancePdf, "documents")
-        : null;
-  
-      const newListing = {
-        ...values,
-        images: uploadedImages,
-        currentAnnualPdf: annualProofURL,
-        insurancePdf: insuranceProofURL,
+        : "";
+
+      const newListing = sanitizeData({
+        airplaneModel: values.airplaneModel || "", // Ensure non-empty string
+        description: values.description || "",
+        location: values.location || "",
+        ratesPerHour: profileData.ratesPerHour || "0", // Default to "0" if undefined
+        minimumHours: values.minimumHours || "1", // Default to "1" if undefined
+        images: uploadedImages.length > 0 ? uploadedImages : [], // Ensure empty array if no images
+        currentAnnualPdf: annualProofURL || "",
+        insurancePdf: insuranceProofURL || "",
         ownerId: user.id,
         createdAt: new Date(),
-        boosted: profileData.boostListing,
-        ratesPerHour: profileData.ratesPerHour,
-        minimumHours: profileData.minimumHours,
-      };
-  
+        boosted: profileData.boostListing || false,
+        boostedListing: profileData.boostListing ? true : false, // Set boostedListing to true if boostListing is true
+      });
+
       await addDoc(collection(db, "airplanes"), newListing);
-  
-      // Posting the listing directly to the Home screen
+
       navigation.navigate("Home", { newListing });
-  
+
       const updatedListings = [
         ...userListings,
         { ...newListing, id: Math.random().toString() },
       ];
       setUserListings(updatedListings);
-  
+
       Alert.alert("Success", "Your listing has been submitted.");
       setFormVisible(false);
     } catch (error) {
       console.error("Error submitting listing: ", error);
-  
+
       if (error.message.includes('Network request failed')) {
         Alert.alert(
           "Network Error",
@@ -245,6 +267,33 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     setRefreshing(true);
     // Fetch the latest data...
     setRefreshing(false);
+  };
+
+  const handleSendRentalRequest = async (selectedListing, rentalHours) => {
+    if (!selectedListing) return;
+
+    const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
+    const ownerCost = rentalCost - rentalCost * 0.06;
+
+    const messageData = {
+      senderId: user.id,
+      senderName: user.fullName,
+      airplaneModel: selectedListing.airplaneModel,
+      rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
+      totalCost: ownerCost.toFixed(2),
+      contact: user?.email || "noemail@example.com", // Ensure this is not undefined
+      createdAt: new Date(),
+      status: "pending", // Initial status of the request
+      renterName: user.fullName || "Anonymous",
+    };
+
+    try {
+      await addDoc(collection(db, "owners", selectedListing.ownerId, "rentalRequests"), messageData);
+      Alert.alert("Request Sent", "Your rental request has been sent to the owner.");
+    } catch (error) {
+      console.error("Error sending rental request: ", error);
+      Alert.alert("Error", "Failed to send rental request to the owner.");
+    }
   };
 
   return (

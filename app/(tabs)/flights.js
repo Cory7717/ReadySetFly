@@ -90,6 +90,13 @@ const Autocomplete = ({ data, onSelect }) => {
   );
 };
 
+// Utility function to sanitize data
+const sanitizeData = (data) => {
+  return Object.fromEntries(
+    Object.entries(data).filter(([_, v]) => v !== undefined)
+  );
+};
+
 // CreateNewPost Component
 const CreateNewPost = ({ onSubmit, onCancel }) => {
   const [content, setContent] = useState('');
@@ -145,16 +152,20 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
     if (content.trim() || image) {
       const newPost = {
         content,
-        image,
+        image: image || null,  // Ensure image is either a valid URL or null
         userName: user.fullName,
         profileImage: user.imageUrl,
         createdAt: new Date(),
       };
+
+      // Sanitize data to remove undefined fields
+      const sanitizedData = sanitizeData(newPost);
+
       try {
-        await addDoc(collection(db, 'posts'), newPost);
-        onSubmit(newPost);
-        setContent('');
-        setImage(null);
+        await addDoc(collection(db, 'posts'), sanitizedData);
+        onSubmit(sanitizedData);
+        setContent('');  // Clear content after submitting
+        setImage(null);  // Clear image after submitting
       } catch (error) {
         Alert.alert('Error', 'Could not submit post.');
       }
@@ -232,7 +243,6 @@ const Post = ({ post }) => {
             <ProfileImage source={{ uri: post?.profileImage }} />
             <Text style={{ marginLeft: 10, fontSize: 18, fontWeight: 'bold' }}>{post?.userName}</Text>
           </View>
-          {/* Post text now appears above the image */}
           <Text style={{ marginTop: 10 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
           {post?.image && <PostImage source={{ uri: post?.image }} />}
           <PostActions>
@@ -252,7 +262,6 @@ const Post = ({ post }) => {
         </PostContainer>
       </TouchableOpacity>
 
-      {/* Modal for FullScreenPost */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -297,6 +306,7 @@ const MainFeed = () => {
         ...doc.data(),
       }));
       setPosts(fetchedPosts);
+      console.log('Posts updated:', fetchedPosts); // Debugging line
     });
 
     return () => unsubscribe();

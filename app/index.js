@@ -11,16 +11,16 @@ import {
 import { Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-expo';
-import { useGlobalContext } from "../context/GlobalProvider";
+// import { useGlobalContext } from "../context/GlobalProvider";
 import CustomButton from "../components/CustomButton";
 import { images } from "../constants";
 import { router } from 'expo-router';
 
 const App = () => {
   const { user } = useUser();
-  const { isLoading, isLoggedIn } = useGlobalContext();
+  // const { isLoading, isLoggedIn } = useGlobalContext();
 
-  if (!isLoading && isLoggedIn) return <Redirect href="/home" />;
+  // if (!isLoading && isLoggedIn) return <Redirect href="/home" />;
 
   return (
     <SafeAreaView style={styles.container}>

@@ -3,7 +3,7 @@ import { Text, View, Image } from "react-native";
 import { SplashScreen, Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
-import GlobalProvider from "../context/GlobalProvider";
+// import GlobalProvider from "../context/GlobalProvider";
 import * as SecureStore from "expo-secure-store";
 
 // Ensure the publishable key is set
@@ -57,7 +57,7 @@ const RootLayout = () => {
   if (!fontsLoaded && !error) return null;
 
   return (
-    <GlobalProvider>
+   
       <ClerkProvider publishableKey={publishableKey}>
         <ClerkLoaded>
           <Stack>
@@ -70,7 +70,7 @@ const RootLayout = () => {
           </Stack>
         </ClerkLoaded>
       </ClerkProvider>
-    </GlobalProvider>
+   
   );
 };
 
