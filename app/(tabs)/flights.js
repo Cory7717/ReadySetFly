@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   SafeAreaView, 
-  ScrollView, 
   View, 
   Image, 
   Text, 
@@ -12,13 +11,14 @@ import {
   Linking, 
   RefreshControl, 
   Modal,
-  Platform
+  ActivityIndicator, 
+  ScrollView
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import { useUser } from '@clerk/clerk-expo';
-import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, limit, startAfter, getDocs } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Text as RNText } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -156,6 +156,7 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
         userName: user.fullName,
         profileImage: user.imageUrl,
         createdAt: new Date(),
+        userId: user.id,  // Store the user's ID who created the post
       };
 
       // Sanitize data to remove undefined fields
@@ -215,9 +216,19 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
 };
 
 // Post Component
-const Post = ({ post }) => {
+const Post = ({ post, onDelete }) => {
   const navigation = useNavigation();
+  const { user } = useUser();
   const [modalVisible, setModalVisible] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    // For testing purposes, assume the current user is an admin if they have a specific ID
+    const adminUserIds = ['adminUserId1', 'adminUserId2']; // Replace with your admin IDs
+    if (adminUserIds.includes(user?.id)) {
+      setIsAdmin(true);
+    }
+  }, [user]);
 
   const onHashtagPress = (hashtag) => {
     Alert.alert('Hashtag Pressed', `You pressed ${hashtag}`);
@@ -235,6 +246,22 @@ const Post = ({ post }) => {
     }
   };
 
+  const handleDeletePost = async () => {
+    // Optimistically update the UI
+    onDelete(post.id);
+
+    try {
+      await deleteDoc(doc(db, 'posts', post.id));
+      Alert.alert('Post deleted', 'Your post has been deleted.');
+    } catch (error) {
+      console.error('Error deleting post: ', error);
+      Alert.alert('Error', 'There was an error deleting the post.');
+      
+      // Rollback the optimistic update if deletion fails
+      onDelete(null); // Re-fetch or restore the post
+    }
+  };
+
   return (
     <>
       <TouchableOpacity onPress={handlePress}>
@@ -242,6 +269,11 @@ const Post = ({ post }) => {
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             <ProfileImage source={{ uri: post?.profileImage }} />
             <Text style={{ marginLeft: 10, fontSize: 18, fontWeight: 'bold' }}>{post?.userName}</Text>
+            {(user?.id === post?.userId || isAdmin) && (
+              <TouchableOpacity onPress={handleDeletePost} style={{ marginLeft: 'auto' }}>
+                <Feather name="trash" size={24} color="red" />
+              </TouchableOpacity>
+            )}
           </View>
           <Text style={{ marginTop: 10 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
           {post?.image && <PostImage source={{ uri: post?.image }} />}
@@ -293,24 +325,47 @@ const Post = ({ post }) => {
 // Main Feed Component
 const MainFeed = () => {
   const [posts, setPosts] = useState([]);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const postsRef = collection(db, 'posts');
-    const q = query(postsRef, orderBy('createdAt', 'desc'));
+  const PAGE_SIZE = 10;  // Number of posts to load per page
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedPosts = snapshot.docs.map((doc) => ({
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async (loadMore = false) => {
+    setLoading(true);
+
+    let postsRef = collection(db, 'posts');
+    let q = query(postsRef, orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
+
+    if (loadMore && lastVisible) {
+      q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(PAGE_SIZE));
+    }
+
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      const newPosts = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setPosts(fetchedPosts);
-      console.log('Posts updated:', fetchedPosts); // Debugging line
-    });
 
-    return () => unsubscribe();
-  }, []);
+      setPosts((prevPosts) => (loadMore ? [...prevPosts, ...newPosts] : newPosts));
+      setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+    }
+
+    setLoading(false);
+  };
+
+  const handleLoadMore = () => {
+    if (!loading) {
+      fetchPosts(true);
+    }
+  };
 
   const handleCreatePost = () => {
     setIsCreatingPost(true);
@@ -325,10 +380,13 @@ const MainFeed = () => {
     setPosts((prevPosts) => [newPost, ...prevPosts]);
   };
 
+  const handleDeletePost = (postId) => {
+    setPosts((prevPosts) => prevPosts.filter(post => post.id !== postId));
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
-    // Simulate a refresh by refetching posts (or any other logic)
-    setRefreshing(false);
+    fetchPosts().then(() => setRefreshing(false));
   };
 
   return (
@@ -339,13 +397,16 @@ const MainFeed = () => {
           Aviation News and Events
         </Text>
       </Header>
-      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-        {isCreatingPost ? (
-          <CreateNewPost onSubmit={handleSubmitPost} onCancel={handleCancelPost} />
-        ) : (
-          posts.map((post) => <Post key={post.id} post={post} />)
-        )}
-      </ScrollView>
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <Post key={item.id} post={item} onDelete={handleDeletePost} />}
+        ListHeaderComponent={isCreatingPost ? <CreateNewPost onSubmit={handleSubmitPost} onCancel={handleCancelPost} /> : null}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loading && <ActivityIndicator size="large" color="#0000ff" />}
+      />
       {!isCreatingPost && (
         <PostButton onPress={handleCreatePost}>
           <Ionicons name="create" size={24} color="white" />

@@ -1,77 +1,71 @@
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, ScrollView, View, Text, TouchableOpacity, RefreshControl } from 'react-native';
-import { styled } from 'nativewind';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
-import { Ionicons } from '@expo/vector-icons';
-import CreateNewPost from './CreateNewPost';
-import Post from './Post';
+import React, { useState } from 'react';
+import { View, Text, Image, TouchableOpacity, Alert, Modal, ScrollView } from 'react-native';
+import { FontAwesome, Feather } from '@expo/vector-icons';
+import { useUser } from '@clerk/clerk-expo';
+import { useNavigation } from '@react-navigation/native';
 
-// Styled components
-const Container = styled(SafeAreaView, 'flex-1 bg-gray-100');
-const Header = styled(View, 'p-4 bg-white flex-row items-center');
-const PostButton = styled(TouchableOpacity, 'p-4 bg-blue-500 rounded-lg absolute bottom-4 left-4 right-4 flex-row items-center justify-center');
-const PostButtonText = styled(Text, 'text-white text-xl text-center ml-2');
+const Post = ({ post, onEdit, onDelete }) => {
+  const { user } = useUser();
+  const [modalVisible, setModalVisible] = useState(false);
+  const navigation = useNavigation();
 
-const MainFeed = () => {
-  const [posts, setPosts] = useState([]);
-  const [isCreatingPost, setIsCreatingPost] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    const postsRef = collection(db, 'posts');
-    const q = query(postsRef, orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedPosts = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setPosts(fetchedPosts);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const handleCreatePost = () => {
-    setIsCreatingPost(true);
-  };
-
-  const handleCancelPost = () => {
-    setIsCreatingPost(false);
-  };
-
-  const handleSubmitPost = (newPost) => {
-    setIsCreatingPost(false);
-    setPosts((prevPosts) => [newPost, ...prevPosts]);
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    // Simulate a refresh by refetching posts (or any other logic)
-    setRefreshing(false);
+  const handlePress = () => {
+    if (post) {
+      setModalVisible(true);
+    } else {
+      console.error('Post object is undefined or null');
+    }
   };
 
   return (
-    <Container>
-      <Header className='pt-5'>
-        <Text className='text-center text-lg font-bold flex-1'>Social Media App</Text>
-      </Header>
-      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-        {isCreatingPost ? (
-          <CreateNewPost onSubmit={handleSubmitPost} onCancel={handleCancelPost} />
-        ) : (
-          posts.map((post) => <Post key={post.id} post={post} />)
-        )}
-      </ScrollView>
-      {!isCreatingPost && (
-        <PostButton onPress={handleCreatePost}>
-          <Ionicons name="create" size={24} color="white" />
-          <PostButtonText>Create Post</PostButtonText>
-        </PostButton>
-      )}
-    </Container>
+    <>
+      <TouchableOpacity onPress={handlePress}>
+        <View style={{ padding: 16, backgroundColor: 'white', marginBottom: 16, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <Image source={{ uri: post?.profileImage }} style={{ width: 40, height: 40, borderRadius: 20, marginRight: 16 }} />
+            <Text style={{ fontSize: 18, fontWeight: 'bold' }}>{post?.userName}</Text>
+            {user?.id === post?.userId && (
+              <View style={{ marginLeft: 'auto', flexDirection: 'row' }}>
+                <TouchableOpacity onPress={onEdit} style={{ marginRight: 10 }}>
+                  <Feather name="edit" size={24} color="blue" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onDelete}>
+                  <Feather name="trash" size={24} color="red" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+          <Text style={{ marginBottom: 16 }}>{post?.content}</Text>
+          {post?.image && <Image source={{ uri: post?.image }} style={{ width: '100%', height: 240, borderRadius: 16 }} />}
+        </View>
+      </TouchableOpacity>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <View style={{ width: '90%', backgroundColor: 'white', borderRadius: 10, padding: 20 }}>
+            <ScrollView>
+              <Text style={{ marginBottom: 10, fontSize: 18 }}>{post?.content}</Text>
+              {post?.image && (
+                <Image
+                  source={{ uri: post?.image }}
+                  style={{ width: '100%', height: 300, borderRadius: 10, marginBottom: 10 }}
+                  resizeMode="cover"
+                />
+              )}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={{ alignSelf: 'center', marginTop: 20 }}>
+              <Text style={{ color: 'blue' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 };
 
-export default MainFeed;
+export default Post;

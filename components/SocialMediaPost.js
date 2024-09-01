@@ -2,9 +2,13 @@ import React from "react";
 import { View, Text, Image, TouchableOpacity, Alert } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation } from '@react-navigation/native';
+import { useUser } from "@clerk/clerk-expo"; // Assuming you're using Clerk for authentication
+import { doc, deleteDoc } from "firebase/firestore"; // Firebase Firestore functions
+import { db } from "../../firebaseConfig"; // Your Firebase config file
 
 const SocialMediaPost = ({ post }) => {
   const navigation = useNavigation();
+  const { user } = useUser(); // Get the current user
 
   const onHashtagPress = (hashtag) => {
     Alert.alert('Hashtag Pressed', `You pressed ${hashtag}`);
@@ -18,6 +22,32 @@ const SocialMediaPost = ({ post }) => {
     navigation.navigate('FullScreenPost', { post });
   };
 
+  const handleDeletePost = async () => {
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "posts", post.id));
+              Alert.alert("Success", "Post deleted successfully.");
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete post.");
+              console.error("Error deleting post: ", error);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <View style={styles.postContainer}>
       <View style={styles.postHeader}>
@@ -26,9 +56,16 @@ const SocialMediaPost = ({ post }) => {
           <Text style={styles.userName}>{post.userName}</Text>
           <Text style={styles.postTime}>{post.time}</Text>
         </View>
+        {user.id === post.userId && ( // Show delete button only if the current user is the creator of the post
+          <TouchableOpacity onPress={handleDeletePost} style={styles.deleteButton}>
+            <FontAwesome name="trash" size={24} color="red" />
+          </TouchableOpacity>
+        )}
       </View>
-      <Text style={styles.postContent}>{post.content}</Text>
-      {post.image && <Image source={{ uri: post.image }} style={styles.postImage} />}
+      <TouchableOpacity onPress={handlePress}>
+        <Text style={styles.postContent}>{post.content}</Text>
+        {post.image && <Image source={{ uri: post.image }} style={styles.postImage} />}
+      </TouchableOpacity>
       <View style={styles.postFooter}>
         <TouchableOpacity style={styles.likeButton} onPress={() => console.log("Liked!")}>
           <FontAwesome name="heart-o" size={24} color="black" />
@@ -106,6 +143,10 @@ const styles = {
   iconText: {
     marginLeft: 8,
     fontSize: 16,
+  },
+  deleteButton: {
+    marginLeft: 'auto',
+    marginRight: 16,
   },
 };
 

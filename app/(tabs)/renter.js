@@ -41,6 +41,8 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const [completedRentals, setCompletedRentals] = useState([]);
   const [ratings, setRatings] = useState({});
 
+  const renterId = user?.id;  // Assuming renterId is the user's id
+
   useEffect(() => {
     fetchCompletedRentals();
   }, []);
@@ -48,17 +50,26 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const fetchCompletedRentals = async () => {
     const db = getFirestore();
     const rentalsRef = collection(db, 'orders');
-    const q = query(rentalsRef, where('ownerId', '==', ownerId), where('status', '==', 'completed'));
 
-    try {
-      const querySnapshot = await getDocs(q);
-      const rentals = [];
-      querySnapshot.forEach((doc) => {
-        rentals.push({ id: doc.id, ...doc.data() });
-      });
-      setCompletedRentals(rentals);
-    } catch (error) {
-      console.error('Error fetching completed rentals:', error);
+    if (ownerId) {
+      const q = query(
+        rentalsRef,
+        where('ownerId', '==', ownerId),
+        where('status', '==', 'completed')
+      );
+
+      try {
+        const querySnapshot = await getDocs(q);
+        const rentals = [];
+        querySnapshot.forEach((doc) => {
+          rentals.push({ id: doc.id, ...doc.data() });
+        });
+        setCompletedRentals(rentals);
+      } catch (error) {
+        console.error('Error fetching completed rentals:', error);
+      }
+    } else {
+      console.error('Error: ownerId is undefined.');
     }
   };
 
@@ -104,28 +115,29 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     setProfileModalVisible(false);
   };
 
-  const handleSendMessageToOwner = async (rentalDetails) => {
+  const handleRentalRequest = async (rentalDetails) => {
     const db = getFirestore();
     try {
-      const message = `
-        Renter Name: ${user.fullName}
-        Contact: ${profileData.contact || 'N/A'}
-        Aircraft: ${rentalDetails.airplaneModel}
-        Rental Period: ${rentalDetails.rentalPeriod}
-        Total Cost: $${rentalDetails.totalCost}
-      `;
+      const rentalRequest = {
+        renterId,  // Include the renterId here
+        airplaneId,
+        ownerId,
+        status: 'requested',
+        requestedAt: new Date(),
+        rentalDetails: {
+          renterName: user.fullName,
+          contact: profileData.contact || 'N/A',
+          rentalPeriod: rentalDetails.rentalPeriod,
+          totalCost: rentalDetails.totalCost,
+        },
+      };
 
-      await addDoc(collection(db, 'owners', ownerId, 'messages'), {
-        senderId: user.id,
-        senderName: user.fullName,
-        message,
-        createdAt: new Date(),
-      });
+      await addDoc(collection(db, 'rentalRequests'), rentalRequest);
 
-      Alert.alert('Message Sent', 'Your rental request has been sent to the owner.');
+      Alert.alert('Request Sent', 'Your rental request has been sent to the owner.');
     } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message to the owner.');
+      console.error('Error sending rental request:', error);
+      Alert.alert('Error', 'Failed to send rental request.');
     }
   };
 

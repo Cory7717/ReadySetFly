@@ -21,6 +21,9 @@ import {
   orderBy,
   where,
   addDoc,
+  deleteDoc,
+  updateDoc,
+  doc,
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -44,6 +47,7 @@ const Home = ({ route, navigation }) => {
     salesTax: "0.00",
     total: "0.00",
   });
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const categories = [
     "Single Engine Piston",
@@ -59,6 +63,7 @@ const Home = ({ route, navigation }) => {
       return;
     }
     const unsubscribe = subscribeToListings();
+    checkAdminStatus();
     return () => unsubscribe();
   }, [user]);
 
@@ -102,6 +107,15 @@ const Home = ({ route, navigation }) => {
     );
   };
 
+  const checkAdminStatus = () => {
+    // Replace with your logic to check if the user is an admin
+    // For example, check against a list of admin user IDs
+    const adminUserIds = ["adminUserId1", "adminUserId2"]; // Example admin user IDs
+    if (adminUserIds.includes(user?.id)) {
+      setIsAdmin(true);
+    }
+  };
+
   const calculateTotalCost = (hours) => {
     if (!selectedListing) return;
 
@@ -128,38 +142,52 @@ const Home = ({ route, navigation }) => {
     const ownerCost = rentalCost - rentalCost * 0.06;
 
     const messageData = {
-        senderId: user.id,
-        senderName: user.fullName,
-        airplaneModel: selectedListing.airplaneModel,
-        rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
-        totalCost: ownerCost.toFixed(2),
-        contact: user.email || "noemail@example.com",  // Fallback to a default value
-        createdAt: new Date(),
+      senderId: user.id,
+      senderName: user.fullName,
+      airplaneModel: selectedListing.airplaneModel,
+      rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
+      totalCost: ownerCost.toFixed(2),
+      contact: user.email || "noemail@example.com", // Fallback to a default value
+      createdAt: new Date(),
     };
 
     try {
-        await addDoc(
-            collection(db, "owners", selectedListing.ownerId, "rentalRequests"),
-            messageData
-        );
-        Alert.alert(
-            "Request Sent",
-            "Your rental request has been sent to the owner."
-        );
-        setFullScreenModalVisible(false);
+      await addDoc(
+        collection(db, "owners", selectedListing.ownerId, "rentalRequests"),
+        messageData
+      );
+      Alert.alert(
+        "Request Sent",
+        "Your rental request has been sent to the owner."
+      );
+      setFullScreenModalVisible(false);
     } catch (error) {
-        console.error("Error sending rental request: ", error);
-        if (error.code === "permission-denied") {
-            Alert.alert(
-                "Permission Denied",
-                "You do not have permission to send this request."
-            );
-        } else {
-            Alert.alert("Error", "Failed to send rental request to the owner.");
-        }
+      console.error("Error sending rental request: ", error);
+      if (error.code === "permission-denied") {
+        Alert.alert(
+          "Permission Denied",
+          "You do not have permission to send this request."
+        );
+      } else {
+        Alert.alert("Error", "Failed to send rental request to the owner.");
+      }
     }
-};
+  };
 
+  const handleDeleteListing = async (listingId) => {
+    try {
+      await deleteDoc(doc(db, "airplanes", listingId));
+      Alert.alert("Deleted", "The listing has been deleted.");
+    } catch (error) {
+      console.error("Error deleting listing: ", error);
+      Alert.alert("Error", "Failed to delete the listing.");
+    }
+  };
+
+  const handleEditListing = async (listingId) => {
+    // Implement your logic to edit a listing
+    Alert.alert("Edit Listing", `This would edit the listing with ID ${listingId}`);
+  };
 
   const handleNextImage = () => {
     if (selectedListing && imageIndex < selectedListing.images.length - 1) {
@@ -253,6 +281,22 @@ const Home = ({ route, navigation }) => {
                   />
                 )}
               </TouchableOpacity>
+              {isAdmin && (
+                <View className="flex-row justify-end mt-2">
+                  <TouchableOpacity
+                    onPress={() => handleEditListing(item.id)}
+                    className="bg-blue-500 p-2 rounded-md mr-2"
+                  >
+                    <Text className="text-white">Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteListing(item.id)}
+                    className="bg-red-500 p-2 rounded-md"
+                  >
+                    <Text className="text-white">Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ))
         ) : (

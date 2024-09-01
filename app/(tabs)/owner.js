@@ -25,11 +25,11 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
-  collection,
-  addDoc,
-  onSnapshot,
-  updateDoc,
-  doc,
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  updateDoc, 
+  doc 
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -43,7 +43,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     ratesPerHour: "",
     minimumHours: "",
     boostListing: false,
-    boostedListing: false, // New state for boosted listing
+    boostedListing: false,
   });
   const [images, setImages] = useState([]);
   const [currentAnnualPdf, setCurrentAnnualPdf] = useState(null);
@@ -139,16 +139,13 @@ const OwnerProfile = ({ ownerId, navigation }) => {
       const response = await fetch(uri);
       const blob = await response.blob();
       const filename = uri.substring(uri.lastIndexOf("/") + 1);
-      const storageRef = ref(storage, `${folder}/${filename}`);
+      // Include user ID in the storage path
+      const storageRef = ref(storage, `${folder}/${user.id}/${filename}`);
       await uploadBytes(storageRef, blob);
       return await getDownloadURL(storageRef);
     } catch (error) {
-      if (error.code === "storage/unauthorized") {
-        Alert.alert("Error", "You do not have permission to upload this file.");
-      } else {
-        console.error("Error uploading file: ", error);
-        throw error;
-      }
+      console.error("Error uploading file: ", error);
+      throw error;
     }
   };
 
@@ -157,6 +154,10 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     for (const key in data) {
       if (data[key] !== undefined && data[key] !== null) {
         sanitizedData[key] = data[key];
+      } else if (typeof data[key] === 'boolean') {
+        sanitizedData[key] = data[key];
+      } else {
+        sanitizedData[key] = "";
       }
     }
     return sanitizedData;
@@ -179,18 +180,18 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         : "";
 
       const newListing = sanitizeData({
-        airplaneModel: values.airplaneModel || "", // Ensure non-empty string
+        airplaneModel: values.airplaneModel || "", 
         description: values.description || "",
         location: values.location || "",
-        ratesPerHour: profileData.ratesPerHour || "0", // Default to "0" if undefined
-        minimumHours: values.minimumHours || "1", // Default to "1" if undefined
-        images: uploadedImages.length > 0 ? uploadedImages : [], // Ensure empty array if no images
+        ratesPerHour: profileData.ratesPerHour || "0", 
+        minimumHours: values.minimumHours || "1",
+        images: uploadedImages.length > 0 ? uploadedImages : [], 
         currentAnnualPdf: annualProofURL || "",
         insurancePdf: insuranceProofURL || "",
         ownerId: user.id,
         createdAt: new Date(),
         boosted: profileData.boostListing || false,
-        boostedListing: profileData.boostListing ? true : false, // Set boostedListing to true if boostListing is true
+        boostedListing: profileData.boostListing ? true : false, 
       });
 
       await addDoc(collection(db, "airplanes"), newListing);
@@ -281,9 +282,9 @@ const OwnerProfile = ({ ownerId, navigation }) => {
       airplaneModel: selectedListing.airplaneModel,
       rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
       totalCost: ownerCost.toFixed(2),
-      contact: user?.email || "noemail@example.com", // Ensure this is not undefined
+      contact: user?.email || "noemail@example.com",
       createdAt: new Date(),
-      status: "pending", // Initial status of the request
+      status: "pending",
       renterName: user.fullName || "Anonymous",
     };
 
