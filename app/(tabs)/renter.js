@@ -45,16 +45,18 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
   useEffect(() => {
     fetchCompletedRentals();
-  }, []);
+  }, [ownerId, user]);
 
   const fetchCompletedRentals = async () => {
     const db = getFirestore();
     const rentalsRef = collection(db, 'orders');
 
-    if (ownerId) {
+    const resolvedOwnerId = ownerId || user?.id;
+
+    if (resolvedOwnerId) {
       const q = query(
         rentalsRef,
-        where('ownerId', '==', ownerId),
+        where('ownerId', '==', resolvedOwnerId),
         where('status', '==', 'completed')
       );
 
@@ -70,6 +72,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       }
     } else {
       console.error('Error: ownerId is undefined.');
+      Alert.alert("Error", "Owner ID is undefined.");
     }
   };
 
@@ -121,7 +124,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       const rentalRequest = {
         renterId,  // Include the renterId here
         airplaneId,
-        ownerId,
+        ownerId: ownerId || user?.id,  // Resolve ownerId here as well
         status: 'requested',
         requestedAt: new Date(),
         rentalDetails: {

@@ -24,13 +24,7 @@ import { Calendar } from "react-native-calendars";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import {
-  collection,
-  addDoc,
-  onSnapshot,
-  updateDoc,
-  doc,
-} from "firebase/firestore";
+import { collection, addDoc, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { useStripe } from "@stripe/stripe-react-native";
@@ -67,8 +61,9 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   const stripe = useStripe();
 
   useEffect(() => {
-    if (ownerId) {
-      const rentalRequestsRef = collection(db, "owners", ownerId, "rentalRequests");
+    const resolvedOwnerId = ownerId || user?.id;
+    if (resolvedOwnerId) {
+      const rentalRequestsRef = collection(db, "owners", resolvedOwnerId, "rentalRequests");
       const unsubscribeRequests = onSnapshot(rentalRequestsRef, (snapshot) => {
         const requestsData = snapshot.docs.map((doc) => ({
           id: doc.id,
@@ -84,7 +79,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
       console.error("Error: ownerId is undefined.");
       Alert.alert("Error", "Owner ID is undefined.");
     }
-  }, [ownerId]);
+  }, [ownerId, user]);
 
   const handleInputChange = (name, value) => {
     setProfileData((prev) => ({ ...prev, [name]: value || "" }));
@@ -181,6 +176,8 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         ? await uploadFile(insurancePdf, "documents")
         : "";
 
+      const resolvedOwnerId = ownerId || user?.id;
+
       const newListing = sanitizeData({
         airplaneModel: values.airplaneModel || "", 
         description: values.description || "",
@@ -190,7 +187,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         images: uploadedImages.length > 0 ? uploadedImages : [], 
         currentAnnualPdf: annualProofURL || "",
         insurancePdf: insuranceProofURL || "",
-        ownerId: user.id,
+        ownerId: resolvedOwnerId,
         createdAt: new Date(),
         boosted: profileData.boostListing || false,
         boostedListing: profileData.boostListing ? true : false, 
@@ -229,12 +226,13 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
   const handleApproveRentalRequest = async (request) => {
     try {
-      if (!ownerId) {
+      const resolvedOwnerId = ownerId || user?.id;
+      if (!resolvedOwnerId) {
         Alert.alert("Error", "Owner ID is undefined.");
         return;
       }
 
-      const notificationRef = doc(db, "owners", ownerId, "rentalRequests", request.id);
+      const notificationRef = doc(db, "owners", resolvedOwnerId, "rentalRequests", request.id);
       await updateDoc(notificationRef, { status: "approved" });
 
       const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
@@ -259,12 +257,13 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
   const handleDenyRentalRequest = async (request) => {
     try {
-      if (!ownerId) {
+      const resolvedOwnerId = ownerId || user?.id;
+      if (!resolvedOwnerId) {
         Alert.alert("Error", "Owner ID is undefined.");
         return;
       }
 
-      const notificationRef = doc(db, "owners", ownerId, "rentalRequests", request.id);
+      const notificationRef = doc(db, "owners", resolvedOwnerId, "rentalRequests", request.id);
       await updateDoc(notificationRef, { status: "denied" });
 
       Alert.alert("Request Denied", "The rental request has been denied.");
@@ -310,10 +309,8 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
-      <SafeAreaView style={{ backgroundColor: "white" }}>
-        <StatusBar barStyle="light-content" />
-      </SafeAreaView>
-
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -333,7 +330,8 @@ const OwnerProfile = ({ ownerId, navigation }) => {
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
-              padding: 16,
+              paddingHorizontal: 16,
+              paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 8 : 16,
             }}
           >
             <View>

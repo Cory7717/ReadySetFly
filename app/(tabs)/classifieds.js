@@ -13,8 +13,8 @@ import {
   Platform,
   Alert,
   ScrollView,
+  StatusBar,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
 import {
@@ -302,7 +302,6 @@ const Classifieds = () => {
     >
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.title}</Text>
-        {/* Removed 'per hour' text here */}
         <Text>${item.price}</Text>
         <Text numberOfLines={4}>{item.description}</Text>
       </View>
@@ -321,114 +320,124 @@ const Classifieds = () => {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
-      <ImageBackground
-        source={wingtipClouds}
-        style={{ height: 224 }}
-        resizeMode="cover"
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: 16,
-          }}
+    <View style={{ flex: 1, backgroundColor: "white" }}>
+      <StatusBar
+        barStyle="light-content"
+        translucent={true}
+        backgroundColor="transparent"
+      />
+      <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
+        <ImageBackground
+          source={wingtipClouds}
+          style={{ height: 224 }}
+          resizeMode="cover"
         >
-          <View>
+          <View style={{ flex: 1, justifyContent: "center", padding: 16 }}>
             <Text style={{ fontSize: 14, color: "white" }}>Welcome</Text>
-            <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "bold",
+                color: "white",
+                marginTop: 4,
+              }}
+            >
               {user?.fullName}
             </Text>
+            <TouchableOpacity
+              onPress={() => setContactModalVisible(true)}
+              style={{
+                backgroundColor: "white",
+                opacity: 0.5,
+                borderRadius: 50,
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                marginTop: 8,
+              }}
+            >
+              <Text style={{ color: "#2d3748", fontWeight: "bold" }}>
+                Contact Broker
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={() => setContactModalVisible(true)}
+        </ImageBackground>
+
+        <View style={{ padding: 16 }}>
+          {/* Filter Button */}
+          <View
             style={{
-              backgroundColor: "white",
-              opacity: 0.5,
-              borderRadius: 50,
-              paddingVertical: 8,
-              paddingHorizontal: 16,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: 16,
             }}
           >
-            <Text style={{ color: "#2d3748" }}>Contact Broker</Text>
-          </TouchableOpacity>
-        </View>
-      </ImageBackground>
+            <Text style={{ fontSize: 18, color: "#2d3748" }}>
+              Filter by location or Aircraft Make
+            </Text>
+            <TouchableOpacity
+              onPress={() => setFilterModalVisible(true)}
+              style={{
+                backgroundColor: "#e2e8f0",
+                padding: 8,
+                borderRadius: 50,
+              }}
+            >
+              <Ionicons name="filter" size={24} color="#4a5568" />
+            </TouchableOpacity>
+          </View>
 
-      <View style={{ flex: 1, padding: 16 }}>
-        {/* Filter Button */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
-        >
-          <Text style={{ fontSize: 18, color: "#2d3748" }}>
-            Filter by location or Aircraft Make
-          </Text>
-          <TouchableOpacity
-            onPress={() => setFilterModalVisible(true)}
-            style={{
-              backgroundColor: "#e2e8f0",
-              padding: 8,
-              borderRadius: 50,
-            }}
-          >
-            <Ionicons name="filter" size={24} color="#4a5568" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Categories Slider */}
-        <FlatList
-          data={categories}
-          renderItem={renderCategoryItem}
-          horizontal
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 16 }}
-        />
-
-        <Text
-          style={{
-            fontSize: 24,
-            fontWeight: "bold",
-            marginBottom: 16,
-            color: "#2d3748",
-            textAlign: "center",
-          }}
-        >
-          Aircraft Marketplace
-        </Text>
-
-        <TouchableOpacity
-          onPress={() => setModalVisible(true)}
-          style={{
-            backgroundColor: "#f56565",
-            borderRadius: 50,
-            paddingVertical: 12,
-            marginBottom: 24,
-          }}
-        >
-          <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-            Add Listing
-          </Text>
-        </TouchableOpacity>
-
-        {filteredListings.length > 0 ? (
+          {/* Categories Slider */}
           <FlatList
-            data={filteredListings}
-            renderItem={renderListingItem}
-            keyExtractor={(item, index) => index.toString()}
-            nestedScrollEnabled={true}
+            data={categories}
+            renderItem={renderCategoryItem}
+            horizontal
+            keyExtractor={(item) => item}
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 16 }}
           />
-        ) : (
-          <Text style={{ textAlign: "center", color: "#4a5568" }}>
-            No listings available
+
+          <Text
+            style={{
+              fontSize: 24,
+              fontWeight: "bold",
+              marginBottom: 16,
+              color: "#2d3748",
+              textAlign: "center",
+            }}
+          >
+            Aircraft Marketplace
           </Text>
-        )}
-      </View>
+
+          <TouchableOpacity
+            onPress={() => setModalVisible(true)}
+            style={{
+              backgroundColor: "#f56565",
+              borderRadius: 50,
+              paddingVertical: 12,
+              marginBottom: 24,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Add Listing
+            </Text>
+          </TouchableOpacity>
+
+          {filteredListings.length > 0 ? (
+            <FlatList
+              data={filteredListings}
+              renderItem={renderListingItem}
+              keyExtractor={(item, index) => index.toString()}
+              nestedScrollEnabled={true}
+            />
+          ) : (
+            <Text style={{ textAlign: "center", color: "#4a5568" }}>
+              No listings available
+            </Text>
+          )}
+        </View>
+      </ScrollView>
 
       {/* Filter Modal */}
       <Modal
@@ -454,7 +463,14 @@ const Classifieds = () => {
               maxWidth: 320,
             }}
           >
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "bold",
+                marginBottom: 16,
+                textAlign: "center",
+              }}
+            >
               Filter Listings
             </Text>
             <TextInput
@@ -470,7 +486,9 @@ const Classifieds = () => {
             />
             <TextInput
               placeholder="Location (City, State or Airport Identifier)"
-              onChangeText={(value) => setFilter({ ...filter, location: value })}
+              onChangeText={(value) =>
+                setFilter({ ...filter, location: value })
+              }
               value={filter.location}
               style={{
                 borderBottomWidth: 1,
@@ -479,7 +497,9 @@ const Classifieds = () => {
                 padding: 8,
               }}
             />
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
               <TouchableOpacity
                 onPress={() => setFilterModalVisible(false)}
                 style={{
@@ -488,7 +508,9 @@ const Classifieds = () => {
                   borderRadius: 8,
                 }}
               >
-                <Text style={{ textAlign: "center", color: "#4a5568" }}>Cancel</Text>
+                <Text style={{ textAlign: "center", color: "#4a5568" }}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={applyFilter}
@@ -498,7 +520,9 @@ const Classifieds = () => {
                   borderRadius: 8,
                 }}
               >
-                <Text style={{ textAlign: "center", color: "white" }}>Apply Filters</Text>
+                <Text style={{ textAlign: "center", color: "white" }}>
+                  Apply Filters
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -522,7 +546,12 @@ const Classifieds = () => {
         >
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1, justifyContent: "center", alignItems: "center", width: "100%" }}
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              width: "100%",
+            }}
           >
             <ScrollView
               contentContainerStyle={{
@@ -545,7 +574,15 @@ const Classifieds = () => {
                   shadowRadius: 8,
                 }}
               >
-                <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: "bold",
+                    marginBottom: 24,
+                    textAlign: "center",
+                    color: "#2d3748",
+                  }}
+                >
                   Submit Your Listing
                 </Text>
 
@@ -667,7 +704,13 @@ const Classifieds = () => {
                         }}
                       />
 
-                      <Text style={{ marginBottom: 8, color: "#2d3748", fontWeight: "bold" }}>
+                      <Text
+                        style={{
+                          marginBottom: 8,
+                          color: "#2d3748",
+                          fontWeight: "bold",
+                        }}
+                      >
                         Category
                       </Text>
                       <FlatList
@@ -680,7 +723,14 @@ const Classifieds = () => {
                         nestedScrollEnabled={true}
                       />
 
-                      <Text style={{ marginBottom: 8, marginTop: 16, color: "#2d3748", fontWeight: "bold" }}>
+                      <Text
+                        style={{
+                          marginBottom: 8,
+                          marginTop: 16,
+                          color: "#2d3748",
+                          fontWeight: "bold",
+                        }}
+                      >
                         Upload Images
                       </Text>
                       <FlatList
@@ -712,17 +762,31 @@ const Classifieds = () => {
                           marginBottom: 16,
                         }}
                       >
-                        <Text style={{ textAlign: "center", color: "#2d3748" }}>
+                        <Text
+                          style={{ textAlign: "center", color: "#2d3748" }}
+                        >
                           {images.length >= 7
                             ? "Maximum 7 Images"
                             : "Add Image"}
                         </Text>
                       </TouchableOpacity>
 
-                      <Text style={{ marginBottom: 8, color: "#2d3748", fontWeight: "bold" }}>
+                      <Text
+                        style={{
+                          marginBottom: 8,
+                          color: "#2d3748",
+                          fontWeight: "bold",
+                        }}
+                      >
                         Select Pricing Package
                       </Text>
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          marginBottom: 16,
+                        }}
+                      >
                         {Object.keys(pricingPackages).map((key) => (
                           <TouchableOpacity
                             key={key}
@@ -756,7 +820,13 @@ const Classifieds = () => {
                             borderRadius: 50,
                           }}
                         >
-                          <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                          <Text
+                            style={{
+                              color: "white",
+                              textAlign: "center",
+                              fontWeight: "bold",
+                            }}
+                          >
                             Submit Listing
                           </Text>
                         </TouchableOpacity>
@@ -774,7 +844,9 @@ const Classifieds = () => {
                     backgroundColor: "#e2e8f0",
                   }}
                 >
-                  <Text style={{ textAlign: "center", color: "#2d3748" }}>
+                  <Text
+                    style={{ textAlign: "center", color: "#2d3748" }}
+                  >
                     Cancel
                   </Text>
                 </TouchableOpacity>
@@ -807,7 +879,12 @@ const Classifieds = () => {
               width: "90%",
             }}
           >
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+              }}
+            >
               <TouchableOpacity
                 onPress={() =>
                   setCurrentImageIndex(
@@ -836,7 +913,13 @@ const Classifieds = () => {
             </View>
             {selectedListing && (
               <>
-                <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 16 }}>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: "bold",
+                    marginBottom: 16,
+                  }}
+                >
                   {selectedListing.title}
                 </Text>
                 <Image
@@ -849,7 +932,6 @@ const Classifieds = () => {
                   }}
                 />
                 <ScrollView style={{ height: 256 }}>
-                  {/* Removed 'per hour' text here */}
                   <Text style={{ fontSize: 18, marginBottom: 8 }}>
                     Price: ${selectedListing.price}
                   </Text>
@@ -860,7 +942,13 @@ const Classifieds = () => {
                     Location: {selectedListing.city}, {selectedListing.state}
                   </Text>
                 </ScrollView>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginTop: 16,
+                  }}
+                >
                   <TouchableOpacity
                     onPress={handleEditListing}
                     style={{
@@ -869,7 +957,9 @@ const Classifieds = () => {
                       borderRadius: 8,
                     }}
                   >
-                    <Text style={{ color: "white", textAlign: "center" }}>Edit</Text>
+                    <Text style={{ color: "white", textAlign: "center" }}>
+                      Edit
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleDeleteListing}
@@ -879,14 +969,18 @@ const Classifieds = () => {
                       borderRadius: 8,
                     }}
                   >
-                    <Text style={{ color: "white", textAlign: "center" }}>Delete</Text>
+                    <Text style={{ color: "white", textAlign: "center" }}>
+                      Delete
+                    </Text>
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity
                   onPress={() => setDetailsModalVisible(false)}
                   style={{ marginTop: 16 }}
                 >
-                  <Text style={{ textAlign: "center", color: "#a0aec0" }}>
+                  <Text
+                    style={{ textAlign: "center", color: "#a0aec0" }}
+                  >
                     Close
                   </Text>
                 </TouchableOpacity>
@@ -929,7 +1023,14 @@ const Classifieds = () => {
                 shadowRadius: 8,
               }}
             >
-              <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
+              <Text
+                style={{
+                  fontSize: 24,
+                  fontWeight: "bold",
+                  marginBottom: 16,
+                  textAlign: "center",
+                }}
+              >
                 Contact Broker
               </Text>
 
@@ -1036,7 +1137,9 @@ const Classifieds = () => {
                       onPress={() => setContactModalVisible(false)}
                       style={{ marginTop: 16 }}
                     >
-                      <Text style={{ textAlign: "center", color: "#a0aec0" }}>
+                      <Text
+                        style={{ textAlign: "center", color: "#a0aec0" }}
+                      >
                         Cancel
                       </Text>
                     </TouchableOpacity>
@@ -1081,7 +1184,14 @@ const Classifieds = () => {
                 shadowRadius: 8,
               }}
             >
-              <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
+              <Text
+                style={{
+                  fontSize: 24,
+                  fontWeight: "bold",
+                  marginBottom: 16,
+                  textAlign: "center",
+                }}
+              >
                 Edit Your Listing
               </Text>
 
@@ -1206,7 +1316,11 @@ const Classifieds = () => {
                       nestedScrollEnabled={true}
                     />
 
-                    <Text style={{ marginBottom: 8, marginTop: 16 }}>Upload Images</Text>
+                    <Text
+                      style={{ marginBottom: 8, marginTop: 16 }}
+                    >
+                      Upload Images
+                    </Text>
                     <FlatList
                       data={images}
                       horizontal
@@ -1261,7 +1375,9 @@ const Classifieds = () => {
                       onPress={() => setEditModalVisible(false)}
                       style={{ marginTop: 16 }}
                     >
-                      <Text style={{ textAlign: "center", color: "#a0aec0" }}>
+                      <Text
+                        style={{ textAlign: "center", color: "#a0aec0" }}
+                      >
                         Cancel
                       </Text>
                     </TouchableOpacity>
@@ -1272,7 +1388,7 @@ const Classifieds = () => {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
