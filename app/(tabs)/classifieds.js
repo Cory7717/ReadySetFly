@@ -14,6 +14,7 @@ import {
   Alert,
   ScrollView,
   StatusBar,
+  Dimensions,
 } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
@@ -332,30 +333,45 @@ const Classifieds = () => {
           style={{ height: 224 }}
           resizeMode="cover"
         >
-          <View style={{ flex: 1, justifyContent: "center", padding: 16 }}>
-            <Text style={{ fontSize: 14, color: "white" }}>Welcome</Text>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "bold",
-                color: "white",
-                marginTop: 4,
-              }}
-            >
-              {user?.fullName}
-            </Text>
+          <View
+            style={{
+              flex: 1,
+              padding: 16,
+              justifyContent: "space-between",
+              alignItems: "flex-end",
+              flexDirection: "row",
+            }}
+          >
+            <View style={{ flex: 1, alignItems: "flex-end", marginTop: 16 }}>
+              <Text style={{ fontSize: 14, color: "white" }}>Welcome</Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  color: "white",
+                  marginTop: 4,
+                }}
+              >
+                {user?.fullName}
+              </Text>
+            </View>
+          </View>
+          <View style={{ alignItems: "center", marginTop: 8 }}>
             <TouchableOpacity
               onPress={() => setContactModalVisible(true)}
               style={{
                 backgroundColor: "white",
-                opacity: 0.5,
+                opacity: 0.7,
                 borderRadius: 50,
                 paddingVertical: 8,
                 paddingHorizontal: 16,
-                marginTop: 8,
+                width: "66%",
+                marginBottom: 10, // added margin bottom
               }}
             >
-              <Text style={{ color: "#2d3748", fontWeight: "bold" }}>
+              <Text
+                style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}
+              >
                 Contact Broker
               </Text>
             </TouchableOpacity>
@@ -1015,8 +1031,7 @@ const Classifieds = () => {
                 backgroundColor: "white",
                 borderRadius: 16,
                 padding: 24,
-                width: "100%",
-                maxWidth: 320,
+                width: "66%", // Changed to 2/3 of the screen width
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.2,
