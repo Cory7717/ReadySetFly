@@ -304,12 +304,16 @@ const Post = ({ post, onDelete }) => {
           <View style={{ width: '90%', backgroundColor: 'white', borderRadius: 10, padding: 20 }}>
             <ScrollView>
               <Text style={{ marginBottom: 10, fontSize: 18 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
-              {post?.image && (
+              {post?.image ? (
                 <Image
                   source={{ uri: post?.image }}
                   style={{ width: '100%', height: 300, borderRadius: 10, marginBottom: 10 }}
                   resizeMode="cover"
                 />
+              ) : (
+                <View style={{ padding: 20, backgroundColor: '#f0f0f0', borderRadius: 10 }}>
+                  <Text style={{ textAlign: 'center', fontSize: 16, color: '#666' }}>No image available</Text>
+                </View>
               )}
             </ScrollView>
             <TouchableOpacity onPress={() => setModalVisible(false)} style={{ alignSelf: 'center', marginTop: 20 }}>

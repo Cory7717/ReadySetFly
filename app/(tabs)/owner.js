@@ -25,11 +25,11 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  updateDoc, 
-  doc 
+  collection,
+  addDoc,
+  onSnapshot,
+  updateDoc,
+  doc,
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -80,11 +80,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
       return () => {
         unsubscribeRequests();
       };
+    } else {
+      console.error("Error: ownerId is undefined.");
+      Alert.alert("Error", "Owner ID is undefined.");
     }
   }, [ownerId]);
 
   const handleInputChange = (name, value) => {
-    setProfileData((prev) => ({ ...prev, [name]: value }));
+    setProfileData((prev) => ({ ...prev, [name]: value || "" }));
   };
 
   const pickImage = async () => {
@@ -139,7 +142,6 @@ const OwnerProfile = ({ ownerId, navigation }) => {
       const response = await fetch(uri);
       const blob = await response.blob();
       const filename = uri.substring(uri.lastIndexOf("/") + 1);
-      // Include user ID in the storage path
       const storageRef = ref(storage, `${folder}/${user.id}/${filename}`);
       await uploadBytes(storageRef, blob);
       return await getDownloadURL(storageRef);
@@ -227,10 +229,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
   const handleApproveRentalRequest = async (request) => {
     try {
+      if (!ownerId) {
+        Alert.alert("Error", "Owner ID is undefined.");
+        return;
+      }
+
       const notificationRef = doc(db, "owners", ownerId, "rentalRequests", request.id);
       await updateDoc(notificationRef, { status: "approved" });
 
-      // Process payment using Stripe
       const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
         amount: parseInt(request.totalCost * 100), // Amount in cents
         currency: 'usd',
@@ -253,6 +259,11 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
   const handleDenyRentalRequest = async (request) => {
     try {
+      if (!ownerId) {
+        Alert.alert("Error", "Owner ID is undefined.");
+        return;
+      }
+
       const notificationRef = doc(db, "owners", ownerId, "rentalRequests", request.id);
       await updateDoc(notificationRef, { status: "denied" });
 
@@ -278,7 +289,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
     const messageData = {
       senderId: user.id,
-      senderName: user.fullName,
+      senderName: user.fullName || "Anonymous",
       airplaneModel: selectedListing.airplaneModel,
       rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
       totalCost: ownerCost.toFixed(2),
@@ -328,7 +339,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             <View>
               <Text style={{ fontSize: 14, color: "white", marginTop: 1 }}>Good Morning</Text>
               <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
-                {user?.fullName}
+                {user?.fullName || "User"}
               </Text>
             </View>
 
@@ -547,7 +558,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     placeholder="Bank Account Number"
                     onChangeText={handleChange("bankAccountNumber")}
                     onBlur={handleBlur("bankAccountNumber")}
-                    value={values.bankAccountNumber}
+                    value={values.bankAccountNumber || ""}
                     style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
@@ -555,7 +566,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     placeholder="Bank Routing Number"
                     onChangeText={handleChange("bankRoutingNumber")}
                     onBlur={handleBlur("bankRoutingNumber")}
-                    value={values.bankRoutingNumber}
+                    value={values.bankRoutingNumber || ""}
                     style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
@@ -610,7 +621,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     placeholder="Card Number"
                     onChangeText={handleChange("cardNumber")}
                     onBlur={handleBlur("cardNumber")}
-                    value={values.cardNumber}
+                    value={values.cardNumber || ""}
                     style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
@@ -618,7 +629,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     placeholder="Expiry Date (MM/YY)"
                     onChangeText={handleChange("cardExpiry")}
                     onBlur={handleBlur("cardExpiry")}
-                    value={values.cardExpiry}
+                    value={values.cardExpiry || ""}
                     style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
@@ -626,7 +637,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     placeholder="CVC"
                     onChangeText={handleChange("cardCVC")}
                     onBlur={handleBlur("cardCVC")}
-                    value={values.cardCVC}
+                    value={values.cardCVC || ""}
                     style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                     keyboardType="numeric"
                   />
@@ -712,14 +723,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                         placeholder="Aircraft Make/Model"
                         onChangeText={handleChange("airplaneModel")}
                         onBlur={handleBlur("airplaneModel")}
-                        value={values.airplaneModel}
+                        value={values.airplaneModel || ""}
                         style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
                         placeholder="Description"
                         onChangeText={handleChange("description")}
                         onBlur={handleBlur("description")}
-                        value={values.description}
+                        value={values.description || ""}
                         multiline
                         style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
@@ -727,7 +738,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                         placeholder="Location (City, State)"
                         onChangeText={handleChange("location")}
                         onBlur={handleBlur("location")}
-                        value={values.location}
+                        value={values.location || ""}
                         style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
                       <TextInput
@@ -736,7 +747,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                           handleInputChange("ratesPerHour", text)
                         }
                         onBlur={handleBlur("ratesPerHour")}
-                        value={profileData.ratesPerHour}
+                        value={profileData.ratesPerHour || ""}
                         keyboardType="default"
                         style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
@@ -744,7 +755,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                         placeholder="Minimum Hour Requirement"
                         onChangeText={handleChange("minimumHours")}
                         onBlur={handleBlur("minimumHours")}
-                        value={values.minimumHours}
+                        value={values.minimumHours || ""}
                         keyboardType="numeric"
                         style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
                       />
