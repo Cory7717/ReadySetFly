@@ -180,7 +180,7 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <ProfileImage source={{ uri: user?.imageUrl }} />
         <WelcomeText>
-          <Text style={{ fontFamily: 'RubikRegular' }}>Posting as</Text>
+          <Text>Posting as</Text>
           <UserName>{user?.fullName}</UserName>
         </WelcomeText>
       </View>
@@ -397,7 +397,7 @@ const MainFeed = () => {
     <Container>
       <Header>
         <Ionicons name="airplane-outline" size={24} color="black" />
-        <Text style={{ fontFamily: 'RubikRegular', textAlign: 'center', fontSize: 20, fontWeight: 'bold', flex: 1 }}>
+        <Text style={{ textAlign: 'center', fontSize: 20, fontWeight: 'bold', flex: 1 }}>
           Aviation News and Events
         </Text>
       </Header>

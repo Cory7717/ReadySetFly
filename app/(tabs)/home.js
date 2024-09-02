@@ -1,16 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
   View,
   TextInput,
   TouchableOpacity,
-  FlatList,
   Modal,
   ImageBackground,
-  ScrollView,
   Image,
   Alert,
   SafeAreaView,
+  Animated,
+  FlatList,
+  ScrollView,
 } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
@@ -22,7 +23,6 @@ import {
   where,
   addDoc,
   deleteDoc,
-  updateDoc,
   doc,
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
@@ -56,6 +56,8 @@ const Home = ({ route, navigation }) => {
     "Helicopter",
     "Jet",
   ];
+
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!user) {
@@ -109,7 +111,6 @@ const Home = ({ route, navigation }) => {
 
   const checkAdminStatus = () => {
     // Replace with your logic to check if the user is an admin
-    // For example, check against a list of admin user IDs
     const adminUserIds = ["adminUserId1", "adminUserId2"]; // Example admin user IDs
     if (adminUserIds.includes(user?.id)) {
       setIsAdmin(true);
@@ -201,33 +202,86 @@ const Home = ({ route, navigation }) => {
     }
   };
 
-  return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ImageBackground
-        source={wingtipClouds}
-        className="h-56"
-        resizeMode="cover"
-      >
-        <View className="flex-row justify-between items-center p-4">
-          <View>
-            <Text className="text-sm text-white pt-5">Good Morning</Text>
-            <Text className="text-lg font-bold text-white">
-              {user?.fullName}
-            </Text>
-          </View>
-        </View>
-      </ImageBackground>
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, 150],
+    outputRange: [200, 70],
+    extrapolate: "clamp",
+  });
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        <View className="flex-row justify-between mb-4">
-          <Text className="text-lg text-gray-800">
+  const headerFontSize = scrollY.interpolate({
+    inputRange: [0, 150],
+    outputRange: [24, 16],
+    extrapolate: "clamp",
+  });
+
+  const headerPaddingTop = scrollY.interpolate({
+    inputRange: [0, 150],
+    outputRange: [40, 10],
+    extrapolate: "clamp",
+  });
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+      <Animated.View
+        style={{
+          height: headerHeight,
+          overflow: "hidden",
+        }}
+      >
+        <ImageBackground
+          source={wingtipClouds}
+          style={{
+            flex: 1,
+            justifyContent: "flex-end",
+          }}
+          resizeMode="cover"
+        >
+          <Animated.View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: headerPaddingTop,
+              paddingBottom: 20,
+            }}
+          >
+            <Animated.Text
+              style={{
+                fontSize: headerFontSize,
+                color: "white",
+                fontWeight: "bold",
+              }}
+            >
+              Good Morning
+            </Animated.Text>
+            <Animated.Text
+              style={{
+                fontSize: Animated.add(headerFontSize, 6),
+                color: "white",
+                fontWeight: "bold",
+              }}
+            >
+              {user?.fullName}
+            </Animated.Text>
+          </Animated.View>
+        </ImageBackground>
+      </Animated.View>
+
+      <Animated.ScrollView
+        contentContainerStyle={{ padding: 16 }}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+      >
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+          <Text style={{ fontSize: 18, color: "#4A4A4A" }}>
             Filter by location or Aircraft Make
           </Text>
           <TouchableOpacity
             onPress={() =>
               Alert.alert("Filter Modal", "This will open the filter modal")
             }
-            className="bg-gray-200 p-2 rounded-full"
+            style={{ backgroundColor: "#E2E2E2", padding: 8, borderRadius: 50 }}
           >
             <Ionicons name="filter" size={24} color="gray" />
           </TouchableOpacity>
@@ -237,74 +291,142 @@ const Home = ({ route, navigation }) => {
           data={categories}
           renderItem={({ item }) => (
             <TouchableOpacity
-              key={item}
               onPress={() => setSelectedCategory(item)}
-              className={`p-2 ${
-                selectedCategory === item ? "bg-gray-500" : "bg-gray-200"
-              } rounded-md mr-2`}
+              style={{
+                padding: 8,
+                backgroundColor:
+                  selectedCategory === item ? "#808080" : "#E2E2E2",
+                borderRadius: 8,
+                marginRight: 8,
+              }}
             >
-              <Text className="text-sm font-bold">{item}</Text>
+              <Text style={{ fontSize: 14, fontWeight: "bold" }}>{item}</Text>
             </TouchableOpacity>
           )}
           horizontal
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
-          className="mb-4"
+          style={{ marginBottom: 16 }}
         />
 
-        <Text className="text-2xl font-bold mb-4 text-gray-900 text-center">
+        <Text
+          style={{
+            fontSize: 24,
+            fontWeight: "bold",
+            marginBottom: 16,
+            textAlign: "center",
+            color: "#2d3748",
+          }}
+        >
           Available Listings
         </Text>
 
         {listings.length > 0 ? (
           listings.map((item) => (
-            <View style={{ marginBottom: 10 }} key={item.id}>
+            <View style={{ marginBottom: 20 }} key={item.id}>
               <TouchableOpacity
                 onPress={() => {
                   setSelectedListing(item);
                   setImageIndex(0);
                   setFullScreenModalVisible(true);
                 }}
-                className="flex-row justify-between items-center p-4 bg-gray-200 rounded-md"
+                style={{
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  backgroundColor: "white",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 2,
+                }}
               >
-                <View className="flex-1">
-                  <Text className="text-lg font-bold">
+                <ImageBackground
+                  source={{ uri: item.images && item.images[0] }}
+                  style={{ height: 200, justifyContent: "space-between" }}
+                  imageStyle={{ borderRadius: 10 }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      padding: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        backgroundColor: "#000000a0",
+                        color: "white",
+                        padding: 4,
+                        borderRadius: 5,
+                      }}
+                    >
+                      {item.location}
+                    </Text>
+                    <Text
+                      style={{
+                        backgroundColor: "#000000a0",
+                        color: "white",
+                        padding: 4,
+                        borderRadius: 5,
+                      }}
+                    >
+                      ${item.ratesPerHour}/hour
+                    </Text>
+                  </View>
+                </ImageBackground>
+                <View style={{ padding: 10 }}>
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: "bold",
+                      color: "#2d3748",
+                    }}
+                  >
                     {item.airplaneModel}
                   </Text>
-                  <Text>${item.ratesPerHour} per hour</Text>
-                  <Text numberOfLines={4}>{item.description}</Text>
+                  <Text
+                    numberOfLines={2}
+                    style={{
+                      color: "#4a5568",
+                    }}
+                  >
+                    {item.description}
+                  </Text>
                 </View>
-                {item.images && item.images[0] && (
-                  <Image
-                    source={{ uri: item.images[0] }}
-                    className="w-24 h-24 ml-3 rounded-lg"
-                  />
-                )}
               </TouchableOpacity>
               {isAdmin && (
-                <View className="flex-row justify-end mt-2">
+                <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
                   <TouchableOpacity
                     onPress={() => handleEditListing(item.id)}
-                    className="bg-blue-500 p-2 rounded-md mr-2"
+                    style={{
+                      backgroundColor: "#1E90FF",
+                      padding: 8,
+                      borderRadius: 8,
+                      marginRight: 8,
+                    }}
                   >
-                    <Text className="text-white">Edit</Text>
+                    <Text style={{ color: "white" }}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => handleDeleteListing(item.id)}
-                    className="bg-red-500 p-2 rounded-md"
+                    style={{
+                      backgroundColor: "#FF6347",
+                      padding: 8,
+                      borderRadius: 8,
+                    }}
                   >
-                    <Text className="text-white">Delete</Text>
+                    <Text style={{ color: "white" }}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               )}
             </View>
           ))
         ) : (
-          <Text className="text-center text-gray-700">
+          <Text style={{ textAlign: "center", color: "#4a5568" }}>
             No listings available
           </Text>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Full Screen Listing Details Modal */}
       <Modal
@@ -313,15 +435,22 @@ const Home = ({ route, navigation }) => {
         visible={fullScreenModalVisible}
         onRequestClose={() => setFullScreenModalVisible(false)}
       >
-        <SafeAreaView className="flex-1 bg-white">
+        <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
           {selectedListing && (
-            <View className="p-4 flex-1">
+            <View style={{ padding: 16, flex: 1 }}>
               <TouchableOpacity
                 onPress={() => setFullScreenModalVisible(false)}
               >
                 <Ionicons name="close" size={30} color="black" />
               </TouchableOpacity>
-              <View className="flex-row justify-between items-center mb-4">
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 16,
+                }}
+              >
                 <TouchableOpacity onPress={handlePreviousImage}>
                   <Ionicons name="arrow-back" size={30} color="black" />
                 </TouchableOpacity>
@@ -339,41 +468,85 @@ const Home = ({ route, navigation }) => {
                   <Ionicons name="arrow-forward" size={30} color="black" />
                 </TouchableOpacity>
               </View>
-              <ScrollView className="flex-1">
-                <Text className="text-3xl font-bold mb-4 text-center">
+              <ScrollView style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 28,
+                    fontWeight: "bold",
+                    marginBottom: 16,
+                    textAlign: "center",
+                    color: "#2d3748",
+                  }}
+                >
                   {selectedListing.airplaneModel}
                 </Text>
-                <Text className="text-xl mb-2 text-center">
+                <Text
+                  style={{
+                    fontSize: 22,
+                    marginBottom: 16,
+                    textAlign: "center",
+                    color: "#2d3748",
+                  }}
+                >
                   ${selectedListing.ratesPerHour} per hour
                 </Text>
-                <Text className="mb-4 text-center">
+                <Text style={{ marginBottom: 16, textAlign: "center", color: "#4a5568" }}>
                   {selectedListing.description}
                 </Text>
 
-                <View className="flex-row items-center justify-between mb-4">
-                  <Text className="font-bold text-lg">Rental Hours</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text style={{ fontWeight: "bold", fontSize: 18 }}>
+                    Rental Hours
+                  </Text>
                   <TextInput
                     value={String(rentalHours)}
                     onChangeText={(text) => setRentalHours(Number(text))}
                     keyboardType="numeric"
-                    className="border border-gray-300 p-2 rounded-md w-24 text-center"
+                    style={{
+                      borderColor: "#CBD5E0",
+                      borderWidth: 1,
+                      padding: 8,
+                      borderRadius: 8,
+                      width: 80,
+                      textAlign: "center",
+                    }}
                   />
                 </View>
 
-                <View className="mb-4">
-                  <Text className="font-bold">Total Cost</Text>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontWeight: "bold" }}>Total Cost</Text>
                   <Text>Rental Cost: ${totalCost.rentalCost}</Text>
                   <Text>Booking Fee: ${totalCost.bookingFee}</Text>
                   <Text>Transaction Fee: ${totalCost.transactionFee}</Text>
                   <Text>Sales Tax: ${totalCost.salesTax}</Text>
-                  <Text className="font-bold">Total: ${totalCost.total}</Text>
+                  <Text style={{ fontWeight: "bold" }}>
+                    Total: ${totalCost.total}
+                  </Text>
                 </View>
 
                 <TouchableOpacity
                   onPress={handleSendRentalRequest}
-                  className="bg-blue-500 p-4 rounded-lg mt-4"
+                  style={{
+                    backgroundColor: "#1E90FF",
+                    padding: 16,
+                    borderRadius: 8,
+                    marginTop: 16,
+                  }}
                 >
-                  <Text className="text-white text-center font-bold">
+                  <Text
+                    style={{
+                      color: "white",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                    }}
+                  >
                     Send Rental Request
                   </Text>
                 </TouchableOpacity>

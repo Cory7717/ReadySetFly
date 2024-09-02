@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   TextInput,
   Image,
@@ -14,6 +14,7 @@ import {
   Alert,
   ImageBackground,
   StatusBar,
+  Animated,
 } from 'react-native';
 import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { Formik } from 'formik';
@@ -21,11 +22,18 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import wingtipClouds from '../../Assets/images/wingtip_clouds.jpg';
+import { useNavigation } from '@react-navigation/native';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
 
 const BookingCalendar = ({ airplaneId, ownerId }) => {
   const { user } = useUser();
+  const navigation = useNavigation();
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] = useState(false);
+  const [messagesModalVisible, setMessagesModalVisible] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileData, setProfileData] = useState({
     name: '',
@@ -40,11 +48,25 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [completedRentals, setCompletedRentals] = useState([]);
   const [ratings, setRatings] = useState({});
+  const [rentalDate, setRentalDate] = useState('');
+  const [rentalHours, setRentalHours] = useState('');
+  const [preferredLocation, setPreferredLocation] = useState('');
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+  const [isMapModalVisible, setMapModalVisible] = useState(false);
+  const [initialLocation, setInitialLocation] = useState(null);
+  const [costPerHour, setCostPerHour] = useState('');
+  const [numHours, setNumHours] = useState('');
+  const [costPerGallon, setCostPerGallon] = useState('');
+  const [numGallons, setNumGallons] = useState('');
+  
+  // Using useRef for slideAnimation to persist animation value
+  const slideAnimation = useRef(new Animated.Value(300)).current;
 
-  const renterId = user?.id;  // Assuming renterId is the user's id
+  const renterId = user?.id;
 
   useEffect(() => {
     fetchCompletedRentals();
+    getCurrentLocation();
   }, [ownerId, user]);
 
   const fetchCompletedRentals = async () => {
@@ -74,6 +96,22 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       console.error('Error: ownerId is undefined.');
       Alert.alert("Error", "Owner ID is undefined.");
     }
+  };
+
+  const getCurrentLocation = async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission to access location was denied');
+      return;
+    }
+
+    let location = await Location.getCurrentPositionAsync({});
+    setInitialLocation({
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      latitudeDelta: 0.0922,
+      longitudeDelta: 0.0421,
+    });
   };
 
   const handleRating = async (rentalId, rating) => {
@@ -118,13 +156,22 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     setProfileModalVisible(false);
   };
 
+  const handleNavigation = (filter) => {
+    try {
+      navigation.navigate('Home', { filter });
+    } catch (error) {
+      console.error("Navigation error:", error);
+      Alert.alert('Error', 'Failed to navigate to the home screen.');
+    }
+  };
+
   const handleRentalRequest = async (rentalDetails) => {
     const db = getFirestore();
     try {
       const rentalRequest = {
-        renterId,  // Include the renterId here
+        renterId,
         airplaneId,
-        ownerId: ownerId || user?.id,  // Resolve ownerId here as well
+        ownerId: ownerId || user?.id,
         status: 'requested',
         requestedAt: new Date(),
         rentalDetails: {
@@ -150,6 +197,57 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     setRefreshing(false);
   };
 
+  const toggleMenu = () => {
+    if (menuVisible) {
+      Animated.timing(slideAnimation, {
+        toValue: 300,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setMenuVisible(false));
+    } else {
+      setMenuVisible(true);
+      Animated.timing(slideAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const showDatePicker = () => {
+    setDatePickerVisibility(true);
+  };
+
+  const hideDatePicker = () => {
+    setDatePickerVisibility(false);
+  };
+
+  const handleConfirm = (date) => {
+    const formattedDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+    setRentalDate(formattedDate);
+    hideDatePicker();
+  };
+
+  const openMapModal = () => {
+    setMapModalVisible(true);
+  };
+
+  const closeMapModal = () => {
+    setMapModalVisible(false);
+  };
+
+  const calculateRentalCost = () => {
+    const hours = parseFloat(numHours);
+    const hourlyCost = parseFloat(costPerHour);
+    const bookingFee = hourlyCost * hours * 0.06;
+    const processingFee = hourlyCost * hours * 0.03;
+    const tax = hourlyCost * hours * 0.0825;
+    const fuelCost = parseFloat(costPerGallon) * parseFloat(numGallons);
+    const totalCost = (hourlyCost * hours) + bookingFee + processingFee + tax + fuelCost;
+
+    return totalCost.toFixed(2);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
       <SafeAreaView style={{ backgroundColor: 'white' }}>
@@ -163,55 +261,151 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         contentContainerStyle={{ paddingBottom: 16 }}
       >
         <ImageBackground
-          source={wingtipClouds}
+          source={require('../../Assets/images/wingtip_clouds.jpg')}
           style={{
-            height: 224,
+            height: 200,
             paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+            justifyContent: 'center',
+            paddingHorizontal: 16,
           }}
           resizeMode="cover"
         >
           <SafeAreaView style={{ flex: 1 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingHorizontal: 16,
-                paddingTop: 8, // Add some padding at the top
-              }}
-            >
-              <View>
-                <Text style={{ fontSize: 14, color: 'white' }}>Welcome,</Text>
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white' }}>
-                  {user?.fullName}
-                </Text>
-              </View>
-
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white' }}>
+              Good afternoon, {user?.fullName}
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
               <TouchableOpacity
-                onPress={() => setProfileModalVisible(true)}
+                onPress={showDatePicker}
                 style={{
                   backgroundColor: 'white',
-                  opacity: 0.5,
-                  borderRadius: 50,
-                  padding: 8,
+                  borderRadius: 8,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  flex: 1,
+                  marginRight: 8,
+                  opacity: 0.9,
+                  justifyContent: 'center',
                 }}
               >
-                <Ionicons name="settings-outline" size={28} color="black" />
+                <Text>{rentalDate || 'Select Date'}</Text>
               </TouchableOpacity>
+              <TextInput
+                placeholder="Estimated Hours"
+                keyboardType="numeric"
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: 8,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  flex: 1,
+                  opacity: 0.9,
+                }}
+                onChangeText={setRentalHours}
+                value={rentalHours}
+              />
             </View>
+            <TouchableOpacity onPress={openMapModal} style={{
+              backgroundColor: 'white',
+              borderRadius: 8,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              marginTop: 16,
+              opacity: 0.9,
+              textAlign: 'center',
+              justifyContent: 'center',
+            }}>
+              <Text style={{ textAlign: 'center' }}>
+                {preferredLocation || 'Preferred City/Airport'}
+              </Text>
+            </TouchableOpacity>
           </SafeAreaView>
         </ImageBackground>
 
-        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-          <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#2d3748' }}>Manage Your Rentals</Text>
-          <Text style={{ fontSize: 14, color: '#718096' }}>
-            Update your profile, view rental details, and manage bookings.
-          </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 16 }}>
+          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('all')}>
+            <Ionicons name="airplane-outline" size={32} color="#3182ce" />
+            <Text>All Aircraft</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('jets')}>
+            <Ionicons name="jet-outline" size={32} color="#a0aec0" />
+            <Text>Jets</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('pistons')}>
+            <Ionicons name="airplane" size={32} color="#a0aec0" />
+            <Text>Pistons</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('helicopters')}>
+            <Ionicons name="helicopter-outline" size={32} color="#a0aec0" />
+            <Text>Helicopters</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#2d3748', marginBottom: 16 }}>
-            Completed Rentals
+        <View style={{ paddingHorizontal: 16 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+            Recent searches
+          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ backgroundColor: '#edf2f7', padding: 12, borderRadius: 8, flex: 1, marginRight: 8 }}>
+              <Text>Van Nuys Airport</Text>
+              <Text style={{ color: '#a0aec0' }}>3 guests · 9/10/23-9/17/23</Text>
+            </View>
+            <View style={{ backgroundColor: '#edf2f7', padding: 12, borderRadius: 8, flex: 1 }}>
+              <Text>Santa Monica Airport</Text>
+              <Text style={{ color: '#a0aec0' }}>2 guests · 9/18/23-9/25/23</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+            Aircraft Types
+          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <TouchableOpacity style={{ flex: 1, marginRight: 8 }} onPress={() => handleNavigation('single-piston')}>
+              <Text style={{ marginTop: 8, fontWeight: 'bold' }}>Single Engine Piston</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{ flex: 1 }} onPress={() => handleNavigation('twin-piston')}>
+              <Text style={{ marginTop: 8, fontWeight: 'bold' }}>Twin Engine Piston</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+            Recommended for you
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <TouchableOpacity style={{ marginRight: 16 }} onPress={() => handleNavigation('cessna-172')}>
+              <Image
+                source={require('../../Assets/images/recommended1.jpg')}
+                style={{ width: 200, height: 120, borderRadius: 8 }}
+                resizeMode="cover"
+              />
+              <Text style={{ marginTop: 8, fontWeight: 'bold' }}>Cessna 172</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{ marginRight: 16 }} onPress={() => handleNavigation('beechcraft-baron')}>
+              <Image
+                source={require('../../Assets/images/recommended2.jpg')}
+                style={{ width: 200, height: 120, borderRadius: 8 }}
+                resizeMode="cover"
+              />
+              <Text style={{ marginTop: 8, fontWeight: 'bold' }}>Beechcraft Baron</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{ marginRight: 16 }} onPress={() => handleNavigation('cirrus-sr22')}>
+              <Image
+                source={require('../../Assets/images/recommended3.jpg')}
+                style={{ width: 200, height: 120, borderRadius: 8 }}
+                resizeMode="cover"
+              />
+              <Text style={{ marginTop: 8, fontWeight: 'bold' }}>Cirrus SR22</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
+        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+            Manage Your Rentals
           </Text>
           {completedRentals.length > 0 ? (
             completedRentals.map((rental) => (
@@ -297,7 +491,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             )}
             {profileData.medical && (
               <Text style={{ color: '#718096', marginBottom: 8 }}>
-                Medical Uploaded: {profileData.medical.split('/').pop()}
+                Medical Uploaded: {profileData.medical.split('/').pop()}`
               </Text>
             )}
             {profileData.insurance && (
@@ -333,6 +527,143 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           </View>
         )}
       </ScrollView>
+
+      {/* Touchable opacity over the whole screen to close the menu */}
+      {menuVisible && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            zIndex: 1, // Ensure the overlay is above other content
+          }}
+          activeOpacity={1}
+          onPress={toggleMenu} // Close menu on press
+        >
+          <Animated.View
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              height: '100%',
+              width: 300,
+              backgroundColor: 'white',
+              padding: 20,
+              transform: [{ translateX: slideAnimation }],
+              shadowColor: '#000',
+              shadowOffset: { width: -2, height: 0 },
+              shadowOpacity: 0.5,
+              shadowRadius: 5,
+              elevation: 5,
+            }}
+          >
+            <TouchableOpacity onPress={toggleMenu} style={{ alignSelf: 'flex-end' }}>
+              <Ionicons name="close" size={24} color="black" />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 20 }}>Menu</Text>
+            <TouchableOpacity onPress={() => setRentalCostEstimatorModalVisible(true)}>
+              <Text style={{ fontSize: 18, marginBottom: 16 }}>Rental Cost Estimator</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setProfileModalVisible(true)}>
+              <Text style={{ fontSize: 18, marginBottom: 16 }}>Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setMessagesModalVisible(true)}>
+              <Text style={{ fontSize: 18, marginBottom: 16 }}>Messages</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleMenu}>
+              <Text style={{ fontSize: 18, color: '#3182ce' }}>Close Menu</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      )}
+
+      <TouchableOpacity
+        style={{ position: 'absolute', top: 40, right: 20 }}
+        onPress={toggleMenu}
+      >
+        <Ionicons name="menu" size={32} color="black" />
+      </TouchableOpacity>
+
+      <DateTimePickerModal
+        isVisible={isDatePickerVisible}
+        mode="date"
+        onConfirm={handleConfirm}
+        onCancel={hideDatePicker}
+      />
+
+      <Modal visible={isMapModalVisible} animationType="slide">
+        <View style={{ flex: 1 }}>
+          <MapView
+            style={{ flex: 1 }}
+            initialRegion={initialLocation}
+            showsUserLocation={true}
+            showsBuildings={true}
+            showsTraffic={true}
+            pitchEnabled={true}
+          >
+            {preferredLocation ? (
+              <Marker
+                coordinate={{
+                  latitude: preferredLocation.latitude,
+                  longitude: preferredLocation.longitude,
+                }}
+                title="Preferred Location"
+                description="Your chosen location"
+              />
+            ) : null}
+          </MapView>
+          <TouchableOpacity
+            onPress={closeMapModal}
+            style={{
+              position: 'absolute',
+              top: 40,
+              left: 20,
+              backgroundColor: '#f56565',
+              padding: 12,
+              borderRadius: 50,
+            }}
+          >
+            <Ionicons name="close" size={24} color="white" />
+          </TouchableOpacity>
+          <View
+            style={{
+              position: 'absolute',
+              top: 100, // Adjust the position to avoid overlap with the close button
+              left: 0,
+              right: 0,
+              backgroundColor: 'white',
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              borderRadius: 10,
+              marginHorizontal: 20,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <TextInput
+              placeholder="Search for a location"
+              style={{
+                flex: 1,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                backgroundColor: '#f0f0f0',
+                borderRadius: 8,
+              }}
+              onSubmitEditing={(event) => {
+                // Add location search functionality
+                console.log(event.nativeEvent.text);
+              }}
+            />
+            <TouchableOpacity>
+              <Ionicons name="search" size={24} color="gray" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={profileModalVisible} animationType="slide">
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f7fafc' }}>
@@ -447,6 +778,124 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                     </>
                   )}
                 </Formik>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={rentalCostEstimatorModalVisible} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f7fafc' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              style={{ width: '100%', maxWidth: 320 }}
+            >
+              <View
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: 24,
+                  padding: 24,
+                  width: '100%',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                }}
+              >
+                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: '#2d3748' }}>
+                  Rental Cost Estimator
+                </Text>
+                <TextInput
+                  placeholder="Cost Per Hour"
+                  keyboardType="numeric"
+                  value={costPerHour}
+                  onChangeText={setCostPerHour}
+                  style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
+                />
+                <TextInput
+                  placeholder="Number of Hours"
+                  keyboardType="numeric"
+                  value={numHours}
+                  onChangeText={setNumHours}
+                  style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
+                />
+                <TextInput
+                  placeholder="Cost Per Gallon of Fuel"
+                  keyboardType="numeric"
+                  value={costPerGallon}
+                  onChangeText={setCostPerGallon}
+                  style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
+                />
+                <TextInput
+                  placeholder="Number of Gallons"
+                  keyboardType="numeric"
+                  value={numGallons}
+                  onChangeText={setNumGallons}
+                  style={{ borderBottomWidth: 1, borderBottomColor: '#cbd5e0', marginBottom: 16, padding: 8, color: '#2d3748' }}
+                />
+                <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: '#2d3748' }}>
+                  Estimated Total: ${calculateRentalCost()}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setRentalCostEstimatorModalVisible(false)}
+                  style={{ backgroundColor: '#718096', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
+                >
+                  <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                    Close
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={messagesModalVisible} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f7fafc' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              style={{ width: '100%', maxWidth: 320 }}
+            >
+              <View
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: 24,
+                  padding: 24,
+                  width: '100%',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                }}
+              >
+                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: '#2d3748' }}>
+                  Messages
+                </Text>
+                {/* Add your messages UI here */}
+                <TouchableOpacity
+                  onPress={() => setMessagesModalVisible(false)}
+                  style={{ backgroundColor: '#718096', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
+                >
+                  <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                    Close
+                  </Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>

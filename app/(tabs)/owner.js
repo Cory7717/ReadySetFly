@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   TextInput,
@@ -15,21 +15,21 @@ import {
   Modal,
   StatusBar,
   RefreshControl,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
 import { Formik } from "formik";
-import { Calendar } from "react-native-calendars";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { useStripe } from "@stripe/stripe-react-native";
 
 const OwnerProfile = ({ ownerId, navigation }) => {
+  const { user } = useUser();
   const [profileData, setProfileData] = useState({
     airplaneModel: "",
     description: "",
@@ -55,34 +55,68 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   const [debitModalVisible, setDebitModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
+  const [selectedRequest, setSelectedRequest] = useState(null);
   const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
-  const { user } = useUser();
-  const storage = getStorage();
-  const stripe = useStripe();
+  const [costCalculatorModalVisible, setCostCalculatorModalVisible] = useState(false);
+  const [costData, setCostData] = useState({
+    aviationFuelCost: '',
+    fuelConsumption: '',
+    oilChangeCost: '',
+    oilChangeHours: '',
+    oilConsumption: '',
+    quartOilCost: '',
+    factoryOverhaulCost: '',
+    overhaulHours: '',
+    propellerOverhaulCost: '',
+    propellerOverhaulHours: '',
+    insurancePremium: '',
+    hangerTieDownCosts: '',
+    annualInspectionCost: '',
+    avionicsUpgradeCost: '',
+    repaintRefurbishCost: '',
+    avionicsSubscriptionCost: '',
+    paperChartsCost: '',
+    groundSchoolCosts: '',
+    aircraftValue: '',
+    loanBalance: '',
+    loanInterestRate: '',
+    alternativeInterestRate: '',
+    appreciationRate: '',
+    hoursFlownPerYear: ''
+  });
+  const [editMode, setEditMode] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
 
-  useEffect(() => {
-    const resolvedOwnerId = ownerId || user?.id;
-    if (resolvedOwnerId) {
-      const rentalRequestsRef = collection(db, "owners", resolvedOwnerId, "rentalRequests");
-      const unsubscribeRequests = onSnapshot(rentalRequestsRef, (snapshot) => {
-        const requestsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setRentalRequests(requestsData);
-      });
+  const slideAnimation = useRef(new Animated.Value(300)).current;
 
-      return () => {
-        unsubscribeRequests();
-      };
+  const toggleMenu = () => {
+    if (menuVisible) {
+      Animated.timing(slideAnimation, {
+        toValue: 300,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setMenuVisible(false));
     } else {
-      console.error("Error: ownerId is undefined.");
-      Alert.alert("Error", "Owner ID is undefined.");
+      setMenuVisible(true);
+      Animated.timing(slideAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
-  }, [ownerId, user]);
+  };
+
+  const saveCostData = () => {
+    setLoading(true);
+    // Save the cost data here (e.g., save to Firebase)
+    setLoading(false);
+    setEditMode(false);
+    setCostCalculatorModalVisible(false);
+    Alert.alert('Success', 'Cost data saved successfully');
+  };
 
   const handleInputChange = (name, value) => {
-    setProfileData((prev) => ({ ...prev, [name]: value || "" }));
+    setCostData((prev) => ({ ...prev, [name]: value }));
   };
 
   const pickImage = async () => {
@@ -310,7 +344,7 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
+
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -341,22 +375,9 @@ const OwnerProfile = ({ ownerId, navigation }) => {
               </Text>
             </View>
 
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity
-                onPress={() => setFormVisible(true)}
-                style={{
-                  backgroundColor: "white",
-                  opacity: 0.5,
-                  borderRadius: 50,
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                }}
-              >
-                <Text style={{ color: "#2d3748", fontWeight: "bold" }}>
-                  Submit Your Listing
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={toggleMenu}>
+              <Ionicons name="menu" size={32} color="white" />
+            </TouchableOpacity>
           </View>
         </ImageBackground>
 
@@ -662,6 +683,76 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         </View>
       </Modal>
 
+      {/* Cost of Ownership Calculator Modal */}
+      <Modal visible={costCalculatorModalVisible} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f7fafc' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              style={{ width: '100%', maxWidth: 320 }}
+            >
+              <View
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: 24,
+                  padding: 24,
+                  width: '100%',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                }}
+              >
+                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: '#2d3748' }}>
+                  Cost of Ownership Calculator
+                </Text>
+                <Formik
+                  initialValues={costData}
+                  onSubmit={saveCostData}
+                >
+                  {({ handleChange, handleBlur, handleSubmit, values }) => (
+                    <>
+                      <TextInput
+                        placeholder="How much do you pay for a gallon of aviation fuel?"
+                        onChangeText={handleChange("aviationFuelCost")}
+                        onBlur={handleBlur("aviationFuelCost")}
+                        value={values.aviationFuelCost || ""}
+                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                        editable={editMode}
+                      />
+                      {/* Repeat similar TextInput components for other fields */}
+                      <TouchableOpacity
+                        onPress={editMode ? handleSubmit : () => setEditMode(true)}
+                        style={{ backgroundColor: '#3182ce', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50, marginBottom: 16 }}
+                      >
+                        <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                          {editMode ? 'Save' : 'Edit'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setCostCalculatorModalVisible(false)}
+                        style={{ backgroundColor: '#718096', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
+                      >
+                        <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                          Cancel
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </Formik>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
       {/* Form Modal */}
       <Modal
         visible={formVisible}
@@ -880,35 +971,65 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
           <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
             <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
-              Rental Request
+              Rental Requests
             </Text>
-            {rentalRequests.length > 0 ? (
+            {selectedRequest ? (
+              <>
+                <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                  Renter: {selectedRequest.renterName}
+                </Text>
+                <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                  Aircraft: {selectedRequest.airplaneModel}
+                </Text>
+                <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                  Total Cost: ${selectedRequest.totalCost}
+                </Text>
+                <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                  Renter Rating: {selectedRequest.renterRating || "N/A"}
+                </Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
+                  <TouchableOpacity
+                    onPress={() => handleApproveRentalRequest(selectedRequest)}
+                    style={{ backgroundColor: "#48bb78", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
+                  >
+                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDenyRentalRequest(selectedRequest)}
+                    style={{ backgroundColor: "#e53e3e", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
+                  >
+                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Deny</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedRequest(null)}
+                  style={{ marginTop: 16, paddingVertical: 12, borderRadius: 50, backgroundColor: "#e2e8f0" }}
+                >
+                  <Text style={{ color: "#2d3748", textAlign: "center", fontWeight: "bold" }}>
+                    Back to List
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : rentalRequests.length > 0 ? (
               rentalRequests.map((request) => (
-                <View key={request.id} style={{ marginBottom: 16 }}>
-                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                <TouchableOpacity
+                  key={request.id}
+                  onPress={() => setSelectedRequest(request)}
+                  style={{
+                    marginBottom: 16,
+                    backgroundColor: "#edf2f7",
+                    padding: 16,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 18, fontWeight: "bold", color: "#2d3748" }}>
                     Renter: {request.renterName}
                   </Text>
-                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                    Aircraft: {request.airplaneModel}
+                  <Text style={{ color: "#4a5568" }}>{request.airplaneModel}</Text>
+                  <Text style={{ color: "#e53e3e", fontWeight: "bold" }}>
+                    ${request.totalCost}
                   </Text>
-                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                    Total Cost: ${request.totalCost}
-                  </Text>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
-                    <TouchableOpacity
-                      onPress={() => handleApproveRentalRequest(request)}
-                      style={{ backgroundColor: "#48bb78", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
-                    >
-                      <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Approve</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDenyRentalRequest(request)}
-                      style={{ backgroundColor: "#e53e3e", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
-                    >
-                      <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>Deny</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                </TouchableOpacity>
               ))
             ) : (
               <Text style={{ color: "#4a5568", textAlign: "center" }}>
@@ -926,6 +1047,34 @@ const OwnerProfile = ({ ownerId, navigation }) => {
           </View>
         </View>
       </Modal>
+
+      {menuVisible && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            height: '100%',
+            width: 300,
+            backgroundColor: 'white',
+            padding: 20,
+            transform: [{ translateX: slideAnimation }],
+            shadowColor: '#000',
+            shadowOffset: { width: -2, height: 0 },
+            shadowOpacity: 0.5,
+            shadowRadius: 5,
+            elevation: 5,
+          }}
+        >
+          <TouchableOpacity onPress={() => setCostCalculatorModalVisible(true)}>
+            <Text style={{ fontSize: 18, marginBottom: 16 }}>Cost of Ownership Calculator</Text>
+          </TouchableOpacity>
+          {/* Add other menu items if needed */}
+          <TouchableOpacity onPress={toggleMenu}>
+            <Text style={{ fontSize: 18, color: '#3182ce' }}>Close Menu</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
     </View>
   );
 };
