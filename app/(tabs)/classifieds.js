@@ -18,7 +18,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
-import { db, storage } from "../../firebaseConfig"; // Ensure you import storage for Firebase Storage
+import { db, storage } from "../../firebaseConfig";
 import {
   collection,
   getDocs,
@@ -34,7 +34,8 @@ import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import * as ImagePicker from "expo-image-picker";
 import { Formik } from "formik";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; // Firebase storage functions
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import * as MailComposer from "expo-mail-composer"; // Add this import
 
 const Classifieds = () => {
   const { user } = useUser();
@@ -42,10 +43,11 @@ const Classifieds = () => {
   const [filteredListings, setFilteredListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false); // Separate filter modal
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [contactModalVisible, setContactModalVisible] = useState(false);
+  const [contactModalVisible, setContactModalVisible] = useState(false); // Add this state
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPricing, setSelectedPricing] = useState("Basic");
@@ -272,6 +274,30 @@ const Classifieds = () => {
     }
   }, [selectedListing, rentalHours]);
 
+  const sendEmail = async (message) => {
+    const isAvailable = await MailComposer.isAvailableAsync();
+    if (isAvailable) {
+      const options = {
+        recipients: ["coryarmer@gmail.com"],
+        subject: "Contacting Broker from Classifieds",
+        body: message,
+      };
+
+      MailComposer.composeAsync(options)
+        .then((result) => {
+          if (result.status === "sent") {
+            Alert.alert("Email Sent", "Your email has been sent successfully.");
+          }
+        })
+        .catch((error) => {
+          console.error("Error sending email: ", error);
+          Alert.alert("Error", "Failed to send email. Please try again later.");
+        });
+    } else {
+      Alert.alert("Mail Composer Unavailable", "This device is not configured to send emails.");
+    }
+  };
+
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       key={item}
@@ -396,7 +422,7 @@ const Classifieds = () => {
             Filter by location or Aircraft Make
           </Text>
           <TouchableOpacity
-            onPress={() => setModalVisible(true)}
+            onPress={() => setFilterModalVisible(true)}
             style={{ backgroundColor: "#E2E2E2", padding: 8, borderRadius: 50 }}
           >
             <Ionicons name="filter" size={24} color="gray" />
@@ -544,6 +570,175 @@ const Classifieds = () => {
           </Text>
         )}
       </Animated.ScrollView>
+
+      {/* Filter by Location Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={filterModalVisible}
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              width: "100%",
+            }}
+          >
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+              style={{ width: "100%", maxWidth: 320 }}
+              nestedScrollEnabled={true}
+            >
+              <View
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: 24,
+                  padding: 24,
+                  width: "100%",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: "bold",
+                    marginBottom: 24,
+                    textAlign: "center",
+                    color: "#2d3748",
+                  }}
+                >
+                  Filter Listings
+                </Text>
+
+                <Formik
+                  initialValues={{
+                    city: "",
+                    state: "",
+                    category: selectedCategory || "Single Engine Piston",
+                  }}
+                  onSubmit={(values) => {
+                    // Apply the filter logic here
+                    const filtered = listings.filter(
+                      (listing) =>
+                        listing.city.toLowerCase().includes(values.city.toLowerCase()) &&
+                        listing.state.toLowerCase().includes(values.state.toLowerCase()) &&
+                        listing.category.includes(values.category)
+                    );
+                    setFilteredListings(filtered);
+                    setFilterModalVisible(false);
+                  }}
+                >
+                  {({
+                    handleChange,
+                    handleBlur,
+                    handleSubmit,
+                    values,
+                  }) => (
+                    <>
+                      <TextInput
+                        placeholder="City"
+                        onChangeText={handleChange("city")}
+                        onBlur={handleBlur("city")}
+                        value={values.city}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
+                      />
+                      <TextInput
+                        placeholder="State"
+                        onChangeText={handleChange("state")}
+                        onBlur={handleBlur("state")}
+                        value={values.state}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#cbd5e0",
+                          marginBottom: 16,
+                          padding: 8,
+                          color: "#2d3748",
+                        }}
+                      />
+                      
+                      <Text
+                        style={{
+                          marginBottom: 8,
+                          color: "#2d3748",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Category
+                      </Text>
+                      <FlatList
+                        data={categories}
+                        renderItem={renderCategoryItem}
+                        horizontal
+                        keyExtractor={(item) => item}
+                        showsHorizontalScrollIndicator={false}
+                        style={{ marginBottom: 16 }}
+                        nestedScrollEnabled={true}
+                      />
+
+                      <TouchableOpacity
+                        onPress={handleSubmit}
+                        style={{
+                          backgroundColor: "#f56565",
+                          paddingVertical: 12,
+                          borderRadius: 50,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "white",
+                            textAlign: "center",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          Apply Filters
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </Formik>
+
+                <TouchableOpacity
+                  onPress={() => setFilterModalVisible(false)}
+                  style={{
+                    marginTop: 16,
+                    paddingVertical: 8,
+                    borderRadius: 50,
+                    backgroundColor: "#e2e8f0",
+                  }}
+                >
+                  <Text style={{ textAlign: "center", color: "#2d3748" }}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       {/* Submit Listing Modal */}
       <Modal
@@ -988,6 +1183,22 @@ const Classifieds = () => {
                     </Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Contact Broker Button */}
+                <TouchableOpacity
+                  onPress={() => setContactModalVisible(true)}
+                  style={{
+                    backgroundColor: "#3182ce",
+                    padding: 12,
+                    borderRadius: 8,
+                    marginTop: 16,
+                  }}
+                >
+                  <Text style={{ color: "white", textAlign: "center" }}>
+                    Contact Broker
+                  </Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={() => setDetailsModalVisible(false)}
                   style={{ marginTop: 16 }}
@@ -998,6 +1209,82 @@ const Classifieds = () => {
                 </TouchableOpacity>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Contact Broker Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={contactModalVisible}
+        onRequestClose={() => setContactModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 24,
+              padding: 24,
+              width: "90%",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "bold",
+                marginBottom: 16,
+                textAlign: "center",
+                color: "#2d3748",
+              }}
+            >
+              Contact Broker
+            </Text>
+            <TextInput
+              placeholder="Your Message"
+              multiline
+              style={{
+                borderWidth: 1,
+                borderColor: "#cbd5e0",
+                padding: 12,
+                height: 150,
+                textAlignVertical: "top",
+                marginBottom: 16,
+                borderRadius: 8,
+                color: "#2d3748",
+              }}
+              onChangeText={(text) => setListingDetails({ ...listingDetails, message: text })}
+            />
+            <TouchableOpacity
+              onPress={() => {
+                sendEmail(listingDetails.message || "No message provided.");
+                setContactModalVisible(false);
+              }}
+              style={{
+                backgroundColor: "#3182ce",
+                padding: 12,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: "white", textAlign: "center" }}>
+                Send Email
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setContactModalVisible(false)}
+              style={{ marginTop: 16 }}
+            >
+              <Text style={{ textAlign: "center", color: "#a0aec0" }}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

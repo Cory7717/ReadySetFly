@@ -23,7 +23,7 @@ import { db } from "../../firebaseConfig";
 import { Formik } from "formik";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { collection, addDoc, onSnapshot, updateDoc, doc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, updateDoc, doc, query, where } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { useStripe } from "@stripe/stripe-react-native";
@@ -59,35 +59,43 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
   const [costCalculatorModalVisible, setCostCalculatorModalVisible] = useState(false);
   const [costData, setCostData] = useState({
-    aviationFuelCost: '',
-    fuelConsumption: '',
-    oilChangeCost: '',
-    oilChangeHours: '',
-    oilConsumption: '',
-    quartOilCost: '',
-    factoryOverhaulCost: '',
-    overhaulHours: '',
-    propellerOverhaulCost: '',
-    propellerOverhaulHours: '',
-    insurancePremium: '',
-    hangerTieDownCosts: '',
-    annualInspectionCost: '',
-    avionicsUpgradeCost: '',
-    repaintRefurbishCost: '',
-    avionicsSubscriptionCost: '',
-    paperChartsCost: '',
-    groundSchoolCosts: '',
-    aircraftValue: '',
-    loanBalance: '',
-    loanInterestRate: '',
-    alternativeInterestRate: '',
-    appreciationRate: '',
-    hoursFlownPerYear: ''
+    estimatedAnnualCost: '',
+    insuranceCost: '',
+    hangerCost: '',
+    fuelCostPerHour: '',
+    mortgageExpense: '',
+    flightHoursPerYear: '',
+    costPerHour: '',
+    rentalPricePerHour: ''
   });
   const [editMode, setEditMode] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [messageModalVisible, setMessageModalVisible] = useState(false);
 
   const slideAnimation = useRef(new Animated.Value(300)).current;
+
+  useEffect(() => {
+    // Load rental history and messages
+    const resolvedOwnerId = ownerId || user?.id;
+    if (resolvedOwnerId) {
+      const rentalHistoryQuery = query(collection(db, "rentalHistory"), where("ownerId", "==", resolvedOwnerId));
+      const unsubscribeRentalHistory = onSnapshot(rentalHistoryQuery, (snapshot) => {
+        setRentalHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+
+      const messagesQuery = query(collection(db, "messages"), where("ownerId", "==", resolvedOwnerId));
+      const unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
+        setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+
+      return () => {
+        unsubscribeRentalHistory();
+        unsubscribeMessages();
+      };
+    }
+  }, [ownerId, user?.id]);
 
   const toggleMenu = () => {
     if (menuVisible) {
@@ -108,11 +116,15 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
   const saveCostData = () => {
     setLoading(true);
-    // Save the cost data here (e.g., save to Firebase)
+    const { estimatedAnnualCost, insuranceCost, hangerCost, fuelCostPerHour, mortgageExpense, flightHoursPerYear } = costData;
+
+    const totalCost = parseFloat(estimatedAnnualCost) + parseFloat(insuranceCost) + parseFloat(hangerCost) + parseFloat(fuelCostPerHour) + parseFloat(mortgageExpense);
+    const costPerHour = (totalCost / parseFloat(flightHoursPerYear)).toFixed(2);
+
+    setCostData({ ...costData, costPerHour });
     setLoading(false);
     setEditMode(false);
-    setCostCalculatorModalVisible(false);
-    Alert.alert('Success', 'Cost data saved successfully');
+    Alert.alert('Success', `Estimated cost per hour: $${costPerHour}`);
   };
 
   const handleInputChange = (name, value) => {
@@ -314,30 +326,30 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     setRefreshing(false);
   };
 
-  const handleSendRentalRequest = async (selectedListing, rentalHours) => {
-    if (!selectedListing) return;
+  const calculateActualRevenue = () => {
+    return rentalHistory.reduce((total, order) => {
+      return total + parseFloat(order.totalCost);
+    }, 0).toFixed(2);
+  };
 
-    const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
-    const ownerCost = rentalCost - rentalCost * 0.06;
+  const sendMessage = async () => {
+    if (!messageInput.trim()) return;
 
+    const resolvedOwnerId = ownerId || user?.id;
     const messageData = {
+      ownerId: resolvedOwnerId,
       senderId: user.id,
       senderName: user.fullName || "Anonymous",
-      airplaneModel: selectedListing.airplaneModel,
-      rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
-      totalCost: ownerCost.toFixed(2),
-      contact: user?.email || "noemail@example.com",
+      text: messageInput,
       createdAt: new Date(),
-      status: "pending",
-      renterName: user.fullName || "Anonymous",
     };
 
     try {
-      await addDoc(collection(db, "owners", selectedListing.ownerId, "rentalRequests"), messageData);
-      Alert.alert("Request Sent", "Your rental request has been sent to the owner.");
+      await addDoc(collection(db, "messages"), messageData);
+      setMessageInput("");
     } catch (error) {
-      console.error("Error sending rental request: ", error);
-      Alert.alert("Error", "Failed to send rental request to the owner.");
+      console.error("Error sending message: ", error);
+      Alert.alert("Error", "Failed to send message.");
     }
   };
 
@@ -414,6 +426,21 @@ const OwnerProfile = ({ ownerId, navigation }) => {
           )}
         </TouchableOpacity>
 
+        {/* New Section with Payment and Earnings Details */}
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+          <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8, color: "#2d3748" }}>
+            Payment and Earnings
+          </Text>
+          <View style={{ backgroundColor: "#f7fafc", borderRadius: 12, padding: 16 }}>
+            <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 4, color: "#4a5568" }}>
+              Actual Revenue
+            </Text>
+            <Text style={{ fontSize: 14, color: "#4a5568" }}>
+              Total Earnings: ${calculateActualRevenue()}
+            </Text>
+          </View>
+        </View>
+
         <View style={{ marginTop: 32 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, color: "#2d3748", textAlign: "center" }}>
             Your Current Listings
@@ -480,6 +507,22 @@ const OwnerProfile = ({ ownerId, navigation }) => {
                     ))}
                   </View>
                 </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedRequest(order);
+                    setMessageModalVisible(true);
+                  }}
+                  style={{
+                    marginTop: 16,
+                    backgroundColor: "#3182ce",
+                    padding: 12,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                    Message Renter
+                  </Text>
+                </TouchableOpacity>
               </View>
             ))
           ) : (
@@ -490,13 +533,14 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         </View>
       </ScrollView>
 
+      {/* Submit Your Listing Button */}
       <View style={{ position: "absolute", bottom: 40, left: 0, right: 0, alignItems: "center" }}>
         <TouchableOpacity
-          onPress={() => setTransferModalVisible(true)}
+          onPress={() => setFormVisible(true)}
           style={{
             padding: 10,
             borderRadius: 25,
-            backgroundColor: "rgba(255, 255, 255, 0.7)",
+            backgroundColor: "#e53e3e",
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.8,
@@ -504,254 +548,9 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             elevation: 5,
           }}
         >
-          <Text style={{ color: "#2d3748", fontWeight: "bold" }}>
-            Available Balance: ${availableBalance}
-          </Text>
+          <Text style={{ color: "white", fontWeight: "bold" }}>Submit Your Listing</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Transfer Modal */}
-      <Modal
-        visible={transferModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setTransferModalVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
-          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
-              Transfer Funds
-            </Text>
-            <TouchableOpacity
-              onPress={() => setAchModalVisible(true)}
-              style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", borderRadius: 50, paddingVertical: 12, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}
-            >
-              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
-                Transfer via ACH
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setDebitModalVisible(true)}
-              style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", borderRadius: 50, paddingVertical: 12, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}
-            >
-              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
-                Transfer to Debit Card
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setTransferModalVisible(false)}
-              style={{ backgroundColor: "#e2e8f0", paddingVertical: 12, borderRadius: 50, marginTop: 16 }}
-            >
-              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ACH Modal */}
-      <Modal
-        visible={achModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setAchModalVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
-          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
-              Enter Bank Details
-            </Text>
-            <Formik
-              initialValues={{
-                bankAccountNumber: "",
-                bankRoutingNumber: "",
-              }}
-              onSubmit={(values) => {
-                handleTransferFunds("ACH");
-              }}
-            >
-              {({ handleChange, handleBlur, handleSubmit, values }) => (
-                <>
-                  <TextInput
-                    placeholder="Bank Account Number"
-                    onChangeText={handleChange("bankAccountNumber")}
-                    onBlur={handleBlur("bankAccountNumber")}
-                    value={values.bankAccountNumber || ""}
-                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                    keyboardType="numeric"
-                  />
-                  <TextInput
-                    placeholder="Bank Routing Number"
-                    onChangeText={handleChange("bankRoutingNumber")}
-                    onBlur={handleBlur("bankRoutingNumber")}
-                    value={values.bankRoutingNumber || ""}
-                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                    keyboardType="numeric"
-                  />
-                  <TouchableOpacity
-                    onPress={handleSubmit}
-                    style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", borderRadius: 50, paddingVertical: 12, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}
-                  >
-                    <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
-                      Submit
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </Formik>
-            <TouchableOpacity
-              onPress={() => setAchModalVisible(false)}
-              style={{ backgroundColor: "#e2e8f0", paddingVertical: 12, borderRadius: 50, marginTop: 16 }}
-            >
-              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Debit Card Modal */}
-      <Modal
-        visible={debitModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setDebitModalVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
-          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
-              Enter Debit Card Details
-            </Text>
-            <Formik
-              initialValues={{
-                cardNumber: "",
-                cardExpiry: "",
-                cardCVC: "",
-              }}
-              onSubmit={(values) => {
-                handleTransferFunds("Debit Card");
-              }}
-            >
-              {({ handleChange, handleBlur, handleSubmit, values }) => (
-                <>
-                  <TextInput
-                    placeholder="Card Number"
-                    onChangeText={handleChange("cardNumber")}
-                    onBlur={handleBlur("cardNumber")}
-                    value={values.cardNumber || ""}
-                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                    keyboardType="numeric"
-                  />
-                  <TextInput
-                    placeholder="Expiry Date (MM/YY)"
-                    onChangeText={handleChange("cardExpiry")}
-                    onBlur={handleBlur("cardExpiry")}
-                    value={values.cardExpiry || ""}
-                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                    keyboardType="numeric"
-                  />
-                  <TextInput
-                    placeholder="CVC"
-                    onChangeText={handleChange("cardCVC")}
-                    onBlur={handleBlur("cardCVC")}
-                    value={values.cardCVC || ""}
-                    style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                    keyboardType="numeric"
-                  />
-                  <TouchableOpacity
-                    onPress={handleSubmit}
-                    style={{ backgroundColor: "rgba(255, 255, 255, 0.5)", borderRadius: 50, paddingVertical: 12, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}
-                  >
-                    <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
-                      Submit
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </Formik>
-            <TouchableOpacity
-              onPress={() => setDebitModalVisible(false)}
-              style={{ backgroundColor: "#e2e8f0", paddingVertical: 12, borderRadius: 50, marginTop: 16 }}
-            >
-              <Text style={{ color: "#2d3748", fontWeight: "bold", textAlign: "center" }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Cost of Ownership Calculator Modal */}
-      <Modal visible={costCalculatorModalVisible} animationType="slide">
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#f7fafc' }}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-          >
-            <ScrollView
-              contentContainerStyle={{
-                flexGrow: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-              style={{ width: '100%', maxWidth: 320 }}
-            >
-              <View
-                style={{
-                  backgroundColor: 'white',
-                  borderRadius: 24,
-                  padding: 24,
-                  width: '100%',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                }}
-              >
-                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: '#2d3748' }}>
-                  Cost of Ownership Calculator
-                </Text>
-                <Formik
-                  initialValues={costData}
-                  onSubmit={saveCostData}
-                >
-                  {({ handleChange, handleBlur, handleSubmit, values }) => (
-                    <>
-                      <TextInput
-                        placeholder="How much do you pay for a gallon of aviation fuel?"
-                        onChangeText={handleChange("aviationFuelCost")}
-                        onBlur={handleBlur("aviationFuelCost")}
-                        value={values.aviationFuelCost || ""}
-                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                        editable={editMode}
-                      />
-                      {/* Repeat similar TextInput components for other fields */}
-                      <TouchableOpacity
-                        onPress={editMode ? handleSubmit : () => setEditMode(true)}
-                        style={{ backgroundColor: '#3182ce', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50, marginBottom: 16 }}
-                      >
-                        <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
-                          {editMode ? 'Save' : 'Edit'}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => setCostCalculatorModalVisible(false)}
-                        style={{ backgroundColor: '#718096', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
-                      >
-                        <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
-                          Cancel
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </Formik>
-              </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </Modal>
 
       {/* Form Modal */}
       <Modal
@@ -1048,6 +847,64 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         </View>
       </Modal>
 
+      {/* Messaging Modal */}
+      <Modal
+        visible={messageModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setMessageModalVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
+          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", maxWidth: 320, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
+              Messages with Renter
+            </Text>
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: 16 }}
+              style={{ maxHeight: 400 }}
+            >
+              {messages.map((message) => (
+                <View key={message.id} style={{ marginBottom: 12 }}>
+                  <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
+                    {message.senderName}
+                  </Text>
+                  <Text style={{ color: "#4a5568" }}>{message.text}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            <TextInput
+              placeholder="Type a message..."
+              value={messageInput}
+              onChangeText={(text) => setMessageInput(text)}
+              style={{
+                borderColor: "#cbd5e0",
+                borderWidth: 1,
+                borderRadius: 50,
+                padding: 12,
+                marginBottom: 12,
+                color: "#2d3748",
+              }}
+            />
+            <TouchableOpacity
+              onPress={sendMessage}
+              style={{ backgroundColor: "#3182ce", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 }}
+            >
+              <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                Send Message
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setMessageModalVisible(false)}
+              style={{ marginTop: 24, paddingVertical: 12, borderRadius: 50, backgroundColor: "#e2e8f0" }}
+            >
+              <Text style={{ color: "#2d3748", textAlign: "center", fontWeight: "bold" }}>
+                Close
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {menuVisible && (
         <Animated.View
           style={{
@@ -1080,3 +937,4 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 };
 
 export default OwnerProfile;
+
