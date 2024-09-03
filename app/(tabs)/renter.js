@@ -63,6 +63,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const [numHours, setNumHours] = useState('');
   const [costPerGallon, setCostPerGallon] = useState('');
   const [numGallons, setNumGallons] = useState('');
+  const [chatButtonActive, setChatButtonActive] = useState(false); // New state for chat button activation
 
   const slideAnimation = useRef(new Animated.Value(300)).current;
 
@@ -240,6 +241,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         const rentalRequestRef = doc(db, 'rentalRequests', rentalDetails.requestId);
         await updateDoc(rentalRequestRef, { status: 'approved' });
 
+        setChatButtonActive(true); // Activate chat button after approval
         Alert.alert('Rental Confirmed', 'Your rental request has been approved.');
       } catch (error) {
         console.error('Error finalizing rental request:', error);
@@ -626,8 +628,8 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             <TouchableOpacity onPress={() => setProfileModalVisible(true)}>
               <Text style={{ fontSize: 18, marginBottom: 16 }}>Profile</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setMessagesModalVisible(true)}>
-              <Text style={{ fontSize: 18, marginBottom: 16 }}>Messages</Text>
+            <TouchableOpacity onPress={() => setMessagesModalVisible(true)} disabled={!chatButtonActive}>
+              <Text style={{ fontSize: 18, marginBottom: 16, color: chatButtonActive ? '#000' : '#ccc' }}>Messages</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={toggleMenu}>
               <Text style={{ fontSize: 18, color: '#3182ce' }}>Close Menu</Text>
@@ -967,7 +969,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           position: "absolute",
           bottom: 20,
           right: 20,
-          backgroundColor: "#3182ce",
+          backgroundColor: chatButtonActive ? "#3182ce" : "#ccc", // Update button color based on state
           width: 60,
           height: 60,
           borderRadius: 30,
@@ -975,7 +977,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           justifyContent: "center",
           zIndex: 1,
         }}
-        onPress={() => setMessagesModalVisible(true)}
+        onPress={() => chatButtonActive && setMessagesModalVisible(true)} // Only activate if chat button is active
       >
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />
       </TouchableOpacity>
