@@ -35,19 +35,21 @@ import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import * as ImagePicker from "expo-image-picker";
 import { Formik } from "formik";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import * as MailComposer from "expo-mail-composer"; // Add this import
+import * as MailComposer from "expo-mail-composer";
+import { useStripe } from '@stripe/stripe-react-native';
 
 const Classifieds = () => {
   const { user } = useUser();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
-  const [filterModalVisible, setFilterModalVisible] = useState(false); // Separate filter modal
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [contactModalVisible, setContactModalVisible] = useState(false); // Add this state
+  const [contactModalVisible, setContactModalVisible] = useState(false);
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPricing, setSelectedPricing] = useState("Basic");
@@ -150,18 +152,75 @@ const Classifieds = () => {
     }
   };
 
+  const fetchPaymentSheetParams = async () => {
+    // Replace with your server endpoint to create a PaymentIntent
+    const response = await fetch(`${API_URL}/payment-sheet`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ amount: totalCost * 100 }), // amount in cents
+    });
+    const { paymentIntent, ephemeralKey, customer } = await response.json();
+
+    return {
+      paymentIntent,
+      ephemeralKey,
+      customer,
+    };
+  };
+
+  const initializePaymentSheet = async () => {
+    const {
+      paymentIntent,
+      ephemeralKey,
+      customer,
+    } = await fetchPaymentSheetParams();
+
+    const { error } = await initPaymentSheet({
+      merchantDisplayName: "Ready Set Fly",
+      customerId: customer,
+      customerEphemeralKeySecret: ephemeralKey,
+      paymentIntentClientSecret: paymentIntent,
+      allowsDelayedPaymentMethods: true,
+      defaultBillingDetails: {
+        name: user.fullName || "Guest",
+      }
+    });
+
+    if (!error) {
+      setLoading(true);
+    } else {
+      Alert.alert("Error", "Failed to initialize payment sheet");
+    }
+  };
+
+  const openPaymentSheet = async () => {
+    const { error } = await presentPaymentSheet();
+
+    if (error) {
+      Alert.alert(`Error code: ${error.code}`, error.message);
+    } else {
+      Alert.alert('Success', 'Your payment is confirmed!');
+      handleCompletePayment(); // Proceed with the listing submission after successful payment
+    }
+  };
+
   const onSubmitMethod = (values) => {
     setLoading(true);
     const selectedPackagePrice = pricingPackages[selectedPricing];
     const totalWithTax = (selectedPackagePrice * 1.0825).toFixed(2);
     setTotalCost(totalWithTax);
     setListingDetails(values);
-    setPaymentModalVisible(true);
+    initializePaymentSheet().then(() => {
+      setPaymentModalVisible(true);
+      openPaymentSheet();
+    });
   };
 
   const handleCompletePayment = async () => {
     try {
-      setLoading(true); // Start loading spinner
+      setLoading(true);
 
       // Upload images first and get their URLs
       const uploadedImages = await Promise.all(
@@ -174,7 +233,6 @@ const Classifieds = () => {
             return await getDownloadURL(snapshot.ref);
           } catch (error) {
             if (__DEV__) {
-              // If in development mode, log the error and return the local URI
               console.error("Error uploading image: ", error);
               Alert.alert(
                 "Development Mode",
@@ -182,18 +240,17 @@ const Classifieds = () => {
               );
               return imageUri;
             } else {
-              throw error; // In production, propagate the error
+              throw error;
             }
           }
         })
       );
 
-      // Prepare the listing with the uploaded image URLs
       const newListing = {
         ...listingDetails,
         price: listingDetails.price,
         category: selectedCategory,
-        images: uploadedImages, // Set the uploaded image URLs
+        images: uploadedImages,
         userEmail: user.primaryEmailAddress.emailAddress,
         contactEmail: listingDetails.email,
         contactPhone: listingDetails.phone,
@@ -208,7 +265,6 @@ const Classifieds = () => {
         totalCost,
       };
 
-      // Save the listing in Firestore
       await addDoc(collection(db, "UserPost"), newListing);
 
       Alert.alert(
@@ -222,7 +278,7 @@ const Classifieds = () => {
       console.error("Error completing payment: ", error);
       Alert.alert("Error", "Failed to complete payment and submit listing.");
     } finally {
-      setLoading(false); // Stop loading spinner
+      setLoading(false);
     }
   };
 

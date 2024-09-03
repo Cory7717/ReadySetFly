@@ -27,9 +27,11 @@ import {
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
+import { useStripe } from "@stripe/stripe-react-native";
 
 const Home = ({ route, navigation }) => {
   const { user } = useUser();
+  const stripe = useStripe();
   const [listings, setListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedListing, setSelectedListing] = useState(null);
@@ -142,36 +144,31 @@ const Home = ({ route, navigation }) => {
     const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
     const ownerCost = rentalCost - rentalCost * 0.06;
 
-    const messageData = {
-      senderId: user.id,
-      senderName: user.fullName,
-      airplaneModel: selectedListing.airplaneModel,
-      rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
-      totalCost: ownerCost.toFixed(2),
-      contact: user.email || "noemail@example.com", // Fallback to a default value
-      createdAt: new Date(),
-    };
-
+    // Send rental request to the owner without finalizing payment
     try {
+      const messageData = {
+        senderId: user.id,
+        senderName: user.fullName,
+        airplaneModel: selectedListing.airplaneModel,
+        rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
+        totalCost: ownerCost.toFixed(2),
+        contact: user.email || "noemail@example.com", // Fallback to a default value
+        createdAt: new Date(),
+      };
+
       await addDoc(
         collection(db, "owners", selectedListing.ownerId, "rentalRequests"),
         messageData
       );
+
       Alert.alert(
         "Request Sent",
-        "Your rental request has been sent to the owner."
+        "Your rental request has been sent to the owner. You will be notified once the owner reviews the request."
       );
       setFullScreenModalVisible(false);
     } catch (error) {
       console.error("Error sending rental request: ", error);
-      if (error.code === "permission-denied") {
-        Alert.alert(
-          "Permission Denied",
-          "You do not have permission to send this request."
-        );
-      } else {
-        Alert.alert("Error", "Failed to send rental request to the owner.");
-      }
+      Alert.alert("Error", "Failed to send rental request to the owner.");
     }
   };
 

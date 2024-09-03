@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   TextInput,
@@ -7,29 +7,41 @@ import {
   TouchableOpacity,
   Image,
   Text,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   FlatList,
   ImageBackground,
   Modal,
   StatusBar,
   RefreshControl,
-  Animated,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "@clerk/clerk-expo";
-import { db } from "../../firebaseConfig";
-import { Formik } from "formik";
+import { db, storage } from "../../firebaseConfig";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { collection, addDoc, onSnapshot, updateDoc, doc, query, where } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  where,
+  getDoc,
+  setDoc,
+} from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { useStripe } from "@stripe/stripe-react-native";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const OwnerProfile = ({ ownerId, navigation }) => {
   const { user } = useUser();
+  const stripe = useStripe();
+  const resolvedOwnerId = ownerId || user?.id;
+
   const [profileData, setProfileData] = useState({
     airplaneModel: "",
     description: "",
@@ -39,6 +51,31 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     boostListing: false,
     boostedListing: false,
   });
+  const [aircraftDetails, setAircraftDetails] = useState({
+    year: "",
+    make: "",
+    model: "",
+    engine: "",
+    totalTime: "",
+    costPerHour: "",
+  });
+  const [costData, setCostData] = useState({
+    purchasePrice: "",
+    loanAmount: "",
+    interestRate: "",
+    loanTerm: "",
+    estimatedAnnualCost: "",
+    insuranceCost: "",
+    hangerCost: "",
+    fuelCostPerHour: "",
+    maintenanceReserve: "",
+    mortgageExpense: "",
+    flightHoursPerYear: "",
+    costPerHour: "",
+  });
+  const [costSaved, setCostSaved] = useState(false);
+  const [aircraftSaved, setAircraftSaved] = useState(false);
+  const [isListedForRent, setIsListedForRent] = useState(false);
   const [images, setImages] = useState([]);
   const [currentAnnualPdf, setCurrentAnnualPdf] = useState(null);
   const [insurancePdf, setInsurancePdf] = useState(null);
@@ -57,37 +94,27 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   const [rentalRequests, setRentalRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
-  const [costCalculatorModalVisible, setCostCalculatorModalVisible] = useState(false);
-  const [costData, setCostData] = useState({
-    estimatedAnnualCost: '',
-    insuranceCost: '',
-    hangerCost: '',
-    fuelCostPerHour: '',
-    mortgageExpense: '',
-    flightHoursPerYear: '',
-    costPerHour: '',
-    rentalPricePerHour: ''
-  });
-  const [editMode, setEditMode] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const [messageModalVisible, setMessageModalVisible] = useState(false);
-
-  const slideAnimation = useRef(new Animated.Value(300)).current;
+  const [messages, setMessages] = useState([]);
 
   useEffect(() => {
     // Load rental history and messages
-    const resolvedOwnerId = ownerId || user?.id;
     if (resolvedOwnerId) {
-      const rentalHistoryQuery = query(collection(db, "rentalHistory"), where("ownerId", "==", resolvedOwnerId));
+      const rentalHistoryQuery = query(
+        collection(db, "rentalHistory"),
+        where("ownerId", "==", resolvedOwnerId)
+      );
       const unsubscribeRentalHistory = onSnapshot(rentalHistoryQuery, (snapshot) => {
-        setRentalHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setRentalHistory(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       });
 
-      const messagesQuery = query(collection(db, "messages"), where("ownerId", "==", resolvedOwnerId));
+      const messagesQuery = query(
+        collection(db, "messages"),
+        where("ownerId", "==", resolvedOwnerId)
+      );
       const unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
-        setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       });
 
       return () => {
@@ -95,40 +122,85 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         unsubscribeMessages();
       };
     }
-  }, [ownerId, user?.id]);
+  }, [resolvedOwnerId]);
 
-  const toggleMenu = () => {
-    if (menuVisible) {
-      Animated.timing(slideAnimation, {
-        toValue: 300,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => setMenuVisible(false));
-    } else {
-      setMenuVisible(true);
-      Animated.timing(slideAnimation, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
+  useEffect(() => {
+    // Load saved data on component mount
+    const fetchData = async () => {
+      if (resolvedOwnerId) {
+        const docRef = doc(db, "aircraftDetails", resolvedOwnerId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setAircraftDetails(data.aircraftDetails);
+          setCostData(data.costData);
+          setCostSaved(true);
+          setAircraftSaved(true);
+        }
+      }
+    };
+    fetchData();
+  }, [resolvedOwnerId]);
 
-  const saveCostData = () => {
+  const saveCostData = async () => {
     setLoading(true);
-    const { estimatedAnnualCost, insuranceCost, hangerCost, fuelCostPerHour, mortgageExpense, flightHoursPerYear } = costData;
+    const {
+      purchasePrice,
+      loanAmount,
+      interestRate,
+      loanTerm,
+      estimatedAnnualCost,
+      insuranceCost,
+      hangerCost,
+      fuelCostPerHour,
+      maintenanceReserve,
+      flightHoursPerYear,
+    } = costData;
 
-    const totalCost = parseFloat(estimatedAnnualCost) + parseFloat(insuranceCost) + parseFloat(hangerCost) + parseFloat(fuelCostPerHour) + parseFloat(mortgageExpense);
-    const costPerHour = (totalCost / parseFloat(flightHoursPerYear)).toFixed(2);
+    // Mortgage Expense Calculation
+    const monthlyInterestRate = parseFloat(interestRate) / 100 / 12;
+    const numberOfPayments = parseFloat(loanTerm) * 12;
+    const mortgageExpense = loanAmount
+      ? (
+          (parseFloat(loanAmount) * monthlyInterestRate) /
+          (1 - Math.pow(1 + monthlyInterestRate, -numberOfPayments))
+        ).toFixed(2)
+      : 0;
 
-    setCostData({ ...costData, costPerHour });
+    const totalCost =
+      parseFloat(estimatedAnnualCost || 0) +
+      parseFloat(insuranceCost || 0) +
+      parseFloat(hangerCost || 0) +
+      (parseFloat(fuelCostPerHour || 0) * parseFloat(flightHoursPerYear || 1)) +
+      parseFloat(maintenanceReserve || 0) +
+      parseFloat(mortgageExpense || 0);
+
+    const costPerHour = (totalCost / parseFloat(flightHoursPerYear || 1)).toFixed(2);
+
+    setCostData((prev) => ({
+      ...prev,
+      costPerHour,
+      mortgageExpense: mortgageExpense,
+    }));
+    setCostSaved(true);
     setLoading(false);
-    setEditMode(false);
-    Alert.alert('Success', `Estimated cost per hour: $${costPerHour}`);
+
+    // Save the cost data to Firebase
+    await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
+      costData,
+      aircraftDetails,
+    });
+
+    Alert.alert("Success", `Estimated cost per hour: $${costPerHour}`);
   };
 
   const handleInputChange = (name, value) => {
     setCostData((prev) => ({ ...prev, [name]: value }));
+    if (name === "ratesPerHour") {
+      setProfileData((prev) => ({ ...prev, ratesPerHour: value }));
+    } else if (name in aircraftDetails) {
+      setAircraftDetails((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const pickImage = async () => {
@@ -197,13 +269,32 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     for (const key in data) {
       if (data[key] !== undefined && data[key] !== null) {
         sanitizedData[key] = data[key];
-      } else if (typeof data[key] === 'boolean') {
+      } else if (typeof data[key] === "boolean") {
         sanitizedData[key] = data[key];
       } else {
         sanitizedData[key] = "";
       }
     }
     return sanitizedData;
+  };
+
+  const onSaveAircraftDetails = async () => {
+    setAircraftSaved(true);
+    Alert.alert("Aircraft Details Saved", "Your aircraft details have been saved.");
+
+    // Save the aircraft details to Firebase
+    await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
+      costData,
+      aircraftDetails,
+    });
+  };
+
+  const onEditAircraftDetails = () => {
+    setAircraftSaved(false);
+  };
+
+  const onEditCostData = () => {
+    setCostSaved(false);
   };
 
   const onSubmitMethod = async (values) => {
@@ -222,21 +313,19 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         ? await uploadFile(insurancePdf, "documents")
         : "";
 
-      const resolvedOwnerId = ownerId || user?.id;
-
       const newListing = sanitizeData({
-        airplaneModel: values.airplaneModel || "", 
-        description: values.description || "",
-        location: values.location || "",
-        ratesPerHour: profileData.ratesPerHour || "0", 
-        minimumHours: values.minimumHours || "1",
-        images: uploadedImages.length > 0 ? uploadedImages : [], 
+        airplaneModel: aircraftDetails.model || "",
+        description: profileData.description || "",
+        location: profileData.location || "",
+        ratesPerHour: aircraftDetails.costPerHour || "0",
+        minimumHours: profileData.minimumHours || "1",
+        images: uploadedImages.length > 0 ? uploadedImages : [],
         currentAnnualPdf: annualProofURL || "",
         insurancePdf: insuranceProofURL || "",
         ownerId: resolvedOwnerId,
         createdAt: new Date(),
         boosted: profileData.boostListing || false,
-        boostedListing: profileData.boostListing ? true : false, 
+        boostedListing: profileData.boostListing ? true : false,
       });
 
       await addDoc(collection(db, "airplanes"), newListing);
@@ -251,10 +340,11 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
       Alert.alert("Success", "Your listing has been submitted.");
       setFormVisible(false);
+      setIsListedForRent(true); // Mark the aircraft as listed for rent
     } catch (error) {
       console.error("Error submitting listing: ", error);
 
-      if (error.message.includes('Network request failed')) {
+      if (error.message.includes("Network request failed")) {
         Alert.alert(
           "Network Error",
           "There was an error submitting your listing due to network issues. Please check your internet connection and try again."
@@ -270,9 +360,26 @@ const OwnerProfile = ({ ownerId, navigation }) => {
     }
   };
 
+  const handleListForRentToggle = async () => {
+    if (isListedForRent) {
+      try {
+        const listingDocRef = doc(db, "airplanes", resolvedOwnerId);
+        await deleteDoc(listingDocRef);
+
+        setUserListings(userListings.filter((listing) => listing.ownerId !== resolvedOwnerId));
+        setIsListedForRent(false);
+        Alert.alert("Success", "Your aircraft has been removed from the listings.");
+      } catch (error) {
+        console.error("Error removing listing: ", error);
+        Alert.alert("Error", "There was an error removing your listing.");
+      }
+    } else {
+      onSubmitMethod(aircraftDetails);
+    }
+  };
+
   const handleApproveRentalRequest = async (request) => {
     try {
-      const resolvedOwnerId = ownerId || user?.id;
       if (!resolvedOwnerId) {
         Alert.alert("Error", "Owner ID is undefined.");
         return;
@@ -283,13 +390,16 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
       const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
         amount: parseInt(request.totalCost * 100), // Amount in cents
-        currency: 'usd',
-        paymentMethodTypes: ['card'],
+        currency: "usd",
+        paymentMethodTypes: ["card"],
         confirm: true,
       });
 
-      if (paymentIntent.status === 'succeeded') {
-        Alert.alert("Payment Successful", "The rental request has been approved and payment processed.");
+      if (paymentIntent?.status === "succeeded") {
+        Alert.alert(
+          "Payment Successful",
+          "The rental request has been approved and payment processed."
+        );
       } else {
         Alert.alert("Payment Failed", "The payment could not be completed. Please try again.");
       }
@@ -303,7 +413,6 @@ const OwnerProfile = ({ ownerId, navigation }) => {
 
   const handleDenyRentalRequest = async (request) => {
     try {
-      const resolvedOwnerId = ownerId || user?.id;
       if (!resolvedOwnerId) {
         Alert.alert("Error", "Owner ID is undefined.");
         return;
@@ -327,15 +436,16 @@ const OwnerProfile = ({ ownerId, navigation }) => {
   };
 
   const calculateActualRevenue = () => {
-    return rentalHistory.reduce((total, order) => {
-      return total + parseFloat(order.totalCost);
-    }, 0).toFixed(2);
+    return rentalHistory
+      .reduce((total, order) => {
+        return total + parseFloat(order.totalCost);
+      }, 0)
+      .toFixed(2);
   };
 
   const sendMessage = async () => {
     if (!messageInput.trim()) return;
 
-    const resolvedOwnerId = ownerId || user?.id;
     const messageData = {
       ownerId: resolvedOwnerId,
       senderId: user.id,
@@ -381,52 +491,133 @@ const OwnerProfile = ({ ownerId, navigation }) => {
             }}
           >
             <View>
-              <Text style={{ fontSize: 14, color: "white", marginTop: 1 }}>Good Morning</Text>
+              <Text style={{ fontSize: 14, color: "white", marginTop: 1 }}>
+                Good Morning
+              </Text>
               <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
                 {user?.fullName || "User"}
               </Text>
             </View>
-
-            <TouchableOpacity onPress={toggleMenu}>
-              <Ionicons name="menu" size={32} color="white" />
-            </TouchableOpacity>
           </View>
         </ImageBackground>
 
-        {/* Pressable Area for Viewing Rental Requests */}
-        <TouchableOpacity
-          onPress={() => setRentalRequestModalVisible(true)}
-          style={{
-            marginVertical: 20,
-            paddingVertical: 15,
-            paddingHorizontal: 20,
-            backgroundColor: "#2d3748",
-            borderRadius: 8,
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "center",
-            marginHorizontal: 16,
-          }}
-        >
-          <Text style={{ color: "white", fontWeight: "bold" }}>View Rental Requests</Text>
-          {rentalRequests.length > 0 && (
-            <View
-              style={{
-                backgroundColor: "#e53e3e",
-                borderRadius: 50,
-                marginLeft: 10,
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-              }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold" }}>
-                {rentalRequests.length}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* Cost of Ownership Calculator Card */}
+        <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
+          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8, color: "#2d3748" }}>
+            Cost of Ownership Calculator
+          </Text>
+          <View style={{ backgroundColor: "#edf2f7", borderRadius: 12, padding: 16 }}>
+            {costSaved ? (
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: "bold", color: "#2d3748" }}>
+                  Total Cost Per Hour of Ownership: ${costData.costPerHour}
+                </Text>
+                <TouchableOpacity
+                  onPress={onEditCostData}
+                  style={{
+                    backgroundColor: "#3182ce",
+                    paddingVertical: 12,
+                    paddingHorizontal: 24,
+                    borderRadius: 50,
+                    marginTop: 16,
+                  }}
+                >
+                  <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                    Edit Cost Data
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <TextInput
+                  placeholder="Purchase Price"
+                  onChangeText={(value) => handleInputChange("purchasePrice", value)}
+                  value={costData.purchasePrice}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Loan Amount"
+                  onChangeText={(value) => handleInputChange("loanAmount", value)}
+                  value={costData.loanAmount}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Interest Rate (%)"
+                  onChangeText={(value) => handleInputChange("interestRate", value)}
+                  value={costData.interestRate}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Loan Term (Years)"
+                  onChangeText={(value) => handleInputChange("loanTerm", value)}
+                  value={costData.loanTerm}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Estimated Annual Cost"
+                  onChangeText={(value) => handleInputChange("estimatedAnnualCost", value)}
+                  value={costData.estimatedAnnualCost}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Insurance Cost"
+                  onChangeText={(value) => handleInputChange("insuranceCost", value)}
+                  value={costData.insuranceCost}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Hanger Cost"
+                  onChangeText={(value) => handleInputChange("hangerCost", value)}
+                  value={costData.hangerCost}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Fuel Cost Per Hour"
+                  onChangeText={(value) => handleInputChange("fuelCostPerHour", value)}
+                  value={costData.fuelCostPerHour}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Maintenance Reserve"
+                  onChangeText={(value) => handleInputChange("maintenanceReserve", value)}
+                  value={costData.maintenanceReserve}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
+                <TextInput
+                  placeholder="Flight Hours Per Year"
+                  onChangeText={(value) => handleInputChange("flightHoursPerYear", value)}
+                  value={costData.flightHoursPerYear}
+                  keyboardType="numeric"
+                  style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
+                />
 
-        {/* New Section with Payment and Earnings Details */}
+                {loading ? (
+                  <ActivityIndicator size="large" color="#FF5A5F" />
+                ) : (
+                  <TouchableOpacity
+                    onPress={saveCostData}
+                    style={{ backgroundColor: "#e53e3e", paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50, marginTop: 16 }}
+                  >
+                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                      Calculate Cost Per Hour
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Payment and Earnings Card */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
           <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8, color: "#2d3748" }}>
             Payment and Earnings
@@ -439,8 +630,214 @@ const OwnerProfile = ({ ownerId, navigation }) => {
               Total Earnings: ${calculateActualRevenue()}
             </Text>
           </View>
+
+          {/* Editable Aircraft Details Card */}
+          <View style={{ marginTop: 16 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8, color: "#2d3748" }}>
+                Aircraft Details
+              </Text>
+              {aircraftSaved && (
+                <TouchableOpacity
+                  onPress={handleListForRentToggle}
+                  style={{
+                    backgroundColor: isListedForRent ? "#e53e3e" : "#48bb78",
+                    paddingVertical: 8,
+                    paddingHorizontal: 16,
+                    borderRadius: 50,
+                  }}
+                >
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    {isListedForRent ? "Unlist" : "List for Rent"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={{ backgroundColor: "#edf2f7", borderRadius: 12, padding: 16 }}>
+              {aircraftSaved ? (
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: "bold", color: "#2d3748" }}>
+                    {`${aircraftDetails.year} ${aircraftDetails.make} ${aircraftDetails.model}`}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
+                    Engine: {aircraftDetails.engine}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
+                    Total Time: {aircraftDetails.totalTime} hrs
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
+                    Cost Per Hour: ${aircraftDetails.costPerHour}
+                  </Text>
+                  <FlatList
+                    data={images}
+                    horizontal
+                    renderItem={({ item, index }) => (
+                      <Image
+                        key={index}
+                        source={{ uri: item }}
+                        style={{
+                          width: 96,
+                          height: 96,
+                          marginRight: 8,
+                          borderRadius: 8,
+                        }}
+                      />
+                    )}
+                    keyExtractor={(item, index) => index.toString()}
+                    style={{ marginTop: 16 }}
+                  />
+                  <TouchableOpacity
+                    onPress={onEditAircraftDetails}
+                    style={{
+                      backgroundColor: "#3182ce",
+                      paddingVertical: 12,
+                      paddingHorizontal: 24,
+                      borderRadius: 50,
+                      marginTop: 16,
+                    }}
+                  >
+                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                      Edit Aircraft Details
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View>
+                  <TextInput
+                    placeholder="Year"
+                    onChangeText={(value) => handleInputChange("year", value)}
+                    value={aircraftDetails.year}
+                    keyboardType="numeric"
+                    style={{
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#cbd5e0",
+                      marginBottom: 8,
+                      padding: 8,
+                      color: "#2d3748",
+                    }}
+                  />
+                  <TextInput
+                    placeholder="Make"
+                    onChangeText={(value) => handleInputChange("make", value)}
+                    value={aircraftDetails.make}
+                    style={{
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#cbd5e0",
+                      marginBottom: 8,
+                      padding: 8,
+                      color: "#2d3748",
+                    }}
+                  />
+                  <TextInput
+                    placeholder="Model"
+                    onChangeText={(value) => handleInputChange("model", value)}
+                    value={aircraftDetails.model}
+                    style={{
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#cbd5e0",
+                      marginBottom: 8,
+                      padding: 8,
+                      color: "#2d3748",
+                    }}
+                  />
+                  <TextInput
+                    placeholder="Engine"
+                    onChangeText={(value) => handleInputChange("engine", value)}
+                    value={aircraftDetails.engine}
+                    style={{
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#cbd5e0",
+                      marginBottom: 8,
+                      padding: 8,
+                      color: "#2d3748",
+                    }}
+                  />
+                  <TextInput
+                    placeholder="Total Time on Frame"
+                    onChangeText={(value) => handleInputChange("totalTime", value)}
+                    value={aircraftDetails.totalTime}
+                    keyboardType="numeric"
+                    style={{
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#cbd5e0",
+                      marginBottom: 8,
+                      padding: 8,
+                      color: "#2d3748",
+                    }}
+                  />
+                  <TextInput
+                    placeholder="Cost Per Hour"
+                    onChangeText={(value) => handleInputChange("costPerHour", value)}
+                    value={aircraftDetails.costPerHour}
+                    keyboardType="numeric"
+                    style={{
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#cbd5e0",
+                      marginBottom: 8,
+                      padding: 8,
+                      color: "#2d3748",
+                    }}
+                  />
+                  <FlatList
+                    data={images}
+                    horizontal
+                    renderItem={({ item, index }) => (
+                      <Image
+                        key={index}
+                        source={{ uri: item }}
+                        style={{
+                          width: 96,
+                          height: 96,
+                          marginRight: 8,
+                          borderRadius: 8,
+                        }}
+                      />
+                    )}
+                    keyExtractor={(item, index) => index.toString()}
+                    style={{ marginTop: 16 }}
+                  />
+                  <TouchableOpacity
+                    onPress={pickImage}
+                    style={{
+                      backgroundColor: "#edf2f7",
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderRadius: 50,
+                      marginTop: 8,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <Text style={{ color: "#2d3748", textAlign: "center" }}>
+                      {images.length >= 7 ? "Maximum 7 Images" : "Add Image"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={onSaveAircraftDetails}
+                    style={{
+                      backgroundColor: "#48bb78",
+                      paddingVertical: 12,
+                      paddingHorizontal: 24,
+                      borderRadius: 50,
+                      marginTop: 16,
+                    }}
+                  >
+                    <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                      Save Aircraft Details
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
         </View>
 
+        {/* Current Listings Section */}
         <View style={{ marginTop: 32 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, color: "#2d3748", textAlign: "center" }}>
             Your Current Listings
@@ -476,19 +873,35 @@ const OwnerProfile = ({ ownerId, navigation }) => {
           )}
         </View>
 
+        {/* Rental History Section */}
         <View style={{ marginTop: 32 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16, color: "#2d3748", textAlign: "center" }}>
             Rental History
           </Text>
           {rentalHistory.length > 0 ? (
             rentalHistory.map((order) => (
-              <View key={order.id} style={{ backgroundColor: "#edf2f7", padding: 16, borderRadius: 16, marginBottom: 16 }}>
+              <View
+                key={order.id}
+                style={{
+                  backgroundColor: "#edf2f7",
+                  padding: 16,
+                  borderRadius: 16,
+                  marginBottom: 16,
+                }}
+              >
                 <Text style={{ fontSize: 18, fontWeight: "bold", color: "#2d3748" }}>
                   {order.airplaneModel}
                 </Text>
                 <Text style={{ color: "#4a5568" }}>{order.rentalPeriod}</Text>
                 <Text style={{ color: "#4a5568" }}>{order.renterName}</Text>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: 16,
+                  }}
+                >
                   <Text style={{ color: "#2d3748" }}>Rate this renter:</Text>
                   <View style={{ flexDirection: "row" }}>
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -532,233 +945,6 @@ const OwnerProfile = ({ ownerId, navigation }) => {
           )}
         </View>
       </ScrollView>
-
-      {/* Submit Your Listing Button */}
-      <View style={{ position: "absolute", bottom: 40, left: 0, right: 0, alignItems: "center" }}>
-        <TouchableOpacity
-          onPress={() => setFormVisible(true)}
-          style={{
-            padding: 10,
-            borderRadius: 25,
-            backgroundColor: "#e53e3e",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.8,
-            shadowRadius: 2,
-            elevation: 5,
-          }}
-        >
-          <Text style={{ color: "white", fontWeight: "bold" }}>Submit Your Listing</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Form Modal */}
-      <Modal
-        visible={formVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setFormVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1, justifyContent: "center", alignItems: "center", width: "100%" }}
-          >
-            <ScrollView
-              contentContainerStyle={{
-                flexGrow: 1,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-              style={{ width: "100%", maxWidth: 320 }}
-            >
-              <View style={{ backgroundColor: "white", borderRadius: 24, padding: 24, width: "100%", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 }}>
-                <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center", color: "#2d3748" }}>
-                  Submit Your Listing
-                </Text>
-
-                <TouchableOpacity
-                  onPress={() => setCalendarVisible(!calendarVisible)}
-                  style={{ backgroundColor: "#edf2f7", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginBottom: 24 }}
-                >
-                  <Text style={{ color: "#2d3748", textAlign: "center" }}>
-                    {calendarVisible ? "Hide Calendar" : "Show Calendar"}
-                  </Text>
-                </TouchableOpacity>
-
-                {calendarVisible && (
-                  <Calendar
-                    onDayPress={onDayPress}
-                    markedDates={selectedDates}
-                    markingType={"multi-dot"}
-                    style={{ marginBottom: 24 }}
-                  />
-                )}
-
-                <Formik
-                  initialValues={{
-                    airplaneModel: "",
-                    description: "",
-                    location: "",
-                    ratesPerHour: "",
-                    minimumHours: "",
-                  }}
-                  onSubmit={onSubmitMethod}
-                >
-                  {({ handleChange, handleBlur, handleSubmit, values }) => (
-                    <>
-                      <TextInput
-                        placeholder="Aircraft Make/Model"
-                        onChangeText={handleChange("airplaneModel")}
-                        onBlur={handleBlur("airplaneModel")}
-                        value={values.airplaneModel || ""}
-                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                      />
-                      <TextInput
-                        placeholder="Description"
-                        onChangeText={handleChange("description")}
-                        onBlur={handleBlur("description")}
-                        value={values.description || ""}
-                        multiline
-                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                      />
-                      <TextInput
-                        placeholder="Location (City, State)"
-                        onChangeText={handleChange("location")}
-                        onBlur={handleBlur("location")}
-                        value={values.location || ""}
-                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                      />
-                      <TextInput
-                        placeholder="Rates Per Hour ($)"
-                        onChangeText={(text) =>
-                          handleInputChange("ratesPerHour", text)
-                        }
-                        onBlur={handleBlur("ratesPerHour")}
-                        value={profileData.ratesPerHour || ""}
-                        keyboardType="default"
-                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                      />
-                      <TextInput
-                        placeholder="Minimum Hour Requirement"
-                        onChangeText={handleChange("minimumHours")}
-                        onBlur={handleBlur("minimumHours")}
-                        value={values.minimumHours || ""}
-                        keyboardType="numeric"
-                        style={{ borderBottomWidth: 1, borderBottomColor: "#cbd5e0", marginBottom: 16, padding: 8, color: "#2d3748" }}
-                      />
-
-                      <TouchableOpacity
-                        onPress={() =>
-                          handleInputChange(
-                            "boostListing",
-                            !profileData.boostListing
-                          )
-                        }
-                        style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#d69e2e", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginBottom: 16 }}
-                      >
-                        <FontAwesome name="dollar" size={24} color="black" />
-                        <Text style={{ marginLeft: 8, color: "#2d3748" }}>
-                          {profileData.boostListing
-                            ? "Boost Selected ($50)"
-                            : "Boost Your Listing ($50)"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <Text style={{ marginBottom: 8, marginTop: 24, color: "#2d3748", fontWeight: "bold" }}>
-                        Upload Images
-                      </Text>
-                      <FlatList
-                        data={images}
-                        horizontal
-                        renderItem={({ item, index }) => (
-                          <Image
-                            key={index}
-                            source={{ uri: item }}
-                            style={{
-                              width: 96,
-                              height: 96,
-                              marginRight: 8,
-                              borderRadius: 8,
-                            }}
-                          />
-                        )}
-                        keyExtractor={(item, index) => index.toString()}
-                        style={{ marginBottom: 16 }}
-                      />
-                      <TouchableOpacity
-                        onPress={pickImage}
-                        style={{ backgroundColor: "#edf2f7", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginTop: 8, marginBottom: 16 }}
-                      >
-                        <Text style={{ color: "#2d3748", textAlign: "center" }}>
-                          {images.length >= 7
-                            ? "Maximum 7 Images"
-                            : "Add Image"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <Text style={{ marginBottom: 8, marginTop: 24, color: "#2d3748", fontWeight: "bold" }}>
-                        Uploaded PDF Documents
-                      </Text>
-                      {currentAnnualPdf && (
-                        <Text style={{ color: "#4a5568" }}>
-                          Proof of Current Annual:{" "}
-                          {currentAnnualPdf.split("/").pop()}
-                        </Text>
-                      )}
-                      {insurancePdf && (
-                        <Text style={{ color: "#4a5568" }}>
-                          Proof of Insurance: {insurancePdf.split("/").pop()}
-                        </Text>
-                      )}
-
-                      <TouchableOpacity
-                        onPress={pickDocument}
-                        style={{ backgroundColor: "#edf2f7", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginTop: 8, marginBottom: 16 }}
-                      >
-                        <Text style={{ color: "#2d3748", textAlign: "center" }}>
-                          Upload PDF Document (Proof of Current Annual)
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={pickInsuranceDocument}
-                        style={{ backgroundColor: "#edf2f7", paddingVertical: 12, paddingHorizontal: 16, borderRadius: 50, marginTop: 8, marginBottom: 16 }}
-                      >
-                        <Text style={{ color: "#2d3748", textAlign: "center" }}>
-                          Upload PDF Document (Proof of Insurance)
-                        </Text>
-                      </TouchableOpacity>
-
-                      {loading ? (
-                        <ActivityIndicator size="large" color="#FF5A5F" />
-                      ) : (
-                        <TouchableOpacity
-                          onPress={handleSubmit}
-                          style={{ backgroundColor: "#e53e3e", paddingVertical: 16, paddingHorizontal: 24, borderRadius: 50 }}
-                        >
-                          <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-                            Submit Listing
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </>
-                  )}
-                </Formik>
-
-                <TouchableOpacity
-                  onPress={() => setFormVisible(false)}
-                  style={{ marginTop: 24, paddingVertical: 12, borderRadius: 50, backgroundColor: "#e2e8f0" }}
-                >
-                  <Text style={{ color: "#2d3748", textAlign: "center", fontWeight: "bold" }}>
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
 
       {/* Rental Request Modal */}
       <Modal
@@ -905,36 +1091,25 @@ const OwnerProfile = ({ ownerId, navigation }) => {
         </View>
       </Modal>
 
-      {menuVisible && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            height: '100%',
-            width: 300,
-            backgroundColor: 'white',
-            padding: 20,
-            transform: [{ translateX: slideAnimation }],
-            shadowColor: '#000',
-            shadowOffset: { width: -2, height: 0 },
-            shadowOpacity: 0.5,
-            shadowRadius: 5,
-            elevation: 5,
-          }}
-        >
-          <TouchableOpacity onPress={() => setCostCalculatorModalVisible(true)}>
-            <Text style={{ fontSize: 18, marginBottom: 16 }}>Cost of Ownership Calculator</Text>
-          </TouchableOpacity>
-          {/* Add other menu items if needed */}
-          <TouchableOpacity onPress={toggleMenu}>
-            <Text style={{ fontSize: 18, color: '#3182ce' }}>Close Menu</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+      <TouchableOpacity
+        style={{
+          position: "absolute",
+          bottom: 20,
+          right: 20,
+          backgroundColor: "#3182ce",
+          width: 60,
+          height: 60,
+          borderRadius: 30,
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1,
+        }}
+        onPress={() => setMessageModalVisible(true)}
+      >
+        <Ionicons name="chatbubble-ellipses" size={32} color="white" />
+      </TouchableOpacity>
     </View>
   );
 };
 
 export default OwnerProfile;
-

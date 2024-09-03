@@ -26,9 +26,14 @@ import { useNavigation } from '@react-navigation/native';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
+import Fontisto from '@expo/vector-icons/Fontisto';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Octicons from '@expo/vector-icons/Octicons';
+import { useStripe } from '@stripe/stripe-react-native';
 
 const BookingCalendar = ({ airplaneId, ownerId }) => {
   const { user } = useUser();
+  const stripe = useStripe();
   const navigation = useNavigation();
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -58,8 +63,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const [numHours, setNumHours] = useState('');
   const [costPerGallon, setCostPerGallon] = useState('');
   const [numGallons, setNumGallons] = useState('');
-  
-  // Using useRef for slideAnimation to persist animation value
+
   const slideAnimation = useRef(new Animated.Value(300)).current;
 
   const renterId = user?.id;
@@ -188,6 +192,59 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     } catch (error) {
       console.error('Error sending rental request:', error);
       Alert.alert('Error', 'Failed to send rental request.');
+    }
+  };
+
+  const processPayment = async (amount) => {
+    try {
+      const response = await fetch('https://your-server-side-code.com/create-payment-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: Math.round(amount * 100), // Convert to cents
+          currency: 'usd',
+        }),
+      });
+      const { clientSecret } = await response.json();
+
+      const { paymentIntent, error } = await stripe.confirmPayment({
+        paymentIntentClientSecret: clientSecret,
+      });
+
+      if (error) {
+        Alert.alert('Payment failed', error.message);
+        return false;
+      }
+
+      if (paymentIntent.status === 'Succeeded') {
+        Alert.alert('Payment successful', 'Your payment has been processed successfully.');
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      Alert.alert('Error', 'Payment processing failed.');
+      return false;
+    }
+  };
+
+  const finalizeRentalRequest = async (rentalDetails) => {
+    const paymentSuccessful = await processPayment(rentalDetails.totalCost);
+
+    if (paymentSuccessful) {
+      const db = getFirestore();
+      try {
+        const rentalRequestRef = doc(db, 'rentalRequests', rentalDetails.requestId);
+        await updateDoc(rentalRequestRef, { status: 'approved' });
+
+        Alert.alert('Rental Confirmed', 'Your rental request has been approved.');
+      } catch (error) {
+        console.error('Error finalizing rental request:', error);
+        Alert.alert('Error', 'Failed to finalize rental request.');
+      }
     }
   };
 
@@ -324,19 +381,19 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 16 }}>
           <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('all')}>
-            <Ionicons name="airplane-outline" size={32} color="#3182ce" />
+            <Octicons name="paper-airplane" size={32} color="#3182ce" />
             <Text>All Aircraft</Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('jets')}>
-            <Ionicons name="jet-outline" size={32} color="#a0aec0" />
+            <Ionicons name="airplane-outline" size={32} color="#3182ce" />
             <Text>Jets</Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('pistons')}>
-            <Ionicons name="airplane" size={32} color="#a0aec0" />
+            <MaterialCommunityIcons name="engine-outline" size={32} color="#3182ce" />
             <Text>Pistons</Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('helicopters')}>
-            <Ionicons name="helicopter-outline" size={32} color="#a0aec0" />
+            <Fontisto name="helicopter" size={32} color="#3182ce" />
             <Text>Helicopters</Text>
           </TouchableOpacity>
         </View>
@@ -496,7 +553,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             )}
             {profileData.insurance && (
               <Text style={{ color: '#718096', marginBottom: 8 }}>
-                Insurance Uploaded: {profileData.insurance.split('/').pop()}
+                Insurance Uploaded: {profileData.insurance.split('/').pop()}`
               </Text>
             )}
             {profileData.image && (
@@ -528,7 +585,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         )}
       </ScrollView>
 
-      {/* Touchable opacity over the whole screen to close the menu */}
       {menuVisible && (
         <TouchableOpacity
           style={{
@@ -538,10 +594,10 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.3)',
-            zIndex: 1, // Ensure the overlay is above other content
+            zIndex: 1,
           }}
           activeOpacity={1}
-          onPress={toggleMenu} // Close menu on press
+          onPress={toggleMenu}
         >
           <Animated.View
             style={{
@@ -581,7 +637,12 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       )}
 
       <TouchableOpacity
-        style={{ position: 'absolute', top: 40, right: 20 }}
+        style={{
+          position: 'absolute',
+          top: 40,
+          right: 20,
+          zIndex: 1,
+        }}
         onPress={toggleMenu}
       >
         <Ionicons name="menu" size={32} color="black" />
@@ -631,7 +692,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           <View
             style={{
               position: 'absolute',
-              top: 100, // Adjust the position to avoid overlap with the close button
+              top: 100,
               left: 0,
               right: 0,
               backgroundColor: 'white',
@@ -654,7 +715,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                 borderRadius: 8,
               }}
               onSubmitEditing={(event) => {
-                // Add location search functionality
                 console.log(event.nativeEvent.text);
               }}
             />
@@ -901,6 +961,24 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
+
+      <TouchableOpacity
+        style={{
+          position: "absolute",
+          bottom: 20,
+          right: 20,
+          backgroundColor: "#3182ce",
+          width: 60,
+          height: 60,
+          borderRadius: 30,
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1,
+        }}
+        onPress={() => setMessagesModalVisible(true)}
+      >
+        <Ionicons name="chatbubble-ellipses" size={32} color="white" />
+      </TouchableOpacity>
     </View>
   );
 };
