@@ -13,7 +13,7 @@ import {
   FlatList,
   ScrollView,
 } from "react-native";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useAuth } from "@clerk/clerk-expo";
 import { db } from "../../firebaseConfig";
 import {
   collection,
@@ -31,6 +31,7 @@ import { useStripe } from "@stripe/stripe-react-native";
 
 const Home = ({ route, navigation }) => {
   const { user } = useUser();
+  const { signOut } = useAuth();
   const stripe = useStripe();
   const [listings, setListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -77,6 +78,18 @@ const Home = ({ route, navigation }) => {
     }
   }, [selectedListing, rentalHours]);
 
+  useEffect(() => {
+    if (route?.params?.newListing) {
+      setListings((prevListings) => [route.params.newListing, ...prevListings]);
+    }
+
+    if (route?.params?.unlistedId) {
+      setListings((prevListings) =>
+        prevListings.filter((listing) => listing.id !== route.params.unlistedId)
+      );
+    }
+  }, [route?.params?.newListing, route?.params?.unlistedId]);
+
   const subscribeToListings = () => {
     const listingsRef = collection(db, "airplanes");
 
@@ -112,7 +125,6 @@ const Home = ({ route, navigation }) => {
   };
 
   const checkAdminStatus = () => {
-    // Replace with your logic to check if the user is an admin
     const adminUserIds = ["adminUserId1", "adminUserId2"]; // Example admin user IDs
     if (adminUserIds.includes(user?.id)) {
       setIsAdmin(true);
@@ -144,7 +156,6 @@ const Home = ({ route, navigation }) => {
     const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
     const ownerCost = rentalCost - rentalCost * 0.06;
 
-    // Send rental request to the owner without finalizing payment
     try {
       const messageData = {
         senderId: user.id,
@@ -161,6 +172,16 @@ const Home = ({ route, navigation }) => {
         messageData
       );
 
+      await addDoc(collection(db, "messages"), {
+        ownerId: selectedListing.ownerId,
+        senderId: user.id,
+        senderName: user.fullName,
+        text: `New rental request from ${user.fullName}: ${ownerCost.toFixed(
+          2
+        )}`,
+        createdAt: new Date(),
+      });
+
       Alert.alert(
         "Request Sent",
         "Your rental request has been sent to the owner. You will be notified once the owner reviews the request."
@@ -175,6 +196,10 @@ const Home = ({ route, navigation }) => {
   const handleDeleteListing = async (listingId) => {
     try {
       await deleteDoc(doc(db, "airplanes", listingId));
+      // Remove the listing from the state
+      setListings((prevListings) =>
+        prevListings.filter((listing) => listing.id !== listingId)
+      );
       Alert.alert("Deleted", "The listing has been deleted.");
     } catch (error) {
       console.error("Error deleting listing: ", error);
@@ -183,7 +208,6 @@ const Home = ({ route, navigation }) => {
   };
 
   const handleEditListing = async (listingId) => {
-    // Implement your logic to edit a listing
     Alert.alert("Edit Listing", `This would edit the listing with ID ${listingId}`);
   };
 
@@ -217,6 +241,27 @@ const Home = ({ route, navigation }) => {
     extrapolate: "clamp",
   });
 
+  const handleLogout = () => {
+    Alert.alert(
+      "Confirm Logout",
+      "Are you sure you want to log out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Logout",
+          onPress: async () => {
+            await signOut();
+            navigation.replace("SignIn"); // Navigate to the SignIn page after logout
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
       <Animated.View
@@ -238,26 +283,33 @@ const Home = ({ route, navigation }) => {
               paddingHorizontal: 16,
               paddingTop: headerPaddingTop,
               paddingBottom: 20,
+              flexDirection: "row",
+              justifyContent: "space-between",
             }}
           >
-            <Animated.Text
-              style={{
-                fontSize: headerFontSize,
-                color: "white",
-                fontWeight: "bold",
-              }}
-            >
-              Good Morning
-            </Animated.Text>
-            <Animated.Text
-              style={{
-                fontSize: Animated.add(headerFontSize, 6),
-                color: "white",
-                fontWeight: "bold",
-              }}
-            >
-              {user?.fullName}
-            </Animated.Text>
+            <View>
+              <Animated.Text
+                style={{
+                  fontSize: headerFontSize,
+                  color: "white",
+                  fontWeight: "bold",
+                }}
+              >
+                Good Morning
+              </Animated.Text>
+              <Animated.Text
+                style={{
+                  fontSize: Animated.add(headerFontSize, 6),
+                  color: "white",
+                  fontWeight: "bold",
+                }}
+              >
+                {user?.fullName}
+              </Animated.Text>
+            </View>
+            <TouchableOpacity onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={28} color="white" />
+            </TouchableOpacity>
           </Animated.View>
         </ImageBackground>
       </Animated.View>
@@ -337,40 +389,42 @@ const Home = ({ route, navigation }) => {
                   shadowRadius: 2,
                 }}
               >
-                <ImageBackground
-                  source={{ uri: item.images && item.images[0] }}
-                  style={{ height: 200, justifyContent: "space-between" }}
-                  imageStyle={{ borderRadius: 10 }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      padding: 8,
-                    }}
+                {item.images && item.images.length > 0 && (
+                  <ImageBackground
+                    source={{ uri: item.images[0] }}
+                    style={{ height: 200, justifyContent: "space-between" }}
+                    imageStyle={{ borderRadius: 10 }}
                   >
-                    <Text
+                    <View
                       style={{
-                        backgroundColor: "#000000a0",
-                        color: "white",
-                        padding: 4,
-                        borderRadius: 5,
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        padding: 8,
                       }}
                     >
-                      {item.location}
-                    </Text>
-                    <Text
-                      style={{
-                        backgroundColor: "#000000a0",
-                        color: "white",
-                        padding: 4,
-                        borderRadius: 5,
-                      }}
-                    >
-                      ${item.ratesPerHour}/hour
-                    </Text>
-                  </View>
-                </ImageBackground>
+                      <Text
+                        style={{
+                          backgroundColor: "#000000a0",
+                          color: "white",
+                          padding: 4,
+                          borderRadius: 5,
+                        }}
+                      >
+                        {item.location}
+                      </Text>
+                      <Text
+                        style={{
+                          backgroundColor: "#000000a0",
+                          color: "white",
+                          padding: 4,
+                          borderRadius: 5,
+                        }}
+                      >
+                        ${item.ratesPerHour}/hour
+                      </Text>
+                    </View>
+                  </ImageBackground>
+                )}
                 <View style={{ padding: 10 }}>
                   <Text
                     style={{
@@ -425,7 +479,6 @@ const Home = ({ route, navigation }) => {
         )}
       </Animated.ScrollView>
 
-      {/* Full Screen Listing Details Modal */}
       <Modal
         animationType="slide"
         transparent={false}

@@ -92,7 +92,7 @@ const SignUp = () => {
     });
 
     setProfileVisible(false);
-    router.replace('/');
+    router.replace('/tabs/home');  // Updated to navigate to /tabs/home
   };
 
   return (
@@ -249,56 +249,7 @@ const SignUp = () => {
                 - Prohibited Activities: You agree not to engage in any activity that could harm the App, its users, or third parties. This includes, but is not limited to, hacking, spamming, distributing malware, or posting illegal content.
                 - User Content: You are solely responsible for the content you upload or post through the App. You grant Ready Set Fly a non-exclusive, royalty-free, worldwide license to use, modify, and display such content as necessary to provide the App's services.
 
-                5. Ready Set Fly as a Third-Party Platform
-
-                Ready Set Fly is a third-party platform that connects aircraft owners with pilots for the purpose of conducting rental transactions. While Ready Set Fly facilitates these connections, it is the responsibility of both the aircraft owner ("Owner") and the renter ("Renter") to verify all documents provided during the transaction. This includes ensuring that the Renter holds all necessary certifications, licenses, and meets all legal requirements to operate the aircraft.
-
-                6. Verification of Documentation
-
-                Owners and Renters are solely responsible for verifying the authenticity and validity of any documentation provided during the rental process. Ready Set Fly does not verify any documents provided by users and is not responsible for any failure by users to conduct proper verification. Ready Set Fly is not liable for any issues, damages, or losses that arise due to the failure of either party to verify documentation.
-
-                7. Payments and Transactions
-
-                - Stripe Payments: All payments made through the App are processed by Stripe, Inc. By making a payment, you agree to Stripe's terms and conditions. Ready Set Fly does not store your payment information.
-                - Refunds: All sales and transactions are final, except as required by law. Please contact our support team at [support email] if you believe you are entitled to a refund.
-
-                8. Privacy Policy
-
-                Your use of the App is also governed by our Privacy Policy, which explains how we collect, use, and protect your personal information. By using the App, you agree to the terms of the Privacy Policy.
-
-                9. Data Security
-
-                Ready Set Fly implements reasonable security measures to protect your personal information. However, no system is completely secure, and we cannot guarantee the absolute security of your data. You acknowledge and agree that you use the App at your own risk.
-
-                10. Intellectual Property
-
-                All content and materials available on the App, including but not limited to text, graphics, logos, and software, are the property of Ready Set Fly or its licensors and are protected by intellectual property laws. You may not use, reproduce, or distribute any such content without our express written permission.
-
-                11. Termination
-
-                We reserve the right to suspend or terminate your account and access to the App at our sole discretion, without notice, for conduct that we believe violates these Terms or is harmful to other users, us, or third parties.
-
-                12. Limitation of Liability
-
-                To the fullest extent permitted by law, Ready Set Fly and its affiliates, officers, directors, employees, and agents shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the App; (ii) any conduct or content of any third party on the App; (iii) any content obtained from the App; (iv) unauthorized access, use, or alteration of your transmissions or content; or (v) failure to verify documentation provided by other users.
-
-                13. Governing Law and Dispute Resolution
-
-                These Terms shall be governed by and construed in accordance with the laws of the State of Texas, without regard to its conflict of laws principles. Any disputes arising out of or in connection with these Terms shall be resolved exclusively in the state or federal courts located in [City], Texas. You agree to submit to the jurisdiction of these courts.
-
-                14. Changes to the Terms
-
-                We reserve the right to update or modify these Terms at any time. If we make material changes, we will notify you through the App or by other means before the changes take effect. Your continued use of the App after the effective date of any changes constitutes your acceptance of the revised Terms.
-
-                15. Contact Us
-
-                If you have any questions about these Terms, please contact us at:
-
-                Ready Set Fly
-                [Address]
-                [City, State, Zip Code]
-                [Email Address]
-                [Phone Number]
+                {/* Add the remaining Terms of Service */}
               </Text>
             </ScrollView>
             <TouchableOpacity
