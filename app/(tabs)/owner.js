@@ -1154,7 +1154,6 @@ const OwnerProfile = ({ ownerId }) => {
                     horizontal
                     renderItem={({ item, index }) => (
                       <Image
-                        key={index}
                         source={{ uri: item }}
                         style={{
                           width: 96,
@@ -1222,9 +1221,9 @@ const OwnerProfile = ({ ownerId }) => {
             Your Current Listings
           </Text>
           {userListings.length > 0 ? (
-            userListings.map((listing) => (
+            userListings.map((listing, index) => (
               <View
-                key={listing.id}
+                key={index}
                 style={{
                   backgroundColor: "#edf2f7",
                   padding: 16,
@@ -1270,9 +1269,9 @@ const OwnerProfile = ({ ownerId }) => {
             Additional Aircraft Listings
           </Text>
           {additionalAircrafts.length > 0 ? (
-            additionalAircrafts.map((aircraft) => (
+            additionalAircrafts.map((aircraft, index) => (
               <View
-                key={aircraft.id}
+                key={index}
                 style={{
                   backgroundColor: "#edf2f7",
                   padding: 16,
@@ -1332,9 +1331,9 @@ const OwnerProfile = ({ ownerId }) => {
             Rental History
           </Text>
           {rentalHistory.length > 0 ? (
-            rentalHistory.map((order) => (
+            rentalHistory.map((order, index) => (
               <View
-                key={order.id}
+                key={index}
                 style={{
                   backgroundColor: "#edf2f7",
                   padding: 16,

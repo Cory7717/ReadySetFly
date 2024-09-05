@@ -36,7 +36,8 @@ import * as ImagePicker from "expo-image-picker";
 import { Formik } from "formik";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import * as MailComposer from "expo-mail-composer";
-import { useStripe } from '@stripe/stripe-react-native';
+import { useStripe } from "@stripe/stripe-react-native";
+// import { API_URL } from '@env';
 
 const Classifieds = () => {
   const { user } = useUser();
@@ -66,13 +67,7 @@ const Classifieds = () => {
     total: "0.00",
   });
 
-  const categories = [
-    "Single Engine Piston",
-    "Twin Engine Piston",
-    "Turbo Prop",
-    "Helicopter",
-    "Jet",
-  ];
+  const categories = ["Aircraft for Sale", "Aviation Jobs", "Flight Schools"];
 
   const pricingPackages = {
     Basic: 25,
@@ -118,7 +113,7 @@ const Classifieds = () => {
     try {
       const q = query(
         collection(db, "UserPost"),
-        where("userEmail", "==", user.primaryEmailAddress.emailAddress),
+        where("category", "==", selectedCategory), // Filter by category
         orderBy("createdAt", "desc")
       );
       const querySnapShot = await getDocs(q);
@@ -133,6 +128,10 @@ const Classifieds = () => {
       Alert.alert("Error", "Failed to load listings. Please try again later.");
     }
   };
+
+  useEffect(() => {
+    getLatestItemList(); // Re-fetch the listings when the category changes
+  }, [selectedCategory]);
 
   const pickImage = async () => {
     if (images.length >= 7) {
@@ -153,11 +152,10 @@ const Classifieds = () => {
   };
 
   const fetchPaymentSheetParams = async () => {
-    // Replace with your server endpoint to create a PaymentIntent
     const response = await fetch(`${API_URL}/payment-sheet`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ amount: totalCost * 100 }), // amount in cents
     });
@@ -171,11 +169,8 @@ const Classifieds = () => {
   };
 
   const initializePaymentSheet = async () => {
-    const {
-      paymentIntent,
-      ephemeralKey,
-      customer,
-    } = await fetchPaymentSheetParams();
+    const { paymentIntent, ephemeralKey, customer } =
+      await fetchPaymentSheetParams();
 
     const { error } = await initPaymentSheet({
       merchantDisplayName: "Ready Set Fly",
@@ -185,7 +180,7 @@ const Classifieds = () => {
       allowsDelayedPaymentMethods: true,
       defaultBillingDetails: {
         name: user.fullName || "Guest",
-      }
+      },
     });
 
     if (!error) {
@@ -201,7 +196,7 @@ const Classifieds = () => {
     if (error) {
       Alert.alert(`Error code: ${error.code}`, error.message);
     } else {
-      Alert.alert('Success', 'Your payment is confirmed!');
+      Alert.alert("Success", "Your payment is confirmed!");
       handleCompletePayment(); // Proceed with the listing submission after successful payment
     }
   };
@@ -228,7 +223,10 @@ const Classifieds = () => {
           try {
             const response = await fetch(imageUri);
             const blob = await response.blob();
-            const storageRef = ref(storage, `aircraftImages/${new Date().getTime()}_${user.id}`);
+            const storageRef = ref(
+              storage,
+              `classifiedImages/${new Date().getTime()}_${user.id}`
+            );
             const snapshot = await uploadBytes(storageRef, blob);
             return await getDownloadURL(snapshot.ref);
           } catch (error) {
@@ -248,7 +246,6 @@ const Classifieds = () => {
 
       const newListing = {
         ...listingDetails,
-        price: listingDetails.price,
         category: selectedCategory,
         images: uploadedImages,
         userEmail: user.primaryEmailAddress.emailAddress,
@@ -288,80 +285,13 @@ const Classifieds = () => {
     setDetailsModalVisible(true);
   };
 
-  const handleEditListing = () => {
-    setEditModalVisible(true);
-    setDetailsModalVisible(false);
-  };
-
-  const handleDeleteListing = async () => {
-    try {
-      await deleteDoc(doc(db, "UserPost", selectedListing.id));
-      Alert.alert("Listing Deleted", "Your listing has been deleted.");
-      setDetailsModalVisible(false);
-      getLatestItemList();
-    } catch (error) {
-      console.error("Error deleting listing: ", error);
-      Alert.alert("Error", "Failed to delete listing.");
-    }
-  };
-
-  const calculateTotalCost = (hours) => {
-    if (!selectedListing) return;
-
-    const pricePerHour = parseFloat(selectedListing.price);
-    const rentalCost = pricePerHour * hours;
-    const bookingFee = rentalCost * 0.06;
-    const transactionFee = rentalCost * 0.03;
-    const salesTax = rentalCost * 0.0825;
-    const total = rentalCost + bookingFee + transactionFee + salesTax;
-
-    setCostDetails({
-      rentalCost: rentalCost.toFixed(2),
-      bookingFee: bookingFee.toFixed(2),
-      transactionFee: transactionFee.toFixed(2),
-      salesTax: salesTax.toFixed(2),
-      total: total.toFixed(2),
-    });
-  };
-
-  useEffect(() => {
-    if (selectedListing && rentalHours > 0) {
-      calculateTotalCost(rentalHours);
-    }
-  }, [selectedListing, rentalHours]);
-
-  const sendEmail = async (message) => {
-    const isAvailable = await MailComposer.isAvailableAsync();
-    if (isAvailable) {
-      const options = {
-        recipients: ["coryarmer@gmail.com"],
-        subject: "Contacting Broker from Classifieds",
-        body: message,
-      };
-
-      MailComposer.composeAsync(options)
-        .then((result) => {
-          if (result.status === "sent") {
-            Alert.alert("Email Sent", "Your email has been sent successfully.");
-          }
-        })
-        .catch((error) => {
-          console.error("Error sending email: ", error);
-          Alert.alert("Error", "Failed to send email. Please try again later.");
-        });
-    } else {
-      Alert.alert("Mail Composer Unavailable", "This device is not configured to send emails.");
-    }
-  };
-
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       key={item}
       onPress={() => setSelectedCategory(item)}
       style={{
         padding: 8,
-        backgroundColor:
-          selectedCategory === item ? "#a0aec0" : "#e2e8f0",
+        backgroundColor: selectedCategory === item ? "#a0aec0" : "#e2e8f0",
         borderRadius: 8,
         marginRight: 8,
       }}
@@ -473,7 +403,13 @@ const Classifieds = () => {
           { useNativeDriver: false }
         )}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
           <Text style={{ fontSize: 18, color: "#4A4A4A" }}>
             Filter by location or Aircraft Make
           </Text>
@@ -516,7 +452,11 @@ const Classifieds = () => {
           }}
         >
           <Text
-            style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            style={{
+              color: "white",
+              textAlign: "center",
+              fontWeight: "bold",
+            }}
           >
             Add Listing
           </Text>
@@ -595,7 +535,13 @@ const Classifieds = () => {
                   </Text>
                 </View>
               </TouchableOpacity>
-              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  marginTop: 8,
+                }}
+              >
                 <TouchableOpacity
                   onPress={handleEditListing}
                   style={{
@@ -694,20 +640,19 @@ const Classifieds = () => {
                     // Apply the filter logic here
                     const filtered = listings.filter(
                       (listing) =>
-                        listing.city.toLowerCase().includes(values.city.toLowerCase()) &&
-                        listing.state.toLowerCase().includes(values.state.toLowerCase()) &&
+                        listing.city
+                          .toLowerCase()
+                          .includes(values.city.toLowerCase()) &&
+                        listing.state
+                          .toLowerCase()
+                          .includes(values.state.toLowerCase()) &&
                         listing.category.includes(values.category)
                     );
                     setFilteredListings(filtered);
                     setFilterModalVisible(false);
                   }}
                 >
-                  {({
-                    handleChange,
-                    handleBlur,
-                    handleSubmit,
-                    values,
-                  }) => (
+                  {({ handleChange, handleBlur, handleSubmit, values }) => (
                     <>
                       <TextInput
                         placeholder="City"
@@ -735,7 +680,7 @@ const Classifieds = () => {
                           color: "#2d3748",
                         }}
                       />
-                      
+
                       <Text
                         style={{
                           marginBottom: 8,
@@ -1118,230 +1063,6 @@ const Classifieds = () => {
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
-      {/* Listing Details Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={detailsModalVisible}
-        onRequestClose={() => setDetailsModalVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 24,
-              padding: 24,
-              width: "90%",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-              }}
-            >
-              <TouchableOpacity
-                onPress={() =>
-                  setCurrentImageIndex(
-                    (currentImageIndex - 1 + selectedListing.images.length) %
-                      selectedListing.images.length
-                  )
-                }
-                style={{ padding: 8 }}
-              >
-                <Ionicons name="arrow-back-circle" size={32} color="#4a5568" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() =>
-                  setCurrentImageIndex(
-                    (currentImageIndex + 1) % selectedListing.images.length
-                  )
-                }
-                style={{ padding: 8 }}
-              >
-                <Ionicons
-                  name="arrow-forward-circle"
-                  size={32}
-                  color="#4a5568"
-                />
-              </TouchableOpacity>
-            </View>
-            {selectedListing && (
-              <>
-                <Text
-                  style={{
-                    fontSize: 20,
-                    fontWeight: "bold",
-                    marginBottom: 16,
-                  }}
-                >
-                  {selectedListing.title}
-                </Text>
-                <Image
-                  source={{ uri: selectedListing.images[currentImageIndex] }}
-                  style={{
-                    width: "100%",
-                    height: 256,
-                    borderRadius: 8,
-                    marginBottom: 16,
-                  }}
-                />
-                <ScrollView style={{ height: 256 }}>
-                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                    Price: ${selectedListing.price}
-                  </Text>
-                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                    Description: {selectedListing.description}
-                  </Text>
-                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                    Location: {selectedListing.city}, {selectedListing.state}
-                  </Text>
-                </ScrollView>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    marginTop: 16,
-                  }}
-                >
-                  <TouchableOpacity
-                    onPress={handleEditListing}
-                    style={{
-                      backgroundColor: "#48bb78",
-                      padding: 12,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <Text style={{ color: "white", textAlign: "center" }}>
-                      Edit
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleDeleteListing}
-                    style={{
-                      backgroundColor: "#f56565",
-                      padding: 12,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <Text style={{ color: "white", textAlign: "center" }}>
-                      Delete
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Contact Broker Button */}
-                <TouchableOpacity
-                  onPress={() => setContactModalVisible(true)}
-                  style={{
-                    backgroundColor: "#3182ce",
-                    padding: 12,
-                    borderRadius: 8,
-                    marginTop: 16,
-                  }}
-                >
-                  <Text style={{ color: "white", textAlign: "center" }}>
-                    Contact Broker
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setDetailsModalVisible(false)}
-                  style={{ marginTop: 16 }}
-                >
-                  <Text style={{ textAlign: "center", color: "#a0aec0" }}>
-                    Close
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Contact Broker Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={contactModalVisible}
-        onRequestClose={() => setContactModalVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 24,
-              padding: 24,
-              width: "90%",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 24,
-                fontWeight: "bold",
-                marginBottom: 16,
-                textAlign: "center",
-                color: "#2d3748",
-              }}
-            >
-              Contact Broker
-            </Text>
-            <TextInput
-              placeholder="Your Message"
-              multiline
-              style={{
-                borderWidth: 1,
-                borderColor: "#cbd5e0",
-                padding: 12,
-                height: 150,
-                textAlignVertical: "top",
-                marginBottom: 16,
-                borderRadius: 8,
-                color: "#2d3748",
-              }}
-              onChangeText={(text) => setListingDetails({ ...listingDetails, message: text })}
-            />
-            <TouchableOpacity
-              onPress={() => {
-                sendEmail(listingDetails.message || "No message provided.");
-                setContactModalVisible(false);
-              }}
-              style={{
-                backgroundColor: "#3182ce",
-                padding: 12,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ color: "white", textAlign: "center" }}>
-                Send Email
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setContactModalVisible(false)}
-              style={{ marginTop: 16 }}
-            >
-              <Text style={{ textAlign: "center", color: "#a0aec0" }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </Modal>
     </SafeAreaView>
