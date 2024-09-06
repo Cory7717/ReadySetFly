@@ -5,6 +5,7 @@ import { useFonts } from "expo-font";
 import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
 // import GlobalProvider from "../context/GlobalProvider";
 import * as SecureStore from "expo-secure-store";
+import PaymentScreen from "./screens/PaymentScreen";
 
 // Ensure the publishable key is set
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;

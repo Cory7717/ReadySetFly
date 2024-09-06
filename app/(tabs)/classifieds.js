@@ -12,10 +12,9 @@ import {
   Animated,
   FlatList,
   ScrollView,
-  StatusBar,
-  Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { db, storage } from "../../firebaseConfig";
@@ -30,16 +29,18 @@ import {
   doc,
   deleteDoc,
 } from "firebase/firestore";
+import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import * as ImagePicker from "expo-image-picker";
 import { Formik } from "formik";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import * as MailComposer from "expo-mail-composer";
 import { useStripe } from "@stripe/stripe-react-native";
-// import { API_URL } from '@env';
+import { API_URL } from "@env";
+import { useNavigation } from "@react-navigation/native";
 
 const Classifieds = () => {
+  const navigation = useNavigation();
   const { user } = useUser();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [listings, setListings] = useState([]);
@@ -47,7 +48,6 @@ const Classifieds = () => {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [contactModalVisible, setContactModalVisible] = useState(false);
@@ -58,7 +58,6 @@ const Classifieds = () => {
   const [listingDetails, setListingDetails] = useState({});
   const [selectedListing, setSelectedListing] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [rentalHours, setRentalHours] = useState(1);
   const [costDetails, setCostDetails] = useState({
     rentalCost: "0.00",
     bookingFee: "0.00",
@@ -66,23 +65,55 @@ const Classifieds = () => {
     salesTax: "0.00",
     total: "0.00",
   });
+  const [location, setLocation] = useState(null);
 
   const categories = ["Aircraft for Sale", "Aviation Jobs", "Flight Schools"];
 
-  const pricingPackages = {
+  const defaultPricingPackages = {
     Basic: 25,
     Featured: 70,
     Enhanced: 150,
   };
 
+  const [pricingPackages, setPricingPackages] = useState(defaultPricingPackages);
+
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (user) {
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission denied", "Location access is required.");
+          return;
+        }
+
+        let currentLocation = await Location.getCurrentPositionAsync({});
+        setLocation(currentLocation);
+      } catch (error) {
+        console.error("Error fetching location: ", error);
+      }
+
       getLatestItemList();
-      autoDeleteExpiredListings();
+    })();
+  }, [user, location]);
+
+  useEffect(() => {
+    if (selectedCategory === "Aviation Jobs") {
+      setPricingPackages({
+        Basic: 15, // $15/week for Aviation Jobs
+      });
+      setSelectedPricing("Basic");
+    } else if (selectedCategory === "Flight Schools") {
+      setPricingPackages({
+        Basic: 250, // $250/month for Flight Schools
+      });
+      setSelectedPricing("Basic");
+    } else {
+      setPricingPackages(defaultPricingPackages); // Reset to default pricing options for other categories
+      setSelectedPricing("Basic");
     }
-  }, [user]);
+  }, [selectedCategory]);
 
   const autoDeleteExpiredListings = async () => {
     const q = query(collection(db, "UserPost"));
@@ -111,16 +142,22 @@ const Classifieds = () => {
 
   const getLatestItemList = async () => {
     try {
-      const q = query(
-        collection(db, "UserPost"),
-        where("category", "==", selectedCategory), // Filter by category
-        orderBy("createdAt", "desc")
-      );
+      let q = query(collection(db, "UserPost"), orderBy("createdAt", "desc"));
+
+      if (selectedCategory) {
+        q = query(
+          collection(db, "UserPost"),
+          where("category", "==", selectedCategory),
+          orderBy("createdAt", "desc")
+        );
+      }
+
       const querySnapShot = await getDocs(q);
       const listingsData = [];
       querySnapShot.forEach((doc) => {
         listingsData.push({ id: doc.id, ...doc.data() });
       });
+
       setListings(listingsData);
       setFilteredListings(listingsData);
     } catch (error) {
@@ -130,25 +167,73 @@ const Classifieds = () => {
   };
 
   useEffect(() => {
-    getLatestItemList(); // Re-fetch the listings when the category changes
+    getLatestItemList();
   }, [selectedCategory]);
 
   const pickImage = async () => {
-    if (images.length >= 7) {
-      Alert.alert("You can only upload up to 7 images.");
+    let maxImages =
+      selectedPricing === "Basic" ? 7 : selectedPricing === "Featured" ? 12 : 16;
+    if (images.length >= maxImages) {
+      Alert.alert(`You can only upload up to ${maxImages} images.`);
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsMultipleSelection: true, // Allow multiple selection
+      allowsEditing: false, // Disable allowsEditing to avoid warning
       aspect: [4, 4],
       quality: 1,
     });
 
     if (!result.canceled) {
-      setImages([...images, result.uri]);
+      let selectedImages;
+      if (result.selected) {
+        // Handle case for multiple image selection
+        selectedImages = result.selected.map((asset) => asset.uri);
+      } else {
+        // Handle case for single image selection
+        selectedImages = [result.uri];
+      }
+      setImages([...images, ...selectedImages]);
     }
+  };
+
+  const filterListingsByDistance = (radiusMiles) => {
+    if (!location) {
+      Alert.alert("Error", "Location is not available.");
+      return;
+    }
+
+    const { latitude: userLat, longitude: userLng } = location.coords;
+
+    const filtered = listings.filter((listing) => {
+      if (listing.location && listing.location.lat && listing.location.lng) {
+        const { lat, lng } = listing.location;
+        const distance = getDistanceFromLatLonInMiles(userLat, userLng, lat, lng);
+        return distance <= radiusMiles;
+      }
+      return false;
+    });
+
+    setFilteredListings(filtered);
+  };
+
+  const getDistanceFromLatLonInMiles = (lat1, lon1, lat2, lon2) => {
+    const R = 3958.8;
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+    return distance;
+  };
+
+  const deg2rad = (deg) => {
+    return deg * (Math.PI / 180);
   };
 
   const fetchPaymentSheetParams = async () => {
@@ -157,7 +242,7 @@ const Classifieds = () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ amount: totalCost * 100 }), // amount in cents
+      body: JSON.stringify({ amount: totalCost * 100 }),
     });
     const { paymentIntent, ephemeralKey, customer } = await response.json();
 
@@ -169,55 +254,58 @@ const Classifieds = () => {
   };
 
   const initializePaymentSheet = async () => {
-    const { paymentIntent, ephemeralKey, customer } =
-      await fetchPaymentSheetParams();
+    try {
+      const { paymentIntent, ephemeralKey, customer } =
+        await fetchPaymentSheetParams();
 
-    const { error } = await initPaymentSheet({
-      merchantDisplayName: "Ready Set Fly",
-      customerId: customer,
-      customerEphemeralKeySecret: ephemeralKey,
-      paymentIntentClientSecret: paymentIntent,
-      allowsDelayedPaymentMethods: true,
-      defaultBillingDetails: {
-        name: user.fullName || "Guest",
-      },
-    });
+      const { error } = await initPaymentSheet({
+        merchantDisplayName: "Ready Set Fly",
+        customerId: customer,
+        customerEphemeralKeySecret: ephemeralKey,
+        paymentIntentClientSecret: paymentIntent,
+        allowsDelayedPaymentMethods: true,
+        defaultBillingDetails: {
+          name: user.fullName || "Guest",
+        },
+      });
 
-    if (!error) {
-      setLoading(true);
-    } else {
-      Alert.alert("Error", "Failed to initialize payment sheet");
+      if (!error) {
+        return true;
+      } else {
+        Alert.alert("Error", "Failed to initialize payment sheet");
+        return false;
+      }
+    } catch (error) {
+      console.error("Error initializing payment sheet:", error);
+      return false;
     }
   };
 
-  const openPaymentSheet = async () => {
-    const { error } = await presentPaymentSheet();
-
-    if (error) {
-      Alert.alert(`Error code: ${error.code}`, error.message);
-    } else {
-      Alert.alert("Success", "Your payment is confirmed!");
-      handleCompletePayment(); // Proceed with the listing submission after successful payment
-    }
+  const openPaymentModal = () => {
+    setPaymentModalVisible(true);
   };
 
-  const onSubmitMethod = (values) => {
+  const onSubmitMethod = async (values) => {
     setLoading(true);
     const selectedPackagePrice = pricingPackages[selectedPricing];
     const totalWithTax = (selectedPackagePrice * 1.0825).toFixed(2);
     setTotalCost(totalWithTax);
     setListingDetails(values);
-    initializePaymentSheet().then(() => {
-      setPaymentModalVisible(true);
-      openPaymentSheet();
+
+    // Ensure that "PaymentScreen" route exists in your navigator
+    navigation.navigate("PaymentScreen", {
+      totalCost: totalWithTax,
+      listingDetails: values,
+      images,
+      selectedPricing,
     });
+    setLoading(false);
   };
 
   const handleCompletePayment = async () => {
     try {
       setLoading(true);
 
-      // Upload images first and get their URLs
       const uploadedImages = await Promise.all(
         images.map(async (imageUri) => {
           try {
@@ -285,6 +373,22 @@ const Classifieds = () => {
     setDetailsModalVisible(true);
   };
 
+  const handleEditListing = (listing) => {
+    setSelectedListing(listing);
+    setEditModalVisible(true);
+  };
+
+  const handleDeleteListing = async (listingId) => {
+    try {
+      await deleteDoc(doc(db, "UserPost", listingId));
+      Alert.alert("Listing Deleted", "Your listing has been deleted.");
+      getLatestItemList();
+    } catch (error) {
+      console.error("Error deleting listing: ", error);
+      Alert.alert("Error", "Failed to delete the listing.");
+    }
+  };
+
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       key={item}
@@ -331,6 +435,21 @@ const Classifieds = () => {
       )}
     </TouchableOpacity>
   );
+
+  const goToNextImage = () => {
+    if (
+      selectedListing?.images &&
+      currentImageIndex < selectedListing.images.length - 1
+    ) {
+      setCurrentImageIndex(currentImageIndex + 1);
+    }
+  };
+
+  const goToPreviousImage = () => {
+    if (currentImageIndex > 0) {
+      setCurrentImageIndex(currentImageIndex - 1);
+    }
+  };
 
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 150],
@@ -543,7 +662,7 @@ const Classifieds = () => {
                 }}
               >
                 <TouchableOpacity
-                  onPress={handleEditListing}
+                  onPress={() => handleEditListing(item)}
                   style={{
                     backgroundColor: "#1E90FF",
                     padding: 8,
@@ -554,7 +673,7 @@ const Classifieds = () => {
                   <Text style={{ color: "white" }}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={handleDeleteListing}
+                  onPress={() => handleDeleteListing(item.id)}
                   style={{
                     backgroundColor: "#FF6347",
                     padding: 8,
@@ -572,6 +691,77 @@ const Classifieds = () => {
           </Text>
         )}
       </Animated.ScrollView>
+
+      {/* Full Screen Modal for Listing Details */}
+      <Modal
+        visible={detailsModalVisible}
+        transparent={true}
+        onRequestClose={() => setDetailsModalVisible(false)}
+        animationType="slide"
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0, 0, 0, 0.9)" }}>
+          <SafeAreaView style={{ flex: 1 }}>
+            <View
+              style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+            >
+              {selectedListing?.images && (
+                <View style={{ width: "90%", height: "70%" }}>
+                  <Image
+                    source={{ uri: selectedListing.images[currentImageIndex] }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      resizeMode: "contain",
+                      marginBottom: 20,
+                    }}
+                  />
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginTop: 20,
+                    }}
+                  >
+                    <TouchableOpacity onPress={goToPreviousImage}>
+                      <Ionicons name="arrow-back" size={36} color="white" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={goToNextImage}>
+                      <Ionicons name="arrow-forward" size={36} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 24,
+                  fontWeight: "bold",
+                  marginTop: 20,
+                }}
+              >
+                {selectedListing?.title}
+              </Text>
+              <Text style={{ color: "white", fontSize: 18, marginTop: 10 }}>
+                ${selectedListing?.price}
+              </Text>
+              <Text style={{ color: "white", fontSize: 16, marginTop: 10 }}>
+                {selectedListing?.description}
+              </Text>
+              <TouchableOpacity
+                style={{
+                  marginTop: 30,
+                  backgroundColor: "#f56565",
+                  padding: 10,
+                  borderRadius: 10,
+                }}
+                onPress={() => setDetailsModalVisible(false)}
+              >
+                <Text style={{ color: "white", fontSize: 16 }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
 
       {/* Filter by Location Modal */}
       <Modal
@@ -630,97 +820,45 @@ const Classifieds = () => {
                   Filter Listings
                 </Text>
 
-                <Formik
-                  initialValues={{
-                    city: "",
-                    state: "",
-                    category: selectedCategory || "Single Engine Piston",
-                  }}
-                  onSubmit={(values) => {
-                    // Apply the filter logic here
-                    const filtered = listings.filter(
-                      (listing) =>
-                        listing.city
-                          .toLowerCase()
-                          .includes(values.city.toLowerCase()) &&
-                        listing.state
-                          .toLowerCase()
-                          .includes(values.state.toLowerCase()) &&
-                        listing.category.includes(values.category)
-                    );
-                    setFilteredListings(filtered);
-                    setFilterModalVisible(false);
+                <TouchableOpacity
+                  onPress={() => filterListingsByDistance(100)}
+                  style={{
+                    backgroundColor: "#f56565",
+                    paddingVertical: 12,
+                    borderRadius: 50,
+                    marginBottom: 12,
                   }}
                 >
-                  {({ handleChange, handleBlur, handleSubmit, values }) => (
-                    <>
-                      <TextInput
-                        placeholder="City"
-                        onChangeText={handleChange("city")}
-                        onBlur={handleBlur("city")}
-                        value={values.city}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
-                      />
-                      <TextInput
-                        placeholder="State"
-                        onChangeText={handleChange("state")}
-                        onBlur={handleBlur("state")}
-                        value={values.state}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
-                      />
+                  <Text
+                    style={{
+                      color: "white",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    View Listings Within 100 Miles
+                  </Text>
+                </TouchableOpacity>
 
-                      <Text
-                        style={{
-                          marginBottom: 8,
-                          color: "#2d3748",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        Category
-                      </Text>
-                      <FlatList
-                        data={categories}
-                        renderItem={renderCategoryItem}
-                        horizontal
-                        keyExtractor={(item) => item}
-                        showsHorizontalScrollIndicator={false}
-                        style={{ marginBottom: 16 }}
-                        nestedScrollEnabled={true}
-                      />
-
-                      <TouchableOpacity
-                        onPress={handleSubmit}
-                        style={{
-                          backgroundColor: "#f56565",
-                          paddingVertical: 12,
-                          borderRadius: 50,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: "white",
-                            textAlign: "center",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          Apply Filters
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </Formik>
+                <TouchableOpacity
+                  onPress={() => setFilteredListings(listings)}
+                  style={{
+                    backgroundColor: "#f56565",
+                    paddingVertical: 12,
+                    borderRadius: 50,
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "white",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    View All Listings
+                  </Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setFilterModalVisible(false)}
@@ -798,6 +936,51 @@ const Classifieds = () => {
                   Submit Your Listing
                 </Text>
 
+                <Text
+                  style={{
+                    marginBottom: 8,
+                    color: "#2d3748",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Select Pricing Package
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginBottom: 16,
+                  }}
+                >
+                  {Object.keys(pricingPackages).map((key) => (
+                    <TouchableOpacity
+                      key={key}
+                      onPress={() => setSelectedPricing(key)}
+                      style={{
+                        padding: 8,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        borderColor:
+                          selectedPricing === key ? "#3182ce" : "#cbd5e0",
+                      }}
+                    >
+                      <Text style={{ textAlign: "center" }}>{key}</Text>
+                      <Text style={{ textAlign: "center" }}>
+                        ${pricingPackages[key]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <FlatList
+                  data={categories}
+                  renderItem={renderCategoryItem}
+                  horizontal
+                  keyExtractor={(item) => item}
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginBottom: 16 }}
+                />
+
                 <Formik
                   initialValues={{
                     title: "",
@@ -807,8 +990,13 @@ const Classifieds = () => {
                     state: "",
                     email: "",
                     phone: "",
+                    companyName: "",
+                    jobTitle: "",
+                    jobDescription: "",
                     category: selectedCategory || "Single Engine Piston",
                     images: [],
+                    flightSchoolName: "",
+                    flightSchoolDetails: "",
                   }}
                   onSubmit={onSubmitMethod}
                 >
@@ -819,48 +1007,128 @@ const Classifieds = () => {
                     values,
                   }) => (
                     <>
-                      <TextInput
-                        placeholder="Aircraft Year/Make/Model"
-                        onChangeText={handleChange("title")}
-                        onBlur={handleBlur("title")}
-                        value={values.title}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
-                      />
-                      <TextInput
-                        placeholder="Price"
-                        onChangeText={handleChange("price")}
-                        onBlur={handleBlur("price")}
-                        value={values.price}
-                        keyboardType="default"
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
-                      />
-                      <TextInput
-                        placeholder="Description"
-                        onChangeText={handleChange("description")}
-                        onBlur={handleBlur("description")}
-                        value={values.description}
-                        multiline
-                        numberOfLines={4}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
-                      />
+                      {selectedCategory === "Aviation Jobs" ? (
+                        <>
+                          <TextInput
+                            placeholder="Company Name"
+                            onChangeText={handleChange("companyName")}
+                            onBlur={handleBlur("companyName")}
+                            value={values.companyName}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: "#cbd5e0",
+                              marginBottom: 16,
+                              padding: 8,
+                              color: "#2d3748",
+                            }}
+                          />
+                          <TextInput
+                            placeholder="Job Title"
+                            onChangeText={handleChange("jobTitle")}
+                            onBlur={handleBlur("jobTitle")}
+                            value={values.jobTitle}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: "#cbd5e0",
+                              marginBottom: 16,
+                              padding: 8,
+                              color: "#2d3748",
+                            }}
+                          />
+                          <TextInput
+                            placeholder="Job Description"
+                            onChangeText={handleChange("jobDescription")}
+                            onBlur={handleBlur("jobDescription")}
+                            value={values.jobDescription}
+                            multiline
+                            numberOfLines={4}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: "#cbd5e0",
+                              marginBottom: 16,
+                              padding: 8,
+                              color: "#2d3748",
+                            }}
+                          />
+                        </>
+                      ) : selectedCategory === "Flight Schools" ? (
+                        <>
+                          <TextInput
+                            placeholder="Flight School Name"
+                            onChangeText={handleChange("flightSchoolName")}
+                            onBlur={handleBlur("flightSchoolName")}
+                            value={values.flightSchoolName}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: "#cbd5e0",
+                              marginBottom: 16,
+                              padding: 8,
+                              color: "#2d3748",
+                            }}
+                          />
+                          <TextInput
+                            placeholder="Flight School Details"
+                            onChangeText={handleChange("flightSchoolDetails")}
+                            onBlur={handleBlur("flightSchoolDetails")}
+                            value={values.flightSchoolDetails}
+                            multiline
+                            numberOfLines={4}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: "#cbd5e0",
+                              marginBottom: 16,
+                              padding: 8,
+                              color: "#2d3748",
+                            }}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <TextInput
+                            placeholder="Aircraft Year/Make/Model"
+                            onChangeText={handleChange("title")}
+                            onBlur={handleBlur("title")}
+                            value={values.title}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: "#cbd5e0",
+                              marginBottom: 16,
+                              padding: 8,
+                              color: "#2d3748",
+                            }}
+                          />
+                          <TextInput
+                            placeholder="Price"
+                            onChangeText={handleChange("price")}
+                            onBlur={handleBlur("price")}
+                            value={values.price}
+                            keyboardType="default"
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: "#cbd5e0",
+                              marginBottom: 16,
+                              padding: 8,
+                              color: "#2d3748",
+                            }}
+                          />
+                          <TextInput
+                            placeholder="Description"
+                            onChangeText={handleChange("description")}
+                            onBlur={handleBlur("description")}
+                            value={values.description}
+                            multiline
+                            numberOfLines={4}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: "#cbd5e0",
+                              marginBottom: 16,
+                              padding: 8,
+                              color: "#2d3748",
+                            }}
+                          />
+                        </>
+                      )}
+
                       <TextInput
                         placeholder="City"
                         onChangeText={handleChange("city")}
@@ -916,110 +1184,68 @@ const Classifieds = () => {
                         }}
                       />
 
-                      <Text
-                        style={{
-                          marginBottom: 8,
-                          color: "#2d3748",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        Category
-                      </Text>
-                      <FlatList
-                        data={categories}
-                        renderItem={renderCategoryItem}
-                        horizontal
-                        keyExtractor={(item) => item}
-                        showsHorizontalScrollIndicator={false}
-                        style={{ marginBottom: 16 }}
-                        nestedScrollEnabled={true}
-                      />
-
-                      <Text
-                        style={{
-                          marginBottom: 8,
-                          marginTop: 16,
-                          color: "#2d3748",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        Upload Images
-                      </Text>
-                      <FlatList
-                        data={images}
-                        horizontal
-                        renderItem={({ item, index }) => (
-                          <Image
-                            key={index}
-                            source={{ uri: item }}
+                      {selectedCategory !== "Aviation Jobs" && (
+                        <>
+                          <Text
                             style={{
-                              width: 96,
-                              height: 96,
-                              marginRight: 8,
-                              borderRadius: 8,
-                            }}
-                          />
-                        )}
-                        keyExtractor={(item, index) => index.toString()}
-                        nestedScrollEnabled={true}
-                      />
-                      <TouchableOpacity
-                        onPress={pickImage}
-                        style={{
-                          backgroundColor: "#edf2f7",
-                          paddingVertical: 8,
-                          paddingHorizontal: 16,
-                          borderRadius: 50,
-                          marginTop: 8,
-                          marginBottom: 16,
-                        }}
-                      >
-                        <Text
-                          style={{ textAlign: "center", color: "#2d3748" }}
-                        >
-                          {images.length >= 7
-                            ? "Maximum 7 Images"
-                            : "Add Image"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <Text
-                        style={{
-                          marginBottom: 8,
-                          color: "#2d3748",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        Select Pricing Package
-                      </Text>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          marginBottom: 16,
-                        }}
-                      >
-                        {Object.keys(pricingPackages).map((key) => (
-                          <TouchableOpacity
-                            key={key}
-                            onPress={() => setSelectedPricing(key)}
-                            style={{
-                              padding: 8,
-                              borderWidth: 1,
-                              borderRadius: 8,
-                              borderColor:
-                                selectedPricing === key
-                                  ? "#3182ce"
-                                  : "#cbd5e0",
+                              marginBottom: 8,
+                              marginTop: 16,
+                              color: "#2d3748",
+                              fontWeight: "bold",
                             }}
                           >
-                            <Text style={{ textAlign: "center" }}>{key}</Text>
-                            <Text style={{ textAlign: "center" }}>
-                              ${pricingPackages[key]}
+                            Upload Images
+                          </Text>
+                          <FlatList
+                            data={images}
+                            horizontal
+                            renderItem={({ item, index }) => (
+                              <Image
+                                key={index}
+                                source={{ uri: item }}
+                                style={{
+                                  width: 96,
+                                  height: 96,
+                                  marginRight: 8,
+                                  borderRadius: 8,
+                                }}
+                              />
+                            )}
+                            keyExtractor={(item, index) => index.toString()}
+                            nestedScrollEnabled={true}
+                          />
+                          <TouchableOpacity
+                            onPress={pickImage}
+                            style={{
+                              backgroundColor: "#edf2f7",
+                              paddingVertical: 8,
+                              paddingHorizontal: 16,
+                              borderRadius: 50,
+                              marginTop: 8,
+                              marginBottom: 16,
+                            }}
+                          >
+                            <Text
+                              style={{ textAlign: "center", color: "#2d3748" }}
+                            >
+                              {images.length >=
+                              (selectedPricing === "Basic"
+                                ? 7
+                                : selectedPricing === "Featured"
+                                ? 12
+                                : 16)
+                                ? `Maximum ${
+                                    selectedPricing === "Basic"
+                                      ? 7
+                                      : selectedPricing === "Featured"
+                                      ? 12
+                                      : 16
+                                  } Images`
+                                : "Add Image"}
                             </Text>
                           </TouchableOpacity>
-                        ))}
-                      </View>
+                        </>
+                      )}
 
                       {loading ? (
                         <ActivityIndicator size="large" color="#FF5A5F" />

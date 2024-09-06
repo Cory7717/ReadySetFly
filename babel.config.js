@@ -4,7 +4,8 @@ module.exports = function(api) {
     presets: ['babel-preset-expo'],
     plugins: [
       "nativewind/babel",
-      "@babel/plugin-transform-runtime" // Optional: can be helpful for Hermes
+      "@babel/plugin-transform-runtime", // Optional: can be helpful for Hermes
+      ['module:react-native-dotenv'],
     ],
   };
 };

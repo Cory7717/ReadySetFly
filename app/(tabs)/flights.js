@@ -27,6 +27,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import FullScreenRental from '../../components/FullScreenRental';
 import PaymentScreen from '../screens/PaymentScreen';
 import FullScreenPost from '../../components/FullScreenPost';
+// import PaymentScreen from '../../components/PaymentScreen';
 
 // Styled components
 const Container = styled(SafeAreaView, 'flex-1 bg-gray-100');
@@ -429,7 +430,11 @@ export default function App() {
         <Stack.Screen name="MainFeed" component={MainFeed} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenRental" component={FullScreenRental} />
-        <Stack.Screen name="PaymentScreen" component={PaymentScreen} />
+        <Stack.Screen 
+          name="PaymentScreen" 
+          component={PaymentScreen} 
+          options={{ title: 'Payment' }} 
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
