@@ -5,7 +5,7 @@ import { useFonts } from "expo-font";
 import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
 // import GlobalProvider from "../context/GlobalProvider";
 import * as SecureStore from "expo-secure-store";
-import PaymentScreen from "./screens/PaymentScreen";
+import PaymentScreen from "./payment.js/PaymentScreen";
 
 // Ensure the publishable key is set
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -68,6 +68,7 @@ const RootLayout = () => {
             <Stack.Screen name="screens/renter_sign_in" options={{ headerShown: false }} />
             <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
             <Stack.Screen name="cfi" options={{ headerShown: false }} />
+
           </Stack>
         </ClerkLoaded>
       </ClerkProvider>

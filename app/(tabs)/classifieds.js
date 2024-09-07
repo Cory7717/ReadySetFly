@@ -37,10 +37,8 @@ import { Formik } from "formik";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { useStripe } from "@stripe/stripe-react-native";
 import { API_URL } from "@env";
-import { useNavigation } from "@react-navigation/native";
 
 const Classifieds = () => {
-  const navigation = useNavigation();
   const { user } = useUser();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [listings, setListings] = useState([]);
@@ -50,7 +48,8 @@ const Classifieds = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [contactModalVisible, setContactModalVisible] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentScreenVisible, setPaymentScreenVisible] = useState(false); // To manage the visibility of the Payment Screen
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPricing, setSelectedPricing] = useState("Basic");
@@ -58,13 +57,6 @@ const Classifieds = () => {
   const [listingDetails, setListingDetails] = useState({});
   const [selectedListing, setSelectedListing] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [costDetails, setCostDetails] = useState({
-    rentalCost: "0.00",
-    bookingFee: "0.00",
-    transactionFee: "0.00",
-    salesTax: "0.00",
-    total: "0.00",
-  });
   const [location, setLocation] = useState(null);
 
   const categories = ["Aircraft for Sale", "Aviation Jobs", "Flight Schools"];
@@ -292,14 +284,23 @@ const Classifieds = () => {
     setTotalCost(totalWithTax);
     setListingDetails(values);
 
-    // Ensure that "PaymentScreen" route exists in your navigator
-    navigation.navigate("PaymentScreen", {
-      totalCost: totalWithTax,
-      listingDetails: values,
-      images,
-      selectedPricing,
-    });
+    // Open the payment modal instead of navigating to another screen
+    setPaymentModalVisible(true);
     setLoading(false);
+  };
+
+  const handleSubmitPayment = async () => {
+    const isInitialized = await initializePaymentSheet();
+    if (isInitialized) {
+      setPaymentModalVisible(false); // Close the payment modal before showing the Stripe screen
+      const { error } = await presentPaymentSheet();
+
+      if (error) {
+        Alert.alert("Payment Failed", error.message);
+      } else {
+        handleCompletePayment();
+      }
+    }
   };
 
   const handleCompletePayment = async () => {
@@ -356,7 +357,7 @@ const Classifieds = () => {
         "Payment Completed",
         "Your listing has been successfully submitted!"
       );
-      setPaymentModalVisible(false);
+      setPaymentScreenVisible(false); // Close the Stripe payment modal
       setModalVisible(false);
       getLatestItemList();
     } catch (error) {
@@ -1289,6 +1290,92 @@ const Classifieds = () => {
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* Payment Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={paymentModalVisible}
+        onRequestClose={() => setPaymentModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 24,
+              padding: 24,
+              width: "90%",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 8,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "bold",
+                marginBottom: 16,
+                textAlign: "center",
+                color: "#2d3748",
+              }}
+            >
+              Complete Payment
+            </Text>
+
+            <Text style={{ fontSize: 18, color: "#4A4A4A", marginBottom: 12 }}>
+              Total Cost: ${totalCost}
+            </Text>
+
+            <TouchableOpacity
+              onPress={handleSubmitPayment}
+              style={{
+                backgroundColor: "#f56565",
+                paddingVertical: 12,
+                borderRadius: 50,
+                marginBottom: 16,
+              }}
+            >
+              <Text
+                style={{
+                  color: "white",
+                  textAlign: "center",
+                  fontWeight: "bold",
+                }}
+              >
+                Proceed to Pay
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setPaymentModalVisible(false)}
+              style={{
+                backgroundColor: "#e2e8f0",
+                paddingVertical: 12,
+                borderRadius: 50,
+                marginTop: 16,
+              }}
+            >
+              <Text
+                style={{
+                  textAlign: "center",
+                  fontWeight: "bold",
+                  color: "#2d3748",
+                }}
+              >
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>

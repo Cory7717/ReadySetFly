@@ -25,7 +25,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import FullScreenRental from '../../components/FullScreenRental';
-import PaymentScreen from '../screens/PaymentScreen';
+import PaymentScreen from '../payment.js/PaymentScreen';
 import FullScreenPost from '../../components/FullScreenPost';
 // import PaymentScreen from '../../components/PaymentScreen';
 
