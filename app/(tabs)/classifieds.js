@@ -264,11 +264,12 @@ const Classifieds = () => {
       if (!error) {
         return true;
       } else {
+        console.error("Payment Sheet initialization error:", error); // Log error
         Alert.alert("Error", "Failed to initialize payment sheet");
         return false;
       }
     } catch (error) {
-      console.error("Error initializing payment sheet:", error);
+      console.error("Error initializing payment sheet:", error); // Log error
       return false;
     }
   };
