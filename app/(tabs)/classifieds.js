@@ -74,21 +74,44 @@ const Classifieds = () => {
   useEffect(() => {
     (async () => {
       try {
+        // Request foreground location permission
         let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert("Permission denied", "Location access is required.");
+        if (status !== 'granted') {
+          // Permission not granted, show an alert
+          Alert.alert(
+            'Location Permission Denied',
+            'Please enable location services in your device settings.'
+          );
           return;
         }
 
-        let currentLocation = await Location.getCurrentPositionAsync({});
+        // Check if location services are enabled
+        let locationServicesEnabled = await Location.hasServicesEnabledAsync();
+        if (!locationServicesEnabled) {
+          // Location services are not enabled, show an alert
+          Alert.alert(
+            'Location Services Disabled',
+            'Please enable location services to use this feature.'
+          );
+          return;
+        }
+
+        // Fetch current location
+        let currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
         setLocation(currentLocation);
       } catch (error) {
-        console.error("Error fetching location: ", error);
+        console.error('Error fetching location:', error);
+        Alert.alert(
+          'Error Fetching Location',
+          'Could not retrieve your current location. Please try again later.'
+        );
       }
 
       getLatestItemList();
     })();
-  }, [user, location]);
+  }, [user]);
 
   useEffect(() => {
     if (selectedCategory === "Aviation Jobs") {
@@ -167,6 +190,7 @@ const Classifieds = () => {
       selectedPricing === "Basic" ? 7 : selectedPricing === "Featured" ? 12 : 16;
     if (images.length >= maxImages) {
       Alert.alert(`You can only upload up to ${maxImages} images.`);
+
       return;
     }
 
@@ -229,6 +253,9 @@ const Classifieds = () => {
   };
 
   const fetchPaymentSheetParams = async () => {
+    // Add this line to log the API_URL
+    console.log("API_URL:", API_URL);
+  
     const response = await fetch(`${API_URL}/payment-sheet`, {
       method: "POST",
       headers: {
@@ -236,14 +263,16 @@ const Classifieds = () => {
       },
       body: JSON.stringify({ amount: totalCost * 100 }),
     });
+  
     const { paymentIntent, ephemeralKey, customer } = await response.json();
-
+  
     return {
       paymentIntent,
       ephemeralKey,
       customer,
     };
   };
+  
 
   const initializePaymentSheet = async () => {
     try {
