@@ -1,19 +1,29 @@
 import React, { useEffect } from "react";
-import { Text, View, Image } from "react-native";
 import { SplashScreen, Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
-// import GlobalProvider from "../context/GlobalProvider";
 import * as SecureStore from "expo-secure-store";
-import PaymentScreen from "./payment.js/PaymentScreen";
+import { StripeProvider } from "@stripe/stripe-react-native";
 
-// Ensure the publishable key is set
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
-if (!publishableKey) {
-  throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env');
-}
+// Function to retrieve Clerk Publishable Key
+const getClerkPublishableKey = () => {
+  const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  if (!clerkPublishableKey) {
+    throw new Error('Missing Clerk Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env');
+  }
+  return clerkPublishableKey;
+};
 
-// Token cache implementation
+// Function to retrieve Stripe Publishable Key
+const getStripePublishableKey = () => {
+  const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  if (!stripePublishableKey) {
+    throw new Error('Missing Stripe Publishable Key. Please set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY in your .env');
+  }
+  return stripePublishableKey;
+};
+
+// Token cache implementation for authentication handling
 const tokenCache = {
   async getToken(key) {
     try {
@@ -57,9 +67,13 @@ const RootLayout = () => {
 
   if (!fontsLoaded && !error) return null;
 
+  // Get keys separately
+  const clerkPublishableKey = getClerkPublishableKey();
+  const stripePublishableKey = getStripePublishableKey();
+
   return (
-   
-      <ClerkProvider publishableKey={publishableKey}>
+    <StripeProvider publishableKey={stripePublishableKey}>
+      <ClerkProvider publishableKey={clerkPublishableKey}>
         <ClerkLoaded>
           <Stack>
             <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -68,11 +82,11 @@ const RootLayout = () => {
             <Stack.Screen name="screens/renter_sign_in" options={{ headerShown: false }} />
             <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
             <Stack.Screen name="cfi" options={{ headerShown: false }} />
-
+            {/* Other screens */}
           </Stack>
         </ClerkLoaded>
       </ClerkProvider>
-   
+    </StripeProvider>
   );
 };
 

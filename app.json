@@ -45,6 +45,9 @@
         }
       ]
     ],
-    "jsEngine": "hermes"
+    "jsEngine": "hermes",
+    "extra": {
+      "API_URL": "https://ready-set-fly-71506.firebaseio.com"
+    }
   }
 }

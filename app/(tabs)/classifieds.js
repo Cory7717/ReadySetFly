@@ -49,7 +49,7 @@ const Classifieds = () => {
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
-  const [paymentScreenVisible, setPaymentScreenVisible] = useState(false); // To manage the visibility of the Payment Screen
+  const [paymentScreenVisible, setPaymentScreenVisible] = useState(false);
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPricing, setSelectedPricing] = useState("Basic");
@@ -74,38 +74,33 @@ const Classifieds = () => {
   useEffect(() => {
     (async () => {
       try {
-        // Request foreground location permission
         let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          // Permission not granted, show an alert
+        if (status !== "granted") {
           Alert.alert(
-            'Location Permission Denied',
-            'Please enable location services in your device settings.'
+            "Location Permission Denied",
+            "Please enable location services in your device settings."
           );
           return;
         }
 
-        // Check if location services are enabled
         let locationServicesEnabled = await Location.hasServicesEnabledAsync();
         if (!locationServicesEnabled) {
-          // Location services are not enabled, show an alert
           Alert.alert(
-            'Location Services Disabled',
-            'Please enable location services to use this feature.'
+            "Location Services Disabled",
+            "Please enable location services to use this feature."
           );
           return;
         }
 
-        // Fetch current location
         let currentLocation = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
         setLocation(currentLocation);
       } catch (error) {
-        console.error('Error fetching location:', error);
+        console.error("Error fetching location:", error);
         Alert.alert(
-          'Error Fetching Location',
-          'Could not retrieve your current location. Please try again later.'
+          "Error Fetching Location",
+          "Could not retrieve your current location. Please try again later."
         );
       }
 
@@ -116,16 +111,16 @@ const Classifieds = () => {
   useEffect(() => {
     if (selectedCategory === "Aviation Jobs") {
       setPricingPackages({
-        Basic: 15, // $15/week for Aviation Jobs
+        Basic: 15,
       });
       setSelectedPricing("Basic");
     } else if (selectedCategory === "Flight Schools") {
       setPricingPackages({
-        Basic: 250, // $250/month for Flight Schools
+        Basic: 250,
       });
       setSelectedPricing("Basic");
     } else {
-      setPricingPackages(defaultPricingPackages); // Reset to default pricing options for other categories
+      setPricingPackages(defaultPricingPackages);
       setSelectedPricing("Basic");
     }
   }, [selectedCategory]);
@@ -196,8 +191,8 @@ const Classifieds = () => {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true, // Allow multiple selection
-      allowsEditing: false, // Disable allowsEditing to avoid warning
+      allowsMultipleSelection: true,
+      allowsEditing: false,
       aspect: [4, 4],
       quality: 1,
     });
@@ -205,10 +200,8 @@ const Classifieds = () => {
     if (!result.canceled) {
       let selectedImages;
       if (result.selected) {
-        // Handle case for multiple image selection
         selectedImages = result.selected.map((asset) => asset.uri);
       } else {
-        // Handle case for single image selection
         selectedImages = [result.uri];
       }
       setImages([...images, ...selectedImages]);
@@ -253,31 +246,53 @@ const Classifieds = () => {
   };
 
   const fetchPaymentSheetParams = async () => {
-    // Add this line to log the API_URL
-    console.log("API_URL:", API_URL);
+    try {
+      const response = await fetch(`${API_URL}/PaymentScreen`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: totalCost * 100 }), // Amount in cents
+      });
   
-    const response = await fetch(`${API_URL}/payment-sheet`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ amount: totalCost * 100 }),
-    });
+      const contentType = response.headers.get("content-type");
   
-    const { paymentIntent, ephemeralKey, customer } = await response.json();
+      // Check if the response is JSON
+      if (contentType && contentType.includes("application/json")) {
+        const jsonResponse = await response.json();
+        console.log("Parsed JSON response: ", jsonResponse);
   
-    return {
-      paymentIntent,
-      ephemeralKey,
-      customer,
-    };
+        if (!response.ok) {
+          console.error("Server response error:", jsonResponse);
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+  
+        const { paymentIntent, ephemeralKey, customer } = jsonResponse;
+        return { paymentIntent, ephemeralKey, customer };
+      } else {
+        // If the response is not JSON, log the raw text for debugging
+        const responseText = await response.text();
+        console.error("Non-JSON response: ", responseText);
+        throw new Error("Invalid response from server. Please try again later.");
+      }
+    } catch (error) {
+      console.error("Error fetching payment sheet params:", error);
+      Alert.alert("Error", "Failed to fetch payment sheet parameters. Please try again.");
+      return null;
+    }
   };
+  
   
 
   const initializePaymentSheet = async () => {
     try {
-      const { paymentIntent, ephemeralKey, customer } =
-        await fetchPaymentSheetParams();
+      const params = await fetchPaymentSheetParams();
+
+      if (!params) {
+        throw new Error("Payment sheet parameters not available.");
+      }
+
+      const { paymentIntent, ephemeralKey, customer } = params;
 
       const { error } = await initPaymentSheet({
         merchantDisplayName: "Ready Set Fly",
@@ -314,7 +329,6 @@ const Classifieds = () => {
     setTotalCost(totalWithTax);
     setListingDetails(values);
 
-    // Open the payment modal instead of navigating to another screen
     setPaymentModalVisible(true);
     setLoading(false);
   };
@@ -322,7 +336,7 @@ const Classifieds = () => {
   const handleSubmitPayment = async () => {
     const isInitialized = await initializePaymentSheet();
     if (isInitialized) {
-      setPaymentModalVisible(false); // Close the payment modal before showing the Stripe screen
+      setPaymentModalVisible(false);
       const { error } = await presentPaymentSheet();
 
       if (error) {
@@ -387,7 +401,7 @@ const Classifieds = () => {
         "Payment Completed",
         "Your listing has been successfully submitted!"
       );
-      setPaymentScreenVisible(false); // Close the Stripe payment modal
+      setPaymentScreenVisible(false);
       setModalVisible(false);
       getLatestItemList();
     } catch (error) {
@@ -723,7 +737,6 @@ const Classifieds = () => {
         )}
       </Animated.ScrollView>
 
-      {/* Full Screen Modal for Listing Details */}
       <Modal
         visible={detailsModalVisible}
         transparent={true}
@@ -794,7 +807,6 @@ const Classifieds = () => {
         </View>
       </Modal>
 
-      {/* Filter by Location Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -910,7 +922,6 @@ const Classifieds = () => {
         </View>
       </Modal>
 
-      {/* Submit Listing Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1323,7 +1334,6 @@ const Classifieds = () => {
         </View>
       </Modal>
 
-      {/* Payment Modal */}
       <Modal
         animationType="slide"
         transparent={true}

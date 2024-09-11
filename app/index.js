@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+
 } from "react-native";
 import { Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +16,7 @@ import { SignedIn, SignedOut, useUser } from '@clerk/clerk-expo';
 import CustomButton from "../components/CustomButton";
 import { images } from "../constants";
 import { router } from 'expo-router';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 const App = () => {
   const { user } = useUser();
@@ -23,6 +25,7 @@ const App = () => {
   // if (!isLoading && isLoggedIn) return <Redirect href="/home" />;
 
   return (
+
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -62,6 +65,10 @@ const App = () => {
     </SafeAreaView>
   );
 };
+
+{/* <StoreProvider>
+
+</StoreProvider> */}
 
 const styles = StyleSheet.create({
   container: {
