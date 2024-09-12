@@ -1,11 +1,11 @@
-import React, { useEffect } from "react";
+import React, { useEffect } from "react"; 
 import { SplashScreen, Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
 import * as SecureStore from "expo-secure-store";
 import { StripeProvider } from "@stripe/stripe-react-native";
 
-// Function to retrieve Clerk Publishable Key
+// Retrieve Clerk Publishable Key
 const getClerkPublishableKey = () => {
   const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
   if (!clerkPublishableKey) {
@@ -14,7 +14,7 @@ const getClerkPublishableKey = () => {
   return clerkPublishableKey;
 };
 
-// Function to retrieve Stripe Publishable Key
+// Retrieve Stripe Publishable Key
 const getStripePublishableKey = () => {
   const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   if (!stripePublishableKey) {

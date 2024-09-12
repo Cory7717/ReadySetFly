@@ -8,103 +8,96 @@ import {
   TouchableOpacity, 
   Alert, 
   FlatList, 
-  Linking, 
-  RefreshControl, 
   Modal,
   ActivityIndicator, 
-  ScrollView
+  ScrollView,
+  Animated,
+  RefreshControl
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, FontAwesome, Feather } from '@expo/vector-icons';
 import { styled } from 'nativewind';
 import { useUser } from '@clerk/clerk-expo';
-import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, limit, startAfter, getDocs } from 'firebase/firestore';
+import { collection, addDoc, orderBy, deleteDoc, doc, limit, startAfter, getDocs, query } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-import { Text as RNText } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import FullScreenRental from '../../components/FullScreenRental';
-import PaymentScreen from '../payment.js/PaymentScreen';
 import FullScreenPost from '../../components/FullScreenPost';
-// import PaymentScreen from '../../components/PaymentScreen';
 
-// Styled components
+// Styled components with modern design and 3D shadow
 const Container = styled(SafeAreaView, 'flex-1 bg-gray-100');
-const Header = styled(View, 'p-4 bg-white flex-row items-center justify-between');
+const Header = styled(View, 'p-4 bg-white flex-row items-center justify-between border-b border-gray-200');
 const ProfileImage = styled(Image, 'w-12 h-12 rounded-full');
-const WelcomeText = styled(View, 'pl-3 pb-5');
-const WelcomeMessage = styled(Text, 'text-base');
-const UserName = styled(Text, 'text-xl font-bold');
-const PostButton = styled(TouchableOpacity, 'p-4 bg-blue-500 rounded-lg absolute bottom-4 left-4 right-4 flex-row items-center justify-center');
-const PostButtonText = styled(Text, 'text-white text-xl text-center ml-2');
-const PostContainer = styled(View, 'p-4 bg-white mb-2 rounded-lg shadow');
-const PostImage = styled(Image, 'w-full h-64 rounded-lg');
-const PostActions = styled(View, 'flex-row items-center justify-between mt-2');
+const PostContainer = styled(View, 'p-4 bg-white mb-4 rounded-lg shadow-lg border border-gray-300 shadow-lg shadow-gray-500');
+const PostImage = styled(Image, 'w-full h-64 rounded-lg object-cover mb-4');
+const PostActions = styled(View, 'flex-row justify-between mt-2');
 const ActionButton = styled(TouchableOpacity, 'flex-row items-center');
 const ActionText = styled(Text, 'ml-1 text-gray-600');
+const UserName = styled(Text, 'text-lg font-bold text-gray-900');
+
+// Stack Navigator
 const Stack = createStackNavigator();
 
-// Utility function to parse hashtags, mentions, and links
-const parseContent = (text, onHashtagPress, onMentionPress) => {
-  const regex = /(#[\w-]+|@[\w-]+|https?:\/\/[\w-./?=&]+)/g;
-  const parts = text.split(regex);
+// Post card component
+const Post = ({ post, onDelete, onViewPost, onLike, onShare }) => {
+  const { user } = useUser();
 
-  return parts.map((part, index) => {
-    if (part.startsWith('#')) {
-      return (
-        <RNText key={index} style={{ color: 'blue' }} onPress={() => onHashtagPress(part)}>
-          {part}
-        </RNText>
-      );
-    }
-    if (part.startsWith('@')) {
-      return (
-        <RNText key={index} style={{ color: 'green' }} onPress={() => onMentionPress(part)}>
-          {part}
-        </RNText>
-      );
-    }
-    if (part.startsWith('http://') || part.startsWith('https://')) {
-      return (
-        <RNText key={index} style={{ color: 'blue' }} onPress={() => Linking.openURL(part)}>
-          {part}
-        </RNText>
-      );
-    }
-    return <RNText key={index}>{part}</RNText>;
-  });
-};
-
-// Autocomplete Component
-const Autocomplete = ({ data, onSelect }) => {
   return (
-    <FlatList
-      data={data}
-      keyExtractor={(item) => item}
-      renderItem={({ item }) => (
-        <TouchableOpacity onPress={() => onSelect(item)} style={{ padding: 10 }}>
-          <Text>{item}</Text>
-        </TouchableOpacity>
-      )}
-    />
+    <TouchableOpacity onPress={() => onViewPost(post)}>
+      <PostContainer>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <ProfileImage source={{ uri: post?.profileImage || 'default_profile_image_url' }} />
+          <View style={{ marginLeft: 10 }}>
+            <UserName>{post?.userName || 'Unknown User'}</UserName>
+            <Text>{post?.createdAt ? new Date(post.createdAt.toDate()).toLocaleDateString() : 'Unknown Date'}</Text>
+          </View>
+          {(user?.id === post?.userId) && (
+            <TouchableOpacity onPress={() => onDelete(post.id)} style={{ marginLeft: 'auto' }}>
+              <Feather name="trash" size={24} color="red" />
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text style={{ marginBottom: 10 }}>{post?.content || ''}</Text>
+        {/* Ensure that the image URI is valid before rendering the image */}
+        {post?.image && typeof post.image === 'string' && <PostImage source={{ uri: post.image }} />}
+        <PostActions>
+          <ActionButton onPress={() => onLike(post)}>
+            <FontAwesome name="thumbs-up" size={20} color="gray" />
+            <ActionText>Like</ActionText>
+          </ActionButton>
+          <ActionButton onPress={() => onShare(post)}>
+            <Ionicons name="share-social-outline" size={24} color="black" />
+            <ActionText>Share</ActionText>
+          </ActionButton>
+        </PostActions>
+      </PostContainer>
+    </TouchableOpacity>
   );
 };
 
-// Utility function to sanitize data
-const sanitizeData = (data) => {
-  return Object.fromEntries(
-    Object.entries(data).filter(([_, v]) => v !== undefined)
-  );
-};
-
-// CreateNewPost Component
-const CreateNewPost = ({ onSubmit, onCancel }) => {
+// CreateNewPost component with slide-up modal and modern border
+const CreateNewPost = ({ onSubmit, onCancel, isVisible }) => {
   const [content, setContent] = useState('');
   const [image, setImage] = useState(null);
-  const [autocompleteData, setAutocompleteData] = useState([]);
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
   const { user } = useUser();
+  const slideAnim = useState(new Animated.Value(600))[0];
+
+  useEffect(() => {
+    if (isVisible) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 600,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isVisible]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -113,61 +106,27 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
       aspect: [4, 3],
       quality: 1,
     });
-
     if (!result.canceled) {
       setImage(result.assets[0].uri);
     }
-  };
-
-  const handleContentChange = (text) => {
-    setContent(text);
-
-    const lastChar = text.slice(-1);
-    if (lastChar === '@') {
-      setShowAutocomplete(true);
-    } else {
-      setShowAutocomplete(false);
-    }
-
-    if (showAutocomplete) {
-      const query = text.split('@').pop();
-      if (query.length > 0) {
-        // Simulate fetching user list
-        const users = ['JohnDoe', 'JaneSmith', 'User123'];
-        const filteredUsers = users.filter((user) =>
-          user.toLowerCase().includes(query.toLowerCase())
-        );
-        setAutocompleteData(filteredUsers);
-      }
-    }
-  };
-
-  const handleSelectUser = (username) => {
-    const words = content.split(' ');
-    words.pop();
-    setContent([...words, `@${username}`].join(' ') + ' ');
-    setShowAutocomplete(false);
   };
 
   const handleSubmit = async () => {
     if (content.trim() || image) {
       const newPost = {
         content,
-        image: image || null,  // Ensure image is either a valid URL or null
+        image: image || null,
         userName: user.fullName,
         profileImage: user.imageUrl,
         createdAt: new Date(),
-        userId: user.id,  // Store the user's ID who created the post
+        userId: user.id,
       };
 
-      // Sanitize data to remove undefined fields
-      const sanitizedData = sanitizeData(newPost);
-
       try {
-        await addDoc(collection(db, 'posts'), sanitizedData);
-        onSubmit(sanitizedData);
-        setContent('');  // Clear content after submitting
-        setImage(null);  // Clear image after submitting
+        await addDoc(collection(db, 'posts'), newPost);
+        onSubmit(newPost);
+        setContent('');
+        setImage(null);
       } catch (error) {
         Alert.alert('Error', 'Could not submit post.');
       }
@@ -177,153 +136,114 @@ const CreateNewPost = ({ onSubmit, onCancel }) => {
   };
 
   return (
-    <View style={{ paddingTop: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <ProfileImage source={{ uri: user?.imageUrl }} />
-        <WelcomeText>
-          <Text>Posting as</Text>
-          <UserName>{user?.fullName}</UserName>
-        </WelcomeText>
-      </View>
-      <PostContainer>
+    <Modal transparent visible={isVisible} animationType="none">
+      <Animated.View
+        style={{
+          transform: [{ translateY: slideAnim }],
+          position: 'absolute',
+          bottom: 0,
+          width: '100%',
+          backgroundColor: 'white',
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          padding: 20,
+          borderWidth: 1,
+          borderColor: '#E2E8F0',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.8,
+          shadowRadius: 2,
+          elevation: 5,
+        }}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <TouchableOpacity onPress={onCancel}>
+            <Feather name="x-circle" size={32} color="gray" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSubmit} style={{ padding: 10, backgroundColor: '#007bff', borderRadius: 50, flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ color: 'white', fontWeight: 'bold' }}>Post</Text>
+            <Ionicons name="send" size={26} color="white" />
+          </TouchableOpacity>
+        </View>
         <TextInput
           placeholder="What's on your mind?"
           value={content}
-          onChangeText={handleContentChange}
+          onChangeText={setContent}
           multiline
-          style={{ marginBottom: 10, maxHeight: 100 }}
+          style={{ marginBottom: 10, padding: 10, backgroundColor: '#f0f0f0', borderRadius: 5 }}
         />
-        {showAutocomplete && (
-          <Autocomplete data={autocompleteData} onSelect={handleSelectUser} />
-        )}
-        <View style={{ paddingBottom: 10 }}>
-          <TouchableOpacity onPress={pickImage} style={{ padding: 10, backgroundColor: '#E2E8F0', borderRadius: 5, marginBottom: 10 }}>
-            <Text style={{ textAlign: 'center', color: '#4A5568' }}>Upload Image</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={pickImage} style={{ padding: 10, backgroundColor: '#E2E8F0', borderRadius: 5 }}>
+          <Text style={{ textAlign: 'center', color: '#4A5568' }}>Upload Image</Text>
+        </TouchableOpacity>
         {image && <PostImage source={{ uri: image }} />}
-        <PostButton onPress={handleSubmit}>
-          <Ionicons name="send" size={26} color="white" />
-          <PostButtonText>Post</PostButtonText>
-        </PostButton>
-        <View style={{ paddingTop: 10 }}>
-          <TouchableOpacity onPress={onCancel} style={{ marginTop: 10 }}>
-            <Feather name="x-circle" size={32} color="white" />
-          </TouchableOpacity>
-        </View>
-      </PostContainer>
-    </View>
+      </Animated.View>
+    </Modal>
   );
 };
 
-// Post Component
-const Post = ({ post, onDelete }) => {
-  const navigation = useNavigation();
-  const { user } = useUser();
-  const [modalVisible, setModalVisible] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+// FullScreen Post modal
+const FullScreenPostModal = ({ post, visible, onClose, onLike, onShare }) => {
+  const [comment, setComment] = useState('');
+  const [comments, setComments] = useState([]);
+  const { user } = useUser(); // To fetch user id
 
-  useEffect(() => {
-    // For testing purposes, assume the current user is an admin if they have a specific ID
-    const adminUserIds = ['adminUserId1', 'adminUserId2']; // Replace with your admin IDs
-    if (adminUserIds.includes(user?.id)) {
-      setIsAdmin(true);
-    }
-  }, [user]);
-
-  const onHashtagPress = (hashtag) => {
-    Alert.alert('Hashtag Pressed', `You pressed ${hashtag}`);
-  };
-
-  const onMentionPress = (mention) => {
-    Alert.alert('Mention Pressed', `You pressed ${mention}`);
-  };
-
-  const handlePress = () => {
-    if (post) {
-      setModalVisible(true);
-    } else {
-      console.error('Post object is undefined or null');
-    }
-  };
-
-  const handleDeletePost = async () => {
-    // Optimistically update the UI
-    onDelete(post.id);
-
-    try {
-      await deleteDoc(doc(db, 'posts', post.id));
-      Alert.alert('Post deleted', 'Your post has been deleted.');
-    } catch (error) {
-      console.error('Error deleting post: ', error);
-      Alert.alert('Error', 'There was an error deleting the post.');
-      
-      // Rollback the optimistic update if deletion fails
-      onDelete(null); // Re-fetch or restore the post
+  const handleAddComment = () => {
+    if (comment.trim()) {
+      const newComment = {
+        userId: user.id,  // Add the user id to the comment
+        text: comment,
+      };
+      setComments([...comments, newComment]);
+      setComment('');
     }
   };
 
   return (
-    <>
-      <TouchableOpacity onPress={handlePress}>
-        <PostContainer>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <ProfileImage source={{ uri: post?.profileImage }} />
-            <Text style={{ marginLeft: 10, fontSize: 18, fontWeight: 'bold' }}>{post?.userName}</Text>
-            {(user?.id === post?.userId || isAdmin) && (
-              <TouchableOpacity onPress={handleDeletePost} style={{ marginLeft: 'auto' }}>
-                <Feather name="trash" size={24} color="red" />
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={{ marginTop: 10 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
-          {post?.image && <PostImage source={{ uri: post?.image }} />}
-          <PostActions>
-            <ActionButton>
-              <FontAwesome name="thumbs-up" size={20} color="gray" />
-              <ActionText>Like</ActionText>
-            </ActionButton>
-            <ActionButton>
-              <FontAwesome name="comment" size={20} color="gray" />
-              <ActionText>Comment</ActionText>
-            </ActionButton>
-            <ActionButton>
-              <Ionicons name="share-social-outline" size={24} color="black" />
-              <ActionText>Share</ActionText>
-            </ActionButton>
-          </PostActions>
-        </PostContainer>
-      </TouchableOpacity>
+    <Modal visible={visible} transparent={false}>
+      <ScrollView style={{ flex: 1, padding: 16 }}>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons name="close" size={30} color="black" />
+        </TouchableOpacity>
+        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+          <ProfileImage source={{ uri: post?.profileImage }} />
+          <Text style={{ fontWeight: 'bold', fontSize: 18, marginTop: 8 }}>{post?.userName}</Text>
+        </View>
+        <Text style={{ fontSize: 16, marginBottom: 16 }}>{post?.content}</Text>
+        {post?.image && <Image source={{ uri: post?.image }} style={{ width: '100%', height: 400, borderRadius: 10 }} resizeMode="cover" />}
+        <PostActions>
+          <ActionButton onPress={() => onLike(post)} style={{ flex: 1, justifyContent: 'center' }}>
+            <FontAwesome name="thumbs-up" size={20} color="gray" />
+            <ActionText>Like</ActionText>
+          </ActionButton>
+          <ActionButton onPress={() => onShare(post)} style={{ flex: 1, justifyContent: 'center' }}>
+            <Ionicons name="share-social-outline" size={24} color="black" />
+            <ActionText>Share</ActionText>
+          </ActionButton>
+        </PostActions>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-          <View style={{ width: '90%', backgroundColor: 'white', borderRadius: 10, padding: 20 }}>
-            <ScrollView>
-              <Text style={{ marginBottom: 10, fontSize: 18 }}>{parseContent(post?.content, onHashtagPress, onMentionPress)}</Text>
-              {post?.image ? (
-                <Image
-                  source={{ uri: post?.image }}
-                  style={{ width: '100%', height: 300, borderRadius: 10, marginBottom: 10 }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={{ padding: 20, backgroundColor: '#f0f0f0', borderRadius: 10 }}>
-                  <Text style={{ textAlign: 'center', fontSize: 16, color: '#666' }}>No image available</Text>
-                </View>
-              )}
-            </ScrollView>
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={{ alignSelf: 'center', marginTop: 20 }}>
-              <Text style={{ color: 'blue' }}>Close</Text>
+        {/* Comment Section */}
+        <View style={{ marginTop: 20 }}>
+          <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Comments:</Text>
+          {comments.map((cmt, index) => (
+            <View key={index} style={{ paddingVertical: 4, borderBottomColor: '#ccc', borderBottomWidth: 1 }}>
+              <Text>{cmt.userId}</Text>
+              <Text>{cmt.text}</Text>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', marginTop: 10 }}>
+            <TextInput
+              placeholder="Add a comment"
+              value={comment}
+              onChangeText={setComment}
+              style={{ flex: 1, padding: 10, backgroundColor: '#f0f0f0', borderRadius: 5 }}
+            />
+            <TouchableOpacity onPress={handleAddComment} style={{ marginLeft: 10, paddingHorizontal: 15, paddingVertical: 10, backgroundColor: '#007bff', borderRadius: 5 }}>
+              <Text style={{ color: 'white' }}>Post</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-    </>
+      </ScrollView>
+    </Modal>
   );
 };
 
@@ -334,8 +254,10 @@ const MainFeed = () => {
   const [loading, setLoading] = useState(false);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [isPostModalVisible, setPostModalVisible] = useState(false);
 
-  const PAGE_SIZE = 10;  // Number of posts to load per page
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     fetchPosts();
@@ -343,26 +265,17 @@ const MainFeed = () => {
 
   const fetchPosts = async (loadMore = false) => {
     setLoading(true);
-
     let postsRef = collection(db, 'posts');
     let q = query(postsRef, orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
-
     if (loadMore && lastVisible) {
       q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(PAGE_SIZE));
     }
-
     const snapshot = await getDocs(q);
-
     if (!snapshot.empty) {
-      const newPosts = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
+      const newPosts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setPosts((prevPosts) => (loadMore ? [...prevPosts, ...newPosts] : newPosts));
       setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
     }
-
     setLoading(false);
   };
 
@@ -372,21 +285,9 @@ const MainFeed = () => {
     }
   };
 
-  const handleCreatePost = () => {
-    setIsCreatingPost(true);
-  };
-
-  const handleCancelPost = () => {
-    setIsCreatingPost(false);
-  };
-
-  const handleSubmitPost = (newPost) => {
-    setIsCreatingPost(false);
-    setPosts((prevPosts) => [newPost, ...prevPosts]);
-  };
-
-  const handleDeletePost = (postId) => {
-    setPosts((prevPosts) => prevPosts.filter(post => post.id !== postId));
+  const handleViewPost = (post) => {
+    setSelectedPost(post);
+    setPostModalVisible(true);
   };
 
   const onRefresh = () => {
@@ -394,30 +295,69 @@ const MainFeed = () => {
     fetchPosts().then(() => setRefreshing(false));
   };
 
+  const handleLike = (post) => {
+    Alert.alert('Liked!', `You liked ${post.userName}'s post.`);
+  };
+
+  const handleShare = (post) => {
+    Alert.alert('Share', `Sharing ${post.userName}'s post.`);
+  };
+
   return (
     <Container>
       <Header>
         <Ionicons name="airplane-outline" size={24} color="black" />
-        <Text style={{ textAlign: 'center', fontSize: 20, fontWeight: 'bold', flex: 1 }}>
-          Aviation News and Events
-        </Text>
+        <Text style={{ textAlign: 'center', fontSize: 20, fontWeight: 'bold', flex: 1 }}>Aviation News and Events</Text>
       </Header>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <Post key={item.id} post={item} onDelete={handleDeletePost} />}
-        ListHeaderComponent={isCreatingPost ? <CreateNewPost onSubmit={handleSubmitPost} onCancel={handleCancelPost} /> : null}
+        renderItem={({ item }) => (
+          <Post 
+            key={item.id} 
+            post={item} 
+            onDelete={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))} 
+            onViewPost={handleViewPost}
+            onLike={handleLike}
+            onShare={handleShare}
+          />
+        )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={loading && <ActivityIndicator size="large" color="#0000ff" />}
       />
+      <CreateNewPost isVisible={isCreatingPost} onSubmit={(newPost) => setPosts([newPost, ...posts])} onCancel={() => setIsCreatingPost(false)} />
       {!isCreatingPost && (
-        <PostButton onPress={handleCreatePost}>
-          <Ionicons name="create" size={24} color="white" />
-          <PostButtonText>Create Post</PostButtonText>
-        </PostButton>
+        <View style={{ position: 'absolute', bottom: 20, left: 0, right: 0, alignItems: 'center' }}>
+          <TouchableOpacity 
+            onPress={() => setIsCreatingPost(true)} 
+            style={{ 
+              backgroundColor: '#007bff', 
+              padding: 16, 
+              borderRadius: 50, 
+              flexDirection: 'row', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              width: '90%', 
+              shadowColor: '#000', 
+              shadowOffset: { width: 0, height: 2 }, 
+              shadowOpacity: 0.8, 
+              shadowRadius: 2, 
+              elevation: 5 
+            }}>
+            <Ionicons name="create" size={24} color="white" />
+            <Text style={{ color: 'white', fontSize: 16, fontWeight: '600', marginLeft: 8 }}>Create Post</Text>
+          </TouchableOpacity>
+        </View>
       )}
+      <FullScreenPostModal 
+        post={selectedPost} 
+        visible={isPostModalVisible} 
+        onClose={() => setPostModalVisible(false)} 
+        onLike={handleLike}
+        onShare={handleShare}
+      />
     </Container>
   );
 };
@@ -430,11 +370,6 @@ export default function App() {
         <Stack.Screen name="MainFeed" component={MainFeed} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenRental" component={FullScreenRental} />
-        <Stack.Screen 
-          name="PaymentScreen" 
-          component={PaymentScreen} 
-          options={{ title: 'Payment' }} 
-        />
       </Stack.Navigator>
     </NavigationContainer>
   );

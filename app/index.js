@@ -1,32 +1,38 @@
 import React from 'react';
 import { StatusBar } from "expo-status-bar";
-import {
-  Text,
-  View,
-  Image,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-
-} from "react-native";
-import { Redirect } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { SignedIn, SignedOut, useUser } from '@clerk/clerk-expo';
-// import { useGlobalContext } from "../context/GlobalProvider";
-import CustomButton from "../components/CustomButton";
-import { images } from "../constants";
-import { router } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
+import { ClerkProvider, SignedIn, SignedOut, useUser } from '@clerk/clerk-expo';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import { Stack } from 'expo-router';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import CustomButton from '../components/CustomButton';
+import { images } from '../constants';
+import { router } from 'expo-router';
+
+// Function to retrieve Clerk Publishable Key
+const getClerkPublishableKey = () => {
+  const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  if (!clerkPublishableKey) {
+    throw new Error('Missing Clerk Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env');
+  }
+  return clerkPublishableKey;
+};
+
+// Function to retrieve Stripe Publishable Key
+const getStripePublishableKey = () => {
+  const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  if (!stripePublishableKey) {
+    throw new Error('Missing Stripe Publishable Key. Please set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY in your .env');
+  }
+  return stripePublishableKey;
+};
 
 const App = () => {
   const { user } = useUser();
-  // const { isLoading, isLoggedIn } = useGlobalContext();
-
-  // if (!isLoading && isLoggedIn) return <Redirect href="/home" />;
 
   return (
-
-    <SafeAreaView style={styles.container}>
+    <SafeAreaProvider>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.logoContainer}>
@@ -62,13 +68,28 @@ const App = () => {
           </View>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 
-{/* <StoreProvider>
+const Index = () => {
+  const clerkPublishableKey = getClerkPublishableKey();
+  const stripePublishableKey = getStripePublishableKey();
 
-</StoreProvider> */}
+  return (
+    <ClerkProvider publishableKey={clerkPublishableKey}>
+      <StripeProvider publishableKey={stripePublishableKey}>
+        <NavigationContainer>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          </Stack>
+        </NavigationContainer>
+      </StripeProvider>
+    </ClerkProvider>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
