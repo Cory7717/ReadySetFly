@@ -43,24 +43,37 @@ const Stack = createStackNavigator();
 const Post = ({ post, onDelete, onViewPost, onLike, onShare }) => {
   const { user } = useUser();
 
+  if (!post) {
+    return null; // Don't render anything if post is undefined
+  }
+
   return (
     <TouchableOpacity onPress={() => onViewPost(post)}>
       <PostContainer>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <ProfileImage source={{ uri: post?.profileImage || 'default_profile_image_url' }} />
+          {post?.profileImage ? (
+            <ProfileImage source={{ uri: post.profileImage }} />
+          ) : (
+            <ProfileImage source={{ uri: 'default_profile_image_url' }} />
+          )}
           <View style={{ marginLeft: 10 }}>
             <UserName>{post?.userName || 'Unknown User'}</UserName>
-            <Text>{post?.createdAt ? new Date(post.createdAt.toDate()).toLocaleDateString() : 'Unknown Date'}</Text>
+            <Text>
+              {post?.createdAt
+                ? new Date(post.createdAt.toDate()).toLocaleDateString()
+                : 'Unknown Date'}
+            </Text>
           </View>
-          {(user?.id === post?.userId) && (
+          {user?.id === post?.userId && (
             <TouchableOpacity onPress={() => onDelete(post.id)} style={{ marginLeft: 'auto' }}>
               <Feather name="trash" size={24} color="red" />
             </TouchableOpacity>
           )}
         </View>
         <Text style={{ marginBottom: 10 }}>{post?.content || ''}</Text>
-        {/* Ensure that the image URI is valid before rendering the image */}
-        {post?.image && typeof post.image === 'string' && <PostImage source={{ uri: post.image }} />}
+        {post?.image && typeof post.image === 'string' && (
+          <PostImage source={{ uri: post.image }} />
+        )}
         <PostActions>
           <ActionButton onPress={() => onLike(post)}>
             <FontAwesome name="thumbs-up" size={20} color="gray" />
@@ -185,12 +198,16 @@ const CreateNewPost = ({ onSubmit, onCancel, isVisible }) => {
 const FullScreenPostModal = ({ post, visible, onClose, onLike, onShare }) => {
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState([]);
-  const { user } = useUser(); // To fetch user id
+  const { user } = useUser();
+
+  if (!post) {
+    return null; // Return nothing if post is undefined
+  }
 
   const handleAddComment = () => {
     if (comment.trim()) {
       const newComment = {
-        userId: user.id,  // Add the user id to the comment
+        userId: user.id,
         text: comment,
       };
       setComments([...comments, newComment]);
@@ -205,11 +222,15 @@ const FullScreenPostModal = ({ post, visible, onClose, onLike, onShare }) => {
           <Ionicons name="close" size={30} color="black" />
         </TouchableOpacity>
         <View style={{ alignItems: 'center', marginBottom: 16 }}>
-          <ProfileImage source={{ uri: post?.profileImage }} />
-          <Text style={{ fontWeight: 'bold', fontSize: 18, marginTop: 8 }}>{post?.userName}</Text>
+          <ProfileImage source={{ uri: post?.profileImage || 'default_profile_image_url' }} />
+          <Text style={{ fontWeight: 'bold', fontSize: 18, marginTop: 8 }}>
+            {post?.userName || 'Unknown User'}
+          </Text>
         </View>
-        <Text style={{ fontSize: 16, marginBottom: 16 }}>{post?.content}</Text>
-        {post?.image && <Image source={{ uri: post?.image }} style={{ width: '100%', height: 400, borderRadius: 10 }} resizeMode="cover" />}
+        <Text style={{ fontSize: 16, marginBottom: 16 }}>{post?.content || ''}</Text>
+        {post?.image && (
+          <Image source={{ uri: post.image }} style={{ width: '100%', height: 400, borderRadius: 10 }} resizeMode="cover" />
+        )}
         <PostActions>
           <ActionButton onPress={() => onLike(post)} style={{ flex: 1, justifyContent: 'center' }}>
             <FontAwesome name="thumbs-up" size={20} color="gray" />
@@ -237,7 +258,10 @@ const FullScreenPostModal = ({ post, visible, onClose, onLike, onShare }) => {
               onChangeText={setComment}
               style={{ flex: 1, padding: 10, backgroundColor: '#f0f0f0', borderRadius: 5 }}
             />
-            <TouchableOpacity onPress={handleAddComment} style={{ marginLeft: 10, paddingHorizontal: 15, paddingVertical: 10, backgroundColor: '#007bff', borderRadius: 5 }}>
+            <TouchableOpacity
+              onPress={handleAddComment}
+              style={{ marginLeft: 10, paddingHorizontal: 15, paddingVertical: 10, backgroundColor: '#007bff', borderRadius: 5 }}
+            >
               <Text style={{ color: 'white' }}>Post</Text>
             </TouchableOpacity>
           </View>
@@ -248,7 +272,7 @@ const FullScreenPostModal = ({ post, visible, onClose, onLike, onShare }) => {
 };
 
 // Main Feed Component
-const MainFeed = () => {
+const MainFeed = ({ navigation }) => {
   const [posts, setPosts] = useState([]);
   const [lastVisible, setLastVisible] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -286,8 +310,7 @@ const MainFeed = () => {
   };
 
   const handleViewPost = (post) => {
-    setSelectedPost(post);
-    setPostModalVisible(true);
+    navigation.navigate('FullScreenPost', { post });
   };
 
   const onRefresh = () => {
@@ -351,21 +374,33 @@ const MainFeed = () => {
           </TouchableOpacity>
         </View>
       )}
-      <FullScreenPostModal 
-        post={selectedPost} 
-        visible={isPostModalVisible} 
-        onClose={() => setPostModalVisible(false)} 
-        onLike={handleLike}
-        onShare={handleShare}
-      />
     </Container>
+  );
+};
+
+// FullScreen Post component
+const FullScreenPost = ({ route }) => {
+  const { post } = route.params;
+
+  if (!post) {
+    return <Text>Post not found</Text>;
+  }
+
+  return (
+    <FullScreenPostModal
+      post={post}
+      visible={true}
+      onClose={() => navigation.goBack()}
+      onLike={() => Alert.alert('Liked!', `You liked ${post.userName}'s post.`)}
+      onShare={() => Alert.alert('Shared!', `You shared ${post.userName}'s post.`)}
+    />
   );
 };
 
 // Root App Component
 export default function App() {
   return (
-    <NavigationContainer independent={true}>
+    <NavigationContainer>
       <Stack.Navigator initialRouteName="MainFeed">
         <Stack.Screen name="MainFeed" component={MainFeed} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
