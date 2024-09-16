@@ -1,4 +1,4 @@
-import { registerRootComponent } from 'expo';
+// import { registerRootComponent } from 'expo';
 
 
 require('dotenv').config();
