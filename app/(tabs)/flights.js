@@ -23,7 +23,7 @@ import { db } from '../../firebaseConfig';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import FullScreenRental from '../../components/FullScreenRental';
-import FullScreenPost from '../../components/FullScreenPost';
+// import FullScreenPost from '../../components/FullScreenPost';
 
 // Styled components with modern design and 3D shadow
 const Container = styled(SafeAreaView, 'flex-1 bg-gray-100');
@@ -400,11 +400,11 @@ const FullScreenPost = ({ route }) => {
 // Root App Component
 export default function App() {
   return (
-    <NavigationContainer>
+    <NavigationContainer independent={true}>
       <Stack.Navigator initialRouteName="MainFeed">
         <Stack.Screen name="MainFeed" component={MainFeed} options={{ headerShown: false }} />
         <Stack.Screen name="FullScreenPost" component={FullScreenPost} options={{ headerShown: false }} />
-        <Stack.Screen name="FullScreenRental" component={FullScreenRental} />
+        {/* <Stack.Screen name="FullScreenRental" component={FullScreenRental} /> */}
       </Stack.Navigator>
     </NavigationContainer>
   );

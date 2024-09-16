@@ -12,27 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["assets/*"],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.readysetfly.rsf",
-      "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to allow you to share photos with your friends."
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./Assets/icon.png",
-        "backgroundImage": "./Assets/images/fulllogo_transparent.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.readysetfly.rsf",
-      "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "CAMERA"
-      ]
-    },
+    "assetBundlePatterns": [
+      "assets/*"
+    ],
     "plugins": [
       "expo-router",
       "expo-font",
@@ -47,7 +29,20 @@
     ],
     "jsEngine": "hermes",
     "extra": {
-      "API_URL": "https://ready-set-fly-71506.firebaseio.com"
-    }
+      "API_URL": "https://ready-set-fly-71506.firebaseio.com",
+      "eas": {
+        "projectId": "e3d26a84-3e0e-4879-971f-dc5a82b1a37a"
+      }
+    },
+    "android": {
+      "package": "com.carmer7717.rsf_app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.coryarmer.rsfapp"
+    },
+    "owner": "carmer7717"
   }
 }
