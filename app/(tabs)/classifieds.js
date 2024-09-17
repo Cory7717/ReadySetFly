@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Text,
   View,
@@ -15,9 +15,11 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Platform,
-} from "react-native";
-import { useUser } from "@clerk/clerk-expo";
-import { db, storage } from "../../firebaseConfig";
+  StyleSheet,
+  Dimensions,
+} from 'react-native';
+import { useUser } from '@clerk/clerk-expo';
+import { db, storage } from '../../firebaseConfig';
 import {
   collection,
   getDocs,
@@ -28,38 +30,50 @@ import {
   updateDoc,
   doc,
   deleteDoc,
-} from "firebase/firestore";
-import * as Location from "expo-location";
-import { Ionicons } from "@expo/vector-icons";
-import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
-import * as ImagePicker from "expo-image-picker";
-import { Formik } from "formik";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { useStripe } from "@stripe/stripe-react-native";
-import { API_URL } from "@env";
+} from 'firebase/firestore';
+import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
+import wingtipClouds from '../../Assets/images/wingtip_clouds.jpg';
+import * as ImagePicker from 'expo-image-picker';
+import { Formik } from 'formik';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { useStripe } from '@stripe/stripe-react-native';
+import { API_URL } from '@env';
+
+const { width } = Dimensions.get('window');
+
+const COLORS = {
+  primary: '#1D4ED8',
+  secondary: '#6B7280',
+  background: '#F3F4F6',
+  white: '#FFFFFF',
+  black: '#000000',
+  gray: '#9CA3AF',
+  lightGray: '#D1D5DB',
+  red: '#EF4444',
+};
 
 const Classifieds = () => {
   const { user } = useUser();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
-  const [paymentScreenVisible, setPaymentScreenVisible] = useState(false); // To manage the visibility of the Payment Screen
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPricing, setSelectedPricing] = useState("Basic");
+  const [selectedPricing, setSelectedPricing] = useState('Basic');
   const [totalCost, setTotalCost] = useState(0);
   const [listingDetails, setListingDetails] = useState({});
   const [selectedListing, setSelectedListing] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [location, setLocation] = useState(null);
 
-  const categories = ["Aircraft for Sale", "Aviation Jobs", "Flight Schools"];
+  const categories = ['Aircraft for Sale', 'Aviation Jobs', 'Flight Schools'];
 
   const defaultPricingPackages = {
     Basic: 25,
@@ -75,15 +89,15 @@ const Classifieds = () => {
     (async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert("Permission denied", "Location access is required.");
+        if (status !== 'granted') {
+          Alert.alert('Permission denied', 'Location access is required.');
           return;
         }
 
         let currentLocation = await Location.getCurrentPositionAsync({});
         setLocation(currentLocation);
       } catch (error) {
-        console.error("Error fetching location: ", error);
+        console.error('Error fetching location: ', error);
       }
 
       getLatestItemList();
@@ -91,56 +105,31 @@ const Classifieds = () => {
   }, [user, location]);
 
   useEffect(() => {
-    if (selectedCategory === "Aviation Jobs") {
+    if (selectedCategory === 'Aviation Jobs') {
       setPricingPackages({
         Basic: 15, // $15/week for Aviation Jobs
       });
-      setSelectedPricing("Basic");
-    } else if (selectedCategory === "Flight Schools") {
+      setSelectedPricing('Basic');
+    } else if (selectedCategory === 'Flight Schools') {
       setPricingPackages({
         Basic: 250, // $250/month for Flight Schools
       });
-      setSelectedPricing("Basic");
+      setSelectedPricing('Basic');
     } else {
       setPricingPackages(defaultPricingPackages); // Reset to default pricing options for other categories
-      setSelectedPricing("Basic");
+      setSelectedPricing('Basic');
     }
   }, [selectedCategory]);
 
-  const autoDeleteExpiredListings = async () => {
-    const q = query(collection(db, "UserPost"));
-    const querySnapshot = await getDocs(q);
-
-    const currentTime = new Date();
-
-    querySnapshot.forEach(async (document) => {
-      const listing = document.data();
-      const createdAt = listing.createdAt ? listing.createdAt.toDate() : null;
-
-      if (createdAt) {
-        const expiryDate = new Date(createdAt);
-        expiryDate.setDate(
-          expiryDate.getDate() + (listing.pricingPackageDuration || 0) + 3
-        );
-
-        if (currentTime > expiryDate) {
-          await deleteDoc(document.ref);
-        }
-      }
-    });
-
-    getLatestItemList();
-  };
-
   const getLatestItemList = async () => {
     try {
-      let q = query(collection(db, "UserPost"), orderBy("createdAt", "desc"));
+      let q = query(collection(db, 'UserPost'), orderBy('createdAt', 'desc'));
 
       if (selectedCategory) {
         q = query(
-          collection(db, "UserPost"),
-          where("category", "==", selectedCategory),
-          orderBy("createdAt", "desc")
+          collection(db, 'UserPost'),
+          where('category', '==', selectedCategory),
+          orderBy('createdAt', 'desc')
         );
       }
 
@@ -153,8 +142,8 @@ const Classifieds = () => {
       setListings(listingsData);
       setFilteredListings(listingsData);
     } catch (error) {
-      console.error("Error fetching listings: ", error);
-      Alert.alert("Error", "Failed to load listings. Please try again later.");
+      console.error('Error fetching listings: ', error);
+      Alert.alert('Error', `Failed to load listings: ${error.message}`);
     }
   };
 
@@ -164,36 +153,34 @@ const Classifieds = () => {
 
   const pickImage = async () => {
     let maxImages =
-      selectedPricing === "Basic" ? 7 : selectedPricing === "Featured" ? 12 : 16;
+      selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 12 : 16;
     if (images.length >= maxImages) {
       Alert.alert(`You can only upload up to ${maxImages} images.`);
       return;
     }
 
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permissionResult.granted === false) {
+      Alert.alert('Permission Required', 'Permission to access the camera roll is required!');
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true, // Allow multiple selection
-      allowsEditing: false, // Disable allowsEditing to avoid warning
-      aspect: [4, 4],
+      allowsMultipleSelection: true,
+      selectionLimit: maxImages - images.length,
       quality: 1,
     });
 
-    if (!result.canceled) {
-      let selectedImages;
-      if (result.selected) {
-        // Handle case for multiple image selection
-        selectedImages = result.selected.map((asset) => asset.uri);
-      } else {
-        // Handle case for single image selection
-        selectedImages = [result.uri];
-      }
-      setImages([...images, ...selectedImages]);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const selectedImages = result.assets.map((asset) => asset.uri);
+      setImages([...images, ...selectedImages].slice(0, maxImages));
     }
   };
 
   const filterListingsByDistance = (radiusMiles) => {
     if (!location) {
-      Alert.alert("Error", "Location is not available.");
+      Alert.alert('Error', 'Location is not available.');
       return;
     }
 
@@ -217,8 +204,10 @@ const Classifieds = () => {
     const dLon = deg2rad(lon2 - lon1);
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.cos(deg2rad(lat1)) *
+        Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
     return distance;
@@ -230,9 +219,9 @@ const Classifieds = () => {
 
   const fetchPaymentSheetParams = async () => {
     const response = await fetch(`${API_URL}/payment-sheet`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({ amount: totalCost * 100 }),
     });
@@ -247,35 +236,30 @@ const Classifieds = () => {
 
   const initializePaymentSheet = async () => {
     try {
-      const { paymentIntent, ephemeralKey, customer } =
-        await fetchPaymentSheetParams();
+      const { paymentIntent, ephemeralKey, customer } = await fetchPaymentSheetParams();
 
       const { error } = await initPaymentSheet({
-        merchantDisplayName: "Ready Set Fly",
+        merchantDisplayName: 'Ready Set Fly',
         customerId: customer,
         customerEphemeralKeySecret: ephemeralKey,
         paymentIntentClientSecret: paymentIntent,
         allowsDelayedPaymentMethods: true,
         defaultBillingDetails: {
-          name: user.fullName || "Guest",
+          name: user.fullName || 'Guest',
         },
       });
 
       if (!error) {
         return true;
       } else {
-        console.error("Payment Sheet initialization error:", error); // Log error
-        Alert.alert("Error", "Failed to initialize payment sheet");
+        console.error('Payment Sheet initialization error:', error);
+        Alert.alert('Error', 'Failed to initialize payment sheet');
         return false;
       }
     } catch (error) {
-      console.error("Error initializing payment sheet:", error); // Log error
+      console.error('Error initializing payment sheet:', error);
       return false;
     }
-  };
-
-  const openPaymentModal = () => {
-    setPaymentModalVisible(true);
   };
 
   const onSubmitMethod = async (values) => {
@@ -297,7 +281,7 @@ const Classifieds = () => {
       const { error } = await presentPaymentSheet();
 
       if (error) {
-        Alert.alert("Payment Failed", error.message);
+        Alert.alert('Payment Failed', error.message);
       } else {
         handleCompletePayment();
       }
@@ -321,10 +305,10 @@ const Classifieds = () => {
             return await getDownloadURL(snapshot.ref);
           } catch (error) {
             if (__DEV__) {
-              console.error("Error uploading image: ", error);
+              console.error('Error uploading image: ', error);
               Alert.alert(
-                "Development Mode",
-                "Error uploading image. This will render in development mode, but you must fix this error before deploying."
+                'Development Mode',
+                'Error uploading image. This will render in development mode, but you must fix this error before deploying.'
               );
               return imageUri;
             } else {
@@ -344,26 +328,25 @@ const Classifieds = () => {
         createdAt: new Date(),
         pricingPackage: selectedPricing,
         pricingPackageDuration:
-          selectedPricing === "Basic"
+          selectedPricing === 'Basic'
             ? 7
-            : selectedPricing === "Featured"
+            : selectedPricing === 'Featured'
             ? 14
             : 30,
         totalCost,
       };
 
-      await addDoc(collection(db, "UserPost"), newListing);
+      await addDoc(collection(db, 'UserPost'), newListing);
 
       Alert.alert(
-        "Payment Completed",
-        "Your listing has been successfully submitted!"
+        'Payment Completed',
+        'Your listing has been successfully submitted!'
       );
-      setPaymentScreenVisible(false); // Close the Stripe payment modal
       setModalVisible(false);
       getLatestItemList();
     } catch (error) {
-      console.error("Error completing payment: ", error);
-      Alert.alert("Error", "Failed to complete payment and submit listing.");
+      console.error('Error completing payment: ', error);
+      Alert.alert('Error', 'Failed to complete payment and submit listing.');
     } finally {
       setLoading(false);
     }
@@ -382,12 +365,12 @@ const Classifieds = () => {
 
   const handleDeleteListing = async (listingId) => {
     try {
-      await deleteDoc(doc(db, "UserPost", listingId));
-      Alert.alert("Listing Deleted", "Your listing has been deleted.");
+      await deleteDoc(doc(db, 'UserPost', listingId));
+      Alert.alert('Listing Deleted', 'Your listing has been deleted.');
       getLatestItemList();
     } catch (error) {
-      console.error("Error deleting listing: ", error);
-      Alert.alert("Error", "Failed to delete the listing.");
+      console.error('Error deleting listing: ', error);
+      Alert.alert('Error', 'Failed to delete the listing.');
     }
   };
 
@@ -395,46 +378,21 @@ const Classifieds = () => {
     <TouchableOpacity
       key={item}
       onPress={() => setSelectedCategory(item)}
-      style={{
-        padding: 8,
-        backgroundColor: selectedCategory === item ? "#a0aec0" : "#e2e8f0",
-        borderRadius: 8,
-        marginRight: 8,
-      }}
+      style={[
+        styles.categoryButton,
+        selectedCategory === item
+          ? styles.categoryButtonSelected
+          : styles.categoryButtonUnselected,
+      ]}
     >
-      <Text style={{ fontSize: 14, fontWeight: "bold" }}>{item}</Text>
-    </TouchableOpacity>
-  );
-
-  const renderListingItem = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => handleListingPress(item)}
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 16,
-        backgroundColor: "#e2e8f0",
-        borderRadius: 8,
-        marginBottom: 8,
-      }}
-    >
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.title}</Text>
-        <Text>${item.price}</Text>
-        <Text numberOfLines={4}>{item.description}</Text>
-      </View>
-      {item.images && item.images[0] && (
-        <Image
-          source={{ uri: item.images[0] }}
-          style={{
-            width: 96,
-            height: 96,
-            marginLeft: 12,
-            borderRadius: 8,
-          }}
-        />
-      )}
+      <Text
+        style={[
+          styles.categoryButtonText,
+          selectedCategory === item && { color: COLORS.white },
+        ]}
+      >
+        {item}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -456,59 +414,45 @@ const Classifieds = () => {
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 150],
     outputRange: [200, 70],
-    extrapolate: "clamp",
+    extrapolate: 'clamp',
   });
 
   const headerFontSize = scrollY.interpolate({
     inputRange: [0, 150],
     outputRange: [24, 16],
-    extrapolate: "clamp",
+    extrapolate: 'clamp',
   });
 
   const headerPaddingTop = scrollY.interpolate({
     inputRange: [0, 150],
     outputRange: [40, 10],
-    extrapolate: "clamp",
+    extrapolate: 'clamp',
   });
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
-      <Animated.View
-        style={{
-          height: headerHeight,
-          overflow: "hidden",
-        }}
-      >
+    <SafeAreaView style={styles.container}>
+      <Animated.View style={[styles.headerContainer, { height: headerHeight }]}>
         <ImageBackground
           source={wingtipClouds}
-          style={{
-            flex: 1,
-            justifyContent: "flex-end",
-          }}
+          style={styles.headerBackground}
           resizeMode="cover"
         >
           <Animated.View
-            style={{
-              paddingHorizontal: 16,
-              paddingTop: headerPaddingTop,
-              paddingBottom: 20,
-            }}
+            style={[
+              styles.headerContent,
+              { paddingTop: headerPaddingTop, paddingBottom: 20 },
+            ]}
           >
             <Animated.Text
-              style={{
-                fontSize: headerFontSize,
-                color: "white",
-                fontWeight: "bold",
-              }}
+              style={[styles.headerGreeting, { fontSize: headerFontSize }]}
             >
               Good Morning
             </Animated.Text>
             <Animated.Text
-              style={{
-                fontSize: Animated.add(headerFontSize, 6),
-                color: "white",
-                fontWeight: "bold",
-              }}
+              style={[
+                styles.headerName,
+                { fontSize: Animated.add(headerFontSize, 6) },
+              ]}
             >
               {user?.fullName}
             </Animated.Text>
@@ -517,26 +461,20 @@ const Classifieds = () => {
       </Animated.View>
 
       <Animated.ScrollView
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={styles.scrollViewContent}
         scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
         )}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
-        >
-          <Text style={{ fontSize: 18, color: "#4A4A4A" }}>
-            Filter by location or Aircraft Make
+        <View style={styles.filterContainer}>
+          <Text style={styles.filterText}>
+            Filter by Location or Aircraft Make
           </Text>
           <TouchableOpacity
             onPress={() => setFilterModalVisible(true)}
-            style={{ backgroundColor: "#E2E2E2", padding: 8, borderRadius: 50 }}
+            style={styles.filterButton}
           >
             <Ionicons name="filter" size={24} color="gray" />
           </TouchableOpacity>
@@ -548,147 +486,62 @@ const Classifieds = () => {
           horizontal
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 16 }}
+          style={styles.categoryList}
         />
 
-        <Text
-          style={{
-            fontSize: 24,
-            fontWeight: "bold",
-            marginBottom: 16,
-            textAlign: "center",
-            color: "#2d3748",
-          }}
-        >
-          Aircraft Marketplace
-        </Text>
+        <Text style={styles.titleText}>Aircraft Marketplace</Text>
 
         <TouchableOpacity
           onPress={() => setModalVisible(true)}
-          style={{
-            backgroundColor: "#f56565",
-            borderRadius: 50,
-            paddingVertical: 12,
-            marginBottom: 24,
-          }}
+          style={styles.addButton}
         >
-          <Text
-            style={{
-              color: "white",
-              textAlign: "center",
-              fontWeight: "bold",
-            }}
-          >
-            Add Listing
-          </Text>
+          <Text style={styles.addButtonText}>Add Listing</Text>
         </TouchableOpacity>
 
         {filteredListings.length > 0 ? (
           filteredListings.map((item) => (
-            <View style={{ marginBottom: 20 }} key={item.id}>
+            <View style={styles.listingCard} key={item.id}>
               <TouchableOpacity
-                onPress={() => {
-                  setSelectedListing(item);
-                  setCurrentImageIndex(0);
-                  setDetailsModalVisible(true);
-                }}
-                style={{
-                  borderRadius: 10,
-                  overflow: "hidden",
-                  backgroundColor: "white",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 2,
-                }}
+                onPress={() => handleListingPress(item)}
+                style={{ flex: 1 }}
               >
                 <ImageBackground
                   source={{ uri: item.images && item.images[0] }}
-                  style={{ height: 200, justifyContent: "space-between" }}
+                  style={styles.listingImageBackground}
                   imageStyle={{ borderRadius: 10 }}
                 >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      padding: 8,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        backgroundColor: "#000000a0",
-                        color: "white",
-                        padding: 4,
-                        borderRadius: 5,
-                      }}
-                    >
+                  <View style={styles.listingImageTextContainer}>
+                    <Text style={styles.listingImageText}>
                       {item.city}, {item.state}
                     </Text>
-                    <Text
-                      style={{
-                        backgroundColor: "#000000a0",
-                        color: "white",
-                        padding: 4,
-                        borderRadius: 5,
-                      }}
-                    >
-                      ${item.price}
-                    </Text>
+                    <Text style={styles.listingImageText}>${item.price}</Text>
                   </View>
                 </ImageBackground>
-                <View style={{ padding: 10 }}>
-                  <Text
-                    style={{
-                      fontSize: 18,
-                      fontWeight: "bold",
-                      color: "#2d3748",
-                    }}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text
-                    numberOfLines={2}
-                    style={{
-                      color: "#4a5568",
-                    }}
-                  >
+                <View style={styles.listingContent}>
+                  <Text style={styles.listingTitle}>{item.title}</Text>
+                  <Text numberOfLines={2} style={styles.listingDescription}>
                     {item.description}
                   </Text>
                 </View>
               </TouchableOpacity>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  marginTop: 8,
-                }}
-              >
+              <View style={styles.listingActions}>
                 <TouchableOpacity
                   onPress={() => handleEditListing(item)}
-                  style={{
-                    backgroundColor: "#1E90FF",
-                    padding: 8,
-                    borderRadius: 8,
-                    marginRight: 8,
-                  }}
+                  style={styles.editButton}
                 >
-                  <Text style={{ color: "white" }}>Edit</Text>
+                  <Text style={styles.buttonText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => handleDeleteListing(item.id)}
-                  style={{
-                    backgroundColor: "#FF6347",
-                    padding: 8,
-                    borderRadius: 8,
-                  }}
+                  style={styles.deleteButton}
                 >
-                  <Text style={{ color: "white" }}>Delete</Text>
+                  <Text style={styles.buttonText}>Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>
           ))
         ) : (
-          <Text style={{ textAlign: "center", color: "#4a5568" }}>
+          <Text style={{ textAlign: 'center', color: COLORS.gray }}>
             No listings available
           </Text>
         )}
@@ -701,29 +554,16 @@ const Classifieds = () => {
         onRequestClose={() => setDetailsModalVisible(false)}
         animationType="slide"
       >
-        <View style={{ flex: 1, backgroundColor: "rgba(0, 0, 0, 0.9)" }}>
+        <View style={styles.detailsModalBackground}>
           <SafeAreaView style={{ flex: 1 }}>
-            <View
-              style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-            >
+            <View style={styles.detailsModalContent}>
               {selectedListing?.images && (
-                <View style={{ width: "90%", height: "70%" }}>
+                <View style={styles.detailsImageContainer}>
                   <Image
                     source={{ uri: selectedListing.images[currentImageIndex] }}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      resizeMode: "contain",
-                      marginBottom: 20,
-                    }}
+                    style={styles.detailsImage}
                   />
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      marginTop: 20,
-                    }}
-                  >
+                  <View style={styles.imageNavigation}>
                     <TouchableOpacity onPress={goToPreviousImage}>
                       <Ionicons name="arrow-back" size={36} color="white" />
                     </TouchableOpacity>
@@ -733,32 +573,16 @@ const Classifieds = () => {
                   </View>
                 </View>
               )}
-              <Text
-                style={{
-                  color: "white",
-                  fontSize: 24,
-                  fontWeight: "bold",
-                  marginTop: 20,
-                }}
-              >
-                {selectedListing?.title}
-              </Text>
-              <Text style={{ color: "white", fontSize: 18, marginTop: 10 }}>
-                ${selectedListing?.price}
-              </Text>
-              <Text style={{ color: "white", fontSize: 16, marginTop: 10 }}>
+              <Text style={styles.detailsTitle}>{selectedListing?.title}</Text>
+              <Text style={styles.detailsPrice}>${selectedListing?.price}</Text>
+              <Text style={styles.detailsDescription}>
                 {selectedListing?.description}
               </Text>
               <TouchableOpacity
-                style={{
-                  marginTop: 30,
-                  backgroundColor: "#f56565",
-                  padding: 10,
-                  borderRadius: 10,
-                }}
+                style={styles.closeButton}
                 onPress={() => setDetailsModalVisible(false)}
               >
-                <Text style={{ color: "white", fontSize: 16 }}>Close</Text>
+                <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
             </View>
           </SafeAreaView>
@@ -772,108 +596,40 @@ const Classifieds = () => {
         visible={filterModalVisible}
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
-        >
+        <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              width: "100%",
-            }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalContainer}
           >
             <ScrollView
-              contentContainerStyle={{
-                flexGrow: 1,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-              style={{ width: "100%", maxWidth: 320 }}
+              contentContainerStyle={styles.modalContentContainer}
+              style={styles.modalScrollView}
               nestedScrollEnabled={true}
             >
-              <View
-                style={{
-                  backgroundColor: "white",
-                  borderRadius: 24,
-                  padding: 24,
-                  width: "100%",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 24,
-                    fontWeight: "bold",
-                    marginBottom: 24,
-                    textAlign: "center",
-                    color: "#2d3748",
-                  }}
-                >
-                  Filter Listings
-                </Text>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Filter Listings</Text>
 
                 <TouchableOpacity
                   onPress={() => filterListingsByDistance(100)}
-                  style={{
-                    backgroundColor: "#f56565",
-                    paddingVertical: 12,
-                    borderRadius: 50,
-                    marginBottom: 12,
-                  }}
+                  style={styles.modalButton}
                 >
-                  <Text
-                    style={{
-                      color: "white",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                    }}
-                  >
+                  <Text style={styles.modalButtonText}>
                     View Listings Within 100 Miles
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setFilteredListings(listings)}
-                  style={{
-                    backgroundColor: "#f56565",
-                    paddingVertical: 12,
-                    borderRadius: 50,
-                    marginBottom: 12,
-                  }}
+                  style={styles.modalButton}
                 >
-                  <Text
-                    style={{
-                      color: "white",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    View All Listings
-                  </Text>
+                  <Text style={styles.modalButtonText}>View All Listings</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setFilterModalVisible(false)}
-                  style={{
-                    marginTop: 16,
-                    paddingVertical: 8,
-                    borderRadius: 50,
-                    backgroundColor: "#e2e8f0",
-                  }}
+                  style={styles.cancelButton}
                 >
-                  <Text style={{ textAlign: "center", color: "#2d3748" }}>
-                    Cancel
-                  </Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -888,86 +644,32 @@ const Classifieds = () => {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
-        >
+        <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              width: "100%",
-            }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalContainer}
           >
             <ScrollView
-              contentContainerStyle={{
-                flexGrow: 1,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-              style={{ width: "100%", maxWidth: 320 }}
+              contentContainerStyle={styles.modalContentContainer}
+              style={styles.modalScrollView}
               nestedScrollEnabled={true}
             >
-              <View
-                style={{
-                  backgroundColor: "white",
-                  borderRadius: 24,
-                  padding: 24,
-                  width: "100%",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 24,
-                    fontWeight: "bold",
-                    marginBottom: 24,
-                    textAlign: "center",
-                    color: "#2d3748",
-                  }}
-                >
-                  Submit Your Listing
-                </Text>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Submit Your Listing</Text>
 
-                <Text
-                  style={{
-                    marginBottom: 8,
-                    color: "#2d3748",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Select Pricing Package
-                </Text>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    marginBottom: 16,
-                  }}
-                >
+                <Text style={styles.sectionTitle}>Select Pricing Package</Text>
+                <View style={styles.pricingOptions}>
                   {Object.keys(pricingPackages).map((key) => (
                     <TouchableOpacity
                       key={key}
                       onPress={() => setSelectedPricing(key)}
-                      style={{
-                        padding: 8,
-                        borderWidth: 1,
-                        borderRadius: 8,
-                        borderColor:
-                          selectedPricing === key ? "#3182ce" : "#cbd5e0",
-                      }}
+                      style={[
+                        styles.pricingOption,
+                        selectedPricing === key && styles.pricingOptionSelected,
+                      ]}
                     >
-                      <Text style={{ textAlign: "center" }}>{key}</Text>
-                      <Text style={{ textAlign: "center" }}>
+                      <Text style={styles.pricingOptionText}>{key}</Text>
+                      <Text style={styles.pricingOptionText}>
                         ${pricingPackages[key]}
                       </Text>
                     </TouchableOpacity>
@@ -980,224 +682,138 @@ const Classifieds = () => {
                   horizontal
                   keyExtractor={(item) => item}
                   showsHorizontalScrollIndicator={false}
-                  style={{ marginBottom: 16 }}
+                  style={styles.categoryList}
                 />
 
                 <Formik
                   initialValues={{
-                    title: "",
-                    price: "",
-                    description: "",
-                    city: "",
-                    state: "",
-                    email: "",
-                    phone: "",
-                    companyName: "",
-                    jobTitle: "",
-                    jobDescription: "",
-                    category: selectedCategory || "Single Engine Piston",
+                    title: '',
+                    price: '',
+                    description: '',
+                    city: '',
+                    state: '',
+                    email: '',
+                    phone: '',
+                    companyName: '',
+                    jobTitle: '',
+                    jobDescription: '',
+                    category: selectedCategory || 'Single Engine Piston',
                     images: [],
-                    flightSchoolName: "",
-                    flightSchoolDetails: "",
+                    flightSchoolName: '',
+                    flightSchoolDetails: '',
                   }}
                   onSubmit={onSubmitMethod}
                 >
-                  {({
-                    handleChange,
-                    handleBlur,
-                    handleSubmit,
-                    values,
-                  }) => (
+                  {({ handleChange, handleBlur, handleSubmit, values }) => (
                     <>
-                      {selectedCategory === "Aviation Jobs" ? (
+                      {selectedCategory === 'Aviation Jobs' ? (
                         <>
                           <TextInput
                             placeholder="Company Name"
-                            onChangeText={handleChange("companyName")}
-                            onBlur={handleBlur("companyName")}
+                            onChangeText={handleChange('companyName')}
+                            onBlur={handleBlur('companyName')}
                             value={values.companyName}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: "#cbd5e0",
-                              marginBottom: 16,
-                              padding: 8,
-                              color: "#2d3748",
-                            }}
+                            style={styles.input}
                           />
                           <TextInput
                             placeholder="Job Title"
-                            onChangeText={handleChange("jobTitle")}
-                            onBlur={handleBlur("jobTitle")}
+                            onChangeText={handleChange('jobTitle')}
+                            onBlur={handleBlur('jobTitle')}
                             value={values.jobTitle}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: "#cbd5e0",
-                              marginBottom: 16,
-                              padding: 8,
-                              color: "#2d3748",
-                            }}
+                            style={styles.input}
                           />
                           <TextInput
                             placeholder="Job Description"
-                            onChangeText={handleChange("jobDescription")}
-                            onBlur={handleBlur("jobDescription")}
+                            onChangeText={handleChange('jobDescription')}
+                            onBlur={handleBlur('jobDescription')}
                             value={values.jobDescription}
                             multiline
                             numberOfLines={4}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: "#cbd5e0",
-                              marginBottom: 16,
-                              padding: 8,
-                              color: "#2d3748",
-                            }}
+                            style={styles.textArea}
                           />
                         </>
-                      ) : selectedCategory === "Flight Schools" ? (
+                      ) : selectedCategory === 'Flight Schools' ? (
                         <>
                           <TextInput
                             placeholder="Flight School Name"
-                            onChangeText={handleChange("flightSchoolName")}
-                            onBlur={handleBlur("flightSchoolName")}
+                            onChangeText={handleChange('flightSchoolName')}
+                            onBlur={handleBlur('flightSchoolName')}
                             value={values.flightSchoolName}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: "#cbd5e0",
-                              marginBottom: 16,
-                              padding: 8,
-                              color: "#2d3748",
-                            }}
+                            style={styles.input}
                           />
                           <TextInput
                             placeholder="Flight School Details"
-                            onChangeText={handleChange("flightSchoolDetails")}
-                            onBlur={handleBlur("flightSchoolDetails")}
+                            onChangeText={handleChange('flightSchoolDetails')}
+                            onBlur={handleBlur('flightSchoolDetails')}
                             value={values.flightSchoolDetails}
                             multiline
                             numberOfLines={4}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: "#cbd5e0",
-                              marginBottom: 16,
-                              padding: 8,
-                              color: "#2d3748",
-                            }}
+                            style={styles.textArea}
                           />
                         </>
                       ) : (
                         <>
                           <TextInput
                             placeholder="Aircraft Year/Make/Model"
-                            onChangeText={handleChange("title")}
-                            onBlur={handleBlur("title")}
+                            onChangeText={handleChange('title')}
+                            onBlur={handleBlur('title')}
                             value={values.title}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: "#cbd5e0",
-                              marginBottom: 16,
-                              padding: 8,
-                              color: "#2d3748",
-                            }}
+                            style={styles.input}
                           />
                           <TextInput
                             placeholder="Price"
-                            onChangeText={handleChange("price")}
-                            onBlur={handleBlur("price")}
+                            onChangeText={handleChange('price')}
+                            onBlur={handleBlur('price')}
                             value={values.price}
                             keyboardType="default"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: "#cbd5e0",
-                              marginBottom: 16,
-                              padding: 8,
-                              color: "#2d3748",
-                            }}
+                            style={styles.input}
                           />
                           <TextInput
                             placeholder="Description"
-                            onChangeText={handleChange("description")}
-                            onBlur={handleBlur("description")}
+                            onChangeText={handleChange('description')}
+                            onBlur={handleBlur('description')}
                             value={values.description}
                             multiline
                             numberOfLines={4}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: "#cbd5e0",
-                              marginBottom: 16,
-                              padding: 8,
-                              color: "#2d3748",
-                            }}
+                            style={styles.textArea}
                           />
                         </>
                       )}
 
                       <TextInput
                         placeholder="City"
-                        onChangeText={handleChange("city")}
-                        onBlur={handleBlur("city")}
+                        onChangeText={handleChange('city')}
+                        onBlur={handleBlur('city')}
                         value={values.city}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
+                        style={styles.input}
                       />
                       <TextInput
                         placeholder="State"
-                        onChangeText={handleChange("state")}
-                        onBlur={handleBlur("state")}
+                        onChangeText={handleChange('state')}
+                        onBlur={handleBlur('state')}
                         value={values.state}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
+                        style={styles.input}
                       />
                       <TextInput
                         placeholder="Contact Email (Required)"
-                        onChangeText={handleChange("email")}
-                        onBlur={handleBlur("email")}
+                        onChangeText={handleChange('email')}
+                        onBlur={handleBlur('email')}
                         value={values.email}
                         keyboardType="email-address"
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
+                        style={styles.input}
                       />
                       <TextInput
                         placeholder="Phone Number (Optional)"
-                        onChangeText={handleChange("phone")}
-                        onBlur={handleBlur("phone")}
+                        onChangeText={handleChange('phone')}
+                        onBlur={handleBlur('phone')}
                         value={values.phone}
                         keyboardType="phone-pad"
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: "#cbd5e0",
-                          marginBottom: 16,
-                          padding: 8,
-                          color: "#2d3748",
-                        }}
+                        style={styles.input}
                       />
 
-                      {selectedCategory !== "Aviation Jobs" && (
+                      {selectedCategory !== 'Aviation Jobs' && (
                         <>
-                          <Text
-                            style={{
-                              marginBottom: 8,
-                              marginTop: 16,
-                              color: "#2d3748",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            Upload Images
-                          </Text>
+                          <Text style={styles.sectionTitle}>Upload Images</Text>
                           <FlatList
                             data={images}
                             horizontal
@@ -1205,12 +821,7 @@ const Classifieds = () => {
                               <Image
                                 key={index}
                                 source={{ uri: item }}
-                                style={{
-                                  width: 96,
-                                  height: 96,
-                                  marginRight: 8,
-                                  borderRadius: 8,
-                                }}
+                                style={styles.uploadedImage}
                               />
                             )}
                             keyExtractor={(item, index) => index.toString()}
@@ -1218,55 +829,36 @@ const Classifieds = () => {
                           />
                           <TouchableOpacity
                             onPress={pickImage}
-                            style={{
-                              backgroundColor: "#edf2f7",
-                              paddingVertical: 8,
-                              paddingHorizontal: 16,
-                              borderRadius: 50,
-                              marginTop: 8,
-                              marginBottom: 16,
-                            }}
+                            style={styles.uploadButton}
                           >
-                            <Text
-                              style={{ textAlign: "center", color: "#2d3748" }}
-                            >
+                            <Text style={styles.uploadButtonText}>
                               {images.length >=
-                              (selectedPricing === "Basic"
+                              (selectedPricing === 'Basic'
                                 ? 7
-                                : selectedPricing === "Featured"
+                                : selectedPricing === 'Featured'
                                 ? 12
                                 : 16)
                                 ? `Maximum ${
-                                    selectedPricing === "Basic"
+                                    selectedPricing === 'Basic'
                                       ? 7
-                                      : selectedPricing === "Featured"
+                                      : selectedPricing === 'Featured'
                                       ? 12
                                       : 16
                                   } Images`
-                                : "Add Image"}
+                                : 'Add Image'}
                             </Text>
                           </TouchableOpacity>
                         </>
                       )}
 
                       {loading ? (
-                        <ActivityIndicator size="large" color="#FF5A5F" />
+                        <ActivityIndicator size="large" color={COLORS.red} />
                       ) : (
                         <TouchableOpacity
                           onPress={handleSubmit}
-                          style={{
-                            backgroundColor: "#f56565",
-                            paddingVertical: 12,
-                            borderRadius: 50,
-                          }}
+                          style={styles.submitButton}
                         >
-                          <Text
-                            style={{
-                              color: "white",
-                              textAlign: "center",
-                              fontWeight: "bold",
-                            }}
-                          >
+                          <Text style={styles.submitButtonText}>
                             Submit Listing
                           </Text>
                         </TouchableOpacity>
@@ -1277,16 +869,9 @@ const Classifieds = () => {
 
                 <TouchableOpacity
                   onPress={() => setModalVisible(false)}
-                  style={{
-                    marginTop: 16,
-                    paddingVertical: 8,
-                    borderRadius: 50,
-                    backgroundColor: "#e2e8f0",
-                  }}
+                  style={styles.cancelButton}
                 >
-                  <Text style={{ textAlign: "center", color: "#2d3748" }}>
-                    Cancel
-                  </Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -1301,80 +886,24 @@ const Classifieds = () => {
         visible={paymentModalVisible}
         onRequestClose={() => setPaymentModalVisible(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 24,
-              padding: 24,
-              width: "90%",
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 8,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 24,
-                fontWeight: "bold",
-                marginBottom: 16,
-                textAlign: "center",
-                color: "#2d3748",
-              }}
-            >
-              Complete Payment
-            </Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.paymentModalContent}>
+            <Text style={styles.modalTitle}>Complete Payment</Text>
 
-            <Text style={{ fontSize: 18, color: "#4A4A4A", marginBottom: 12 }}>
-              Total Cost: ${totalCost}
-            </Text>
+            <Text style={styles.paymentAmount}>Total Cost: ${totalCost}</Text>
 
             <TouchableOpacity
               onPress={handleSubmitPayment}
-              style={{
-                backgroundColor: "#f56565",
-                paddingVertical: 12,
-                borderRadius: 50,
-                marginBottom: 16,
-              }}
+              style={styles.submitButton}
             >
-              <Text
-                style={{
-                  color: "white",
-                  textAlign: "center",
-                  fontWeight: "bold",
-                }}
-              >
-                Proceed to Pay
-              </Text>
+              <Text style={styles.submitButtonText}>Proceed to Pay</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setPaymentModalVisible(false)}
-              style={{
-                backgroundColor: "#e2e8f0",
-                paddingVertical: 12,
-                borderRadius: 50,
-                marginTop: 16,
-              }}
+              style={styles.cancelButton}
             >
-              <Text
-                style={{
-                  textAlign: "center",
-                  fontWeight: "bold",
-                  color: "#2d3748",
-                }}
-              >
-                Cancel
-              </Text>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1384,3 +913,333 @@ const Classifieds = () => {
 };
 
 export default Classifieds;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  headerContainer: {
+    overflow: 'hidden',
+  },
+  headerBackground: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  headerContent: {
+    paddingHorizontal: 16,
+  },
+  headerGreeting: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+  headerName: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+  scrollViewContent: {
+    padding: 16,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  filterText: {
+    fontSize: 18,
+    color: COLORS.secondary,
+  },
+  filterButton: {
+    backgroundColor: COLORS.lightGray,
+    padding: 8,
+    borderRadius: 50,
+  },
+  categoryList: {
+    marginBottom: 16,
+  },
+  categoryButton: {
+    padding: 8,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  categoryButtonSelected: {
+    backgroundColor: COLORS.primary,
+  },
+  categoryButtonUnselected: {
+    backgroundColor: COLORS.lightGray,
+  },
+  categoryButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.black,
+  },
+  titleText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: COLORS.black,
+  },
+  addButton: {
+    backgroundColor: COLORS.red,
+    borderRadius: 50,
+    paddingVertical: 12,
+    marginBottom: 24,
+  },
+  addButtonText: {
+    color: COLORS.white,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  listingCard: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: COLORS.white,
+    marginBottom: 20,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  listingImageBackground: {
+    height: 200,
+    justifyContent: 'space-between',
+  },
+  listingImageTextContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 8,
+  },
+  listingImageText: {
+    backgroundColor: '#000000a0',
+    color: COLORS.white,
+    padding: 4,
+    borderRadius: 5,
+  },
+  listingContent: {
+    padding: 10,
+  },
+  listingTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.black,
+  },
+  listingDescription: {
+    color: COLORS.gray,
+  },
+  listingActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    paddingHorizontal: 10,
+  },
+  editButton: {
+    backgroundColor: COLORS.primary,
+    padding: 8,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  deleteButton: {
+    backgroundColor: COLORS.red,
+    padding: 8,
+    borderRadius: 8,
+  },
+  buttonText: {
+    color: COLORS.white,
+  },
+  detailsModalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+  },
+  detailsModalContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailsImageContainer: {
+    width: '90%',
+    height: '50%',
+  },
+  detailsImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
+  imageNavigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    width: '50%',
+  },
+  detailsTitle: {
+    color: COLORS.white,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 20,
+  },
+  detailsPrice: {
+    color: COLORS.white,
+    fontSize: 18,
+    marginTop: 10,
+  },
+  detailsDescription: {
+    color: COLORS.white,
+    fontSize: 16,
+    marginTop: 10,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  closeButton: {
+    marginTop: 30,
+    backgroundColor: COLORS.red,
+    padding: 10,
+    borderRadius: 10,
+  },
+  closeButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContainer: {
+    flex: 1,
+    width: '100%',
+  },
+  modalContentContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalScrollView: {
+    width: '100%',
+    maxWidth: 320,
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 24,
+    textAlign: 'center',
+    color: COLORS.black,
+  },
+  modalButton: {
+    backgroundColor: COLORS.red,
+    paddingVertical: 12,
+    borderRadius: 50,
+    marginBottom: 12,
+  },
+  modalButtonText: {
+    color: COLORS.white,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  cancelButton: {
+    marginTop: 16,
+    paddingVertical: 8,
+    borderRadius: 50,
+    backgroundColor: COLORS.lightGray,
+  },
+  cancelButtonText: {
+    textAlign: 'center',
+    color: COLORS.black,
+  },
+  input: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+    marginBottom: 16,
+    padding: 8,
+    color: COLORS.black,
+  },
+  textArea: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+    marginBottom: 16,
+    padding: 8,
+    color: COLORS.black,
+    textAlignVertical: 'top',
+  },
+  sectionTitle: {
+    marginBottom: 8,
+    color: COLORS.black,
+    fontWeight: 'bold',
+  },
+  pricingOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  pricingOption: {
+    padding: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    borderColor: COLORS.lightGray,
+    width: (width - 64) / 3 - 8,
+    alignItems: 'center',
+  },
+  pricingOptionSelected: {
+    borderColor: COLORS.primary,
+  },
+  pricingOptionText: {
+    textAlign: 'center',
+    color: COLORS.black,
+  },
+  uploadedImage: {
+    width: 96,
+    height: 96,
+    marginRight: 8,
+    borderRadius: 8,
+  },
+  uploadButton: {
+    backgroundColor: COLORS.background,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 50,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  uploadButtonText: {
+    textAlign: 'center',
+    color: COLORS.black,
+  },
+  submitButton: {
+    backgroundColor: COLORS.red,
+    paddingVertical: 12,
+    borderRadius: 50,
+    marginTop: 16,
+  },
+  submitButtonText: {
+    color: COLORS.white,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  paymentModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    alignItems: 'center',
+  },
+  paymentAmount: {
+    fontSize: 18,
+    color: COLORS.secondary,
+    marginBottom: 12,
+  },
+});

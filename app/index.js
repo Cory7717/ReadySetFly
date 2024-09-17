@@ -62,11 +62,11 @@ const App = () => {
           />
         </View>
 
-        <TouchableOpacity onPress={() => router.push("/cfi")} style={styles.createCFIButtonContainer}>
+        {/* <TouchableOpacity onPress={() => router.push("/cfi")} style={styles.createCFIButtonContainer}>
           <View style={styles.createCFIButton}>
             <Text style={styles.createCFIButtonText}>Create CFI Profile</Text>
           </View>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </ScrollView>
     </SafeAreaProvider>
   );
