@@ -17,6 +17,7 @@ import {
   Platform,
   StyleSheet,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { db, storage } from '../../firebaseConfig';
@@ -27,8 +28,6 @@ import {
   addDoc,
   query,
   where,
-  updateDoc,
-  doc,
   deleteDoc,
 } from 'firebase/firestore';
 import * as Location from 'expo-location';
@@ -62,6 +61,7 @@ const Classifieds = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false); // Job details modal
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [images, setImages] = useState([]);
@@ -72,6 +72,8 @@ const Classifieds = () => {
   const [selectedListing, setSelectedListing] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [location, setLocation] = useState(null);
+
+  const scaleValue = useRef(new Animated.Value(0)).current;
 
   const categories = ['Aircraft for Sale', 'Aviation Jobs', 'Flight Schools'];
 
@@ -86,11 +88,12 @@ const Classifieds = () => {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    (async () => {
+    const fetchLocation = async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert('Permission denied', 'Location access is required.');
+          setLocation(null);
           return;
         }
 
@@ -98,11 +101,16 @@ const Classifieds = () => {
         setLocation(currentLocation);
       } catch (error) {
         console.error('Error fetching location: ', error);
+        Alert.alert(
+          'Error fetching location',
+          'Location is unavailable. Make sure that location services are enabled.'
+        );
+        setLocation(null);
       }
+    };
 
-      getLatestItemList();
-    })();
-  }, [user, location]);
+    fetchLocation();
+  }, [user]);
 
   useEffect(() => {
     if (selectedCategory === 'Aviation Jobs') {
@@ -161,7 +169,10 @@ const Classifieds = () => {
 
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
-      Alert.alert('Permission Required', 'Permission to access the camera roll is required!');
+      Alert.alert(
+        'Permission Required',
+        'Permission to access the camera roll is required!'
+      );
       return;
     }
 
@@ -218,20 +229,32 @@ const Classifieds = () => {
   };
 
   const fetchPaymentSheetParams = async () => {
-    const response = await fetch(`${API_URL}/payment-sheet`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ amount: totalCost * 100 }),
-    });
-    const { paymentIntent, ephemeralKey, customer } = await response.json();
+    try {
+      const response = await fetch(`${API_URL}/payment-sheet`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: totalCost }), // totalCost is in cents
+      });
 
-    return {
-      paymentIntent,
-      ephemeralKey,
-      customer,
-    };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch payment sheet parameters.');
+      }
+
+      const { paymentIntent, ephemeralKey, customer } = await response.json();
+
+      return {
+        paymentIntent,
+        ephemeralKey,
+        customer,
+      };
+    } catch (error) {
+      console.error('Error fetching payment sheet parameters:', error);
+      Alert.alert('Error', 'Failed to fetch payment sheet parameters.');
+      throw error;
+    }
   };
 
   const initializePaymentSheet = async () => {
@@ -249,15 +272,16 @@ const Classifieds = () => {
         },
       });
 
-      if (!error) {
-        return true;
-      } else {
+      if (error) {
         console.error('Payment Sheet initialization error:', error);
         Alert.alert('Error', 'Failed to initialize payment sheet');
         return false;
+      } else {
+        return true;
       }
     } catch (error) {
       console.error('Error initializing payment sheet:', error);
+      Alert.alert('Error', 'Failed to initialize payment sheet');
       return false;
     }
   };
@@ -265,8 +289,8 @@ const Classifieds = () => {
   const onSubmitMethod = async (values) => {
     setLoading(true);
     const selectedPackagePrice = pricingPackages[selectedPricing];
-    const totalWithTax = (selectedPackagePrice * 1.0825).toFixed(2);
-    setTotalCost(totalWithTax);
+    const totalWithTaxInCents = Math.round(selectedPackagePrice * 1.0825 * 100);
+    setTotalCost(totalWithTaxInCents);
     setListingDetails(values);
 
     // Open the payment modal instead of navigating to another screen
@@ -275,6 +299,12 @@ const Classifieds = () => {
   };
 
   const handleSubmitPayment = async () => {
+    // During development, accept the listing without initializing the payment sheet
+    setPaymentModalVisible(false);
+    handleCompletePayment();
+
+    // Uncomment this code when you integrate Stripe payment
+    /*
     const isInitialized = await initializePaymentSheet();
     if (isInitialized) {
       setPaymentModalVisible(false); // Close the payment modal before showing the Stripe screen
@@ -286,6 +316,7 @@ const Classifieds = () => {
         handleCompletePayment();
       }
     }
+    */
   };
 
   const handleCompletePayment = async () => {
@@ -333,15 +364,12 @@ const Classifieds = () => {
             : selectedPricing === 'Featured'
             ? 14
             : 30,
-        totalCost,
+        totalCost: totalCost / 100, // Convert back to dollars for storage
       };
 
       await addDoc(collection(db, 'UserPost'), newListing);
 
-      Alert.alert(
-        'Payment Completed',
-        'Your listing has been successfully submitted!'
-      );
+      Alert.alert('Payment Completed', 'Your listing has been successfully submitted!');
       setModalVisible(false);
       getLatestItemList();
     } catch (error) {
@@ -354,8 +382,11 @@ const Classifieds = () => {
 
   const handleListingPress = (listing) => {
     setSelectedListing(listing);
-    setCurrentImageIndex(0);
-    setDetailsModalVisible(true);
+    if (listing.category === 'Aviation Jobs') {
+      setJobDetailsModalVisible(true); // Show job-specific modal
+    } else {
+      setDetailsModalVisible(true);
+    }
   };
 
   const handleEditListing = (listing) => {
@@ -371,6 +402,21 @@ const Classifieds = () => {
     } catch (error) {
       console.error('Error deleting listing: ', error);
       Alert.alert('Error', 'Failed to delete the listing.');
+    }
+  };
+
+  const handleAskQuestion = () => {
+    if (selectedListing && selectedListing.contactEmail) {
+      const email = selectedListing.contactEmail;
+      const subject = encodeURIComponent(`Inquiry about ${selectedListing.title}`);
+      const mailUrl = `mailto:${email}?subject=${subject}`;
+
+      Linking.openURL(mailUrl).catch((error) => {
+        console.error('Error opening mail app:', error);
+        Alert.alert('Error', 'Unable to open mail app.');
+      });
+    } else {
+      Alert.alert('Error', 'Contact email not available.');
     }
   };
 
@@ -402,12 +448,16 @@ const Classifieds = () => {
       currentImageIndex < selectedListing.images.length - 1
     ) {
       setCurrentImageIndex(currentImageIndex + 1);
+    } else {
+      setCurrentImageIndex(0); // Loop back to first image
     }
   };
 
   const goToPreviousImage = () => {
     if (currentImageIndex > 0) {
       setCurrentImageIndex(currentImageIndex - 1);
+    } else {
+      setCurrentImageIndex(selectedListing.images.length - 1); // Go to last image
     }
   };
 
@@ -428,6 +478,18 @@ const Classifieds = () => {
     outputRange: [40, 10],
     extrapolate: 'clamp',
   });
+
+  useEffect(() => {
+    if (modalVisible) {
+      Animated.spring(scaleValue, {
+        toValue: 1,
+        friction: 5,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      scaleValue.setValue(0);
+    }
+  }, [modalVisible]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -469,9 +531,7 @@ const Classifieds = () => {
         )}
       >
         <View style={styles.filterContainer}>
-          <Text style={styles.filterText}>
-            Filter by Location or Aircraft Make
-          </Text>
+          <Text style={styles.filterText}>Filter by Location or Aircraft Make</Text>
           <TouchableOpacity
             onPress={() => setFilterModalVisible(true)}
             style={styles.filterButton}
@@ -505,39 +565,29 @@ const Classifieds = () => {
                 onPress={() => handleListingPress(item)}
                 style={{ flex: 1 }}
               >
-                <ImageBackground
-                  source={{ uri: item.images && item.images[0] }}
-                  style={styles.listingImageBackground}
-                  imageStyle={{ borderRadius: 10 }}
-                >
-                  <View style={styles.listingImageTextContainer}>
-                    <Text style={styles.listingImageText}>
+                {item.category === 'Aviation Jobs' ? (
+                  <View style={styles.jobCard}>
+                    <Text style={styles.jobTitle}>{item.jobTitle}</Text>
+                    <Text style={styles.jobCompany}>{item.companyName}</Text>
+                    <Text style={styles.jobLocation}>
                       {item.city}, {item.state}
                     </Text>
-                    <Text style={styles.listingImageText}>${item.price}</Text>
                   </View>
-                </ImageBackground>
-                <View style={styles.listingContent}>
-                  <Text style={styles.listingTitle}>{item.title}</Text>
-                  <Text numberOfLines={2} style={styles.listingDescription}>
-                    {item.description}
-                  </Text>
-                </View>
+                ) : (
+                  <ImageBackground
+                    source={{ uri: item.images && item.images[0] }}
+                    style={styles.listingImageBackground}
+                    imageStyle={{ borderRadius: 10 }}
+                  >
+                    <View style={styles.listingImageTextContainer}>
+                      <Text style={styles.listingImageText}>
+                        {item.city}, {item.state}
+                      </Text>
+                      <Text style={styles.listingImageText}>${item.price}</Text>
+                    </View>
+                  </ImageBackground>
+                )}
               </TouchableOpacity>
-              <View style={styles.listingActions}>
-                <TouchableOpacity
-                  onPress={() => handleEditListing(item)}
-                  style={styles.editButton}
-                >
-                  <Text style={styles.buttonText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleDeleteListing(item.id)}
-                  style={styles.deleteButton}
-                >
-                  <Text style={styles.buttonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           ))
         ) : (
@@ -547,7 +597,35 @@ const Classifieds = () => {
         )}
       </Animated.ScrollView>
 
-      {/* Full Screen Modal for Listing Details */}
+      {/* Aviation Job Full-Screen Modal */}
+      <Modal
+        visible={jobDetailsModalVisible}
+        transparent={true}
+        onRequestClose={() => setJobDetailsModalVisible(false)}
+        animationType="slide"
+      >
+        <View style={styles.jobModalBackground}>
+          <SafeAreaView style={styles.jobModalContainer}>
+            <Text style={styles.jobModalTitle}>{selectedListing?.jobTitle}</Text>
+            <Text style={styles.jobModalCompany}>{selectedListing?.companyName}</Text>
+            <Text style={styles.jobModalLocation}>
+              {selectedListing?.city}, {selectedListing?.state}
+            </Text>
+            <Text style={styles.jobModalDescription}>
+              {selectedListing?.jobDescription}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.jobModalCloseButton}
+              onPress={() => setJobDetailsModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* Full-Screen Modal for Other Categories */}
       <Modal
         visible={detailsModalVisible}
         transparent={true}
@@ -563,14 +641,18 @@ const Classifieds = () => {
                     source={{ uri: selectedListing.images[currentImageIndex] }}
                     style={styles.detailsImage}
                   />
-                  <View style={styles.imageNavigation}>
-                    <TouchableOpacity onPress={goToPreviousImage}>
-                      <Ionicons name="arrow-back" size={36} color="white" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={goToNextImage}>
-                      <Ionicons name="arrow-forward" size={36} color="white" />
-                    </TouchableOpacity>
-                  </View>
+                  <TouchableOpacity
+                    style={[styles.navigationArrow, { left: 10 }]}
+                    onPress={goToPreviousImage}
+                  >
+                    <Ionicons name="arrow-back" size={36} color="white" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.navigationArrow, { right: 10 }]}
+                    onPress={goToNextImage}
+                  >
+                    <Ionicons name="arrow-forward" size={36} color="white" />
+                  </TouchableOpacity>
                 </View>
               )}
               <Text style={styles.detailsTitle}>{selectedListing?.title}</Text>
@@ -578,6 +660,14 @@ const Classifieds = () => {
               <Text style={styles.detailsDescription}>
                 {selectedListing?.description}
               </Text>
+
+              <TouchableOpacity
+                style={styles.askQuestionButton}
+                onPress={handleAskQuestion}
+              >
+                <Text style={styles.askQuestionButtonText}>Ask a question</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setDetailsModalVisible(false)}
@@ -639,15 +729,17 @@ const Classifieds = () => {
 
       {/* Submit Listing Modal */}
       <Modal
-        animationType="slide"
+        animationType="none"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalContainer}
+          <Animated.View
+            style={[
+              styles.modalContainer,
+              { transform: [{ scale: scaleValue }] },
+            ]}
           >
             <ScrollView
               contentContainerStyle={styles.modalContentContainer}
@@ -875,7 +967,7 @@ const Classifieds = () => {
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </KeyboardAvoidingView>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -890,7 +982,9 @@ const Classifieds = () => {
           <View style={styles.paymentModalContent}>
             <Text style={styles.modalTitle}>Complete Payment</Text>
 
-            <Text style={styles.paymentAmount}>Total Cost: ${totalCost}</Text>
+            <Text style={styles.paymentAmount}>
+              Total Cost: ${(totalCost / 100).toFixed(2)}
+            </Text>
 
             <TouchableOpacity
               onPress={handleSubmitPayment}
@@ -1060,17 +1154,17 @@ const styles = StyleSheet.create({
   detailsImageContainer: {
     width: '90%',
     height: '50%',
+    position: 'relative',
   },
   detailsImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'contain',
   },
-  imageNavigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    width: '50%',
+  navigationArrow: {
+    position: 'absolute',
+    top: '45%',
+    padding: 10,
   },
   detailsTitle: {
     color: COLORS.white,
@@ -1090,8 +1184,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+  askQuestionButton: {
+    marginTop: 20,
+    backgroundColor: COLORS.primary,
+    padding: 10,
+    borderRadius: 10,
+  },
+  askQuestionButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+  },
   closeButton: {
-    marginTop: 30,
+    marginTop: 20,
     backgroundColor: COLORS.red,
     padding: 10,
     borderRadius: 10,
@@ -1107,27 +1211,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContainer: {
-    flex: 1,
-    width: '100%',
+    width: '90%',
+    maxHeight: '90%',
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 0,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
   },
   modalContentContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 24,
   },
   modalScrollView: {
     width: '100%',
-    maxWidth: 320,
   },
   modalContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 24,
     width: '100%',
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
   },
   modalTitle: {
     fontSize: 24,
@@ -1241,5 +1343,79 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.secondary,
     marginBottom: 12,
+  },
+  jobCard: {
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: COLORS.white,
+    marginBottom: 20,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  jobTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.black,
+    marginBottom: 5,
+  },
+  jobCompany: {
+    fontSize: 16,
+    color: COLORS.secondary,
+    marginBottom: 5,
+  },
+  jobLocation: {
+    fontSize: 14,
+    color: COLORS.gray,
+  },
+  jobModalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  jobModalContainer: {
+    width: '90%',
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  jobModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.black,
+    marginBottom: 10,
+  },
+  jobModalCompany: {
+    fontSize: 18,
+    color: COLORS.secondary,
+    marginBottom: 5,
+  },
+  jobModalLocation: {
+    fontSize: 16,
+    color: COLORS.gray,
+    marginBottom: 10,
+  },
+  jobModalDescription: {
+    fontSize: 16,
+    color: COLORS.black,
+    marginBottom: 20,
+  },
+  jobModalCloseButton: {
+    backgroundColor: COLORS.red,
+    padding: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
   },
 });

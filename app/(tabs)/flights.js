@@ -339,6 +339,7 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
   const [comments, setComments] = useState(post.comments || []);
   const [likes, setLikes] = useState(post.likes || []);
   const [liked, setLiked] = useState((post.likes || []).includes(user.id));
+  const [textTruncated, setTextTruncated] = useState(false);
 
   useEffect(() => {
     // Real-time updates for comments and likes
@@ -549,7 +550,20 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
             </TouchableOpacity>
           )}
         </View>
-        <PostContent>{post?.content || ''}</PostContent>
+        <PostContent
+          onTextLayout={(e) => {
+            if (e.nativeEvent.lines.length > 4 && !textTruncated) {
+              setTextTruncated(true);
+            }
+          }}
+          numberOfLines={4}
+          ellipsizeMode="tail"
+        >
+          {post?.content || ''}
+        </PostContent>
+        {textTruncated && (
+          <Text style={{ color: 'blue' }}>See more</Text>
+        )}
 
         {post.image && (
           <View style={{ marginBottom: 10 }}>
