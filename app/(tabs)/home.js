@@ -50,7 +50,6 @@ const Home = ({ route, navigation }) => {
     salesTax: "0.00",
     total: "0.00",
   });
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const categories = [
     "Single Engine Piston",
@@ -68,7 +67,6 @@ const Home = ({ route, navigation }) => {
       return;
     }
     const unsubscribe = subscribeToListings();
-    checkAdminStatus();
     return () => unsubscribe();
   }, [user]);
 
@@ -92,7 +90,6 @@ const Home = ({ route, navigation }) => {
 
   const subscribeToListings = () => {
     const listingsRef = collection(db, "airplanes");
-
     let q = query(listingsRef, orderBy("createdAt", "desc"));
 
     if (filter.make) {
@@ -110,6 +107,13 @@ const Home = ({ route, navigation }) => {
           id: doc.id,
           ...doc.data(),
         }));
+
+        listingsData.forEach((listing) => {
+          if (!Array.isArray(listing.images)) {
+            listing.images = [listing.images]; // Convert to array if it's not
+          }
+        });
+
         setListings(listingsData);
       },
       (error) => {
@@ -122,13 +126,6 @@ const Home = ({ route, navigation }) => {
         }
       }
     );
-  };
-
-  const checkAdminStatus = () => {
-    const adminUserIds = ["adminUserId1", "adminUserId2"]; // Example admin user IDs
-    if (adminUserIds.includes(user?.id)) {
-      setIsAdmin(true);
-    }
   };
 
   const calculateTotalCost = (hours) => {
@@ -161,7 +158,7 @@ const Home = ({ route, navigation }) => {
         senderId: user.id,
         senderName: user.fullName,
         airplaneModel: selectedListing.airplaneModel,
-        rentalPeriod: `2024-09-01 to 2024-09-07`, // Replace with actual data
+        rentalPeriod: "2024-09-01 to 2024-09-07", // Replace with actual data
         totalCost: ownerCost.toFixed(2),
         contact: user.email || "noemail@example.com", // Fallback to a default value
         createdAt: new Date(),
@@ -322,7 +319,13 @@ const Home = ({ route, navigation }) => {
           { useNativeDriver: false }
         )}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
           <Text style={{ fontSize: 18, color: "#4A4A4A" }}>
             Filter by location or Aircraft Make
           </Text>
@@ -445,8 +448,15 @@ const Home = ({ route, navigation }) => {
                   </Text>
                 </View>
               </TouchableOpacity>
-              {isAdmin && (
-                <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
+              {/* Show edit and delete buttons only for the listing owner */}
+              {item.ownerId === user.id && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    marginTop: 8,
+                  }}
+                >
                   <TouchableOpacity
                     onPress={() => handleEditListing(item.id)}
                     style={{
@@ -540,7 +550,13 @@ const Home = ({ route, navigation }) => {
                 >
                   ${selectedListing.ratesPerHour} per hour
                 </Text>
-                <Text style={{ marginBottom: 16, textAlign: "center", color: "#4a5568" }}>
+                <Text
+                  style={{
+                    marginBottom: 16,
+                    textAlign: "center",
+                    color: "#4a5568",
+                  }}
+                >
                   {selectedListing.description}
                 </Text>
 

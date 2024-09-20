@@ -61,7 +61,7 @@ const Classifieds = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
-  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false); // Job details modal
+  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false); 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [images, setImages] = useState([]);
@@ -115,16 +115,16 @@ const Classifieds = () => {
   useEffect(() => {
     if (selectedCategory === 'Aviation Jobs') {
       setPricingPackages({
-        Basic: 15, // $15/week for Aviation Jobs
+        Basic: 15, 
       });
       setSelectedPricing('Basic');
     } else if (selectedCategory === 'Flight Schools') {
       setPricingPackages({
-        Basic: 250, // $250/month for Flight Schools
+        Basic: 250, 
       });
       setSelectedPricing('Basic');
     } else {
-      setPricingPackages(defaultPricingPackages); // Reset to default pricing options for other categories
+      setPricingPackages(defaultPricingPackages); 
       setSelectedPricing('Basic');
     }
   }, [selectedCategory]);
@@ -235,7 +235,7 @@ const Classifieds = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ amount: totalCost }), // totalCost is in cents
+        body: JSON.stringify({ amount: totalCost }), 
       });
 
       if (!response.ok) {
@@ -293,30 +293,13 @@ const Classifieds = () => {
     setTotalCost(totalWithTaxInCents);
     setListingDetails(values);
 
-    // Open the payment modal instead of navigating to another screen
     setPaymentModalVisible(true);
     setLoading(false);
   };
 
   const handleSubmitPayment = async () => {
-    // During development, accept the listing without initializing the payment sheet
     setPaymentModalVisible(false);
     handleCompletePayment();
-
-    // Uncomment this code when you integrate Stripe payment
-    /*
-    const isInitialized = await initializePaymentSheet();
-    if (isInitialized) {
-      setPaymentModalVisible(false); // Close the payment modal before showing the Stripe screen
-      const { error } = await presentPaymentSheet();
-
-      if (error) {
-        Alert.alert('Payment Failed', error.message);
-      } else {
-        handleCompletePayment();
-      }
-    }
-    */
   };
 
   const handleCompletePayment = async () => {
@@ -364,7 +347,7 @@ const Classifieds = () => {
             : selectedPricing === 'Featured'
             ? 14
             : 30,
-        totalCost: totalCost / 100, // Convert back to dollars for storage
+        totalCost: totalCost / 100, 
       };
 
       await addDoc(collection(db, 'UserPost'), newListing);
@@ -383,7 +366,7 @@ const Classifieds = () => {
   const handleListingPress = (listing) => {
     setSelectedListing(listing);
     if (listing.category === 'Aviation Jobs') {
-      setJobDetailsModalVisible(true); // Show job-specific modal
+      setJobDetailsModalVisible(true); 
     } else {
       setDetailsModalVisible(true);
     }
@@ -449,7 +432,7 @@ const Classifieds = () => {
     ) {
       setCurrentImageIndex(currentImageIndex + 1);
     } else {
-      setCurrentImageIndex(0); // Loop back to first image
+      setCurrentImageIndex(0); 
     }
   };
 
@@ -457,7 +440,7 @@ const Classifieds = () => {
     if (currentImageIndex > 0) {
       setCurrentImageIndex(currentImageIndex - 1);
     } else {
-      setCurrentImageIndex(selectedListing.images.length - 1); // Go to last image
+      setCurrentImageIndex(selectedListing.images.length - 1); 
     }
   };
 
@@ -500,10 +483,7 @@ const Classifieds = () => {
           resizeMode="cover"
         >
           <Animated.View
-            style={[
-              styles.headerContent,
-              { paddingTop: headerPaddingTop, paddingBottom: 20 },
-            ]}
+            style={[styles.headerContent, { paddingTop: headerPaddingTop, paddingBottom: 20 }]}
           >
             <Animated.Text
               style={[styles.headerGreeting, { fontSize: headerFontSize }]}
@@ -573,6 +553,28 @@ const Classifieds = () => {
                       {item.city}, {item.state}
                     </Text>
                   </View>
+                ) : item.category === 'Flight Schools' ? (
+                  <View style={styles.schoolCard}>
+                    {/* Render flight school name and details */}
+                    <Text style={styles.schoolName}>{item.flightSchoolName}</Text>
+                    <Text style={styles.schoolDetails}>{item.flightSchoolDetails}</Text>
+                    {/* Render images if available */}
+                    {item.images && item.images.length > 0 ? (
+                      <ImageBackground
+                        source={{ uri: item.images[0] }}
+                        style={styles.listingImageBackground}
+                        imageStyle={{ borderRadius: 10 }}
+                      >
+                        <View style={styles.listingImageTextContainer}>
+                          <Text style={styles.listingImageText}>
+                            {item.city}, {item.state}
+                          </Text>
+                        </View>
+                      </ImageBackground>
+                    ) : (
+                      <Text style={styles.noImageText}>No Images Available</Text>
+                    )}
+                  </View>
                 ) : (
                   <ImageBackground
                     source={{ uri: item.images && item.images[0] }}
@@ -606,6 +608,12 @@ const Classifieds = () => {
       >
         <View style={styles.jobModalBackground}>
           <SafeAreaView style={styles.jobModalContainer}>
+            <TouchableOpacity
+              style={styles.closeIconContainer}
+              onPress={() => setJobDetailsModalVisible(false)}
+            >
+              <Ionicons name="close" size={30} color={COLORS.black} />
+            </TouchableOpacity>
             <Text style={styles.jobModalTitle}>{selectedListing?.jobTitle}</Text>
             <Text style={styles.jobModalCompany}>{selectedListing?.companyName}</Text>
             <Text style={styles.jobModalLocation}>
@@ -616,10 +624,10 @@ const Classifieds = () => {
             </Text>
 
             <TouchableOpacity
-              style={styles.jobModalCloseButton}
-              onPress={() => setJobDetailsModalVisible(false)}
+              style={styles.applyButton}
+              onPress={handleAskQuestion}
             >
-              <Text style={styles.closeButtonText}>Close</Text>
+              <Text style={styles.applyButtonText}>Apply Now</Text>
             </TouchableOpacity>
           </SafeAreaView>
         </View>
@@ -736,10 +744,7 @@ const Classifieds = () => {
       >
         <View style={styles.modalOverlay}>
           <Animated.View
-            style={[
-              styles.modalContainer,
-              { transform: [{ scale: scaleValue }] },
-            ]}
+            style={[styles.modalContainer, { transform: [{ scale: scaleValue }] }]}
           >
             <ScrollView
               contentContainerStyle={styles.modalContentContainer}
@@ -1408,14 +1413,51 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     marginBottom: 20,
   },
-  jobModalCloseButton: {
-    backgroundColor: COLORS.red,
+  applyButton: {
+    backgroundColor: COLORS.primary,
     padding: 10,
     borderRadius: 10,
     alignItems: 'center',
+    marginTop: 20,
+  },
+  applyButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+  },
+  closeIconContainer: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 1,
   },
   closeButtonText: {
     color: COLORS.white,
     fontSize: 16,
+  },
+  schoolCard: {
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: COLORS.white,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+    marginBottom: 20,
+  },
+  schoolName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.black,
+  },
+  schoolDetails: {
+    fontSize: 16,
+    color: COLORS.gray,
+    marginVertical: 5,
+  },
+  noImageText: {
+    textAlign: 'center',
+    color: COLORS.gray,
+    marginTop: 10,
   },
 });

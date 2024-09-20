@@ -15,7 +15,7 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native"; // Import useNavigation hook
+import { useNavigation } from "@react-navigation/native";
 import { useUser } from "@clerk/clerk-expo";
 import { db, storage } from "../../firebaseConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -36,12 +36,12 @@ import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { useStripe } from "@stripe/stripe-react-native";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Picker } from "@react-native-picker/picker"; // Import Picker for the year selection
+import { Picker } from "@react-native-picker/picker";
 
 const OwnerProfile = ({ ownerId }) => {
   const { user } = useUser();
   const stripe = useStripe();
-  const navigation = useNavigation(); // Use the useNavigation hook to get navigation
+  const navigation = useNavigation();
   const resolvedOwnerId = ownerId || user?.id;
 
   const [profileData, setProfileData] = useState({
@@ -54,17 +54,17 @@ const OwnerProfile = ({ ownerId }) => {
     boostedListing: false,
   });
   const [aircraftDetails, setAircraftDetails] = useState({
-    year: "2020", // Default year
+    year: "2020",
     make: "",
     model: "",
     engine: "",
-    description: "", // Added description field
+    description: "",
     totalTime: "",
     costPerHour: "",
-    location: "", // Added location field
-    airportIdentifier: "", // Added airport identifier field
+    location: "",
+    airportIdentifier: "",
   });
-  const [additionalAircrafts, setAdditionalAircrafts] = useState([]); // Array to store additional aircrafts
+  const [additionalAircrafts, setAdditionalAircrafts] = useState([]);
   const [costData, setCostData] = useState({
     purchasePrice: "",
     loanAmount: "",
@@ -99,8 +99,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [rentalRequestModalVisible, setRentalRequestModalVisible] =
-    useState(false);
+  const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
   const [messageInput, setMessageInput] = useState("");
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -171,7 +170,6 @@ const OwnerProfile = ({ ownerId }) => {
       flightHoursPerYear,
     } = costData;
 
-    // Mortgage Expense Calculation
     const monthlyInterestRate = parseFloat(interestRate) / 100 / 12;
     const numberOfPayments = parseFloat(loanTerm) * 12;
     const mortgageExpense = loanAmount
@@ -322,7 +320,6 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   const onSubmitMethod = async (values, additional = false) => {
-    // Ensure location, model, and other fields are properly populated
     if (!aircraftDetails.location || aircraftDetails.location.trim() === "") {
       Alert.alert("Error", "Location is required.");
       return;
@@ -340,14 +337,12 @@ const OwnerProfile = ({ ownerId }) => {
 
     setLoading(true);
     try {
-      // Upload images to Firebase Storage
       const uploadedImages = [];
       for (const image of images) {
         const downloadURL = await uploadFile(image, "airplaneImages");
         uploadedImages.push(downloadURL);
       }
 
-      // Upload PDFs (current annual and insurance)
       const annualProofURL = currentAnnualPdf
         ? await uploadFile(currentAnnualPdf, "documents")
         : "";
@@ -355,7 +350,6 @@ const OwnerProfile = ({ ownerId }) => {
         ? await uploadFile(insurancePdf, "documents")
         : "";
 
-      // Prepare new listing data
       const newListing = sanitizeData({
         airplaneModel: aircraftDetails.model || "",
         description: profileData.description || "",
@@ -372,7 +366,6 @@ const OwnerProfile = ({ ownerId }) => {
         boostedListing: profileData.boostListing ? true : false,
       });
 
-      // Add listing to Firestore
       await addDoc(collection(db, "airplanes"), newListing);
 
       if (additional) {
@@ -383,10 +376,9 @@ const OwnerProfile = ({ ownerId }) => {
 
       Alert.alert("Success", "Your listing has been submitted.");
       setFormVisible(false);
-      setIsListedForRent(true); // Mark the aircraft as listed for rent
+      setIsListedForRent(true);
     } catch (error) {
       console.error("Error submitting listing: ", error);
-
       if (error.message.includes("Network request failed")) {
         Alert.alert(
           "Network Error",
@@ -450,14 +442,13 @@ const OwnerProfile = ({ ownerId }) => {
       await updateDoc(notificationRef, { status: "approved" });
 
       const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
-        amount: parseInt(request.totalCost * 100), // Amount in cents
+        amount: parseInt(request.totalCost * 100),
         currency: "usd",
         paymentMethodTypes: ["card"],
         confirm: true,
       });
 
       if (paymentIntent?.status === "succeeded") {
-        // Send message to the renter
         await addDoc(collection(db, "messages"), {
           ownerId: resolvedOwnerId,
           renterId: request.renterId,
@@ -481,7 +472,7 @@ const OwnerProfile = ({ ownerId }) => {
           "The rental request has been approved and payment processed. Chat is now open."
         );
 
-        setMessageModalVisible(true); // Open chat
+        setMessageModalVisible(true);
       } else {
         Alert.alert(
           "Payment Failed",
@@ -522,7 +513,6 @@ const OwnerProfile = ({ ownerId }) => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    // Fetch the latest data...
     setRefreshing(false);
   };
 
@@ -1364,9 +1354,7 @@ const OwnerProfile = ({ ownerId }) => {
                         onPress={() => handleRating(order.id, star)}
                       >
                         <FontAwesome
-                          name={
-                            star <= (ratings[order.id] || 0) ? "star" : "star-o"
-                          }
+                          name={star <= (ratings[order.id] || 0) ? "star" : "star-o"}
                           size={24}
                           color="gold"
                         />
