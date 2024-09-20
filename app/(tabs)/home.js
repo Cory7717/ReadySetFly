@@ -496,7 +496,7 @@ const Home = ({ route, navigation }) => {
         onRequestClose={() => setFullScreenModalVisible(false)}
       >
         <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
-          {selectedListing && (
+          {selectedListing && selectedListing.images && (
             <View style={{ padding: 16, flex: 1 }}>
               <TouchableOpacity
                 onPress={() => setFullScreenModalVisible(false)}
