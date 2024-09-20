@@ -38,12 +38,14 @@ import { useStripe } from "@stripe/stripe-react-native";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Picker } from "@react-native-picker/picker";
 
+// Start of OwnerProfile Component
 const OwnerProfile = ({ ownerId }) => {
   const { user } = useUser();
   const stripe = useStripe();
   const navigation = useNavigation();
   const resolvedOwnerId = ownerId || user?.id;
 
+  // State variables for profile and aircraft details
   const [profileData, setProfileData] = useState({
     airplaneModel: "",
     description: "",
@@ -53,6 +55,7 @@ const OwnerProfile = ({ ownerId }) => {
     boostListing: false,
     boostedListing: false,
   });
+
   const [aircraftDetails, setAircraftDetails] = useState({
     year: "2020",
     make: "",
@@ -64,6 +67,8 @@ const OwnerProfile = ({ ownerId }) => {
     location: "",
     airportIdentifier: "",
   });
+
+  const [initialAircraftDetails, setInitialAircraftDetails] = useState(null); // Added for cancel functionality
   const [additionalAircrafts, setAdditionalAircrafts] = useState([]);
   const [costData, setCostData] = useState({
     purchasePrice: "",
@@ -79,6 +84,7 @@ const OwnerProfile = ({ ownerId }) => {
     flightHoursPerYear: "",
     costPerHour: "",
   });
+
   const [costSaved, setCostSaved] = useState(false);
   const [aircraftSaved, setAircraftSaved] = useState(false);
   const [isListedForRent, setIsListedForRent] = useState(false);
@@ -146,6 +152,7 @@ const OwnerProfile = ({ ownerId }) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setAircraftDetails(data.aircraftDetails);
+          setInitialAircraftDetails(data.aircraftDetails); // Store the initial details
           setCostData(data.costData);
           setCostSaved(true);
           setAircraftSaved(true);
@@ -155,6 +162,7 @@ const OwnerProfile = ({ ownerId }) => {
     fetchData();
   }, [resolvedOwnerId]);
 
+  // Save cost data to Firebase
   const saveCostData = async () => {
     setLoading(true);
     const {
@@ -299,10 +307,7 @@ const OwnerProfile = ({ ownerId }) => {
     }
 
     setAircraftSaved(true);
-    Alert.alert(
-      "Aircraft Details Saved",
-      "Your aircraft details have been saved."
-    );
+    Alert.alert("Aircraft Details Saved", "Your aircraft details have been saved.");
 
     // Save the aircraft details to Firebase
     await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
@@ -313,6 +318,14 @@ const OwnerProfile = ({ ownerId }) => {
 
   const onEditAircraftDetails = () => {
     setAircraftSaved(false);
+  };
+
+  const onCancelAircraftEdit = () => {
+    if (initialAircraftDetails) {
+      setAircraftDetails(initialAircraftDetails); // Revert to the initial state
+      setAircraftSaved(true);
+      Alert.alert("Changes Canceled", "Aircraft details reverted to the original state.");
+    }
   };
 
   const onEditCostData = () => {
@@ -395,12 +408,18 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
+  // Update for handling unlisting and ensuring removal from Home screen
   const handleListForRentToggle = async (listing, additional = false) => {
+    if (!listing?.id) {
+      Alert.alert("Error", "Listing ID is missing.");
+      return;
+    }
+  
     if (isListedForRent) {
       try {
         const listingDocRef = doc(db, "airplanes", listing.id);
-        await deleteDoc(listingDocRef);
-
+        await deleteDoc(listingDocRef);  // Ensure this is the right collection and document ID
+  
         if (additional) {
           setAdditionalAircrafts(
             additionalAircrafts.filter((aircraft) => aircraft.id !== listing.id)
@@ -411,14 +430,14 @@ const OwnerProfile = ({ ownerId }) => {
           );
         }
 
+        // Notify Home screen to remove listing
+        navigation.navigate('Home', { updatedListings: userListings.filter((aircraft) => aircraft.id !== listing.id) });
+  
         setIsListedForRent(false);
-        Alert.alert(
-          "Success",
-          "Your aircraft has been removed from the listings."
-        );
+        Alert.alert("Success", "Your aircraft has been removed from the listings.");
       } catch (error) {
         console.error("Error removing listing: ", error);
-        Alert.alert("Error", "There was an error removing your listing.");
+        Alert.alert("Error", "There was an error removing your listing. Please check your network or try again.");
       }
     } else {
       onSubmitMethod(listing, additional);
@@ -1191,6 +1210,28 @@ const OwnerProfile = ({ ownerId }) => {
                       Save Aircraft Details
                     </Text>
                   </TouchableOpacity>
+
+                  {/* Cancel button for reverting changes */}
+                  <TouchableOpacity
+                    onPress={onCancelAircraftEdit}
+                    style={{
+                      backgroundColor: "#e53e3e",
+                      paddingVertical: 12,
+                      paddingHorizontal: 24,
+                      borderRadius: 50,
+                      marginTop: 16,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        textAlign: "center",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Cancel Changes
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
@@ -1236,6 +1277,20 @@ const OwnerProfile = ({ ownerId }) => {
                 <Text style={{ color: "#e53e3e", fontWeight: "bold" }}>
                   ${listing.ratesPerHour} per hour
                 </Text>
+                <TouchableOpacity
+                  onPress={() => handleListForRentToggle(listing)}
+                  style={{
+                    backgroundColor: isListedForRent ? "#e53e3e" : "#48bb78",
+                    paddingVertical: 8,
+                    paddingHorizontal: 16,
+                    borderRadius: 50,
+                    marginTop: 16,
+                  }}
+                >
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    {isListedForRent ? "Unlist" : "List for Rent"}
+                  </Text>
+                </TouchableOpacity>
               </View>
             ))
           ) : (
