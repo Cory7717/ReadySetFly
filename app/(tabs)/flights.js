@@ -1,4 +1,3 @@
-// Import statements
 import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
@@ -18,7 +17,6 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { styled } from 'nativewind';
 import { useUser } from '@clerk/clerk-expo';
 import {
   collection,
@@ -44,19 +42,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 
 // Constants
 const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150'; // Replace with a valid URL
-
-// Styled components with modern design
-const Container = styled(View, 'flex-1 bg-white');
-const HeaderContainer = styled(SafeAreaView, 'bg-white border border-gray-200 rounded-md shadow-lg m-2');
-const Header = styled(View, 'p-2 flex-row items-center justify-between');
-const ProfileImage = styled(Image, 'w-10 h-10 rounded-full');
-const PostContainer = styled(View, 'bg-white mb-4 rounded-2xl shadow-md border border-gray-100 p-4');
-const PostActions = styled(View, 'flex-row justify-around mt-2 border-t border-gray-200 pt-2');
-const ActionButton = styled(TouchableOpacity, 'flex-row items-center justify-center flex-1');
-const ActionText = styled(Text, 'ml-1 text-gray-600');
-const UserName = styled(Text, 'text-base font-semibold text-gray-900');
-const PostContent = styled(Text, 'text-base text-gray-800 mb-2');
-const CommentInput = styled(TextInput, 'flex-1 p-2 bg-gray-100 rounded-full');
 
 // Stack Navigator
 const Stack = createStackNavigator();
@@ -113,7 +98,6 @@ const UserHeader = ({ navigation, user }) => {
         const imageUrl = await getDownloadURL(storageRef);
 
         // Update the user's profile image
-        // Note: Update this according to how you handle user profiles
         await user.update({ imageUrl: imageUrl });
 
         // Update state
@@ -127,11 +111,11 @@ const UserHeader = ({ navigation, user }) => {
   };
 
   return (
-    <HeaderContainer>
+    <SafeAreaView style={{ backgroundColor: 'white', borderRadius: 10, margin: 10, shadowOpacity: 0.5, shadowRadius: 5, elevation: 3 }}>
       <StatusBar hidden />
-      <Header>
+      <View style={{ padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <TouchableOpacity onPress={pickProfileImage}>
-          <ProfileImage source={{ uri: profileImage }} />
+          <Image source={{ uri: profileImage }} style={{ width: 40, height: 40, borderRadius: 20 }} />
           {uploading && (
             <ActivityIndicator
               size="small"
@@ -176,8 +160,8 @@ const UserHeader = ({ navigation, user }) => {
             <Ionicons name="settings-outline" size={24} color="#1D4ED8" style={{ marginHorizontal: 5 }} />
           </TouchableOpacity>
         </View>
-      </Header>
-    </HeaderContainer>
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -271,7 +255,7 @@ const CreatePost = ({ onSubmit }) => {
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <ProfileImage source={{ uri: user?.imageUrl || DEFAULT_PROFILE_IMAGE }} />
+        <Image source={{ uri: user?.imageUrl || DEFAULT_PROFILE_IMAGE }} style={{ width: 40, height: 40, borderRadius: 20 }} />
         <TextInput
           placeholder="What's on your mind?"
           value={content}
@@ -339,7 +323,6 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
   const [comments, setComments] = useState(post.comments || []);
   const [likes, setLikes] = useState(post.likes || []);
   const [liked, setLiked] = useState((post.likes || []).includes(user.id));
-  const [textTruncated, setTextTruncated] = useState(false);
 
   useEffect(() => {
     // Real-time updates for comments and likes
@@ -448,100 +431,17 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
     return 'Unknown Date'; // Fallback if the date is missing or not valid
   };
 
-  const handleLikeComment = async (targetComment) => {
-    try {
-      // Recursive function to update the likes in the comment tree
-      const updateLikes = (commentsArray) => {
-        return commentsArray.map((cmt) => {
-          if (cmt === targetComment) {
-            const alreadyLiked = (cmt.likes || []).includes(user.id);
-            const updatedLikes = alreadyLiked
-              ? cmt.likes.filter((id) => id !== user.id)
-              : [...(cmt.likes || []), user.id];
-            return { ...cmt, likes: updatedLikes };
-          } else if (cmt.replies && cmt.replies.length > 0) {
-            return { ...cmt, replies: updateLikes(cmt.replies) };
-          } else {
-            return cmt;
-          }
-        });
-      };
-
-      const updatedComments = updateLikes(comments);
-      setComments(updatedComments);
-
-      // Update in Firestore
-      const postRef = doc(db, 'posts', post.id);
-      await updateDoc(postRef, {
-        comments: updatedComments,
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Could not update comment like.');
-    }
-  };
-
-  const handleReplyComment = async (parentComment, replyText) => {
-    try {
-      const newReply = {
-        userId: user.id,
-        userName: user.fullName || 'Anonymous',
-        text: replyText,
-        userImage: user.imageUrl || DEFAULT_PROFILE_IMAGE,
-        likes: [],
-        replies: [],
-      };
-
-      // Recursive function to add the reply to the correct comment
-      const addReply = (commentsArray) => {
-        return commentsArray.map((cmt) => {
-          if (cmt === parentComment) {
-            const updatedReplies = cmt.replies ? [...cmt.replies, newReply] : [newReply];
-            return { ...cmt, replies: updatedReplies };
-          } else if (cmt.replies && cmt.replies.length > 0) {
-            return { ...cmt, replies: addReply(cmt.replies) };
-          } else {
-            return cmt;
-          }
-        });
-      };
-
-      const updatedComments = addReply(comments);
-      setComments(updatedComments);
-
-      // Update in Firestore
-      const postRef = doc(db, 'posts', post.id);
-      await updateDoc(postRef, {
-        comments: updatedComments,
-      });
-
-      // Send notification to the comment owner
-      if (parentComment.userId !== user.id) {
-        await addDoc(collection(db, 'notifications'), {
-          toUserId: parentComment.userId,
-          fromUserId: user.id,
-          fromUserName: user.fullName || 'Anonymous',
-          type: 'reply',
-          postId: post.id,
-          read: false,
-          createdAt: serverTimestamp(),
-        });
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Could not add reply.');
-    }
-  };
-
   return (
     <TouchableOpacity onPress={() => onViewPost(post)}>
-      <PostContainer>
+      <View style={{ backgroundColor: 'white', margin: 10, padding: 10, borderRadius: 20, shadowOpacity: 0.5, shadowRadius: 5, elevation: 3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
           {post?.profileImage ? (
-            <ProfileImage source={{ uri: post.profileImage }} />
+            <Image source={{ uri: post.profileImage }} style={{ width: 40, height: 40, borderRadius: 20 }} />
           ) : (
-            <ProfileImage source={{ uri: DEFAULT_PROFILE_IMAGE }} />
+            <Image source={{ uri: DEFAULT_PROFILE_IMAGE }} style={{ width: 40, height: 40, borderRadius: 20 }} />
           )}
           <View style={{ marginLeft: 10 }}>
-            <UserName>{post?.userName || 'Unknown User'}</UserName>
+            <Text style={{ fontWeight: 'bold' }}>{post?.userName || 'Unknown User'}</Text>
             <Text style={{ color: 'gray', fontSize: 12 }}>{renderDate()}</Text>
           </View>
           {user?.id === post?.userId && (
@@ -550,21 +450,13 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
             </TouchableOpacity>
           )}
         </View>
-        <PostContent
-          onTextLayout={(e) => {
-            if (e.nativeEvent.lines.length > 4 && !textTruncated) {
-              setTextTruncated(true);
-            }
-          }}
+        <Text
           numberOfLines={4}
           ellipsizeMode="tail"
+          style={{ color: '#4B5563', fontSize: 16, marginBottom: 8 }}
         >
           {post?.content || ''}
-        </PostContent>
-        {textTruncated && (
-          <Text style={{ color: 'blue' }}>See more</Text>
-        )}
-
+        </Text>
         {post.image && (
           <View style={{ marginBottom: 10 }}>
             <TouchableOpacity onPress={() => onViewPost(post)}>
@@ -577,16 +469,16 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
           </View>
         )}
 
-        <PostActions>
-          <ActionButton onPress={handleLike}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderColor: '#E5E7EB' }}>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }} onPress={handleLike}>
             <Ionicons name={liked ? 'heart' : 'heart-outline'} size={24} color={liked ? 'red' : 'gray'} />
-            <ActionText>{likes.length > 0 ? likes.length : ''}</ActionText>
-          </ActionButton>
-          <ActionButton onPress={handleShare}>
+            <Text style={{ marginLeft: 5 }}>{likes.length > 0 ? likes.length : ''}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }} onPress={handleShare}>
             <Ionicons name="share-social-outline" size={24} color="gray" />
-            <ActionText>Share</ActionText>
-          </ActionButton>
-        </PostActions>
+            <Text style={{ marginLeft: 5 }}>Share</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Comments Section */}
         <View style={{ marginTop: 10 }}>
@@ -594,8 +486,8 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
             <Comment
               key={index}
               comment={cmt}
-              onLikeComment={handleLikeComment}
-              onReplyComment={handleReplyComment}
+              onLikeComment={() => {}}
+              onReplyComment={() => {}}
               userId={user.id}
             />
           ))}
@@ -606,7 +498,7 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
 
         {/* Comment Input */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
-          <ProfileImage source={{ uri: user?.imageUrl || DEFAULT_PROFILE_IMAGE }} />
+          <Image source={{ uri: user?.imageUrl || DEFAULT_PROFILE_IMAGE }} style={{ width: 40, height: 40, borderRadius: 20 }} />
           <TextInput
             placeholder="Add a comment..."
             value={commentText}
@@ -623,57 +515,10 @@ const Post = ({ post, onDelete, onEdit, onViewPost, onShare }) => {
             <Ionicons name="send" size={24} color="#1D4ED8" style={{ marginLeft: 10 }} />
           </TouchableOpacity>
         </View>
-
-        {optionsVisible && (
-          <Modal
-            transparent={true}
-            visible={optionsVisible}
-            animationType="fade"
-            onRequestClose={() => setOptionsVisible(false)}
-          >
-            <TouchableOpacity style={{ flex: 1 }} onPress={() => setOptionsVisible(false)}>
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 40,
-                  right: 20,
-                  backgroundColor: 'white',
-                  padding: 10,
-                  borderRadius: 10,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 4,
-                  elevation: 5,
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => {
-                    setOptionsVisible(false);
-                    onEdit(post);
-                  }}
-                  style={{ padding: 10 }}
-                >
-                  <Text>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => {
-                    setOptionsVisible(false);
-                    onDelete(post.id);
-                  }}
-                  style={{ padding: 10 }}
-                >
-                  <Text style={{ color: 'red' }}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-        )}
-      </PostContainer>
+      </View>
     </TouchableOpacity>
   );
 };
-
 // Comment Component
 const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
   const [liked, setLiked] = useState((comment.likes || []).includes(userId));
@@ -700,7 +545,7 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
   return (
     <View style={{ marginBottom: 10, marginLeft: (comment.depth || 0) * 20 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <ProfileImage source={{ uri: comment.userImage || DEFAULT_PROFILE_IMAGE }} />
+        <Image source={{ uri: comment.userImage || DEFAULT_PROFILE_IMAGE }} style={{ width: 40, height: 40, borderRadius: 20 }} />
         <View style={{ marginLeft: 10, flex: 1 }}>
           <Text style={{ fontWeight: 'bold' }}>{comment.userName}</Text>
           <Text>{comment.text}</Text>
@@ -715,7 +560,6 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
           </View>
         </View>
       </View>
-      {/* Reply Input */}
       {showReplyInput && (
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, marginLeft: 50 }}>
           <TextInput
@@ -729,7 +573,6 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
           </TouchableOpacity>
         </View>
       )}
-      {/* Render Replies */}
       {comment.replies && comment.replies.length > 0 && (
         <View style={{ marginTop: 10 }}>
           {comment.replies.slice(0, 3).map((reply, index) => (
@@ -828,7 +671,6 @@ const FullScreenPostModal = ({ post, visible, onClose }) => {
   const [liked, setLiked] = useState((post.likes || []).includes(user.id));
 
   useEffect(() => {
-    // Real-time updates for comments and likes
     const unsubscribe = onSnapshot(doc(db, 'posts', post.id), (docSnap) => {
       if (docSnap.exists()) {
         const updatedPost = docSnap.data();
@@ -857,7 +699,6 @@ const FullScreenPostModal = ({ post, visible, onClose }) => {
         });
         setComment('');
 
-        // Send notification to post owner
         if (post.userId !== user.id) {
           await addDoc(collection(db, 'notifications'), {
             toUserId: post.userId,
@@ -889,7 +730,6 @@ const FullScreenPostModal = ({ post, visible, onClose }) => {
         });
         setLiked(true);
 
-        // Send notification to post owner
         if (post.userId !== user.id) {
           await addDoc(collection(db, 'notifications'), {
             toUserId: post.userId,
@@ -906,93 +746,6 @@ const FullScreenPostModal = ({ post, visible, onClose }) => {
       Alert.alert('Error', 'Could not update like.');
     }
   };
-
-  const handleLikeComment = async (targetComment) => {
-    try {
-      // Recursive function to update the likes in the comment tree
-      const updateLikes = (commentsArray) => {
-        return commentsArray.map((cmt) => {
-          if (cmt === targetComment) {
-            const alreadyLiked = (cmt.likes || []).includes(user.id);
-            const updatedLikes = alreadyLiked
-              ? cmt.likes.filter((id) => id !== user.id)
-              : [...(cmt.likes || []), user.id];
-            return { ...cmt, likes: updatedLikes };
-          } else if (cmt.replies && cmt.replies.length > 0) {
-            return { ...cmt, replies: updateLikes(cmt.replies) };
-          } else {
-            return cmt;
-          }
-        });
-      };
-
-      const updatedComments = updateLikes(comments);
-      setComments(updatedComments);
-
-      // Update in Firestore
-      const postRef = doc(db, 'posts', post.id);
-      await updateDoc(postRef, {
-        comments: updatedComments,
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Could not update comment like.');
-    }
-  };
-
-  const handleReplyComment = async (parentComment, replyText) => {
-    try {
-      const newReply = {
-        userId: user.id,
-        userName: user.fullName || 'Anonymous',
-        text: replyText,
-        userImage: user.imageUrl || DEFAULT_PROFILE_IMAGE,
-        likes: [],
-        replies: [],
-      };
-
-      // Recursive function to add the reply to the correct comment
-      const addReply = (commentsArray) => {
-        return commentsArray.map((cmt) => {
-          if (cmt === parentComment) {
-            const updatedReplies = cmt.replies ? [...cmt.replies, newReply] : [newReply];
-            return { ...cmt, replies: updatedReplies };
-          } else if (cmt.replies && cmt.replies.length > 0) {
-            return { ...cmt, replies: addReply(cmt.replies) };
-          } else {
-            return cmt;
-          }
-        });
-      };
-
-      const updatedComments = addReply(comments);
-      setComments(updatedComments);
-
-      // Update in Firestore
-      const postRef = doc(db, 'posts', post.id);
-      await updateDoc(postRef, {
-        comments: updatedComments,
-      });
-
-      // Send notification to the comment owner
-      if (parentComment.userId !== user.id) {
-        await addDoc(collection(db, 'notifications'), {
-          toUserId: parentComment.userId,
-          fromUserId: user.id,
-          fromUserName: user.fullName || 'Anonymous',
-          type: 'reply',
-          postId: post.id,
-          read: false,
-          createdAt: serverTimestamp(),
-        });
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Could not add reply.');
-    }
-  };
-
-  if (!post) {
-    return null; // Return nothing if post is undefined
-  }
 
   return (
     <Modal visible={visible} transparent={false}>
@@ -1017,7 +770,7 @@ const FullScreenPostModal = ({ post, visible, onClose }) => {
               <Ionicons name="close-outline" size={30} color="black" />
             </TouchableOpacity>
             <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              <ProfileImage source={{ uri: post?.profileImage || DEFAULT_PROFILE_IMAGE }} />
+              <Image source={{ uri: post?.profileImage || DEFAULT_PROFILE_IMAGE }} style={{ width: 60, height: 60, borderRadius: 30 }} />
               <Text style={{ fontWeight: 'bold', fontSize: 18, marginTop: 8 }}>
                 {post?.userName || 'Unknown User'}
               </Text>
@@ -1025,7 +778,7 @@ const FullScreenPostModal = ({ post, visible, onClose }) => {
                 {post?.createdAt?.toDate ? post.createdAt.toDate().toLocaleDateString() : 'Unknown Date'}
               </Text>
             </View>
-            <PostContent>{post?.content || ''}</PostContent>
+            <Text>{post?.content || ''}</Text>
             {post.image && (
               <View style={{ marginBottom: 10 }}>
                 <Image
@@ -1035,44 +788,33 @@ const FullScreenPostModal = ({ post, visible, onClose }) => {
                 />
               </View>
             )}
-            <PostActions>
-              <ActionButton onPress={handleLike}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10 }}>
+              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }} onPress={handleLike}>
                 <Ionicons name={liked ? 'heart' : 'heart-outline'} size={24} color={liked ? 'red' : 'gray'} />
-                <ActionText>{likes.length > 0 ? likes.length : ''}</ActionText>
-              </ActionButton>
-            </PostActions>
+                <Text style={{ marginLeft: 5 }}>{likes.length > 0 ? likes.length : ''}</Text>
+              </TouchableOpacity>
+            </View>
 
-            {/* Comments Section */}
-            <View style={{ marginTop: 20, paddingHorizontal: 16 }}>
+            <View style={{ marginTop: 20 }}>
               <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Comments</Text>
               {comments.map((cmt, index) => (
                 <Comment
                   key={index}
                   comment={cmt}
-                  onLikeComment={handleLikeComment}
-                  onReplyComment={handleReplyComment}
+                  onLikeComment={() => {}}
+                  onReplyComment={() => {}}
                   userId={user.id}
                 />
               ))}
             </View>
           </View>
         </ScrollView>
-        {/* Comment Input */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            padding: 10,
-            borderTopColor: '#E5E7EB',
-            borderTopWidth: 1,
-            backgroundColor: '#fff',
-          }}
-        >
-          <CommentInput
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, borderTopColor: '#E5E7EB', borderTopWidth: 1 }}>
+          <TextInput
             placeholder="Add a comment..."
             value={comment}
             onChangeText={setComment}
-            multiline
+            style={{ flex: 1, padding: 10, backgroundColor: '#F3F4F6', borderRadius: 20 }}
           />
           <TouchableOpacity onPress={handleAddComment} style={{ marginLeft: 10 }}>
             <Ionicons name="send" size={24} color="#1D4ED8" />
@@ -1122,8 +864,6 @@ const MainFeed = ({ navigation }) => {
   const [posts, setPosts] = useState([]);
   const [lastVisible, setLastVisible] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [isEditingPost, setIsEditingPost] = useState(false);
-  const [postToEdit, setPostToEdit] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const PAGE_SIZE = 10;
@@ -1170,42 +910,12 @@ const MainFeed = ({ navigation }) => {
     fetchPosts().then(() => setRefreshing(false));
   };
 
-  const handleDelete = (id) => {
-    Alert.alert(
-      'Delete Post',
-      'Are you sure you want to delete this post?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => confirmDelete(id),
-        },
-      ],
-      { cancelable: true }
-    );
-  };
-
-  const confirmDelete = async (id) => {
-    try {
-      await deleteDoc(doc(db, 'posts', id));
-      setPosts((prev) => prev.filter((p) => p.id !== id));
-    } catch (error) {
-      Alert.alert('Error', 'Could not delete post.');
-    }
-  };
-
-  const handleEdit = (post) => {
-    setPostToEdit(post);
-    setIsEditingPost(true);
-  };
-
   const handleNewPost = (newPost) => {
     setPosts([newPost, ...posts]);
   };
 
   return (
-    <Container>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
       <UserHeader navigation={navigation} user={user} />
       <FlatList
         data={posts}
@@ -1215,8 +925,6 @@ const MainFeed = ({ navigation }) => {
           <Post
             key={item.id}
             post={item}
-            onDelete={handleDelete}
-            onEdit={handleEdit}
             onViewPost={handleViewPost}
             onShare={() => {}}
           />
@@ -1225,11 +933,9 @@ const MainFeed = ({ navigation }) => {
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={loading && <ActivityIndicator size="large" color="#1D4ED8" />}
-        ListEmptyComponent={
-          !loading && <Text style={{ textAlign: 'center', marginTop: 20 }}>No posts available.</Text>
-        }
+        ListEmptyComponent={!loading && <Text style={{ textAlign: 'center', marginTop: 20 }}>No posts available.</Text>}
       />
-    </Container>
+    </SafeAreaView>
   );
 };
 
