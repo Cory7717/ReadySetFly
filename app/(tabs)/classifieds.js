@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react'; 
 import {
   Text,
   View,
@@ -15,7 +15,6 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Platform,
-  StyleSheet,
   Dimensions,
   Linking,
 } from 'react-native';
@@ -38,6 +37,7 @@ import { Formik } from 'formik';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useStripe } from '@stripe/stripe-react-native';
 import { API_URL } from '@env';
+import DawnBackground from '../../Assets/images/DawnBackground.jpg';
 
 const { width } = Dimensions.get('window');
 
@@ -61,7 +61,7 @@ const Classifieds = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
-  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false); 
+  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [images, setImages] = useState([]);
@@ -115,16 +115,16 @@ const Classifieds = () => {
   useEffect(() => {
     if (selectedCategory === 'Aviation Jobs') {
       setPricingPackages({
-        Basic: 15, 
+        Basic: 15,
       });
       setSelectedPricing('Basic');
     } else if (selectedCategory === 'Flight Schools') {
       setPricingPackages({
-        Basic: 250, 
+        Basic: 250,
       });
       setSelectedPricing('Basic');
     } else {
-      setPricingPackages(defaultPricingPackages); 
+      setPricingPackages(defaultPricingPackages);
       setSelectedPricing('Basic');
     }
   }, [selectedCategory]);
@@ -216,9 +216,9 @@ const Classifieds = () => {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(deg2rad(lat1)) *
-        Math.cos(deg2rad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(deg2rad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
     return distance;
@@ -235,7 +235,7 @@ const Classifieds = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ amount: totalCost }), 
+        body: JSON.stringify({ amount: totalCost }),
       });
 
       if (!response.ok) {
@@ -345,9 +345,9 @@ const Classifieds = () => {
           selectedPricing === 'Basic'
             ? 7
             : selectedPricing === 'Featured'
-            ? 14
-            : 30,
-        totalCost: totalCost / 100, 
+              ? 14
+              : 30,
+        totalCost: totalCost / 100,
       };
 
       await addDoc(collection(db, 'UserPost'), newListing);
@@ -366,7 +366,7 @@ const Classifieds = () => {
   const handleListingPress = (listing) => {
     setSelectedListing(listing);
     if (listing.category === 'Aviation Jobs') {
-      setJobDetailsModalVisible(true); 
+      setJobDetailsModalVisible(true);
     } else {
       setDetailsModalVisible(true);
     }
@@ -407,18 +407,19 @@ const Classifieds = () => {
     <TouchableOpacity
       key={item}
       onPress={() => setSelectedCategory(item)}
-      style={[
-        styles.categoryButton,
-        selectedCategory === item
-          ? styles.categoryButtonSelected
-          : styles.categoryButtonUnselected,
-      ]}
+      style={{
+        padding: 8,
+        borderRadius: 8,
+        marginRight: 8,
+        backgroundColor: selectedCategory === item ? COLORS.primary : COLORS.lightGray
+      }}
     >
       <Text
-        style={[
-          styles.categoryButtonText,
-          selectedCategory === item && { color: COLORS.white },
-        ]}
+        style={{
+          fontSize: 14,
+          fontWeight: 'bold',
+          color: selectedCategory === item ? COLORS.white : COLORS.black,
+        }}
       >
         {item}
       </Text>
@@ -432,7 +433,7 @@ const Classifieds = () => {
     ) {
       setCurrentImageIndex(currentImageIndex + 1);
     } else {
-      setCurrentImageIndex(0); 
+      setCurrentImageIndex(0);
     }
   };
 
@@ -440,7 +441,7 @@ const Classifieds = () => {
     if (currentImageIndex > 0) {
       setCurrentImageIndex(currentImageIndex - 1);
     } else {
-      setCurrentImageIndex(selectedListing.images.length - 1); 
+      setCurrentImageIndex(selectedListing.images.length - 1);
     }
   };
 
@@ -475,26 +476,31 @@ const Classifieds = () => {
   }, [modalVisible]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Animated.View style={[styles.headerContainer, { height: headerHeight }]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
+      <Animated.View style={{ overflow: 'hidden', height: headerHeight }}>
         <ImageBackground
           source={wingtipClouds}
-          style={styles.headerBackground}
+          style={{ flex: 1, justifyContent: 'flex-end' }}
           resizeMode="cover"
         >
           <Animated.View
-            style={[styles.headerContent, { paddingTop: headerPaddingTop, paddingBottom: 20 }]}
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: headerPaddingTop,
+              paddingBottom: 20,
+            }}
           >
             <Animated.Text
-              style={[styles.headerGreeting, { fontSize: headerFontSize }]}
+              style={{ color: COLORS.white, fontWeight: 'bold', fontSize: headerFontSize }}
             >
               Good Morning
             </Animated.Text>
             <Animated.Text
-              style={[
-                styles.headerName,
-                { fontSize: Animated.add(headerFontSize, 6) },
-              ]}
+              style={{
+                color: COLORS.white,
+                fontWeight: 'bold',
+                fontSize: Animated.add(headerFontSize, 6),
+              }}
             >
               {user?.fullName}
             </Animated.Text>
@@ -503,18 +509,18 @@ const Classifieds = () => {
       </Animated.View>
 
       <Animated.ScrollView
-        contentContainerStyle={styles.scrollViewContent}
+        contentContainerStyle={{ padding: 16 }}
         scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
         )}
       >
-        <View style={styles.filterContainer}>
-          <Text style={styles.filterText}>Filter by Location or Aircraft Make</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+          <Text style={{ fontSize: 18, color: COLORS.secondary }}>Filter by Location or Aircraft Make</Text>
           <TouchableOpacity
             onPress={() => setFilterModalVisible(true)}
-            style={styles.filterButton}
+            style={{ backgroundColor: COLORS.lightGray, padding: 8, borderRadius: 50 }}
           >
             <Ionicons name="filter" size={24} color="gray" />
           </TouchableOpacity>
@@ -526,66 +532,84 @@ const Classifieds = () => {
           horizontal
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
-          style={styles.categoryList}
+          style={{ marginBottom: 16 }}
         />
 
-        <Text style={styles.titleText}>Aircraft Marketplace</Text>
+        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: COLORS.black }}>
+          Aircraft Marketplace
+        </Text>
 
         <TouchableOpacity
           onPress={() => setModalVisible(true)}
-          style={styles.addButton}
+          style={{
+            backgroundColor: COLORS.red,
+            borderRadius: 50,
+            paddingVertical: 12,
+            marginBottom: 24,
+          }}
         >
-          <Text style={styles.addButtonText}>Add Listing</Text>
+          <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+            Add Listing
+          </Text>
         </TouchableOpacity>
 
         {filteredListings.length > 0 ? (
           filteredListings.map((item) => (
-            <View style={styles.listingCard} key={item.id}>
+            <View
+              style={{
+                borderRadius: 10,
+                overflow: 'hidden',
+                backgroundColor: COLORS.white,
+                marginBottom: 20,
+                shadowColor: COLORS.black,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+                elevation: 3,
+              }}
+              key={item.id}
+            >
               <TouchableOpacity
                 onPress={() => handleListingPress(item)}
                 style={{ flex: 1 }}
               >
                 {item.category === 'Aviation Jobs' ? (
-                  <View style={styles.jobCard}>
-                    <Text style={styles.jobTitle}>{item.jobTitle}</Text>
-                    <Text style={styles.jobCompany}>{item.companyName}</Text>
-                    <Text style={styles.jobLocation}>
-                      {item.city}, {item.state}
-                    </Text>
+                  <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 20 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black, marginBottom: 5 }}>{item.jobTitle}</Text>
+                    <Text style={{ fontSize: 16, color: COLORS.secondary, marginBottom: 5 }}>{item.companyName}</Text>
+                    <Text style={{ fontSize: 14, color: COLORS.gray }}>{item.city}, {item.state}</Text>
                   </View>
                 ) : item.category === 'Flight Schools' ? (
-                  <View style={styles.schoolCard}>
-                    {/* Render flight school name and details */}
-                    <Text style={styles.schoolName}>{item.flightSchoolName}</Text>
-                    <Text style={styles.schoolDetails}>{item.flightSchoolDetails}</Text>
-                    {/* Render images if available */}
+                  <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}>{item.flightSchoolName}</Text>
+                    <Text style={{ fontSize: 16, color: COLORS.gray, marginVertical: 5 }}>{item.flightSchoolDetails}</Text>
                     {item.images && item.images.length > 0 ? (
                       <ImageBackground
                         source={{ uri: item.images[0] }}
-                        style={styles.listingImageBackground}
-                        imageStyle={{ borderRadius: 10 }}
+                        style={{ height: 200, justifyContent: 'space-between', borderRadius: 10 }}
                       >
-                        <View style={styles.listingImageTextContainer}>
-                          <Text style={styles.listingImageText}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
+                          <Text style={{ backgroundColor: '#000000a0', color: COLORS.white, padding: 4, borderRadius: 5 }}>
                             {item.city}, {item.state}
                           </Text>
                         </View>
                       </ImageBackground>
                     ) : (
-                      <Text style={styles.noImageText}>No Images Available</Text>
+                      <Text style={{ textAlign: 'center', color: COLORS.gray, marginTop: 10 }}>No Images Available</Text>
                     )}
                   </View>
                 ) : (
                   <ImageBackground
                     source={{ uri: item.images && item.images[0] }}
-                    style={styles.listingImageBackground}
-                    imageStyle={{ borderRadius: 10 }}
+                    style={{ height: 200, justifyContent: 'space-between', borderRadius: 10 }}
                   >
-                    <View style={styles.listingImageTextContainer}>
-                      <Text style={styles.listingImageText}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
+                      <Text style={{ backgroundColor: '#000000a0', color: COLORS.white, padding: 4, borderRadius: 5 }}>
                         {item.city}, {item.state}
                       </Text>
-                      <Text style={styles.listingImageText}>${item.price}</Text>
+                      <Text style={{ backgroundColor: '#000000a0', color: COLORS.white, padding: 4, borderRadius: 5 }}>
+                        ${item.price}
+                      </Text>
                     </View>
                   </ImageBackground>
                 )}
@@ -593,12 +617,11 @@ const Classifieds = () => {
             </View>
           ))
         ) : (
-          <Text style={{ textAlign: 'center', color: COLORS.gray }}>
-            No listings available
-          </Text>
+          <Text style={{ textAlign: 'center', color: COLORS.gray }}>No listings available</Text>
         )}
       </Animated.ScrollView>
 
+      {/* Modals for handling detailed listing views and actions */}
       {/* Aviation Job Full-Screen Modal */}
       <Modal
         visible={jobDetailsModalVisible}
@@ -606,81 +629,84 @@ const Classifieds = () => {
         onRequestClose={() => setJobDetailsModalVisible(false)}
         animationType="slide"
       >
-        <View style={styles.jobModalBackground}>
-          <SafeAreaView style={styles.jobModalContainer}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <SafeAreaView style={{ width: '90%', backgroundColor: COLORS.white, borderRadius: 20, padding: 20 }}>
             <TouchableOpacity
-              style={styles.closeIconContainer}
+              style={{ position: 'absolute', top: 10, right: 10, zIndex: 1 }}
               onPress={() => setJobDetailsModalVisible(false)}
             >
               <Ionicons name="close" size={30} color={COLORS.black} />
             </TouchableOpacity>
-            <Text style={styles.jobModalTitle}>{selectedListing?.jobTitle}</Text>
-            <Text style={styles.jobModalCompany}>{selectedListing?.companyName}</Text>
-            <Text style={styles.jobModalLocation}>
-              {selectedListing?.city}, {selectedListing?.state}
-            </Text>
-            <Text style={styles.jobModalDescription}>
-              {selectedListing?.jobDescription}
-            </Text>
-
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: COLORS.black, marginBottom: 10 }}>{selectedListing?.jobTitle}</Text>
+            <Text style={{ fontSize: 18, color: COLORS.secondary, marginBottom: 5 }}>{selectedListing?.companyName}</Text>
+            <Text style={{ fontSize: 16, color: COLORS.gray, marginBottom: 10 }}>{selectedListing?.city}, {selectedListing?.state}</Text>
+            <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 20 }}>{selectedListing?.jobDescription}</Text>
             <TouchableOpacity
-              style={styles.applyButton}
+              style={{ backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center', marginTop: 20 }}
               onPress={handleAskQuestion}
             >
-              <Text style={styles.applyButtonText}>Apply Now</Text>
+              <Text style={{ color: COLORS.white, fontSize: 16 }}>Apply Now</Text>
             </TouchableOpacity>
           </SafeAreaView>
         </View>
       </Modal>
 
       {/* Full-Screen Modal for Other Categories */}
+      {/* Full-Screen Modal for Flight Schools */}
       <Modal
         visible={detailsModalVisible}
         transparent={true}
         onRequestClose={() => setDetailsModalVisible(false)}
         animationType="slide"
       >
-        <View style={styles.detailsModalBackground}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)' }}>
           <SafeAreaView style={{ flex: 1 }}>
-            <View style={styles.detailsModalContent}>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               {selectedListing?.images && (
-                <View style={styles.detailsImageContainer}>
+                <View style={{ width: '90%', height: '50%', position: 'relative' }}>
                   <Image
                     source={{ uri: selectedListing.images[currentImageIndex] }}
-                    style={styles.detailsImage}
+                    style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
                   />
                   <TouchableOpacity
-                    style={[styles.navigationArrow, { left: 10 }]}
+                    style={{ position: 'absolute', top: '45%', padding: 10, left: 10 }}
                     onPress={goToPreviousImage}
                   >
                     <Ionicons name="arrow-back" size={36} color="white" />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.navigationArrow, { right: 10 }]}
+                    style={{ position: 'absolute', top: '45%', padding: 10, right: 10 }}
                     onPress={goToNextImage}
                   >
                     <Ionicons name="arrow-forward" size={36} color="white" />
                   </TouchableOpacity>
                 </View>
               )}
-              <Text style={styles.detailsTitle}>{selectedListing?.title}</Text>
-              <Text style={styles.detailsPrice}>${selectedListing?.price}</Text>
-              <Text style={styles.detailsDescription}>
-                {selectedListing?.description}
+              {/* Display flight school name */}
+              <Text style={{ color: COLORS.white, fontSize: 24, fontWeight: 'bold', marginTop: 20 }}>
+                {selectedListing?.flightSchoolName}
               </Text>
-
+              {/* Display flight school details */}
+              <Text style={{ color: COLORS.white, fontSize: 18, marginTop: 10, textAlign: 'center', paddingHorizontal: 20 }}>
+                {selectedListing?.flightSchoolDetails}
+              </Text>
+              {/* Optional: display other information like location */}
+              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
+                {selectedListing?.city}, {selectedListing?.state}
+              </Text>
+              {/* Ask question button */}
               <TouchableOpacity
-                style={styles.askQuestionButton}
+                style={{ marginTop: 20, backgroundColor: COLORS.primary, padding: 10, borderRadius: 10 }}
                 onPress={handleAskQuestion}
               >
-                <Text style={styles.askQuestionButtonText}>Ask a question</Text>
+                <Text style={{ color: COLORS.white, fontSize: 16 }}>Ask a question</Text>
               </TouchableOpacity>
-
+              {/* Close modal button */}
               <TouchableOpacity
-                style={styles.closeButton}
+                style={{ marginTop: 20, backgroundColor: COLORS.red, padding: 10, borderRadius: 10 }}
                 onPress={() => setDetailsModalVisible(false)}
               >
-                <Text style={styles.closeButtonText}>Close</Text>
+                <Text style={{ color: COLORS.white, fontSize: 16 }}>Close</Text>
               </TouchableOpacity>
             </View>
           </SafeAreaView>
@@ -694,40 +720,40 @@ const Classifieds = () => {
         visible={filterModalVisible}
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalContainer}
+            style={{ width: '90%', maxHeight: '90%', backgroundColor: COLORS.white, borderRadius: 24, padding: 0 }}
           >
-            <ScrollView
-              contentContainerStyle={styles.modalContentContainer}
-              style={styles.modalScrollView}
-              nestedScrollEnabled={true}
-            >
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Filter Listings</Text>
+            <ScrollView contentContainerStyle={{ padding: 24 }} style={{ width: '100%' }} nestedScrollEnabled={true}>
+              <View style={{ width: '100%' }}>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+                  Filter Listings
+                </Text>
 
                 <TouchableOpacity
                   onPress={() => filterListingsByDistance(100)}
-                  style={styles.modalButton}
+                  style={{ backgroundColor: COLORS.red, paddingVertical: 12, borderRadius: 50, marginBottom: 12 }}
                 >
-                  <Text style={styles.modalButtonText}>
+                  <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
                     View Listings Within 100 Miles
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setFilteredListings(listings)}
-                  style={styles.modalButton}
+                  style={{ backgroundColor: COLORS.red, paddingVertical: 12, borderRadius: 50, marginBottom: 12 }}
                 >
-                  <Text style={styles.modalButtonText}>View All Listings</Text>
+                  <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                    View All Listings
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setFilterModalVisible(false)}
-                  style={styles.cancelButton}
+                  style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -742,33 +768,45 @@ const Classifieds = () => {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
           <Animated.View
-            style={[styles.modalContainer, { transform: [{ scale: scaleValue }] }]}
+            style={{
+              width: '90%',
+              maxHeight: '90%',
+              backgroundColor: COLORS.white,
+              borderRadius: 24,
+              padding: 0,
+              shadowColor: COLORS.black,
+              shadowOffset: { width: 0, height: 5 },
+              shadowOpacity: 0.3,
+              shadowRadius: 10,
+              elevation: 10,
+              transform: [{ scale: scaleValue }]
+            }}
           >
-            <ScrollView
-              contentContainerStyle={styles.modalContentContainer}
-              style={styles.modalScrollView}
-              nestedScrollEnabled={true}
-            >
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Submit Your Listing</Text>
+            <ScrollView contentContainerStyle={{ padding: 24 }} style={{ width: '100%' }} nestedScrollEnabled={true}>
+              <View style={{ width: '100%' }}>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+                  Submit Your Listing
+                </Text>
 
-                <Text style={styles.sectionTitle}>Select Pricing Package</Text>
-                <View style={styles.pricingOptions}>
+                <Text style={{ marginBottom: 8, color: COLORS.black, fontWeight: 'bold' }}>Select Pricing Package</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
                   {Object.keys(pricingPackages).map((key) => (
                     <TouchableOpacity
                       key={key}
                       onPress={() => setSelectedPricing(key)}
-                      style={[
-                        styles.pricingOption,
-                        selectedPricing === key && styles.pricingOptionSelected,
-                      ]}
+                      style={{
+                        padding: 8,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        borderColor: selectedPricing === key ? COLORS.primary : COLORS.lightGray,
+                        width: (width - 64) / 3 - 8,
+                        alignItems: 'center',
+                      }}
                     >
-                      <Text style={styles.pricingOptionText}>{key}</Text>
-                      <Text style={styles.pricingOptionText}>
-                        ${pricingPackages[key]}
-                      </Text>
+                      <Text style={{ textAlign: 'center', color: COLORS.black }}>{key}</Text>
+                      <Text style={{ textAlign: 'center', color: COLORS.black }}>${pricingPackages[key]}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -779,7 +817,7 @@ const Classifieds = () => {
                   horizontal
                   keyExtractor={(item) => item}
                   showsHorizontalScrollIndicator={false}
-                  style={styles.categoryList}
+                  style={{ marginBottom: 16 }}
                 />
 
                 <Formik
@@ -810,14 +848,26 @@ const Classifieds = () => {
                             onChangeText={handleChange('companyName')}
                             onBlur={handleBlur('companyName')}
                             value={values.companyName}
-                            style={styles.input}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                           />
                           <TextInput
                             placeholder="Job Title"
                             onChangeText={handleChange('jobTitle')}
                             onBlur={handleBlur('jobTitle')}
                             value={values.jobTitle}
-                            style={styles.input}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                           />
                           <TextInput
                             placeholder="Job Description"
@@ -826,7 +876,14 @@ const Classifieds = () => {
                             value={values.jobDescription}
                             multiline
                             numberOfLines={4}
-                            style={styles.textArea}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                           />
                         </>
                       ) : selectedCategory === 'Flight Schools' ? (
@@ -836,7 +893,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('flightSchoolName')}
                             onBlur={handleBlur('flightSchoolName')}
                             value={values.flightSchoolName}
-                            style={styles.input}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                           />
                           <TextInput
                             placeholder="Flight School Details"
@@ -845,7 +908,14 @@ const Classifieds = () => {
                             value={values.flightSchoolDetails}
                             multiline
                             numberOfLines={4}
-                            style={styles.textArea}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                           />
                         </>
                       ) : (
@@ -855,7 +925,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('title')}
                             onBlur={handleBlur('title')}
                             value={values.title}
-                            style={styles.input}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                           />
                           <TextInput
                             placeholder="Price"
@@ -863,7 +939,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('price')}
                             value={values.price}
                             keyboardType="default"
-                            style={styles.input}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                           />
                           <TextInput
                             placeholder="Description"
@@ -872,7 +954,14 @@ const Classifieds = () => {
                             value={values.description}
                             multiline
                             numberOfLines={4}
-                            style={styles.textArea}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                           />
                         </>
                       )}
@@ -882,14 +971,26 @@ const Classifieds = () => {
                         onChangeText={handleChange('city')}
                         onBlur={handleBlur('city')}
                         value={values.city}
-                        style={styles.input}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
                       />
                       <TextInput
                         placeholder="State"
                         onChangeText={handleChange('state')}
                         onBlur={handleBlur('state')}
                         value={values.state}
-                        style={styles.input}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
                       />
                       <TextInput
                         placeholder="Contact Email (Required)"
@@ -897,7 +998,13 @@ const Classifieds = () => {
                         onBlur={handleBlur('email')}
                         value={values.email}
                         keyboardType="email-address"
-                        style={styles.input}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
                       />
                       <TextInput
                         placeholder="Phone Number (Optional)"
@@ -905,12 +1012,18 @@ const Classifieds = () => {
                         onBlur={handleBlur('phone')}
                         value={values.phone}
                         keyboardType="phone-pad"
-                        style={styles.input}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
                       />
 
                       {selectedCategory !== 'Aviation Jobs' && (
                         <>
-                          <Text style={styles.sectionTitle}>Upload Images</Text>
+                          <Text style={{ marginBottom: 8, color: COLORS.black, fontWeight: 'bold' }}>Upload Images</Text>
                           <FlatList
                             data={images}
                             horizontal
@@ -918,7 +1031,12 @@ const Classifieds = () => {
                               <Image
                                 key={index}
                                 source={{ uri: item }}
-                                style={styles.uploadedImage}
+                                style={{
+                                  width: 96,
+                                  height: 96,
+                                  marginRight: 8,
+                                  borderRadius: 8,
+                                }}
                               />
                             )}
                             keyExtractor={(item, index) => index.toString()}
@@ -926,22 +1044,27 @@ const Classifieds = () => {
                           />
                           <TouchableOpacity
                             onPress={pickImage}
-                            style={styles.uploadButton}
+                            style={{
+                              backgroundColor: COLORS.background,
+                              paddingVertical: 8,
+                              paddingHorizontal: 16,
+                              borderRadius: 50,
+                              marginTop: 8,
+                              marginBottom: 16,
+                            }}
                           >
-                            <Text style={styles.uploadButtonText}>
+                            <Text style={{ textAlign: 'center', color: COLORS.black }}>
                               {images.length >=
-                              (selectedPricing === 'Basic'
-                                ? 7
-                                : selectedPricing === 'Featured'
-                                ? 12
-                                : 16)
-                                ? `Maximum ${
-                                    selectedPricing === 'Basic'
-                                      ? 7
-                                      : selectedPricing === 'Featured'
-                                      ? 12
-                                      : 16
-                                  } Images`
+                                (selectedPricing === 'Basic'
+                                  ? 7
+                                  : selectedPricing === 'Featured'
+                                    ? 12
+                                    : 16)
+                                ? `Maximum ${selectedPricing === 'Basic'
+                                  ? 7
+                                  : selectedPricing === 'Featured'
+                                    ? 12
+                                    : 16} Images`
                                 : 'Add Image'}
                             </Text>
                           </TouchableOpacity>
@@ -953,9 +1076,14 @@ const Classifieds = () => {
                       ) : (
                         <TouchableOpacity
                           onPress={handleSubmit}
-                          style={styles.submitButton}
+                          style={{
+                            backgroundColor: COLORS.red,
+                            paddingVertical: 12,
+                            borderRadius: 50,
+                            marginTop: 16,
+                          }}
                         >
-                          <Text style={styles.submitButtonText}>
+                          <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
                             Submit Listing
                           </Text>
                         </TouchableOpacity>
@@ -966,9 +1094,9 @@ const Classifieds = () => {
 
                 <TouchableOpacity
                   onPress={() => setModalVisible(false)}
-                  style={styles.cancelButton}
+                  style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -983,26 +1111,47 @@ const Classifieds = () => {
         visible={paymentModalVisible}
         onRequestClose={() => setPaymentModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.paymentModalContent}>
-            <Text style={styles.modalTitle}>Complete Payment</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <View
+            style={{
+              backgroundColor: COLORS.white,
+              borderRadius: 24,
+              padding: 24,
+              width: '90%',
+              shadowColor: COLORS.black,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 8,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+              Complete Payment
+            </Text>
 
-            <Text style={styles.paymentAmount}>
+            <Text style={{ fontSize: 18, color: COLORS.secondary, marginBottom: 12 }}>
               Total Cost: ${(totalCost / 100).toFixed(2)}
             </Text>
 
             <TouchableOpacity
               onPress={handleSubmitPayment}
-              style={styles.submitButton}
+              style={{
+                backgroundColor: COLORS.red,
+                paddingVertical: 12,
+                borderRadius: 50,
+                marginTop: 16,
+              }}
             >
-              <Text style={styles.submitButtonText}>Proceed to Pay</Text>
+              <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                Proceed to Pay
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setPaymentModalVisible(false)}
-              style={styles.cancelButton}
+              style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1012,452 +1161,3 @@ const Classifieds = () => {
 };
 
 export default Classifieds;
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  headerContainer: {
-    overflow: 'hidden',
-  },
-  headerBackground: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  headerContent: {
-    paddingHorizontal: 16,
-  },
-  headerGreeting: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-  },
-  headerName: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-  },
-  scrollViewContent: {
-    padding: 16,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  filterText: {
-    fontSize: 18,
-    color: COLORS.secondary,
-  },
-  filterButton: {
-    backgroundColor: COLORS.lightGray,
-    padding: 8,
-    borderRadius: 50,
-  },
-  categoryList: {
-    marginBottom: 16,
-  },
-  categoryButton: {
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  categoryButtonSelected: {
-    backgroundColor: COLORS.primary,
-  },
-  categoryButtonUnselected: {
-    backgroundColor: COLORS.lightGray,
-  },
-  categoryButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.black,
-  },
-  titleText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: COLORS.black,
-  },
-  addButton: {
-    backgroundColor: COLORS.red,
-    borderRadius: 50,
-    paddingVertical: 12,
-    marginBottom: 24,
-  },
-  addButtonText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  listingCard: {
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: COLORS.white,
-    marginBottom: 20,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  listingImageBackground: {
-    height: 200,
-    justifyContent: 'space-between',
-  },
-  listingImageTextContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 8,
-  },
-  listingImageText: {
-    backgroundColor: '#000000a0',
-    color: COLORS.white,
-    padding: 4,
-    borderRadius: 5,
-  },
-  listingContent: {
-    padding: 10,
-  },
-  listingTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
-  },
-  listingDescription: {
-    color: COLORS.gray,
-  },
-  listingActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-    paddingHorizontal: 10,
-  },
-  editButton: {
-    backgroundColor: COLORS.primary,
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  deleteButton: {
-    backgroundColor: COLORS.red,
-    padding: 8,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: COLORS.white,
-  },
-  detailsModalBackground: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-  },
-  detailsModalContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailsImageContainer: {
-    width: '90%',
-    height: '50%',
-    position: 'relative',
-  },
-  detailsImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
-  },
-  navigationArrow: {
-    position: 'absolute',
-    top: '45%',
-    padding: 10,
-  },
-  detailsTitle: {
-    color: COLORS.white,
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 20,
-  },
-  detailsPrice: {
-    color: COLORS.white,
-    fontSize: 18,
-    marginTop: 10,
-  },
-  detailsDescription: {
-    color: COLORS.white,
-    fontSize: 16,
-    marginTop: 10,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  askQuestionButton: {
-    marginTop: 20,
-    backgroundColor: COLORS.primary,
-    padding: 10,
-    borderRadius: 10,
-  },
-  askQuestionButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-  },
-  closeButton: {
-    marginTop: 20,
-    backgroundColor: COLORS.red,
-    padding: 10,
-    borderRadius: 10,
-  },
-  closeButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContainer: {
-    width: '90%',
-    maxHeight: '90%',
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 0,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  modalContentContainer: {
-    padding: 24,
-  },
-  modalScrollView: {
-    width: '100%',
-  },
-  modalContent: {
-    width: '100%',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    textAlign: 'center',
-    color: COLORS.black,
-  },
-  modalButton: {
-    backgroundColor: COLORS.red,
-    paddingVertical: 12,
-    borderRadius: 50,
-    marginBottom: 12,
-  },
-  modalButtonText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    marginTop: 16,
-    paddingVertical: 8,
-    borderRadius: 50,
-    backgroundColor: COLORS.lightGray,
-  },
-  cancelButtonText: {
-    textAlign: 'center',
-    color: COLORS.black,
-  },
-  input: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-    marginBottom: 16,
-    padding: 8,
-    color: COLORS.black,
-  },
-  textArea: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-    marginBottom: 16,
-    padding: 8,
-    color: COLORS.black,
-    textAlignVertical: 'top',
-  },
-  sectionTitle: {
-    marginBottom: 8,
-    color: COLORS.black,
-    fontWeight: 'bold',
-  },
-  pricingOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  pricingOption: {
-    padding: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    borderColor: COLORS.lightGray,
-    width: (width - 64) / 3 - 8,
-    alignItems: 'center',
-  },
-  pricingOptionSelected: {
-    borderColor: COLORS.primary,
-  },
-  pricingOptionText: {
-    textAlign: 'center',
-    color: COLORS.black,
-  },
-  uploadedImage: {
-    width: 96,
-    height: 96,
-    marginRight: 8,
-    borderRadius: 8,
-  },
-  uploadButton: {
-    backgroundColor: COLORS.background,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 50,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  uploadButtonText: {
-    textAlign: 'center',
-    color: COLORS.black,
-  },
-  submitButton: {
-    backgroundColor: COLORS.red,
-    paddingVertical: 12,
-    borderRadius: 50,
-    marginTop: 16,
-  },
-  submitButtonText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  paymentModalContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 24,
-    width: '90%',
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    alignItems: 'center',
-  },
-  paymentAmount: {
-    fontSize: 18,
-    color: COLORS.secondary,
-    marginBottom: 12,
-  },
-  jobCard: {
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: COLORS.white,
-    marginBottom: 20,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  jobTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 5,
-  },
-  jobCompany: {
-    fontSize: 16,
-    color: COLORS.secondary,
-    marginBottom: 5,
-  },
-  jobLocation: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  jobModalBackground: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  jobModalContainer: {
-    width: '90%',
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  jobModalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 10,
-  },
-  jobModalCompany: {
-    fontSize: 18,
-    color: COLORS.secondary,
-    marginBottom: 5,
-  },
-  jobModalLocation: {
-    fontSize: 16,
-    color: COLORS.gray,
-    marginBottom: 10,
-  },
-  jobModalDescription: {
-    fontSize: 16,
-    color: COLORS.black,
-    marginBottom: 20,
-  },
-  applyButton: {
-    backgroundColor: COLORS.primary,
-    padding: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  applyButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-  },
-  closeIconContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 1,
-  },
-  closeButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-  },
-  schoolCard: {
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: COLORS.white,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-    marginBottom: 20,
-  },
-  schoolName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
-  },
-  schoolDetails: {
-    fontSize: 16,
-    color: COLORS.gray,
-    marginVertical: 5,
-  },
-  noImageText: {
-    textAlign: 'center',
-    color: COLORS.gray,
-    marginTop: 10,
-  },
-});
