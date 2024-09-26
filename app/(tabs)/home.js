@@ -1,3 +1,5 @@
+// Home.js
+
 import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
@@ -151,33 +153,37 @@ const Home = ({ route, navigation }) => {
     if (!selectedListing) return;
 
     const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
-    const ownerCost = rentalCost - rentalCost * 0.06;
+    const bookingFee = rentalCost * 0.06;
+    const transactionFee = rentalCost * 0.03;
+    const salesTax = rentalCost * 0.0825;
+    const totalCostValue = rentalCost + bookingFee + transactionFee + salesTax;
 
     try {
-      const messageData = {
-        senderId: user.id,
-        senderName: user.fullName,
+      const rentalRequestData = {
+        renterId: user.id,
+        renterName: user.fullName,
+        ownerId: selectedListing.ownerId,
         airplaneModel: selectedListing.airplaneModel,
         rentalPeriod: "2024-09-01 to 2024-09-07", // Replace with actual data
-        totalCost: ownerCost.toFixed(2),
-        contact: user.email || "noemail@example.com", // Fallback to a default value
+        totalCost: totalCostValue.toFixed(2),
+        contact: user.email || "noemail@example.com",
         createdAt: new Date(),
+        status: "pending",
       };
 
-      await addDoc(
-        collection(db, "owners", selectedListing.ownerId, "rentalRequests"),
-        messageData
-      );
+      // Add rental request document to 'rentalRequests' collection
+      const rentalRequestRef = await addDoc(collection(db, "rentalRequests"), rentalRequestData);
 
-      await addDoc(collection(db, "messages"), {
-        ownerId: selectedListing.ownerId,
-        senderId: user.id,
-        senderName: user.fullName,
-        text: `New rental request from ${user.fullName}: ${ownerCost.toFixed(
-          2
-        )}`,
-        createdAt: new Date(),
-      });
+      // Create initial message in messages subcollection under the rental request
+      await addDoc(
+        collection(db, "rentalRequests", rentalRequestRef.id, "messages"),
+        {
+          senderId: user.id,
+          senderName: user.fullName,
+          text: `Hi, I would like to rent your ${selectedListing.airplaneModel}.`,
+          createdAt: new Date(),
+        }
+      );
 
       Alert.alert(
         "Request Sent",
@@ -360,7 +366,6 @@ const Home = ({ route, navigation }) => {
           showsHorizontalScrollIndicator={false}
           style={{ marginBottom: 16 }}
         />
-
         <Text
           style={{
             fontSize: 24,

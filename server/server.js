@@ -37,7 +37,7 @@ app.post('/PaymentScreen', async (req, res) => {
       paymentIntent: paymentIntent.client_secret,
       ephemeralKey: ephemeralKey.secret,
       customer: customer.id,
-      publishableKey: 'pk_test_XXXX', // Use your test publishable key
+      publishableKey: 'pk_live_51PoTvh00cx1Ta1YEkbOV5Nh5cZhtiJbKT5ZYPfev3jVFJOJwSn6ep3BZMqGbZbXazgsW5WEw5Gkqh2OrG2vn6tvo00llA3yt0P', // Use your test publishable key
     });
   } catch (error) {
     console.error('Error creating payment sheet:', error);

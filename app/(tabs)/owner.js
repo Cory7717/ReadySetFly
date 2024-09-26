@@ -37,15 +37,14 @@ import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { useStripe } from "@stripe/stripe-react-native";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Picker } from "@react-native-picker/picker";
+import { Calendar } from "react-native-calendars";
 
-// Start of OwnerProfile Component
 const OwnerProfile = ({ ownerId }) => {
   const { user } = useUser();
   const stripe = useStripe();
   const navigation = useNavigation();
   const resolvedOwnerId = ownerId || user?.id;
 
-  // State variables for profile and aircraft details
   const [profileData, setProfileData] = useState({
     airplaneModel: "",
     description: "",
@@ -68,7 +67,7 @@ const OwnerProfile = ({ ownerId }) => {
     airportIdentifier: "",
   });
 
-  const [initialAircraftDetails, setInitialAircraftDetails] = useState(null); // Added for cancel functionality
+  const [initialAircraftDetails, setInitialAircraftDetails] = useState(null);
   const [additionalAircrafts, setAdditionalAircrafts] = useState([]);
   const [costData, setCostData] = useState({
     purchasePrice: "",
@@ -105,13 +104,13 @@ const OwnerProfile = ({ ownerId }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
   const [messageInput, setMessageInput] = useState("");
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [messages, setMessages] = useState([]);
+  const [chatThreads, setChatThreads] = useState([]);
+  const [selectedChatThreadId, setSelectedChatThreadId] = useState(null);
 
   useEffect(() => {
-    // Load rental history and messages
     if (resolvedOwnerId) {
       const rentalHistoryQuery = query(
         collection(db, "rentalHistory"),
@@ -128,10 +127,35 @@ const OwnerProfile = ({ ownerId }) => {
 
       const messagesQuery = query(
         collection(db, "messages"),
-        where("ownerId", "==", resolvedOwnerId)
+        where("participants", "array-contains", resolvedOwnerId)
       );
       const unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
-        setMessages(
+        setChatThreads(
+          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        );
+      });
+
+      const rentalRequestsQuery = collection(
+        db,
+        "owners",
+        resolvedOwnerId,
+        "rentalRequests"
+      );
+      const unsubscribeRentalRequests = onSnapshot(
+        rentalRequestsQuery,
+        (snapshot) => {
+          setRentalRequests(
+            snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+          );
+        }
+      );
+
+      const userListingsQuery = query(
+        collection(db, "airplanes"),
+        where("ownerId", "==", resolvedOwnerId)
+      );
+      const unsubscribeUserListings = onSnapshot(userListingsQuery, (snapshot) => {
+        setUserListings(
           snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
         );
       });
@@ -139,12 +163,13 @@ const OwnerProfile = ({ ownerId }) => {
       return () => {
         unsubscribeRentalHistory();
         unsubscribeMessages();
+        unsubscribeRentalRequests();
+        unsubscribeUserListings();
       };
     }
   }, [resolvedOwnerId]);
 
   useEffect(() => {
-    // Load saved data on component mount
     const fetchData = async () => {
       if (resolvedOwnerId) {
         const docRef = doc(db, "aircraftDetails", resolvedOwnerId);
@@ -152,7 +177,7 @@ const OwnerProfile = ({ ownerId }) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setAircraftDetails(data.aircraftDetails);
-          setInitialAircraftDetails(data.aircraftDetails); // Store the initial details
+          setInitialAircraftDetails(data.aircraftDetails);
           setCostData(data.costData);
           setCostSaved(true);
           setAircraftSaved(true);
@@ -162,7 +187,21 @@ const OwnerProfile = ({ ownerId }) => {
     fetchData();
   }, [resolvedOwnerId]);
 
-  // Save cost data to Firebase
+  useEffect(() => {
+    if (selectedChatThreadId) {
+      const chatDocRef = doc(db, "messages", selectedChatThreadId);
+      const unsubscribe = onSnapshot(chatDocRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const chatData = docSnapshot.data();
+          setMessages(chatData.messages || []);
+        }
+      });
+      return () => unsubscribe();
+    } else {
+      setMessages([]);
+    }
+  }, [selectedChatThreadId]);
+
   const saveCostData = async () => {
     setLoading(true);
     const {
@@ -207,7 +246,6 @@ const OwnerProfile = ({ ownerId }) => {
     setCostSaved(true);
     setLoading(false);
 
-    // Save the cost data to Firebase
     await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
       costData,
       aircraftDetails,
@@ -309,7 +347,6 @@ const OwnerProfile = ({ ownerId }) => {
     setAircraftSaved(true);
     Alert.alert("Aircraft Details Saved", "Your aircraft details have been saved.");
 
-    // Save the aircraft details to Firebase
     await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
       costData,
       aircraftDetails,
@@ -322,7 +359,7 @@ const OwnerProfile = ({ ownerId }) => {
 
   const onCancelAircraftEdit = () => {
     if (initialAircraftDetails) {
-      setAircraftDetails(initialAircraftDetails); // Revert to the initial state
+      setAircraftDetails(initialAircraftDetails);
       setAircraftSaved(true);
       Alert.alert("Changes Canceled", "Aircraft details reverted to the original state.");
     }
@@ -379,7 +416,8 @@ const OwnerProfile = ({ ownerId }) => {
         boostedListing: profileData.boostListing ? true : false,
       });
 
-      await addDoc(collection(db, "airplanes"), newListing);
+      const docRef = await addDoc(collection(db, "airplanes"), newListing);
+      newListing.id = docRef.id;
 
       if (additional) {
         setAdditionalAircrafts([...additionalAircrafts, newListing]);
@@ -408,18 +446,17 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  // Update for handling unlisting and ensuring removal from Home screen
   const handleListForRentToggle = async (listing, additional = false) => {
     if (!listing?.id) {
       Alert.alert("Error", "Listing ID is missing.");
       return;
     }
-  
+
     if (isListedForRent) {
       try {
         const listingDocRef = doc(db, "airplanes", listing.id);
-        await deleteDoc(listingDocRef);  // Ensure this is the right collection and document ID
-  
+        await deleteDoc(listingDocRef);
+
         if (additional) {
           setAdditionalAircrafts(
             additionalAircrafts.filter((aircraft) => aircraft.id !== listing.id)
@@ -430,14 +467,21 @@ const OwnerProfile = ({ ownerId }) => {
           );
         }
 
-        // Notify Home screen to remove listing
-        navigation.navigate('Home', { updatedListings: userListings.filter((aircraft) => aircraft.id !== listing.id) });
-  
+        navigation.navigate("Home", {
+          updatedListings: userListings.filter(
+            (aircraft) => aircraft.id !== listing.id
+          ),
+          unlistedId: listing.id,
+        });
+
         setIsListedForRent(false);
         Alert.alert("Success", "Your aircraft has been removed from the listings.");
       } catch (error) {
         console.error("Error removing listing: ", error);
-        Alert.alert("Error", "There was an error removing your listing. Please check your network or try again.");
+        Alert.alert(
+          "Error",
+          "There was an error removing your listing. Please check your network or try again."
+        );
       }
     } else {
       onSubmitMethod(listing, additional);
@@ -446,11 +490,13 @@ const OwnerProfile = ({ ownerId }) => {
 
   const handleApproveRentalRequest = async (request) => {
     try {
-      if (!resolvedOwnerId) {
-        Alert.alert("Error", "Owner ID is undefined.");
+      // Validate correct properties
+      if (!request.renterId || !request.listingId) {
+        console.error("Invalid request data: ", request);
+        Alert.alert("Error", "Request data is invalid.");
         return;
       }
-
+  
       const notificationRef = doc(
         db,
         "owners",
@@ -459,60 +505,52 @@ const OwnerProfile = ({ ownerId }) => {
         request.id
       );
       await updateDoc(notificationRef, { status: "approved" });
-
-      const paymentIntent = await stripe.paymentRequestWithPaymentIntent({
-        amount: parseInt(request.totalCost * 100),
-        currency: "usd",
-        paymentMethodTypes: ["card"],
-        confirm: true,
+  
+      // Send notification to renter
+      await addDoc(collection(db, "renters", request.renterId, "notifications"), {
+        type: "rentalApproved",
+        message: "Your rental request has been approved. Please complete the payment.",
+        listingId: request.listingId,
+        ownerId: resolvedOwnerId,
+        createdAt: new Date(),
       });
-
-      if (paymentIntent?.status === "succeeded") {
-        await addDoc(collection(db, "messages"), {
-          ownerId: resolvedOwnerId,
-          renterId: request.renterId,
-          senderName: user.fullName || "Owner",
-          text: "Your rental request has been approved. Please proceed with the payment.",
-          createdAt: new Date(),
-        });
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            ownerId: resolvedOwnerId,
-            senderName: user.fullName || "Owner",
-            text: "Your rental request has been approved. Please proceed with the payment.",
-            createdAt: new Date(),
-          },
-        ]);
-
-        Alert.alert(
-          "Payment Successful",
-          "The rental request has been approved and payment processed. Chat is now open."
-        );
-
-        setMessageModalVisible(true);
-      } else {
-        Alert.alert(
-          "Payment Failed",
-          "The payment could not be completed. Please try again."
-        );
-      }
-
-      setRentalRequestModalVisible(false);
+  
+      const chatThread = {
+        participants: [resolvedOwnerId, request.renterId],
+        messages: [],
+      };
+      const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
+      chatThread.id = chatDocRef.id;
+      setChatThreads([...chatThreads, chatThread]);
+  
+      Alert.alert(
+        "Request Approved",
+        "The rental request has been approved. The renter has been notified to complete the payment."
+      );
+      setMessageModalVisible(false);
     } catch (error) {
       console.error("Error approving rental request: ", error);
       Alert.alert("Error", "There was an error approving the rental request.");
     }
   };
-
+  
+  // Similar fix for handleDenyRentalRequest function
+  
+  
   const handleDenyRentalRequest = async (request) => {
     try {
       if (!resolvedOwnerId) {
         Alert.alert("Error", "Owner ID is undefined.");
         return;
       }
-
+  
+      // Validate request properties
+      if (!request.renterId || !request.listingId) {
+        console.error("Invalid request data: ", request);
+        Alert.alert("Error", "Request data is invalid.");
+        return;
+      }
+  
       const notificationRef = doc(
         db,
         "owners",
@@ -521,14 +559,25 @@ const OwnerProfile = ({ ownerId }) => {
         request.id
       );
       await updateDoc(notificationRef, { status: "denied" });
-
+  
+      // Send notification to renter
+      await addDoc(collection(db, "renters", request.renterId, "notifications"), {
+        type: "rentalDenied",
+        message: "Your rental request has been denied by the owner.",
+        listingId: request.listingId,
+        ownerId: resolvedOwnerId,
+        createdAt: new Date(),
+      });
+  
       Alert.alert("Request Denied", "The rental request has been denied.");
-      setRentalRequestModalVisible(false);
+      setMessageModalVisible(false);
     } catch (error) {
       console.error("Error denying rental request: ", error);
       Alert.alert("Error", "There was an error denying the rental request.");
     }
   };
+  
+  
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -547,20 +596,62 @@ const OwnerProfile = ({ ownerId }) => {
     if (!messageInput.trim()) return;
 
     const messageData = {
-      ownerId: resolvedOwnerId,
       senderId: user.id,
-      senderName: user.fullName || "Anonymous",
+      senderName: user.fullName || "Owner",
       text: messageInput,
       createdAt: new Date(),
     };
 
     try {
-      await addDoc(collection(db, "messages"), messageData);
+      const chatThreadId = selectedChatThreadId;
+      const chatDocRef = doc(db, "messages", chatThreadId);
+      const chatDoc = await getDoc(chatDocRef);
+      if (chatDoc.exists()) {
+        const chatData = chatDoc.data();
+        await updateDoc(chatDocRef, {
+          messages: [...(chatData.messages || []), messageData],
+        });
+      }
+
       setMessageInput("");
-      setMessages([...messages, messageData]);
+      setMessages((prevMessages) => [...prevMessages, messageData]);
     } catch (error) {
       console.error("Error sending message: ", error);
       Alert.alert("Error", "Failed to send message.");
+    }
+  };
+
+  const openMessageModal = async (chatThreadId = null) => {
+    try {
+      setMessageModalVisible(true);
+      setSelectedChatThreadId(chatThreadId);
+      if (chatThreadId) {
+        const chatDocRef = doc(db, "messages", chatThreadId);
+        const chatDoc = await getDoc(chatDocRef);
+        if (chatDoc.exists()) {
+          const chatData = chatDoc.data();
+          setMessages(chatData.messages || []);
+        } else {
+          setMessages([]);
+        }
+      } else {
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error("Error opening message modal: ", error);
+      Alert.alert("Error", "Failed to open messages.");
+    }
+  };
+
+  const handleRating = async (orderId, rating) => {
+    try {
+      const orderDocRef = doc(db, "rentalHistory", orderId);
+      await updateDoc(orderDocRef, { rating });
+      setRatings((prevRatings) => ({ ...prevRatings, [orderId]: rating }));
+      Alert.alert("Rating Submitted", "Thank you for your feedback!");
+    } catch (error) {
+      console.error("Error submitting rating:", error);
+      Alert.alert("Error", "Failed to submit rating.");
     }
   };
 
@@ -600,661 +691,173 @@ const OwnerProfile = ({ ownerId }) => {
               <Text style={{ fontSize: 14, color: "white", marginTop: 1 }}>
                 Good Morning
               </Text>
-              <Text
-                style={{ fontSize: 18, fontWeight: "bold", color: "white" }}
-              >
+              <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
                 {user?.fullName || "User"}
               </Text>
             </View>
           </View>
         </ImageBackground>
 
-        {/* Cost of Ownership Calculator Card */}
-        <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "bold",
-              marginBottom: 8,
-              color: "#2d3748",
-            }}
-          >
+        {/* Cost of Ownership Calculator */}
+        <View style={{ padding: 16 }}>
+          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Cost of Ownership Calculator
           </Text>
-          <View
-            style={{
-              backgroundColor: "#edf2f7",
-              borderRadius: 12,
-              padding: 16,
-            }}
-          >
-            {costSaved ? (
-              <View>
-                <Text
-                  style={{ fontSize: 16, fontWeight: "bold", color: "#2d3748" }}
-                >
-                  Total Cost Per Hour of Ownership: ${costData.costPerHour}
-                </Text>
-                <TouchableOpacity
-                  onPress={onEditCostData}
-                  style={{
-                    backgroundColor: "#3182ce",
-                    paddingVertical: 12,
-                    paddingHorizontal: 24,
-                    borderRadius: 50,
-                    marginTop: 16,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "white",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    Edit Cost Data
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View>
-                <TextInput
-                  placeholder="Purchase Price"
-                  onChangeText={(value) =>
-                    handleInputChange("purchasePrice", value)
-                  }
-                  value={costData.purchasePrice}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Loan Amount"
-                  onChangeText={(value) =>
-                    handleInputChange("loanAmount", value)
-                  }
-                  value={costData.loanAmount}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Interest Rate (%)"
-                  onChangeText={(value) =>
-                    handleInputChange("interestRate", value)
-                  }
-                  value={costData.interestRate}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Loan Term (Years)"
-                  onChangeText={(value) => handleInputChange("loanTerm", value)}
-                  value={costData.loanTerm}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Estimated Annual Cost"
-                  onChangeText={(value) =>
-                    handleInputChange("estimatedAnnualCost", value)
-                  }
-                  value={costData.estimatedAnnualCost}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Insurance Cost"
-                  onChangeText={(value) =>
-                    handleInputChange("insuranceCost", value)
-                  }
-                  value={costData.insuranceCost}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Hanger Cost"
-                  onChangeText={(value) =>
-                    handleInputChange("hangerCost", value)
-                  }
-                  value={costData.hangerCost}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Fuel Cost Per Hour"
-                  onChangeText={(value) =>
-                    handleInputChange("fuelCostPerHour", value)
-                  }
-                  value={costData.fuelCostPerHour}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Maintenance Reserve"
-                  onChangeText={(value) =>
-                    handleInputChange("maintenanceReserve", value)
-                  }
-                  value={costData.maintenanceReserve}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-                <TextInput
-                  placeholder="Flight Hours Per Year"
-                  onChangeText={(value) =>
-                    handleInputChange("flightHoursPerYear", value)
-                  }
-                  value={costData.flightHoursPerYear}
-                  keyboardType="numeric"
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#cbd5e0",
-                    marginBottom: 16,
-                    padding: 8,
-                    color: "#2d3748",
-                  }}
-                />
-
-                {loading ? (
-                  <ActivityIndicator size="large" color="#FF5A5F" />
-                ) : (
-                  <TouchableOpacity
-                    onPress={saveCostData}
-                    style={{
-                      backgroundColor: "#e53e3e",
-                      paddingVertical: 16,
-                      paddingHorizontal: 24,
-                      borderRadius: 50,
-                      marginTop: 16,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Calculate Cost Per Hour
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Payment and Earnings Card */}
-        <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: "bold",
-              marginBottom: 8,
-              color: "#2d3748",
-            }}
-          >
-            Payment and Earnings
-          </Text>
-          <View
-            style={{
-              backgroundColor: "#f7fafc",
-              borderRadius: 12,
-              padding: 16,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "bold",
-                marginBottom: 4,
-                color: "#4a5568",
-              }}
-            >
-              Actual Revenue
-            </Text>
-            <Text style={{ fontSize: 14, color: "#4a5568" }}>
-              Total Earnings: ${calculateActualRevenue()}
-            </Text>
-          </View>
-
-          {/* Editable Aircraft Details Card */}
-          <View style={{ marginTop: 16 }}>
+          {costSaved ? (
+            // Show summary card
             <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
+              style={{ backgroundColor: "#edf2f7", padding: 16, borderRadius: 16 }}
             >
-              <Text
+              <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8 }}>
+                Estimated Cost per Hour: ${costData.costPerHour}
+              </Text>
+              {/* Include other summary details if needed */}
+              <TouchableOpacity
+                onPress={onEditCostData}
                 style={{
-                  fontSize: 18,
-                  fontWeight: "bold",
-                  marginBottom: 8,
-                  color: "#2d3748",
+                  backgroundColor: "#3182ce",
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  marginTop: 16,
                 }}
               >
-                Aircraft Details
-              </Text>
-              {aircraftSaved && (
-                <TouchableOpacity
-                  onPress={handleListForRentToggle}
-                  style={{
-                    backgroundColor: isListedForRent ? "#e53e3e" : "#48bb78",
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                    borderRadius: 50,
-                  }}
+                <Text
+                  style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
                 >
-                  <Text style={{ color: "white", fontWeight: "bold" }}>
-                    {isListedForRent ? "Unlist" : "List for Rent"}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                  Edit Cost Data
+                </Text>
+              </TouchableOpacity>
             </View>
-            <View
-              style={{
-                backgroundColor: "#edf2f7",
-                borderRadius: 12,
-                padding: 16,
-              }}
-            >
-              {aircraftSaved ? (
-                <View>
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: "bold",
-                      color: "#2d3748",
-                    }}
-                  >
-                    {`${aircraftDetails.year} ${aircraftDetails.make} ${aircraftDetails.model}`}
-                  </Text>
-                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
-                    Engine: {aircraftDetails.engine}
-                  </Text>
-                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
-                    Description: {aircraftDetails.description}
-                  </Text>
-                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
-                    Total Time: {aircraftDetails.totalTime} hrs
-                  </Text>
-                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
-                    Location: {aircraftDetails.location}
-                  </Text>
-                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
-                    Airport Identifier: {aircraftDetails.airportIdentifier}
-                  </Text>
-                  <Text style={{ fontSize: 14, color: "#4a5568" }}>
-                    Cost Per Hour: ${aircraftDetails.costPerHour}
-                  </Text>
-                  <FlatList
-                    data={images}
-                    horizontal
-                    renderItem={({ item, index }) => (
-                      <Image
-                        key={index}
-                        source={{ uri: item }}
-                        style={{
-                          width: 96,
-                          height: 96,
-                          marginRight: 8,
-                          borderRadius: 8,
-                        }}
-                      />
-                    )}
-                    keyExtractor={(item, index) => index.toString()}
-                    style={{ marginTop: 16 }}
-                  />
-                  <TouchableOpacity
-                    onPress={onEditAircraftDetails}
-                    style={{
-                      backgroundColor: "#3182ce",
-                      paddingVertical: 12,
-                      paddingHorizontal: 24,
-                      borderRadius: 50,
-                      marginTop: 16,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Edit Aircraft Details
-                    </Text>
-                  </TouchableOpacity>
-                  {/* Add Additional Aircraft Button */}
-                  <TouchableOpacity
-                    onPress={() => {
-                      setAircraftSaved(false);
-                      setAircraftDetails({
-                        year: "",
-                        make: "",
-                        model: "",
-                        engine: "",
-                        description: "",
-                        totalTime: "",
-                        costPerHour: "",
-                        location: "",
-                        airportIdentifier: "",
-                      });
-                      setImages([]);
-                    }}
-                    style={{
-                      backgroundColor: "#48bb78",
-                      paddingVertical: 12,
-                      paddingHorizontal: 24,
-                      borderRadius: 50,
-                      marginTop: 16,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Add Additional Aircraft
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View>
-                  {/* Picker for Year */}
-                  <Text
-                    style={{ fontSize: 14, color: "#4a5568", marginBottom: 8 }}
-                  >
-                    Year:
-                  </Text>
-                  <Picker
-                    selectedValue={aircraftDetails.year}
-                    onValueChange={(itemValue) =>
-                      handleInputChange("year", itemValue)
-                    }
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      color: "#2d3748",
-                    }}
-                  >
-                    {[...Array(75)].map((_, index) => {
-                      const year = new Date().getFullYear() - index;
-                      return (
-                        <Picker.Item
-                          key={year}
-                          label={`${year}`}
-                          value={`${year}`}
-                        />
-                      );
-                    })}
-                  </Picker>
-
-                  <TextInput
-                    placeholder="Make"
-                    onChangeText={(value) => handleInputChange("make", value)}
-                    value={aircraftDetails.make}
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      padding: 8,
-                      color: "#2d3748",
-                    }}
-                  />
-                  <TextInput
-                    placeholder="Model"
-                    onChangeText={(value) => handleInputChange("model", value)}
-                    value={aircraftDetails.model}
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      padding: 8,
-                      color: "#2d3748",
-                    }}
-                  />
-                  <TextInput
-                    placeholder="Engine"
-                    onChangeText={(value) => handleInputChange("engine", value)}
-                    value={aircraftDetails.engine}
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      padding: 8,
-                      color: "#2d3748",
-                    }}
-                  />
-                  {/* New Description Field */}
-                  <TextInput
-                    placeholder="Description"
-                    onChangeText={(value) =>
-                      handleInputChange("description", value)
-                    }
-                    value={aircraftDetails.description}
-                    multiline
-                    numberOfLines={4}
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      padding: 8,
-                      color: "#2d3748",
-                    }}
-                  />
-                  <TextInput
-                    placeholder="Total Time on Frame"
-                    onChangeText={(value) =>
-                      handleInputChange("totalTime", value)
-                    }
-                    value={aircraftDetails.totalTime}
-                    keyboardType="numeric"
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      padding: 8,
-                      color: "#2d3748",
-                    }}
-                  />
-                  <TextInput
-                    placeholder="Location (City, State, Zipcode)"
-                    onChangeText={(value) =>
-                      handleInputChange("location", value)
-                    }
-                    value={aircraftDetails.location}
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      padding: 8,
-                      color: "#2d3748",
-                    }}
-                  />
-                  <TextInput
-                    placeholder="Airport Identifier"
-                    onChangeText={(value) =>
-                      handleInputChange("airportIdentifier", value)
-                    }
-                    value={aircraftDetails.airportIdentifier}
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      padding: 8,
-                      color: "#2d3748",
-                    }}
-                  />
-                  <TextInput
-                    placeholder="Cost Per Hour"
-                    onChangeText={(value) =>
-                      handleInputChange("costPerHour", value)
-                    }
-                    value={aircraftDetails.costPerHour}
-                    keyboardType="numeric"
-                    style={{
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#cbd5e0",
-                      marginBottom: 8,
-                      padding: 8,
-                      color: "#2d3748",
-                    }}
-                  />
-                  <FlatList
-                    data={images}
-                    horizontal
-                    renderItem={({ item, index }) => (
-                      <Image
-                        source={{ uri: item }}
-                        style={{
-                          width: 96,
-                          height: 96,
-                          marginRight: 8,
-                          borderRadius: 8,
-                        }}
-                      />
-                    )}
-                    keyExtractor={(item, index) => index.toString()}
-                    style={{ marginTop: 16 }}
-                  />
-                  <TouchableOpacity
-                    onPress={pickImage}
-                    style={{
-                      backgroundColor: "#edf2f7",
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 50,
-                      marginTop: 8,
-                      marginBottom: 16,
-                    }}
-                  >
-                    <Text style={{ color: "#2d3748", textAlign: "center" }}>
-                      {images.length >= 7 ? "Maximum 7 Images" : "Add Image"}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={onSaveAircraftDetails}
-                    style={{
-                      backgroundColor: "#48bb78",
-                      paddingVertical: 12,
-                      paddingHorizontal: 24,
-                      borderRadius: 50,
-                      marginTop: 16,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Save Aircraft Details
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Cancel button for reverting changes */}
-                  <TouchableOpacity
-                    onPress={onCancelAircraftEdit}
-                    style={{
-                      backgroundColor: "#e53e3e",
-                      paddingVertical: 12,
-                      paddingHorizontal: 24,
-                      borderRadius: 50,
-                      marginTop: 16,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Cancel Changes
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
+          ) : (
+            <>
+              {/* Form Fields for Cost Data */}
+              {Object.keys(costData).map((key) => (
+                <TextInput
+                  key={key}
+                  placeholder={key.replace(/([A-Z])/g, " $1")}
+                  value={costData[key]}
+                  onChangeText={(value) => handleInputChange(key, value)}
+                  keyboardType="numeric"
+                  style={{
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#ccc",
+                    marginBottom: 12,
+                    paddingVertical: 8,
+                  }}
+                />
+              ))}
+              <TouchableOpacity
+                onPress={saveCostData}
+                style={{
+                  backgroundColor: "#3182ce",
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  marginBottom: 16,
+                }}
+              >
+                <Text
+                  style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+                >
+                  Save Cost Data
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
-        {/* Current Listings Section */}
-        <View style={{ marginTop: 32 }}>
+        {/* Aircraft Details */}
+        <View style={{ padding: 16 }}>
+          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+            Aircraft Details
+          </Text>
+          {aircraftSaved ? (
+            // Show summary card
+            <View
+              style={{ backgroundColor: "#edf2f7", padding: 16, borderRadius: 16 }}
+            >
+              {Object.keys(aircraftDetails).map((key) => (
+                <Text key={key} style={{ marginBottom: 8 }}>
+                  {key.replace(/([A-Z])/g, " $1")}: {aircraftDetails[key]}
+                </Text>
+              ))}
+              <TouchableOpacity
+                onPress={onEditAircraftDetails}
+                style={{
+                  backgroundColor: "#3182ce",
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  marginTop: 16,
+                }}
+              >
+                <Text
+                  style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+                >
+                  Edit Aircraft Details
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {/* Form Fields for Aircraft Details */}
+              {Object.keys(aircraftDetails).map((key) => (
+                <TextInput
+                  key={key}
+                  placeholder={key.replace(/([A-Z])/g, " $1")}
+                  value={aircraftDetails[key]}
+                  onChangeText={(value) => handleInputChange(key, value)}
+                  style={{
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#ccc",
+                    marginBottom: 12,
+                    paddingVertical: 8,
+                  }}
+                />
+              ))}
+              <TouchableOpacity
+                onPress={onSaveAircraftDetails}
+                style={{
+                  backgroundColor: "#3182ce",
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  marginBottom: 16,
+                }}
+              >
+                <Text
+                  style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+                >
+                  Save Aircraft Details
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={onCancelAircraftEdit}
+                style={{
+                  backgroundColor: "#e53e3e",
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  marginBottom: 16,
+                }}
+              >
+                <Text
+                  style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Current Listings */}
+        <View style={{ padding: 16 }}>
           <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              marginBottom: 16,
-              color: "#2d3748",
-              textAlign: "center",
-            }}
+            style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}
           >
-            Your Current Listings
+            Current Listings
           </Text>
           {userListings.length > 0 ? (
-            userListings.map((listing, index) => (
+            userListings.map((listing) => (
               <View
-                key={index}
+                key={listing.id}
                 style={{
                   backgroundColor: "#edf2f7",
                   padding: 16,
@@ -1262,108 +865,53 @@ const OwnerProfile = ({ ownerId }) => {
                   marginBottom: 16,
                 }}
               >
-                <Text
-                  style={{ fontSize: 18, fontWeight: "bold", color: "#2d3748" }}
-                >
+                <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                   {listing.airplaneModel}
                 </Text>
-                {listing.boosted && (
-                  <Text style={{ color: "#d69e2e", fontWeight: "bold" }}>
-                    Sponsored Listing
-                  </Text>
-                )}
-                <Text style={{ color: "#4a5568" }}>{listing.description}</Text>
-                <Text style={{ color: "#4a5568" }}>{listing.location}</Text>
-                <Text style={{ color: "#e53e3e", fontWeight: "bold" }}>
-                  ${listing.ratesPerHour} per hour
-                </Text>
+                <Text>{listing.description}</Text>
+                <Text>Rate per Hour: ${listing.ratesPerHour}</Text>
                 <TouchableOpacity
                   onPress={() => handleListForRentToggle(listing)}
                   style={{
-                    backgroundColor: isListedForRent ? "#e53e3e" : "#48bb78",
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                    borderRadius: 50,
+                    backgroundColor: "#e53e3e",
+                    paddingVertical: 12,
+                    borderRadius: 8,
                     marginTop: 16,
                   }}
                 >
-                  <Text style={{ color: "white", fontWeight: "bold" }}>
-                    {isListedForRent ? "Unlist" : "List for Rent"}
+                  <Text
+                    style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+                  >
+                    Remove Listing
                   </Text>
                 </TouchableOpacity>
               </View>
             ))
           ) : (
-            <Text style={{ color: "#4a5568", textAlign: "center" }}>
-              No listings available.
-            </Text>
+            <Text>No current listings.</Text>
           )}
         </View>
 
-        {/* Additional Aircrafts Section */}
-        <View style={{ marginTop: 32 }}>
-          <Text
+        {/* Create New Listing */}
+        <View style={{ padding: 16 }}>
+          <TouchableOpacity
+            onPress={() => setFormVisible(true)}
             style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              marginBottom: 16,
-              color: "#2d3748",
-              textAlign: "center",
+              backgroundColor: "#3182ce",
+              paddingVertical: 12,
+              borderRadius: 8,
             }}
           >
-            Additional Aircraft Listings
-          </Text>
-          {additionalAircrafts.length > 0 ? (
-            additionalAircrafts.map((aircraft, index) => (
-              <View
-                key={index}
-                style={{
-                  backgroundColor: "#edf2f7",
-                  padding: 16,
-                  borderRadius: 16,
-                  marginBottom: 16,
-                }}
-              >
-                <Text
-                  style={{ fontSize: 18, fontWeight: "bold", color: "#2d3748" }}
-                >
-                  {aircraft.airplaneModel}
-                </Text>
-                {aircraft.boosted && (
-                  <Text style={{ color: "#d69e2e", fontWeight: "bold" }}>
-                    Sponsored Listing
-                  </Text>
-                )}
-                <Text style={{ color: "#4a5568" }}>{aircraft.description}</Text>
-                <Text style={{ color: "#4a5568" }}>{aircraft.location}</Text>
-                <Text style={{ color: "#e53e3e", fontWeight: "bold" }}>
-                  ${aircraft.ratesPerHour} per hour
-                </Text>
-                <TouchableOpacity
-                  onPress={() => handleListForRentToggle(aircraft, true)}
-                  style={{
-                    backgroundColor: isListedForRent ? "#e53e3e" : "#48bb78",
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                    borderRadius: 50,
-                    marginTop: 16,
-                  }}
-                >
-                  <Text style={{ color: "white", fontWeight: "bold" }}>
-                    {isListedForRent ? "Unlist" : "List for Rent"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : (
-            <Text style={{ color: "#4a5568", textAlign: "center" }}>
-              No additional aircraft listings available.
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Create New Listing
             </Text>
-          )}
+          </TouchableOpacity>
         </View>
 
         {/* Rental History Section */}
-        <View style={{ marginTop: 32 }}>
+        <View style={{ padding: 16 }}>
           <Text
             style={{
               fontSize: 24,
@@ -1386,9 +934,7 @@ const OwnerProfile = ({ ownerId }) => {
                   marginBottom: 16,
                 }}
               >
-                <Text
-                  style={{ fontSize: 18, fontWeight: "bold", color: "#2d3748" }}
-                >
+                <Text style={{ fontSize: 18, fontWeight: "bold", color: "#2d3748" }}>
                   {order.airplaneModel}
                 </Text>
                 <Text style={{ color: "#4a5568" }}>{order.rentalPeriod}</Text>
@@ -1420,7 +966,7 @@ const OwnerProfile = ({ ownerId }) => {
                 <TouchableOpacity
                   onPress={() => {
                     setSelectedRequest(order);
-                    setMessageModalVisible(true);
+                    openMessageModal(order.chatThreadId);
                   }}
                   style={{
                     marginTop: 16,
@@ -1449,182 +995,6 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </ScrollView>
 
-      {/* Rental Request Modal */}
-      <Modal
-        visible={rentalRequestModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setRentalRequestModalVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 24,
-              padding: 24,
-              width: "100%",
-              maxWidth: 320,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 8,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 24,
-                fontWeight: "bold",
-                marginBottom: 24,
-                textAlign: "center",
-                color: "#2d3748",
-              }}
-            >
-              Rental Requests
-            </Text>
-            {selectedRequest ? (
-              <>
-                <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                  Renter: {selectedRequest.renterName}
-                </Text>
-                <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                  Aircraft: {selectedRequest.airplaneModel}
-                </Text>
-                <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                  Total Cost: ${selectedRequest.totalCost}
-                </Text>
-                <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                  Renter Rating: {selectedRequest.renterRating || "N/A"}
-                </Text>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    marginTop: 16,
-                  }}
-                >
-                  <TouchableOpacity
-                    onPress={() => handleApproveRentalRequest(selectedRequest)}
-                    style={{
-                      backgroundColor: "#48bb78",
-                      paddingVertical: 12,
-                      paddingHorizontal: 24,
-                      borderRadius: 50,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Approve
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDenyRentalRequest(selectedRequest)}
-                    style={{
-                      backgroundColor: "#e53e3e",
-                      paddingVertical: 12,
-                      paddingHorizontal: 24,
-                      borderRadius: 50,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        textAlign: "center",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Deny
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setSelectedRequest(null)}
-                  style={{
-                    marginTop: 16,
-                    paddingVertical: 12,
-                    borderRadius: 50,
-                    backgroundColor: "#e2e8f0",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#2d3748",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    Back to List
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : rentalRequests.length > 0 ? (
-              rentalRequests.map((request) => (
-                <TouchableOpacity
-                  key={request.id}
-                  onPress={() => setSelectedRequest(request)}
-                  style={{
-                    marginBottom: 16,
-                    backgroundColor: "#edf2f7",
-                    padding: 16,
-                    borderRadius: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 18,
-                      fontWeight: "bold",
-                      color: "#2d3748",
-                    }}
-                  >
-                    Renter: {request.renterName}
-                  </Text>
-                  <Text style={{ color: "#4a5568" }}>
-                    {request.airplaneModel}
-                  </Text>
-                  <Text style={{ color: "#e53e3e", fontWeight: "bold" }}>
-                    ${request.totalCost}
-                  </Text>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={{ color: "#4a5568", textAlign: "center" }}>
-                No rental requests available.
-              </Text>
-            )}
-            <TouchableOpacity
-              onPress={() => setRentalRequestModalVisible(false)}
-              style={{
-                marginTop: 24,
-                paddingVertical: 12,
-                borderRadius: 50,
-                backgroundColor: "#e2e8f0",
-              }}
-            >
-              <Text
-                style={{
-                  color: "#2d3748",
-                  textAlign: "center",
-                  fontWeight: "bold",
-                }}
-              >
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* Messaging Modal */}
       <Modal
         visible={messageModalVisible}
@@ -1635,103 +1005,263 @@ const OwnerProfile = ({ ownerId }) => {
         <View
           style={{
             flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
             backgroundColor: "rgba(0, 0, 0, 0.5)",
           }}
         >
           <View
             style={{
+              flex: 1,
+              marginTop: 50,
+              marginHorizontal: 16,
               backgroundColor: "white",
               borderRadius: 24,
               padding: 24,
-              width: "100%",
-              maxWidth: 320,
               shadowColor: "#000",
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.2,
               shadowRadius: 8,
             }}
           >
-            <Text
-              style={{
-                fontSize: 24,
-                fontWeight: "bold",
-                marginBottom: 24,
-                textAlign: "center",
-                color: "#2d3748",
-              }}
-            >
-              Messages with Renter
-            </Text>
-            <ScrollView
-              contentContainerStyle={{ paddingBottom: 16 }}
-              style={{ maxHeight: 400 }}
-            >
-              {messages.map((message) => (
-                <View key={message.id} style={{ marginBottom: 12 }}>
-                  <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                    {message.senderName}
-                  </Text>
-                  <Text style={{ color: "#4a5568" }}>{message.text}</Text>
-                </View>
-              ))}
-            </ScrollView>
-            <TextInput
-              placeholder="Type a message..."
-              value={messageInput}
-              onChangeText={(text) => setMessageInput(text)}
-              style={{
-                borderColor: "#cbd5e0",
-                borderWidth: 1,
-                borderRadius: 50,
-                padding: 12,
-                marginBottom: 12,
-                color: "#2d3748",
-              }}
-            />
-            <TouchableOpacity
-              onPress={sendMessage}
-              style={{
-                backgroundColor: "#3182ce",
-                paddingVertical: 12,
-                paddingHorizontal: 24,
-                borderRadius: 50,
-              }}
-            >
-              <Text
-                style={{
-                  color: "white",
-                  textAlign: "center",
-                  fontWeight: "bold",
-                }}
-              >
-                Send Message
-              </Text>
-            </TouchableOpacity>
+            {/* Close Button */}
             <TouchableOpacity
               onPress={() => setMessageModalVisible(false)}
               style={{
-                marginTop: 24,
-                paddingVertical: 12,
-                borderRadius: 50,
-                backgroundColor: "#e2e8f0",
+                position: "absolute",
+                top: 16,
+                right: 16,
+                zIndex: 1,
               }}
+            >
+              <Ionicons name="close-circle" size={32} color="#2d3748" />
+            </TouchableOpacity>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingTop: 40 }}
             >
               <Text
                 style={{
-                  color: "#2d3748",
-                  textAlign: "center",
+                  fontSize: 24,
                   fontWeight: "bold",
+                  marginBottom: 24,
+                  textAlign: "center",
+                  color: "#2d3748",
                 }}
               >
-                Close
+                Rental Requests
               </Text>
-            </TouchableOpacity>
+              {selectedRequest ? (
+                <>
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                    Renter: {selectedRequest.senderName}
+                  </Text>
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                    Aircraft: {selectedRequest.airplaneModel}
+                  </Text>
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                    Total Cost: ${selectedRequest.totalCost}
+                  </Text>
+                  <Text style={{ fontSize: 18, marginBottom: 8 }}>
+                    Contact: {selectedRequest.contact}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginTop: 16,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => handleApproveRentalRequest(selectedRequest)}
+                      style={{
+                        backgroundColor: "#48bb78",
+                        paddingVertical: 12,
+                        paddingHorizontal: 24,
+                        borderRadius: 50,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "white",
+                          textAlign: "center",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Approve
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDenyRentalRequest(selectedRequest)}
+                      style={{
+                        backgroundColor: "#e53e3e",
+                        paddingVertical: 12,
+                        paddingHorizontal: 24,
+                        borderRadius: 50,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "white",
+                          textAlign: "center",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Deny
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setSelectedRequest(null)}
+                    style={{
+                      marginTop: 16,
+                      paddingVertical: 12,
+                      borderRadius: 50,
+                      backgroundColor: "#e2e8f0",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#2d3748",
+                        textAlign: "center",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Back to List
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : rentalRequests.length > 0 ? (
+                rentalRequests.map((request) => (
+                  <TouchableOpacity
+                    key={request.id}
+                    onPress={() => setSelectedRequest(request)}
+                    style={{
+                      marginBottom: 16,
+                      backgroundColor: "#edf2f7",
+                      padding: 16,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        fontWeight: "bold",
+                        color: "#2d3748",
+                      }}
+                    >
+                      Renter: {request.senderName}
+                    </Text>
+                    <Text style={{ color: "#4a5568" }}>
+                      {request.airplaneModel}
+                    </Text>
+                    <Text style={{ color: "#e53e3e", fontWeight: "bold" }}>
+                      ${request.totalCost}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={{ color: "#4a5568", textAlign: "center" }}>
+                  No rental requests available.
+                </Text>
+              )}
+              <TouchableOpacity
+                onPress={() => setMessageModalVisible(false)}
+                style={{
+                  marginTop: 24,
+                  paddingVertical: 12,
+                  borderRadius: 50,
+                  backgroundColor: "#e2e8f0",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#2d3748",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Close
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
+      {/* Create New Listing Modal */}
+      <Modal
+        visible={formVisible}
+        animationType="slide"
+        onRequestClose={() => setFormVisible(false)}
+      >
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <Text
+            style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}
+          >
+            Create New Listing
+          </Text>
+          {/* Form Fields for New Listing */}
+          {/* ... Include form fields similar to aircraftDetails and profileData */}
+          <TouchableOpacity
+            onPress={() => onSubmitMethod({}, false)}
+            style={{
+              backgroundColor: "#3182ce",
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginTop: 16,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Submit Listing
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setFormVisible(false)}
+            style={{
+              backgroundColor: "#e53e3e",
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginTop: 16,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </Modal>
+
+      {/* Calendar Modal */}
+      <Modal
+        visible={calendarVisible}
+        animationType="slide"
+        onRequestClose={() => setCalendarVisible(false)}
+      >
+        <View style={{ flex: 1 }}>
+          <Calendar onDayPress={onDayPress} markedDates={selectedDates} />
+          <TouchableOpacity
+            onPress={() => setCalendarVisible(false)}
+            style={{
+              backgroundColor: "#3182ce",
+              paddingVertical: 12,
+              borderRadius: 8,
+              margin: 16,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Close Calendar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Blue Chat Bubble Icon */}
       <TouchableOpacity
         style={{
           position: "absolute",
@@ -1745,9 +1275,28 @@ const OwnerProfile = ({ ownerId }) => {
           justifyContent: "center",
           zIndex: 1,
         }}
-        onPress={() => setMessageModalVisible(true)}
+        onPress={() => openMessageModal()}
       >
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />
+        {rentalRequests.length > 0 && (
+          <View
+            style={{
+              position: "absolute",
+              top: -5,
+              right: -5,
+              backgroundColor: "red",
+              borderRadius: 10,
+              width: 20,
+              height: 20,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ color: "white", fontSize: 12 }}>
+              {rentalRequests.length}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
     </View>
   );

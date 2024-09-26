@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'; 
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Text,
   View,
@@ -28,6 +28,8 @@ import {
   query,
   where,
   deleteDoc,
+  doc,
+  updateDoc
 } from 'firebase/firestore';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -61,7 +63,7 @@ const Classifieds = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
-  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false);
+  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false); // Correctly handle job modal
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [images, setImages] = useState([]);
@@ -286,20 +288,24 @@ const Classifieds = () => {
     }
   };
 
-  const onSubmitMethod = async (values) => {
-    setLoading(true);
-    const selectedPackagePrice = pricingPackages[selectedPricing];
-    const totalWithTaxInCents = Math.round(selectedPackagePrice * 1.0825 * 100);
-    setTotalCost(totalWithTaxInCents);
-    setListingDetails(values);
-
-    setPaymentModalVisible(true);
-    setLoading(false);
-  };
-
   const handleSubmitPayment = async () => {
-    setPaymentModalVisible(false);
-    handleCompletePayment();
+    try {
+      const isPaymentSheetInitialized = await initializePaymentSheet();
+
+      if (isPaymentSheetInitialized) {
+        const { error } = await presentPaymentSheet();
+
+        if (error) {
+          Alert.alert('Error', `Payment failed: ${error.message}`);
+        } else {
+          Alert.alert('Success', 'Your payment is successful!');
+          handleCompletePayment();
+        }
+      }
+    } catch (error) {
+      console.error('Payment Error:', error);
+      Alert.alert('Error', 'Failed to process payment.');
+    }
   };
 
   const handleCompletePayment = async () => {
@@ -379,12 +385,39 @@ const Classifieds = () => {
 
   const handleDeleteListing = async (listingId) => {
     try {
-      await deleteDoc(doc(db, 'UserPost', listingId));
-      Alert.alert('Listing Deleted', 'Your listing has been deleted.');
-      getLatestItemList();
+      Alert.alert(
+        'Confirm Delete',
+        'Are you sure you want to delete this listing?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              await deleteDoc(doc(db, 'UserPost', listingId));
+              Alert.alert('Listing Deleted', 'Your listing has been deleted.');
+              getLatestItemList();
+              setDetailsModalVisible(false);
+              setJobDetailsModalVisible(false); // Close job modal if deleting job listing
+            }
+          }
+        ]
+      );
     } catch (error) {
       console.error('Error deleting listing: ', error);
       Alert.alert('Error', 'Failed to delete the listing.');
+    }
+  };
+
+  const handleSaveEdit = async (values) => {
+    try {
+      await updateDoc(doc(db, 'UserPost', selectedListing.id), values);
+      Alert.alert('Listing Updated', 'Your listing has been successfully updated.');
+      setEditModalVisible(false);
+      getLatestItemList();
+    } catch (error) {
+      console.error('Error updating listing:', error);
+      Alert.alert('Error', 'Failed to update the listing.');
     }
   };
 
@@ -401,6 +434,18 @@ const Classifieds = () => {
     } else {
       Alert.alert('Error', 'Contact email not available.');
     }
+  };
+
+  const onSubmitMethod = async (values) => {
+    setLoading(true);
+    const selectedPackagePrice = pricingPackages[selectedPricing];
+    const totalWithTaxInCents = Math.round(selectedPackagePrice * 1.0825 * 100);
+    setTotalCost(totalWithTaxInCents);
+    setListingDetails(values);
+
+    // Open payment modal
+    setPaymentModalVisible(true);
+    setLoading(false);
   };
 
   const renderCategoryItem = ({ item }) => (
@@ -647,6 +692,19 @@ const Classifieds = () => {
             >
               <Text style={{ color: COLORS.white, fontSize: 16 }}>Apply Now</Text>
             </TouchableOpacity>
+            {/* Edit and delete buttons */}
+            <TouchableOpacity
+              style={{ backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center', marginTop: 20 }}
+              onPress={() => handleEditListing(selectedListing)}
+            >
+              <Text style={{ color: COLORS.white, fontSize: 16 }}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ backgroundColor: COLORS.red, padding: 10, borderRadius: 10, alignItems: 'center', marginTop: 10 }}
+              onPress={() => handleDeleteListing(selectedListing.id)}
+            >
+              <Text style={{ color: COLORS.white, fontSize: 16 }}>Delete</Text>
+            </TouchableOpacity>
           </SafeAreaView>
         </View>
       </Modal>
@@ -662,6 +720,20 @@ const Classifieds = () => {
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)' }}>
           <SafeAreaView style={{ flex: 1 }}>
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              {/* Move edit and delete buttons to top corners */}
+              <TouchableOpacity
+                style={{ position: 'absolute', top: 20, left: 20, zIndex: 1, backgroundColor: COLORS.primary, padding: 8, borderRadius: 10 }}
+                onPress={() => handleEditListing(selectedListing)}
+              >
+                <Text style={{ color: COLORS.white }}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ position: 'absolute', top: 20, right: 20, zIndex: 1, backgroundColor: COLORS.red, padding: 8, borderRadius: 10 }}
+                onPress={() => handleDeleteListing(selectedListing.id)}
+              >
+                <Text style={{ color: COLORS.white }}>Delete</Text>
+              </TouchableOpacity>
+
               {selectedListing?.images && (
                 <View style={{ width: '90%', height: '50%', position: 'relative' }}>
                   <Image
@@ -684,11 +756,11 @@ const Classifieds = () => {
               )}
               {/* Display flight school name */}
               <Text style={{ color: COLORS.white, fontSize: 24, fontWeight: 'bold', marginTop: 20 }}>
-                {selectedListing?.flightSchoolName}
+                {selectedListing?.flightSchoolName || selectedListing?.title}
               </Text>
               {/* Display flight school details */}
               <Text style={{ color: COLORS.white, fontSize: 18, marginTop: 10, textAlign: 'center', paddingHorizontal: 20 }}>
-                {selectedListing?.flightSchoolDetails}
+                {selectedListing?.flightSchoolDetails || selectedListing?.description}
               </Text>
               {/* Optional: display other information like location */}
               <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
@@ -1154,6 +1226,171 @@ const Classifieds = () => {
               <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* Edit Listing Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent={true}
+        onRequestClose={() => setEditModalVisible(false)}
+        animationType="slide"
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '90%', maxHeight: '90%', backgroundColor: COLORS.white, borderRadius: 24, padding: 0 }}
+          >
+            <ScrollView contentContainerStyle={{ padding: 24 }} style={{ width: '100%' }} nestedScrollEnabled={true}>
+              <View style={{ width: '100%' }}>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+                  Edit Your Listing
+                </Text>
+
+                <Formik
+                  initialValues={{
+                    title: selectedListing?.title || '',
+                    price: selectedListing?.price || '',
+                    description: selectedListing?.description || '',
+                    city: selectedListing?.city || '',
+                    state: selectedListing?.state || '',
+                    email: selectedListing?.email || '',
+                    phone: selectedListing?.phone || '',
+                    companyName: selectedListing?.companyName || '',
+                    jobTitle: selectedListing?.jobTitle || '',
+                    jobDescription: selectedListing?.jobDescription || '',
+                    category: selectedListing?.category || '',
+                    flightSchoolName: selectedListing?.flightSchoolName || '',
+                    flightSchoolDetails: selectedListing?.flightSchoolDetails || '',
+                  }}
+                  onSubmit={handleSaveEdit}
+                >
+                  {({ handleChange, handleBlur, handleSubmit, values }) => (
+                    <>
+                      <TextInput
+                        placeholder="Title"
+                        onChangeText={handleChange('title')}
+                        onBlur={handleBlur('title')}
+                        value={values.title}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
+                      />
+                      <TextInput
+                        placeholder="Price"
+                        onChangeText={handleChange('price')}
+                        onBlur={handleBlur('price')}
+                        value={values.price}
+                        keyboardType="default"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
+                      />
+                      <TextInput
+                        placeholder="Description"
+                        onChangeText={handleChange('description')}
+                        onBlur={handleBlur('description')}
+                        value={values.description}
+                        multiline
+                        numberOfLines={4}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                          textAlignVertical: 'top',
+                        }}
+                      />
+                      <TextInput
+                        placeholder="City"
+                        onChangeText={handleChange('city')}
+                        onBlur={handleBlur('city')}
+                        value={values.city}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
+                      />
+                      <TextInput
+                        placeholder="State"
+                        onChangeText={handleChange('state')}
+                        onBlur={handleBlur('state')}
+                        value={values.state}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
+                      />
+                      <TextInput
+                        placeholder="Email"
+                        onChangeText={handleChange('email')}
+                        onBlur={handleBlur('email')}
+                        value={values.email}
+                        keyboardType="email-address"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
+                      />
+                      <TextInput
+                        placeholder="Phone"
+                        onChangeText={handleChange('phone')}
+                        onBlur={handleBlur('phone')}
+                        value={values.phone}
+                        keyboardType="phone-pad"
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: COLORS.lightGray,
+                          marginBottom: 16,
+                          padding: 8,
+                          color: COLORS.black,
+                        }}
+                      />
+
+                      <TouchableOpacity
+                        onPress={handleSubmit}
+                        style={{
+                          backgroundColor: COLORS.primary,
+                          paddingVertical: 12,
+                          borderRadius: 50,
+                          marginTop: 16,
+                        }}
+                      >
+                        <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                          Save Changes
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => setEditModalVisible(false)}
+                        style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
+                      >
+                        <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </Formik>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>
