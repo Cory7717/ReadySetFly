@@ -19,6 +19,7 @@ import {
   Linking,
 } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
+import { useNavigation } from '@react-navigation/native'; // Import navigation hook
 import { db, storage } from '../../firebaseConfig';
 import {
   collection,
@@ -57,6 +58,7 @@ const COLORS = {
 const Classifieds = () => {
   const { user } = useUser();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const navigation = useNavigation(); // Initialize navigation
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -240,18 +242,18 @@ const Classifieds = () => {
         },
         body: JSON.stringify({ amount: totalCost }),
       });
-  
+
       console.log('Response status:', response.status);
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         console.log('Error data:', errorData);
         throw new Error(errorData.error || 'Failed to fetch payment sheet parameters.');
       }
-  
+
       const { paymentIntent, ephemeralKey, customer } = await response.json();
       console.log('Fetched payment sheet params:', { paymentIntent, ephemeralKey, customer });
-  
+
       return {
         paymentIntent,
         ephemeralKey,
@@ -263,7 +265,6 @@ const Classifieds = () => {
       throw error;
     }
   };
-  
 
   const initializePaymentSheet = async () => {
     try {
@@ -1162,7 +1163,7 @@ const Classifieds = () => {
                           }}
                         >
                           <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
-                            Submit Listing
+                            Submit Listing & Proceed to Pay
                           </Text>
                         </TouchableOpacity>
                       )}

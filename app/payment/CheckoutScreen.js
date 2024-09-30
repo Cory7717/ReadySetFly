@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, Alert, TextInput, View } from 'react-native';
 import { useStripe } from '@stripe/stripe-react-native';
 
-const API_URL = 'https://ready-set-fly-71506-default-rtdb.firebaseio.com'; // Replace with your actual server URL
+const API_URL = 'https://api.stripe.com'; // Replace with your actual server URL
 
 export default function CheckoutScreen() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();

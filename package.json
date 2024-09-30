@@ -15,6 +15,7 @@
     "@clerk/clerk-js": "^5.13.2",
     "@expo/metro-runtime": "^3.2.3",
     "@firebase/auth": "^1.7.9",
+    "@firebasegen/default": "file:generated/javascript/default",
     "@react-native-async-storage/async-storage": "^1.24.0",
     "@react-native-community/checkbox": "^0.5.17",
     "@react-native-community/datetimepicker": "8.0.1",

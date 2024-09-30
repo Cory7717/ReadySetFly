@@ -12,7 +12,7 @@ const PaymentScreen = ({ route }) => {
       setLoading(true);
 
       // Fetch payment intent client secret from your server
-      const response = await fetch('https://ready-set-fly-71506-default-rtdb.firebaseio.com', {
+      const response = await fetch('https://api.stripe.com', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: totalAmount * 100 }), // Total amount in cents

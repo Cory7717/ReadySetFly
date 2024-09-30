@@ -1,8 +1,12 @@
 const express = require('express');
 const stripe = require('stripe')('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'); // Replace with your actual secret key
 const bodyParser = require('body-parser');
+const cors = require('cors'); // Import the CORS package
 const app = express();
 const PORT = process.env.PORT || 8081;
+
+// Use the cors middleware
+app.use(cors()); // Allow all origins
 
 app.use(bodyParser.json());
 
