@@ -14,6 +14,8 @@
     "@clerk/clerk-expo": "^1.2.9",
     "@clerk/clerk-js": "^5.13.2",
     "@expo/metro-runtime": "^3.2.3",
+    "@firebase/auth": "^1.7.9",
+    "@react-native-async-storage/async-storage": "^1.24.0",
     "@react-native-community/checkbox": "^0.5.17",
     "@react-native-community/datetimepicker": "8.0.1",
     "@react-native-firebase/storage": "^21.0.0",
@@ -77,6 +79,7 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-vector-icons": "^10.1.0",
     "react-native-view-shot": "^3.8.0",
+    "stripe": "^16.12.0",
     "typescript": "~5.3.3"
   },
   "devDependencies": {

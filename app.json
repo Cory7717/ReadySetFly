@@ -23,7 +23,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses your photos to let you share them with your friends."
+          "photosPermission": "The app accesses your photos to let you share them with your friends.",
+          "cameraPermission": "The app needs access to your camera to take photos."
         }
       ]
     ],
@@ -37,11 +38,17 @@
     "android": {
       "package": "com.carmer7717.rsf_app",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
       ]
     },
     "ios": {
-      "bundleIdentifier": "com.coryarmer.rsfapp"
+      "bundleIdentifier": "com.coryarmer.rsfapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "The app needs access to your camera to take photos.",
+        "NSPhotoLibraryUsageDescription": "The app accesses your photos to let you share them with your friends.",
+        "NSPhotoLibraryAddUsageDescription": "The app needs access to add photos to your library."
+      }
     },
     "owner": "carmer7717"
   }

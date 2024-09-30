@@ -232,6 +232,7 @@ const Classifieds = () => {
 
   const fetchPaymentSheetParams = async () => {
     try {
+      console.log(`Making request to: ${API_URL}/payment-sheet`);
       const response = await fetch(`${API_URL}/payment-sheet`, {
         method: 'POST',
         headers: {
@@ -239,14 +240,18 @@ const Classifieds = () => {
         },
         body: JSON.stringify({ amount: totalCost }),
       });
-
+  
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.log('Error data:', errorData);
         throw new Error(errorData.error || 'Failed to fetch payment sheet parameters.');
       }
-
+  
       const { paymentIntent, ephemeralKey, customer } = await response.json();
-
+      console.log('Fetched payment sheet params:', { paymentIntent, ephemeralKey, customer });
+  
       return {
         paymentIntent,
         ephemeralKey,
@@ -258,6 +263,7 @@ const Classifieds = () => {
       throw error;
     }
   };
+  
 
   const initializePaymentSheet = async () => {
     try {

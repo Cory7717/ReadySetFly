@@ -42,6 +42,9 @@ import { db, storage } from '../../firebaseConfig';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Appbar, Avatar, Badge, Button } from 'react-native-paper';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 // Constants
 const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150'; // Replace with a valid URL
@@ -70,10 +73,10 @@ const UserHeader = ({ navigation, user }) => {
 
   const pickProfileImage = useCallback(async () => {
     try {
-      const permissionResult = await ImagePicker.getMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        const requestResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!requestResult.granted) {
+      const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        const { status: requestStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (requestStatus !== 'granted') {
           Alert.alert('Permission Required', 'Permission to access the media library is required!');
           return;
         }
@@ -105,17 +108,16 @@ const UserHeader = ({ navigation, user }) => {
             xhr.send(null);
           });
 
-          const filename = `profileImages/${user.id}_${Date.now()}`;
+          const filename = `profileImages/${user.id}/${user.id}_${Date.now()}`;
           const storageRef = ref(storage, filename);
           await uploadBytes(storageRef, blob);
 
-          // Close the blob to release memory
-          blob.close();
-
           const imageUrl = await getDownloadURL(storageRef);
 
-          // Update the user's profile image
-          await user.update({ imageUrl: imageUrl });
+          // Update user's profile image using Clerk's API
+          await user.update({
+            image: imageUrl, // Ensure the correct attribute name as per Clerk's API
+          });
 
           setProfileImage(imageUrl);
         } else {
@@ -170,7 +172,7 @@ const UserHeader = ({ navigation, user }) => {
   );
 };
 
-// Create Post Component with image fix
+// Create Post Component with image handling
 const CreatePost = ({ onSubmit }) => {
   const { user } = useUser();
   const [content, setContent] = useState('');
@@ -179,10 +181,10 @@ const CreatePost = ({ onSubmit }) => {
 
   const pickImage = useCallback(async () => {
     try {
-      const permissionResult = await ImagePicker.getMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        const requestResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!requestResult.granted) {
+      const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        const { status: requestStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (requestStatus !== 'granted') {
           Alert.alert(
             'Permission Required',
             'Permission to access the media library is required!'
@@ -235,14 +237,11 @@ const CreatePost = ({ onSubmit }) => {
             throw new Error('Invalid user ID or image data.');
           }
 
-          const filename = `${user.id}_${Date.now()}_${Math.random()
+          const filename = `${user.id}/${user.id}_${Date.now()}_${Math.random()
             .toString(36)
             .substr(2, 9)}`;
           const storageRef = ref(storage, `postImages/${filename}`);
           await uploadBytes(storageRef, blob);
-
-          // Close the blob to release memory
-          blob.close();
 
           imageUrl = await getDownloadURL(storageRef);
         } catch (error) {
@@ -335,7 +334,9 @@ const CreatePost = ({ onSubmit }) => {
   );
 };
 
-// Post Component with image fix
+// Main App Component and the rest of the code continue here...
+// ...
+// Post Component with image handling and comments
 const Post = React.memo(({ post: initialPost, onViewPost }) => {
   const { user } = useUser();
   const [post, setPost] = useState(initialPost);
@@ -462,30 +463,19 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
             <Text style={styles.postDate}>{renderDate}</Text>
           </View>
         </View>
-        <Text
-          numberOfLines={4}
-          ellipsizeMode="tail"
-          style={styles.postContent}
-        >
+        <Text numberOfLines={4} ellipsizeMode="tail" style={styles.postContent}>
           {post?.content || ''}
         </Text>
         {post.image && (
           <View style={styles.postImageContainer}>
             <TouchableOpacity onPress={() => onViewPost(post)}>
-              <Image
-                source={{ uri: post.image }}
-                style={styles.postImage}
-                resizeMode="cover"
-              />
+              <Image source={{ uri: post.image }} style={styles.postImage} resizeMode="cover" />
             </TouchableOpacity>
           </View>
         )}
 
         <View style={styles.postActions}>
-          <TouchableOpacity
-            style={styles.postActionButton}
-            onPress={handleLike}
-          >
+          <TouchableOpacity style={styles.postActionButton} onPress={handleLike}>
             <Ionicons
               name={liked ? 'heart' : 'heart-outline'}
               size={24}
@@ -493,10 +483,7 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
             />
             <Text style={styles.postActionText}>{likes.length > 0 ? likes.length : ''}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.postActionButton}
-            onPress={handleShare}
-          >
+          <TouchableOpacity style={styles.postActionButton} onPress={handleShare}>
             <Ionicons name="share-social-outline" size={24} color="gray" />
             <Text style={styles.postActionText}>Share</Text>
           </TouchableOpacity>
@@ -530,16 +517,8 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
             onChangeText={setCommentText}
             style={styles.commentInput}
           />
-          <TouchableOpacity
-            onPress={handleAddComment}
-            disabled={!commentText.trim()}
-          >
-            <Ionicons
-              name="send"
-              size={24}
-              color="#1D4ED8"
-              style={styles.sendIcon}
-            />
+          <TouchableOpacity onPress={handleAddComment} disabled={!commentText.trim()}>
+            <Ionicons name="send" size={24} color="#1D4ED8" style={styles.sendIcon} />
           </TouchableOpacity>
         </View>
       </View>
@@ -573,20 +552,13 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
   return (
     <View style={[styles.commentContainer, { marginLeft: (comment.depth || 0) * 20 }]}>
       <View style={styles.commentHeader}>
-        <Image
-          source={{ uri: comment.userImage || DEFAULT_PROFILE_IMAGE }}
-          style={styles.avatar}
-        />
+        <Image source={{ uri: comment.userImage || DEFAULT_PROFILE_IMAGE }} style={styles.avatar} />
         <View style={styles.commentContent}>
           <Text style={styles.commentUserName}>{comment.userName}</Text>
           <Text>{comment.text}</Text>
           <View style={styles.commentActions}>
             <TouchableOpacity onPress={handleLike} style={styles.commentActionButton}>
-              <Ionicons
-                name={liked ? 'heart' : 'heart-outline'}
-                size={16}
-                color={liked ? 'red' : 'gray'}
-              />
+              <Ionicons name={liked ? 'heart' : 'heart-outline'} size={16} color={liked ? 'red' : 'gray'} />
               <Text style={styles.commentActionText}>{(comment.likes || []).length}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleReply} style={styles.commentReplyButton}>
@@ -603,11 +575,7 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
             onChangeText={setReplyText}
             style={styles.replyInput}
           />
-          <TouchableOpacity
-            onPress={handleAddReply}
-            disabled={!replyText.trim()}
-            style={styles.sendReplyButton}
-          >
+          <TouchableOpacity onPress={handleAddReply} disabled={!replyText.trim()} style={styles.sendReplyButton}>
             <Ionicons name="send" size={20} color="#1D4ED8" />
           </TouchableOpacity>
         </View>
@@ -631,7 +599,6 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
     </View>
   );
 };
-
 // Notifications Component
 const Notifications = ({ navigation }) => {
   const { user } = useUser();
@@ -692,20 +659,17 @@ const Notifications = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         )}
-        ListEmptyComponent={
-          <Text style={styles.emptyNotifications}>No notifications.</Text>
-        }
+        ListEmptyComponent={<Text style={styles.emptyNotifications}>No notifications.</Text>}
       />
     </SafeAreaView>
   );
 };
 
-// FullScreen Post modal with image fix
+// FullScreenPostModal Component with updated image handling
 const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
+  const { user } = useUser();
   const [post, setPost] = useState(initialPost);
   const [comment, setComment] = useState('');
-  const { user } = useUser();
-
   const [comments, setComments] = useState(post.comments || []);
   const [likes, setLikes] = useState(post.likes || []);
   const [liked, setLiked] = useState((post.likes || []).includes(user.id));
@@ -821,10 +785,7 @@ const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
               </View>
             )}
             <View style={styles.postActions}>
-              <TouchableOpacity
-                style={styles.postActionButton}
-                onPress={handleLike}
-              >
+              <TouchableOpacity style={styles.postActionButton} onPress={handleLike}>
                 <Ionicons
                   name={liked ? 'heart' : 'heart-outline'}
                   size={24}
@@ -864,7 +825,7 @@ const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
   );
 };
 
-// FullScreen Post component
+// FullScreenPost Component
 const FullScreenPost = ({ route, navigation }) => {
   const { post, postId } = route.params;
   const [currentPost, setCurrentPost] = useState(post);
@@ -903,7 +864,7 @@ const FullScreenPost = ({ route, navigation }) => {
   );
 };
 
-// Main Feed Component
+// MainFeed Component with updated image handling in posts
 const MainFeed = ({ navigation }) => {
   const { user } = useUser();
   const [posts, setPosts] = useState([]);
@@ -994,9 +955,7 @@ const MainFeed = ({ navigation }) => {
           )
         }
         ListEmptyComponent={
-          !loading && (
-            <Text style={styles.emptyPosts}>No posts available.</Text>
-          )
+          !loading && <Text style={styles.emptyPosts}>No posts available.</Text>
         }
       />
     </SafeAreaView>
@@ -1006,6 +965,7 @@ const MainFeed = ({ navigation }) => {
 // Root App Component
 export default function App() {
   return (
+    // <ClerkProvider publishableKey={clerkPublishableKey}>
     <NavigationContainer independent={true}>
       <Stack.Navigator initialRouteName="MainFeed">
         <Stack.Screen
@@ -1025,9 +985,9 @@ export default function App() {
         />
       </Stack.Navigator>
     </NavigationContainer>
+    // </ClerkProvider>
   );
 }
-
 // Stylesheet
 const styles = StyleSheet.create({
   header: {
