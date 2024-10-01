@@ -45,7 +45,6 @@ import { Appbar, Avatar, Badge, Button } from 'react-native-paper';
 import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
 // Constants
 const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150'; // Replace with a valid URL
 
@@ -334,9 +333,7 @@ const CreatePost = ({ onSubmit }) => {
   );
 };
 
-// Main App Component and the rest of the code continue here...
-// ...
-// Post Component with image handling and comments
+// Post Component with image handling, comments, edit, and delete functionality
 const Post = React.memo(({ post: initialPost, onViewPost }) => {
   const { user } = useUser();
   const [post, setPost] = useState(initialPost);
@@ -344,6 +341,8 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
   const [comments, setComments] = useState(post.comments || []);
   const [likes, setLikes] = useState(post.likes || []);
   const [liked, setLiked] = useState((post.likes || []).includes(user.id));
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editText, setEditText] = useState(post.content);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'posts', post.id), (docSnap) => {
@@ -358,39 +357,37 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
     return () => unsubscribe();
   }, [post.id, user.id]);
 
-  const handleAddComment = useCallback(async () => {
-    if (commentText.trim()) {
-      const newComment = {
-        userId: user.id,
-        userName: user.fullName || 'Anonymous',
-        text: commentText,
-        userImage: user.imageUrl || DEFAULT_PROFILE_IMAGE,
-        likes: [],
-        replies: [],
-      };
-      try {
-        const postRef = doc(db, 'posts', post.id);
-        await updateDoc(postRef, {
-          comments: arrayUnion(newComment),
-        });
-        setCommentText('');
-
-        if (post.userId !== user.id) {
-          await addDoc(collection(db, 'notifications'), {
-            toUserId: post.userId,
-            fromUserId: user.id,
-            fromUserName: user.fullName || 'Anonymous',
-            type: 'comment',
-            postId: post.id,
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-        }
-      } catch (error) {
-        Alert.alert('Error', 'Could not add comment.');
-      }
+  const handleEdit = async () => {
+    try {
+      const postRef = doc(db, 'posts', post.id);
+      await updateDoc(postRef, {
+        content: editText,
+      });
+      setEditModalVisible(false);
+    } catch (error) {
+      Alert.alert('Error', 'Could not update post.');
     }
-  }, [commentText, post.id, post.userId, user]);
+  };
+
+  const handleDelete = async () => {
+    Alert.alert('Confirm Delete', 'Are you sure you want to delete this post?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(db, 'posts', post.id));
+          } catch (error) {
+            Alert.alert('Error', 'Could not delete post.');
+          }
+        },
+      },
+    ]);
+  };
 
   const handleLike = useCallback(async () => {
     try {
@@ -462,6 +459,15 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
             <Text style={styles.postUserName}>{post?.userName || 'Unknown User'}</Text>
             <Text style={styles.postDate}>{renderDate}</Text>
           </View>
+          {/* Edit/Delete Menu */}
+          {post.userId === user.id && (
+            <TouchableOpacity
+              onPress={() => setEditModalVisible(true)}
+              style={styles.menuButton}
+            >
+              <Ionicons name="ellipsis-vertical" size={24} color="gray" />
+            </TouchableOpacity>
+          )}
         </View>
         <Text numberOfLines={4} ellipsizeMode="tail" style={styles.postContent}>
           {post?.content || ''}
@@ -517,10 +523,29 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
             onChangeText={setCommentText}
             style={styles.commentInput}
           />
-          <TouchableOpacity onPress={handleAddComment} disabled={!commentText.trim()}>
+          <TouchableOpacity onPress={() => {}} disabled={!commentText.trim()}>
             <Ionicons name="send" size={24} color="#1D4ED8" style={styles.sendIcon} />
           </TouchableOpacity>
         </View>
+
+        {/* Edit Post Modal */}
+        <Modal visible={editModalVisible} transparent={true}>
+          <View style={styles.editModalContainer}>
+            <View style={styles.editModal}>
+              <TextInput
+                style={styles.editInput}
+                value={editText}
+                onChangeText={setEditText}
+                multiline
+              />
+              <View style={styles.modalButtons}>
+                <Button onPress={handleEdit}>Save</Button>
+                <Button onPress={() => setEditModalVisible(false)}>Cancel</Button>
+                <Button onPress={handleDelete} color="red">Delete</Button>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </TouchableOpacity>
   );
@@ -599,6 +624,7 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
     </View>
   );
 };
+
 // Notifications Component
 const Notifications = ({ navigation }) => {
   const { user } = useUser();
@@ -965,7 +991,6 @@ const MainFeed = ({ navigation }) => {
 // Root App Component
 export default function App() {
   return (
-    // <ClerkProvider publishableKey={clerkPublishableKey}>
     <NavigationContainer independent={true}>
       <Stack.Navigator initialRouteName="MainFeed">
         <Stack.Screen
@@ -985,9 +1010,9 @@ export default function App() {
         />
       </Stack.Navigator>
     </NavigationContainer>
-    // </ClerkProvider>
   );
 }
+
 // Stylesheet
 const styles = StyleSheet.create({
   header: {
@@ -1129,6 +1154,35 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#F3F4F6',
     borderRadius: 20,
+  },
+  editModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  editModal: {
+    width: '80%',
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    elevation: 5,
+  },
+  editInput: {
+    height: 100,
+    textAlignVertical: 'top',
+    marginBottom: 20,
+    padding: 10,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  menuButton: {
+    marginLeft: 'auto',
   },
   commentContainer: {
     marginBottom: 10,

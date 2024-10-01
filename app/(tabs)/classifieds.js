@@ -19,7 +19,8 @@ import {
   Linking,
 } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
-import { useNavigation } from '@react-navigation/native'; // Import navigation hook
+import { createStackNavigator } from '@react-navigation/stack';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { db, storage } from '../../firebaseConfig';
 import {
   collection,
@@ -30,7 +31,7 @@ import {
   where,
   deleteDoc,
   doc,
-  updateDoc
+  updateDoc,
 } from 'firebase/firestore';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +42,7 @@ import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useStripe } from '@stripe/stripe-react-native';
 import { API_URL } from '@env';
 import DawnBackground from '../../Assets/images/DawnBackground.jpg';
+import PaymentScreen from '../payment/PaymentScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -55,19 +57,20 @@ const COLORS = {
   red: '#EF4444',
 };
 
+const Stack = createStackNavigator();
+
 const Classifieds = () => {
   const { user } = useUser();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
-  const navigation = useNavigation(); // Initialize navigation
+  const navigation = useNavigation();
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
-  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false); // Correctly handle job modal
+  const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPricing, setSelectedPricing] = useState('Basic');
@@ -164,8 +167,16 @@ const Classifieds = () => {
   }, [selectedCategory]);
 
   const pickImage = async () => {
-    let maxImages =
-      selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 12 : 16;
+    let maxImages = 1; // Default max for Aviation Jobs
+
+    // Set max images based on selected category
+    if (selectedCategory === 'Flight Schools') {
+      maxImages = 4;
+    } else if (selectedCategory === 'Aircraft for Sale') {
+      maxImages =
+        selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 12 : 16;
+    }
+
     if (images.length >= maxImages) {
       Alert.alert(`You can only upload up to ${maxImages} images.`);
       return;
@@ -191,6 +202,39 @@ const Classifieds = () => {
       const selectedImages = result.assets.map((asset) => asset.uri);
       setImages([...images, ...selectedImages].slice(0, maxImages));
     }
+  };
+
+  const renderImageUploadButton = () => {
+    let maxImages = 1; // Default for Aviation Jobs
+    if (selectedCategory === 'Flight Schools') {
+      maxImages = 4;
+    } else if (selectedCategory === 'Aircraft for Sale') {
+      maxImages =
+        selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 12 : 16;
+    }
+    
+    const remainingUploads = maxImages - images.length;
+
+    return (
+      <TouchableOpacity
+        onPress={pickImage}
+        disabled={images.length >= maxImages}
+        style={{
+          backgroundColor: remainingUploads > 0 ? COLORS.background : COLORS.lightGray,
+          paddingVertical: 8,
+          paddingHorizontal: 16,
+          borderRadius: 50,
+          marginTop: 8,
+          marginBottom: 16,
+        }}
+      >
+        <Text style={{ textAlign: 'center', color: COLORS.black }}>
+          {images.length >= maxImages
+            ? `Maximum ${maxImages} Images Reached`
+            : `Add Image (${remainingUploads} remaining)`}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   const filterListingsByDistance = (radiusMiles) => {
@@ -234,8 +278,8 @@ const Classifieds = () => {
 
   const fetchPaymentSheetParams = async () => {
     try {
-      console.log(`Making request to: ${API_URL}/payment-sheet`);
-      const response = await fetch(`${API_URL}/payment-sheet`, {
+      console.log(`Making request to: ${API_URL}/create-payment-intent`);
+      const response = await fetch(`${API_URL}/create-payment-intent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -297,21 +341,17 @@ const Classifieds = () => {
 
   const handleSubmitPayment = async () => {
     try {
-      const isPaymentSheetInitialized = await initializePaymentSheet();
-
-      if (isPaymentSheetInitialized) {
-        const { error } = await presentPaymentSheet();
-
-        if (error) {
-          Alert.alert('Error', `Payment failed: ${error.message}`);
-        } else {
-          Alert.alert('Success', 'Your payment is successful!');
-          handleCompletePayment();
-        }
-      }
+      navigation.navigate('PaymentScreen', {
+        totalCost,
+        listingDetails,
+        images,
+        selectedCategory,
+        selectedPricing,
+      });
     } catch (error) {
       console.error('Payment Error:', error);
       Alert.alert('Error', 'Failed to process payment.');
+      setLoading(false);
     }
   };
 
@@ -367,11 +407,11 @@ const Classifieds = () => {
 
       Alert.alert('Payment Completed', 'Your listing has been successfully submitted!');
       setModalVisible(false);
+      setLoading(false);
       getLatestItemList();
     } catch (error) {
       console.error('Error completing payment: ', error);
       Alert.alert('Error', 'Failed to complete payment and submit listing.');
-    } finally {
       setLoading(false);
     }
   };
@@ -405,7 +445,7 @@ const Classifieds = () => {
               Alert.alert('Listing Deleted', 'Your listing has been deleted.');
               getLatestItemList();
               setDetailsModalVisible(false);
-              setJobDetailsModalVisible(false); // Close job modal if deleting job listing
+              setJobDetailsModalVisible(false);
             }
           }
         ]
@@ -450,10 +490,37 @@ const Classifieds = () => {
     setTotalCost(totalWithTaxInCents);
     setListingDetails(values);
 
-    // Open payment modal
-    setPaymentModalVisible(true);
+    // Close all modals before navigating to PaymentScreen
+    setModalVisible(false);
+    setFilterModalVisible(false);
+    setDetailsModalVisible(false);
+    setJobDetailsModalVisible(false);
+    setEditModalVisible(false);
+
+    // Navigate to PaymentScreen
+    navigation.navigate('PaymentScreen', {
+      totalCost: totalWithTaxInCents,
+      listingDetails: values,
+      images,
+      selectedCategory,
+      selectedPricing,
+    });
+
     setLoading(false);
   };
+
+  useEffect(() => {
+    // Close all modals when the Classifieds screen is focused
+    const unsubscribe = navigation.addListener('focus', () => {
+      setModalVisible(false);
+      setFilterModalVisible(false);
+      setDetailsModalVisible(false);
+      setJobDetailsModalVisible(false);
+      setEditModalVisible(false);
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
@@ -1121,32 +1188,7 @@ const Classifieds = () => {
                             keyExtractor={(item, index) => index.toString()}
                             nestedScrollEnabled={true}
                           />
-                          <TouchableOpacity
-                            onPress={pickImage}
-                            style={{
-                              backgroundColor: COLORS.background,
-                              paddingVertical: 8,
-                              paddingHorizontal: 16,
-                              borderRadius: 50,
-                              marginTop: 8,
-                              marginBottom: 16,
-                            }}
-                          >
-                            <Text style={{ textAlign: 'center', color: COLORS.black }}>
-                              {images.length >=
-                                (selectedPricing === 'Basic'
-                                  ? 7
-                                  : selectedPricing === 'Featured'
-                                    ? 12
-                                    : 16)
-                                ? `Maximum ${selectedPricing === 'Basic'
-                                  ? 7
-                                  : selectedPricing === 'Featured'
-                                    ? 12
-                                    : 16} Images`
-                                : 'Add Image'}
-                            </Text>
-                          </TouchableOpacity>
+                          {renderImageUploadButton()}
                         </>
                       )}
 
@@ -1180,59 +1222,6 @@ const Classifieds = () => {
               </View>
             </ScrollView>
           </Animated.View>
-        </View>
-      </Modal>
-
-      {/* Payment Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={paymentModalVisible}
-        onRequestClose={() => setPaymentModalVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-          <View
-            style={{
-              backgroundColor: COLORS.white,
-              borderRadius: 24,
-              padding: 24,
-              width: '90%',
-              shadowColor: COLORS.black,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 8,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
-              Complete Payment
-            </Text>
-
-            <Text style={{ fontSize: 18, color: COLORS.secondary, marginBottom: 12 }}>
-              Total Cost: ${(totalCost / 100).toFixed(2)}
-            </Text>
-
-            <TouchableOpacity
-              onPress={handleSubmitPayment}
-              style={{
-                backgroundColor: COLORS.red,
-                paddingVertical: 12,
-                borderRadius: 50,
-                marginTop: 16,
-              }}
-            >
-              <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
-                Proceed to Pay
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setPaymentModalVisible(false)}
-              style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
-            >
-              <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </Modal>
 
@@ -1404,4 +1393,24 @@ const Classifieds = () => {
   );
 };
 
-export default Classifieds;
+const AppNavigator = () => {
+  return (
+    <NavigationContainer independent={true}>
+      <Stack.Navigator initialRouteName="Classifieds">
+        <Stack.Screen
+          name="Classifieds"
+          component={Classifieds}
+          options={{ headerShown: false }}
+        />
+        {/* Add PaymentScreen to Stack Navigator */}
+        <Stack.Screen
+          name="PaymentScreen"
+          component={PaymentScreen}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+export default AppNavigator;

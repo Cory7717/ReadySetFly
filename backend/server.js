@@ -1,17 +1,17 @@
+require('dotenv').config(); // Import dotenv to load environment variables
 const express = require('express');
-const stripe = require('stripe')('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'); // Replace with your actual secret key
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Initialize Stripe with secret key
 const bodyParser = require('body-parser');
-const cors = require('cors'); // Import the CORS package
+const cors = require('cors'); 
 const app = express();
 const PORT = process.env.PORT || 8081;
 
-// Use the cors middleware
-app.use(cors()); // Allow all origins
-
+// Use CORS and Body-parser
+app.use(cors()); // Allow all origins (be sure to limit this in production)
 app.use(bodyParser.json());
 
 // Endpoint for handling Payment Sheet
-app.post('/PaymentScreen', async (req, res) => {
+app.post('/create-payment-intent', async (req, res) => {
   try {
     const { amount } = req.body; // Expect cost in cents from frontend
 
@@ -31,17 +31,17 @@ app.post('/PaymentScreen', async (req, res) => {
     // Create a PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount, // Amount in cents from the client
-      currency: 'usd', // Corrected the currency
+      currency: 'usd',
       customer: customer.id,
       automatic_payment_methods: { enabled: true },
     });
 
     // Respond with payment details for the frontend
     res.json({
-      paymentIntent: paymentIntent.client_secret,
+      clientSecret: paymentIntent.client_secret, // Corrected to clientSecret
       ephemeralKey: ephemeralKey.secret,
       customer: customer.id,
-      publishableKey: 'pk_live_51PoTvh00cx1Ta1YEkbOV5Nh5cZhtiJbKT5ZYPfev3jVFJOJwSn6ep3BZMqGbZbXazgsW5WEw5Gkqh2OrG2vn6tvo00llA3yt0P', // Use your test publishable key
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY, // Use environment variable
     });
   } catch (error) {
     console.error('Error creating payment sheet:', error);

@@ -244,7 +244,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
   const processPayment = async (amount) => {
     try {
-      const response = await fetch('https://your-server-side-code.com/create-payment-intent', {
+      const response = await fetch('https://api.stripe.com', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

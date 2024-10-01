@@ -30,7 +30,7 @@
     ],
     "jsEngine": "hermes",
     "extra": {
-      "API_URL": "https://ready-set-fly-71506.firebaseio.com",
+      "API_URL": "https://api.stripe.com",
       "eas": {
         "projectId": "e3d26a84-3e0e-4879-971f-dc5a82b1a37a"
       }
