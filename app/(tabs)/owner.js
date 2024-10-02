@@ -110,6 +110,9 @@ const OwnerProfile = ({ ownerId }) => {
   const [chatThreads, setChatThreads] = useState([]);
   const [selectedChatThreadId, setSelectedChatThreadId] = useState(null);
 
+  // State for rental date
+  const [rentalDate, setRentalDate] = useState(null);
+
   useEffect(() => {
     if (resolvedOwnerId) {
       const rentalHistoryQuery = query(
@@ -135,6 +138,7 @@ const OwnerProfile = ({ ownerId }) => {
         );
       });
 
+      // Corrected code to fetch rental requests from the owner's subcollection
       const rentalRequestsQuery = collection(
         db,
         "owners",
@@ -221,7 +225,7 @@ const OwnerProfile = ({ ownerId }) => {
     const numberOfPayments = parseFloat(loanTerm) * 12;
     const mortgageExpense = loanAmount
       ? (
-          (parseFloat(loanAmount) * monthlyInterestRate) /
+          (parseFloat(loanAmount) * monthlyInterestRate) / 
           (1 - Math.pow(1 + monthlyInterestRate, -numberOfPayments))
         ).toFixed(2)
       : 0;
@@ -300,14 +304,17 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
+  // Update onDayPress to handle date selection for rental requests
   const onDayPress = (day) => {
     const selected = !selectedDates[day.dateString];
+    setRentalDate(day.dateString); // Set rental date to the selected date
     setSelectedDates({
       ...selectedDates,
       [day.dateString]: selected
         ? { selected: true, marked: true, dotColor: "red" }
         : undefined,
     });
+    setCalendarVisible(false); // Close calendar after date selection
   };
 
   const uploadFile = async (uri, folder) => {
@@ -490,13 +497,12 @@ const OwnerProfile = ({ ownerId }) => {
 
   const handleApproveRentalRequest = async (request) => {
     try {
-      // Validate correct properties
-      if (!request.renterId || !request.listingId) {
+      if (!request.renterId || !request.listingId || !rentalDate) {
         console.error("Invalid request data: ", request);
-        Alert.alert("Error", "Request data is invalid.");
+        Alert.alert("Error", "Request data is invalid or rental date is missing.");
         return;
       }
-  
+
       const notificationRef = doc(
         db,
         "owners",
@@ -504,17 +510,20 @@ const OwnerProfile = ({ ownerId }) => {
         "rentalRequests",
         request.id
       );
-      await updateDoc(notificationRef, { status: "approved" });
-  
-      // Send notification to renter
+      await updateDoc(notificationRef, {
+        status: "approved",
+        rentalDate: rentalDate, // Include rental date
+      });
+
       await addDoc(collection(db, "renters", request.renterId, "notifications"), {
         type: "rentalApproved",
         message: "Your rental request has been approved. Please complete the payment.",
         listingId: request.listingId,
         ownerId: resolvedOwnerId,
+        rentalDate: rentalDate, // Include rental date
         createdAt: new Date(),
       });
-  
+
       const chatThread = {
         participants: [resolvedOwnerId, request.renterId],
         messages: [],
@@ -522,10 +531,10 @@ const OwnerProfile = ({ ownerId }) => {
       const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
       chatThread.id = chatDocRef.id;
       setChatThreads([...chatThreads, chatThread]);
-  
+
       Alert.alert(
         "Request Approved",
-        "The rental request has been approved. The renter has been notified to complete the payment."
+        `The rental request for ${rentalDate} has been approved.`
       );
       setMessageModalVisible(false);
     } catch (error) {
@@ -533,24 +542,20 @@ const OwnerProfile = ({ ownerId }) => {
       Alert.alert("Error", "There was an error approving the rental request.");
     }
   };
-  
-  // Similar fix for handleDenyRentalRequest function
-  
-  
+
   const handleDenyRentalRequest = async (request) => {
     try {
       if (!resolvedOwnerId) {
         Alert.alert("Error", "Owner ID is undefined.");
         return;
       }
-  
-      // Validate request properties
+
       if (!request.renterId || !request.listingId) {
         console.error("Invalid request data: ", request);
         Alert.alert("Error", "Request data is invalid.");
         return;
       }
-  
+
       const notificationRef = doc(
         db,
         "owners",
@@ -559,8 +564,7 @@ const OwnerProfile = ({ ownerId }) => {
         request.id
       );
       await updateDoc(notificationRef, { status: "denied" });
-  
-      // Send notification to renter
+
       await addDoc(collection(db, "renters", request.renterId, "notifications"), {
         type: "rentalDenied",
         message: "Your rental request has been denied by the owner.",
@@ -568,7 +572,7 @@ const OwnerProfile = ({ ownerId }) => {
         ownerId: resolvedOwnerId,
         createdAt: new Date(),
       });
-  
+
       Alert.alert("Request Denied", "The rental request has been denied.");
       setMessageModalVisible(false);
     } catch (error) {
@@ -576,8 +580,6 @@ const OwnerProfile = ({ ownerId }) => {
       Alert.alert("Error", "There was an error denying the rental request.");
     }
   };
-  
-  
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -711,7 +713,6 @@ const OwnerProfile = ({ ownerId }) => {
               <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8 }}>
                 Estimated Cost per Hour: ${costData.costPerHour}
               </Text>
-              {/* Include other summary details if needed */}
               <TouchableOpacity
                 onPress={onEditCostData}
                 style={{
@@ -1053,7 +1054,7 @@ const OwnerProfile = ({ ownerId }) => {
               {selectedRequest ? (
                 <>
                   <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                    Renter: {selectedRequest.senderName}
+                    Renter: {selectedRequest.renterName}
                   </Text>
                   <Text style={{ fontSize: 18, marginBottom: 8 }}>
                     Aircraft: {selectedRequest.airplaneModel}
@@ -1062,7 +1063,7 @@ const OwnerProfile = ({ ownerId }) => {
                     Total Cost: ${selectedRequest.totalCost}
                   </Text>
                   <Text style={{ fontSize: 18, marginBottom: 8 }}>
-                    Contact: {selectedRequest.contact}
+                    Rental Date: {selectedRequest.rentalPeriod || "Not Specified"}
                   </Text>
                   <View
                     style={{
@@ -1149,13 +1150,16 @@ const OwnerProfile = ({ ownerId }) => {
                         color: "#2d3748",
                       }}
                     >
-                      Renter: {request.senderName}
+                      Renter: {request.renterName}
                     </Text>
                     <Text style={{ color: "#4a5568" }}>
                       {request.airplaneModel}
                     </Text>
                     <Text style={{ color: "#e53e3e", fontWeight: "bold" }}>
                       ${request.totalCost}
+                    </Text>
+                    <Text style={{ color: "#4a5568" }}>
+                      Date: {request.rentalPeriod || "Not Specified"}
                     </Text>
                   </TouchableOpacity>
                 ))

@@ -24,7 +24,7 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { db, storage } from '../../firebaseConfig';
 import {
   collection,
-  getDocs,
+  onSnapshot,
   orderBy,
   addDoc,
   query,
@@ -41,7 +41,6 @@ import { Formik } from 'formik';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useStripe } from '@stripe/stripe-react-native';
 import { API_URL } from '@env';
-import DawnBackground from '../../Assets/images/DawnBackground.jpg';
 import PaymentScreen from '../payment/PaymentScreen';
 
 const { width } = Dimensions.get('window');
@@ -61,7 +60,7 @@ const Stack = createStackNavigator();
 
 const Classifieds = () => {
   const { user } = useUser();
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { initPaymentSheet } = useStripe();
   const navigation = useNavigation();
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
@@ -136,40 +135,31 @@ const Classifieds = () => {
     }
   }, [selectedCategory]);
 
-  const getLatestItemList = async () => {
-    try {
-      let q = query(collection(db, 'UserPost'), orderBy('createdAt', 'desc'));
-
-      if (selectedCategory) {
-        q = query(
+  useEffect(() => {
+    const q = selectedCategory
+      ? query(
           collection(db, 'UserPost'),
           where('category', '==', selectedCategory),
           orderBy('createdAt', 'desc')
-        );
-      }
+        )
+      : query(collection(db, 'UserPost'), orderBy('createdAt', 'desc'));
 
-      const querySnapShot = await getDocs(q);
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const listingsData = [];
-      querySnapShot.forEach((doc) => {
+      querySnapshot.forEach((doc) => {
         listingsData.push({ id: doc.id, ...doc.data() });
       });
 
       setListings(listingsData);
       setFilteredListings(listingsData);
-    } catch (error) {
-      console.error('Error fetching listings: ', error);
-      Alert.alert('Error', `Failed to load listings: ${error.message}`);
-    }
-  };
+    });
 
-  useEffect(() => {
-    getLatestItemList();
+    return () => unsubscribe();
   }, [selectedCategory]);
 
   const pickImage = async () => {
-    let maxImages = 1; // Default max for Aviation Jobs
+    let maxImages = 1;
 
-    // Set max images based on selected category
     if (selectedCategory === 'Flight Schools') {
       maxImages = 4;
     } else if (selectedCategory === 'Aircraft for Sale') {
@@ -205,14 +195,14 @@ const Classifieds = () => {
   };
 
   const renderImageUploadButton = () => {
-    let maxImages = 1; // Default for Aviation Jobs
+    let maxImages = 1;
     if (selectedCategory === 'Flight Schools') {
       maxImages = 4;
     } else if (selectedCategory === 'Aircraft for Sale') {
       maxImages =
         selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 12 : 16;
     }
-    
+
     const remainingUploads = maxImages - images.length;
 
     return (
@@ -311,6 +301,11 @@ const Classifieds = () => {
   };
 
   const initializePaymentSheet = async () => {
+    if (!user || !user.id) {
+      Alert.alert('Error', 'User information is not available.');
+      return false;
+    }
+
     try {
       const { paymentIntent, ephemeralKey, customer } = await fetchPaymentSheetParams();
 
@@ -356,6 +351,12 @@ const Classifieds = () => {
   };
 
   const handleCompletePayment = async () => {
+    if (!user || !user.id) {
+      Alert.alert('Error', 'User information is not available.');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -366,7 +367,7 @@ const Classifieds = () => {
             const blob = await response.blob();
             const storageRef = ref(
               storage,
-              `classifiedImages/${new Date().getTime()}_${user.id}`
+              `classifiedImages/${user.id}/${new Date().getTime()}_${user.id}`
             );
             const snapshot = await uploadBytes(storageRef, blob);
             return await getDownloadURL(snapshot.ref);
@@ -389,6 +390,7 @@ const Classifieds = () => {
         ...listingDetails,
         category: selectedCategory,
         images: uploadedImages,
+        ownerId: user.id,
         userEmail: user.primaryEmailAddress.emailAddress,
         contactEmail: listingDetails.email,
         contactPhone: listingDetails.phone,
@@ -408,12 +410,87 @@ const Classifieds = () => {
       Alert.alert('Payment Completed', 'Your listing has been successfully submitted!');
       setModalVisible(false);
       setLoading(false);
-      getLatestItemList();
     } catch (error) {
       console.error('Error completing payment: ', error);
       Alert.alert('Error', 'Failed to complete payment and submit listing.');
       setLoading(false);
     }
+  };
+
+  const handleTestSubmitListing = async (values) => {
+    if (!user || !user.id) {
+      Alert.alert('Error', 'User information is not available.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const uploadedImages = await Promise.all(
+        images.map(async (imageUri) => {
+          try {
+            const response = await fetch(imageUri);
+            const blob = await response.blob();
+            const storageRef = ref(
+              storage,
+              `classifiedImages/${user.id}/${new Date().getTime()}_${user.id}`
+            );
+            const snapshot = await uploadBytes(storageRef, blob);
+            return await getDownloadURL(snapshot.ref);
+          } catch (error) {
+            if (__DEV__) {
+              console.error('Error uploading image: ', error);
+              return imageUri;
+            } else {
+              throw error;
+            }
+          }
+        })
+      );
+
+      const testListing = {
+        ...values,
+        category: selectedCategory,
+        images: uploadedImages,
+        ownerId: user.id,
+        userEmail: user.primaryEmailAddress.emailAddress,
+        createdAt: new Date(),
+        pricingPackage: selectedPricing,
+      };
+
+      await addDoc(collection(db, 'UserPost'), testListing);
+
+      Alert.alert('Test Listing Submitted', 'Your test listing has been added successfully.');
+      setModalVisible(false);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error submitting listing for testing: ', error);
+      Alert.alert('Error', 'Failed to submit the listing for testing.');
+      setLoading(false);
+    }
+  };
+
+  const renderEditAndDeleteButtons = (listing) => {
+    if (user && listing?.ownerId === user.id) {
+      return (
+        <View style={{ flexDirection: 'row', marginTop: 10 }}>
+          <TouchableOpacity
+            style={{ backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center', marginRight: 10 }}
+            onPress={() => handleEditListing(listing)}
+          >
+            <Text style={{ color: COLORS.white, fontSize: 16 }}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ backgroundColor: COLORS.red, padding: 10, borderRadius: 10, alignItems: 'center' }}
+            onPress={() => handleDeleteListing(listing.id)}
+          >
+            <Text style={{ color: COLORS.white, fontSize: 16 }}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return null;
   };
 
   const handleListingPress = (listing) => {
@@ -443,7 +520,6 @@ const Classifieds = () => {
             onPress: async () => {
               await deleteDoc(doc(db, 'UserPost', listingId));
               Alert.alert('Listing Deleted', 'Your listing has been deleted.');
-              getLatestItemList();
               setDetailsModalVisible(false);
               setJobDetailsModalVisible(false);
             }
@@ -457,11 +533,15 @@ const Classifieds = () => {
   };
 
   const handleSaveEdit = async (values) => {
+    if (!user || !user.id) {
+      Alert.alert('Error', 'User information is not available.');
+      return;
+    }
+
     try {
       await updateDoc(doc(db, 'UserPost', selectedListing.id), values);
       Alert.alert('Listing Updated', 'Your listing has been successfully updated.');
       setEditModalVisible(false);
-      getLatestItemList();
     } catch (error) {
       console.error('Error updating listing:', error);
       Alert.alert('Error', 'Failed to update the listing.');
@@ -484,20 +564,24 @@ const Classifieds = () => {
   };
 
   const onSubmitMethod = async (values) => {
+    if (!user || !user.id) {
+      Alert.alert('Error', 'User information is not available.');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const selectedPackagePrice = pricingPackages[selectedPricing];
     const totalWithTaxInCents = Math.round(selectedPackagePrice * 1.0825 * 100);
     setTotalCost(totalWithTaxInCents);
     setListingDetails(values);
 
-    // Close all modals before navigating to PaymentScreen
     setModalVisible(false);
     setFilterModalVisible(false);
     setDetailsModalVisible(false);
     setJobDetailsModalVisible(false);
     setEditModalVisible(false);
 
-    // Navigate to PaymentScreen
     navigation.navigate('PaymentScreen', {
       totalCost: totalWithTaxInCents,
       listingDetails: values,
@@ -510,7 +594,6 @@ const Classifieds = () => {
   };
 
   useEffect(() => {
-    // Close all modals when the Classifieds screen is focused
     const unsubscribe = navigation.addListener('focus', () => {
       setModalVisible(false);
       setFilterModalVisible(false);
@@ -692,6 +775,9 @@ const Classifieds = () => {
                 onPress={() => handleListingPress(item)}
                 style={{ flex: 1 }}
               >
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black, padding: 10 }}>
+                  {item.title}
+                </Text>
                 {item.category === 'Aviation Jobs' ? (
                   <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 20 }}>
                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black, marginBottom: 5 }}>{item.jobTitle}</Text>
@@ -740,8 +826,6 @@ const Classifieds = () => {
         )}
       </Animated.ScrollView>
 
-      {/* Modals for handling detailed listing views and actions */}
-      {/* Aviation Job Full-Screen Modal */}
       <Modal
         visible={jobDetailsModalVisible}
         transparent={true}
@@ -766,25 +850,11 @@ const Classifieds = () => {
             >
               <Text style={{ color: COLORS.white, fontSize: 16 }}>Apply Now</Text>
             </TouchableOpacity>
-            {/* Edit and delete buttons */}
-            <TouchableOpacity
-              style={{ backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center', marginTop: 20 }}
-              onPress={() => handleEditListing(selectedListing)}
-            >
-              <Text style={{ color: COLORS.white, fontSize: 16 }}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ backgroundColor: COLORS.red, padding: 10, borderRadius: 10, alignItems: 'center', marginTop: 10 }}
-              onPress={() => handleDeleteListing(selectedListing.id)}
-            >
-              <Text style={{ color: COLORS.white, fontSize: 16 }}>Delete</Text>
-            </TouchableOpacity>
+            {renderEditAndDeleteButtons(selectedListing)}
           </SafeAreaView>
         </View>
       </Modal>
 
-      {/* Full-Screen Modal for Other Categories */}
-      {/* Full-Screen Modal for Flight Schools */}
       <Modal
         visible={detailsModalVisible}
         transparent={true}
@@ -794,19 +864,7 @@ const Classifieds = () => {
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)' }}>
           <SafeAreaView style={{ flex: 1 }}>
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              {/* Move edit and delete buttons to top corners */}
-              <TouchableOpacity
-                style={{ position: 'absolute', top: 20, left: 20, zIndex: 1, backgroundColor: COLORS.primary, padding: 8, borderRadius: 10 }}
-                onPress={() => handleEditListing(selectedListing)}
-              >
-                <Text style={{ color: COLORS.white }}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ position: 'absolute', top: 20, right: 20, zIndex: 1, backgroundColor: COLORS.red, padding: 8, borderRadius: 10 }}
-                onPress={() => handleDeleteListing(selectedListing.id)}
-              >
-                <Text style={{ color: COLORS.white }}>Delete</Text>
-              </TouchableOpacity>
+              {renderEditAndDeleteButtons(selectedListing)}
 
               {selectedListing?.images && (
                 <View style={{ width: '90%', height: '50%', position: 'relative' }}>
@@ -828,26 +886,21 @@ const Classifieds = () => {
                   </TouchableOpacity>
                 </View>
               )}
-              {/* Display flight school name */}
               <Text style={{ color: COLORS.white, fontSize: 24, fontWeight: 'bold', marginTop: 20 }}>
                 {selectedListing?.flightSchoolName || selectedListing?.title}
               </Text>
-              {/* Display flight school details */}
               <Text style={{ color: COLORS.white, fontSize: 18, marginTop: 10, textAlign: 'center', paddingHorizontal: 20 }}>
                 {selectedListing?.flightSchoolDetails || selectedListing?.description}
               </Text>
-              {/* Optional: display other information like location */}
               <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
                 {selectedListing?.city}, {selectedListing?.state}
               </Text>
-              {/* Ask question button */}
               <TouchableOpacity
                 style={{ marginTop: 20, backgroundColor: COLORS.primary, padding: 10, borderRadius: 10 }}
                 onPress={handleAskQuestion}
               >
                 <Text style={{ color: COLORS.white, fontSize: 16 }}>Ask a question</Text>
               </TouchableOpacity>
-              {/* Close modal button */}
               <TouchableOpacity
                 style={{ marginTop: 20, backgroundColor: COLORS.red, padding: 10, borderRadius: 10 }}
                 onPress={() => setDetailsModalVisible(false)}
@@ -859,7 +912,6 @@ const Classifieds = () => {
         </View>
       </Modal>
 
-      {/* Filter by Location Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -907,7 +959,6 @@ const Classifieds = () => {
         </View>
       </Modal>
 
-      {/* Submit Listing Modal */}
       <Modal
         animationType="none"
         transparent={true}
@@ -1192,6 +1243,21 @@ const Classifieds = () => {
                         </>
                       )}
 
+                      <TouchableOpacity
+                        onPress={() => handleTestSubmitListing(values)}
+                        style={{
+                          backgroundColor: COLORS.primary,
+                          paddingVertical: 12,
+                          borderRadius: 50,
+                          marginTop: 16,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                          Submit Without Payment (Test)
+                        </Text>
+                      </TouchableOpacity>
+
                       {loading ? (
                         <ActivityIndicator size="large" color={COLORS.red} />
                       ) : (
@@ -1201,7 +1267,6 @@ const Classifieds = () => {
                             backgroundColor: COLORS.red,
                             paddingVertical: 12,
                             borderRadius: 50,
-                            marginTop: 16,
                           }}
                         >
                           <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
@@ -1225,7 +1290,6 @@ const Classifieds = () => {
         </View>
       </Modal>
 
-      {/* Edit Listing Modal */}
       <Modal
         visible={editModalVisible}
         transparent={true}
@@ -1402,7 +1466,6 @@ const AppNavigator = () => {
           component={Classifieds}
           options={{ headerShown: false }}
         />
-        {/* Add PaymentScreen to Stack Navigator */}
         <Stack.Screen
           name="PaymentScreen"
           component={PaymentScreen}

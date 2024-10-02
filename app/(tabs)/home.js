@@ -1,5 +1,3 @@
-// Home.js
-
 import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
@@ -30,6 +28,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { useStripe } from "@stripe/stripe-react-native";
+import { Calendar } from "react-native-calendars";
 
 const Home = ({ route, navigation }) => {
   const { user } = useUser();
@@ -45,6 +44,8 @@ const Home = ({ route, navigation }) => {
     location: "",
   });
   const [rentalHours, setRentalHours] = useState(1);
+  const [rentalDate, setRentalDate] = useState(null); // State for the selected rental date
+  const [calendarModalVisible, setCalendarModalVisible] = useState(false); // State for calendar modal visibility
   const [totalCost, setTotalCost] = useState({
     rentalCost: "0.00",
     bookingFee: "0.00",
@@ -152,6 +153,11 @@ const Home = ({ route, navigation }) => {
   const handleSendRentalRequest = async () => {
     if (!selectedListing) return;
 
+    if (!rentalDate) {
+      Alert.alert("Error", "Please select a rental date.");
+      return;
+    }
+
     const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
     const bookingFee = rentalCost * 0.06;
     const transactionFee = rentalCost * 0.03;
@@ -164,23 +170,26 @@ const Home = ({ route, navigation }) => {
         renterName: user.fullName,
         ownerId: selectedListing.ownerId,
         airplaneModel: selectedListing.airplaneModel,
-        rentalPeriod: "2024-09-01 to 2024-09-07", // Replace with actual data
+        rentalPeriod: rentalDate, // Include selected rental date
         totalCost: totalCostValue.toFixed(2),
         contact: user.email || "noemail@example.com",
         createdAt: new Date(),
         status: "pending",
       };
 
-      // Add rental request document to 'rentalRequests' collection
-      const rentalRequestRef = await addDoc(collection(db, "rentalRequests"), rentalRequestData);
+      // Correct the path to add the rental request to the owner's rentalRequests subcollection
+      const rentalRequestRef = await addDoc(
+        collection(db, "owners", selectedListing.ownerId, "rentalRequests"),
+        rentalRequestData
+      );
 
       // Create initial message in messages subcollection under the rental request
       await addDoc(
-        collection(db, "rentalRequests", rentalRequestRef.id, "messages"),
+        collection(db, "owners", selectedListing.ownerId, "rentalRequests", rentalRequestRef.id, "messages"),
         {
           senderId: user.id,
           senderName: user.fullName,
-          text: `Hi, I would like to rent your ${selectedListing.airplaneModel}.`,
+          text: `Hi, I would like to rent your ${selectedListing.airplaneModel} on ${rentalDate}.`,
           createdAt: new Date(),
         }
       );
@@ -196,10 +205,14 @@ const Home = ({ route, navigation }) => {
     }
   };
 
+  const handleDateSelection = (day) => {
+    setRentalDate(day.dateString);
+    setCalendarModalVisible(false);
+  };
+
   const handleDeleteListing = async (listingId) => {
     try {
       await deleteDoc(doc(db, "airplanes", listingId));
-      // Remove the listing from the state
       setListings((prevListings) =>
         prevListings.filter((listing) => listing.id !== listingId)
       );
@@ -257,7 +270,7 @@ const Home = ({ route, navigation }) => {
           text: "Logout",
           onPress: async () => {
             await signOut();
-            navigation.replace("SignIn"); // Navigate to the SignIn page after logout
+            navigation.replace("SignIn");
           },
         },
       ],
@@ -453,7 +466,6 @@ const Home = ({ route, navigation }) => {
                   </Text>
                 </View>
               </TouchableOpacity>
-              {/* Show edit and delete buttons only for the listing owner */}
               {item.ownerId === user.id && (
                 <View
                   style={{
@@ -591,6 +603,33 @@ const Home = ({ route, navigation }) => {
                   />
                 </View>
 
+                {/* Calendar Button */}
+                <TouchableOpacity
+                  onPress={() => setCalendarModalVisible(true)}
+                  style={{
+                    backgroundColor: "#1E90FF",
+                    padding: 12,
+                    borderRadius: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "white",
+                      textAlign: "center",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Select Rental Date
+                  </Text>
+                </TouchableOpacity>
+
+                {rentalDate && (
+                  <Text style={{ marginBottom: 16, textAlign: "center" }}>
+                    Selected Rental Date: {rentalDate}
+                  </Text>
+                )}
+
                 <View style={{ marginBottom: 16 }}>
                   <Text style={{ fontWeight: "bold" }}>Total Cost</Text>
                   <Text>Rental Cost: ${totalCost.rentalCost}</Text>
@@ -625,6 +664,36 @@ const Home = ({ route, navigation }) => {
             </View>
           )}
         </SafeAreaView>
+      </Modal>
+
+      {/* Calendar Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={calendarModalVisible}
+        onRequestClose={() => setCalendarModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "white" }}>
+          <Calendar
+            onDayPress={handleDateSelection}
+            markedDates={
+              rentalDate ? { [rentalDate]: { selected: true, marked: true, dotColor: "red" } } : {}
+            }
+          />
+          <TouchableOpacity
+            onPress={() => setCalendarModalVisible(false)}
+            style={{
+              backgroundColor: "#1E90FF",
+              padding: 16,
+              borderRadius: 8,
+              margin: 16,
+            }}
+          >
+            <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+              Close Calendar
+            </Text>
+          </TouchableOpacity>
+        </View>
       </Modal>
     </SafeAreaView>
   );

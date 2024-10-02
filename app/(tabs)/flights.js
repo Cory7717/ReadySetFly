@@ -13,12 +13,10 @@ import {
   ActivityIndicator,
   ScrollView,
   RefreshControl,
-  StatusBar,
-  Dimensions,
   StyleSheet,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '@clerk/clerk-expo';
 import {
   collection,
@@ -42,8 +40,6 @@ import { db, storage } from '../../firebaseConfig';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Appbar, Avatar, Badge, Button } from 'react-native-paper';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Constants
 const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150'; // Replace with a valid URL
@@ -115,7 +111,7 @@ const UserHeader = ({ navigation, user }) => {
 
           // Update user's profile image using Clerk's API
           await user.update({
-            image: imageUrl, // Ensure the correct attribute name as per Clerk's API
+            image: imageUrl,
           });
 
           setProfileImage(imageUrl);
