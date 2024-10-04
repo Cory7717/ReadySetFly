@@ -6,9 +6,9 @@ import { ClerkProvider } from '@clerk/clerk-expo';
 import { useAuth } from '@clerk/clerk-expo';
 
 const AuthLayout = () => {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isSignedUp } = useAuth();
 
-  if (isSignedIn) {
+  if (isSignedIn, isSignedUp) {
     return <Redirect href="app(tabs)/home.js" />;
   }
 

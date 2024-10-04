@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
@@ -9,6 +9,10 @@ import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet } from 'rea
 import CustomButton from '../components/CustomButton';
 import { images } from '../constants';
 import { router } from 'expo-router';
+// Import React and other necessary modules
+
+import { useAuth } from '@clerk/clerk-expo';
+
 
 // Function to retrieve Clerk Publishable Key
 const getClerkPublishableKey = () => {

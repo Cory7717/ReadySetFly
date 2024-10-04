@@ -227,6 +227,30 @@ const Classifieds = () => {
     );
   };
 
+  const renderListingImages = (item) => {
+    // Matching the image rendering style to `flights` component
+    return (
+      <FlatList
+        data={item.images}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(imageUri, index) => `${item.id}-${index}`}
+        renderItem={({ item: imageUri }) => (
+          <Image
+            source={{ uri: imageUri }}
+            style={{
+              width: width - 32,
+              height: 200,
+              borderRadius: 10,
+              marginBottom: 8,
+              marginRight: 8,
+            }}
+          />
+        )}
+      />
+    );
+  };
+
   const filterListingsByDistance = (radiusMiles) => {
     if (!location) {
       Alert.alert('Error', 'Location is not available.');
@@ -254,9 +278,9 @@ const Classifieds = () => {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(deg2rad(lat1)) *
-      Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+        Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
     return distance;
@@ -400,8 +424,8 @@ const Classifieds = () => {
           selectedPricing === 'Basic'
             ? 7
             : selectedPricing === 'Featured'
-              ? 14
-              : 30,
+            ? 14
+            : 30,
         totalCost: totalCost / 100,
       };
 
@@ -423,10 +447,10 @@ const Classifieds = () => {
       setLoading(false);
       return;
     }
-
+  
     try {
       setLoading(true);
-
+  
       const uploadedImages = await Promise.all(
         images.map(async (imageUri) => {
           try {
@@ -434,33 +458,32 @@ const Classifieds = () => {
             const blob = await response.blob();
             const storageRef = ref(
               storage,
-              `classifiedImages/${user.id}/${new Date().getTime()}_${user.id}`
+              `classifiedImages/${new Date().getTime()}_${user.id}`
             );
             const snapshot = await uploadBytes(storageRef, blob);
-            return await getDownloadURL(snapshot.ref);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            return downloadURL;
           } catch (error) {
-            if (__DEV__) {
-              console.error('Error uploading image: ', error);
-              return imageUri;
-            } else {
-              throw error;
-            }
+            console.error('Error uploading image: ', error);
+            return null;
           }
         })
       );
-
+  
+      const validUploadedImages = uploadedImages.filter((url) => url !== null);
+  
       const testListing = {
         ...values,
         category: selectedCategory,
-        images: uploadedImages,
+        images: validUploadedImages,
         ownerId: user.id,
         userEmail: user.primaryEmailAddress.emailAddress,
         createdAt: new Date(),
         pricingPackage: selectedPricing,
       };
-
+  
       await addDoc(collection(db, 'UserPost'), testListing);
-
+  
       Alert.alert('Test Listing Submitted', 'Your test listing has been added successfully.');
       setModalVisible(false);
       setLoading(false);
@@ -470,19 +493,30 @@ const Classifieds = () => {
       setLoading(false);
     }
   };
-
+  
   const renderEditAndDeleteButtons = (listing) => {
     if (user && listing?.ownerId === user.id) {
       return (
         <View style={{ flexDirection: 'row', marginTop: 10 }}>
           <TouchableOpacity
-            style={{ backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center', marginRight: 10 }}
+            style={{
+              backgroundColor: COLORS.primary,
+              padding: 10,
+              borderRadius: 10,
+              alignItems: 'center',
+              marginRight: 10,
+            }}
             onPress={() => handleEditListing(listing)}
           >
             <Text style={{ color: COLORS.white, fontSize: 16 }}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={{ backgroundColor: COLORS.red, padding: 10, borderRadius: 10, alignItems: 'center' }}
+            style={{
+              backgroundColor: COLORS.red,
+              padding: 10,
+              borderRadius: 10,
+              alignItems: 'center',
+            }}
             onPress={() => handleDeleteListing(listing.id)}
           >
             <Text style={{ color: COLORS.white, fontSize: 16 }}>Delete</Text>
@@ -522,8 +556,8 @@ const Classifieds = () => {
               Alert.alert('Listing Deleted', 'Your listing has been deleted.');
               setDetailsModalVisible(false);
               setJobDetailsModalVisible(false);
-            }
-          }
+            },
+          },
         ]
       );
     } catch (error) {
@@ -613,7 +647,7 @@ const Classifieds = () => {
         padding: 8,
         borderRadius: 8,
         marginRight: 8,
-        backgroundColor: selectedCategory === item ? COLORS.primary : COLORS.lightGray
+        backgroundColor: selectedCategory === item ? COLORS.primary : COLORS.lightGray,
       }}
     >
       <Text
@@ -631,6 +665,7 @@ const Classifieds = () => {
   const goToNextImage = () => {
     if (
       selectedListing?.images &&
+      selectedListing.images.length > 0 &&
       currentImageIndex < selectedListing.images.length - 1
     ) {
       setCurrentImageIndex(currentImageIndex + 1);
@@ -640,12 +675,20 @@ const Classifieds = () => {
   };
 
   const goToPreviousImage = () => {
-    if (currentImageIndex > 0) {
+    if (
+      selectedListing?.images &&
+      selectedListing.images.length > 0 &&
+      currentImageIndex > 0
+    ) {
       setCurrentImageIndex(currentImageIndex - 1);
-    } else {
+    } else if (selectedListing?.images && selectedListing.images.length > 0) {
       setCurrentImageIndex(selectedListing.images.length - 1);
     }
   };
+
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [selectedListing]);
 
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 150],
@@ -719,7 +762,9 @@ const Classifieds = () => {
         )}
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-          <Text style={{ fontSize: 18, color: COLORS.secondary }}>Filter by Location or Aircraft Make</Text>
+          <Text style={{ fontSize: 18, color: COLORS.secondary }}>
+            Filter by Location or Aircraft Make
+          </Text>
           <TouchableOpacity
             onPress={() => setFilterModalVisible(true)}
             style={{ backgroundColor: COLORS.lightGray, padding: 8, borderRadius: 50 }}
@@ -737,7 +782,15 @@ const Classifieds = () => {
           style={{ marginBottom: 16 }}
         />
 
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: COLORS.black }}>
+        <Text
+          style={{
+            fontSize: 24,
+            fontWeight: 'bold',
+            marginBottom: 16,
+            textAlign: 'center',
+            color: COLORS.black,
+          }}
+        >
           Aircraft Marketplace
         </Text>
 
@@ -771,58 +824,102 @@ const Classifieds = () => {
               }}
               key={item.id}
             >
-              <TouchableOpacity
-                onPress={() => handleListingPress(item)}
-                style={{ flex: 1 }}
-              >
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black, padding: 10 }}>
+              <TouchableOpacity onPress={() => handleListingPress(item)} style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    color: COLORS.black,
+                    padding: 10,
+                  }}
+                >
                   {item.title}
                 </Text>
                 {item.category === 'Aviation Jobs' ? (
-                  <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 20 }}>
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black, marginBottom: 5 }}>{item.jobTitle}</Text>
-                    <Text style={{ fontSize: 16, color: COLORS.secondary, marginBottom: 5 }}>{item.companyName}</Text>
-                    <Text style={{ fontSize: 14, color: COLORS.gray }}>{item.city}, {item.state}</Text>
+                  <View
+                    style={{
+                      padding: 10,
+                      borderRadius: 10,
+                      backgroundColor: COLORS.white,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 'bold',
+                        color: COLORS.black,
+                        marginBottom: 5,
+                      }}
+                    >
+                      {item.jobTitle}
+                    </Text>
+                    <Text
+                      style={{ fontSize: 16, color: COLORS.secondary, marginBottom: 5 }}
+                    >
+                      {item.companyName}
+                    </Text>
+                    <Text style={{ fontSize: 14, color: COLORS.gray }}>
+                      {item.city}, {item.state}
+                    </Text>
                   </View>
                 ) : item.category === 'Flight Schools' ? (
-                  <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white }}>
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}>{item.flightSchoolName}</Text>
-                    <Text style={{ fontSize: 16, color: COLORS.gray, marginVertical: 5 }}>{item.flightSchoolDetails}</Text>
+                  <View
+                    style={{
+                      padding: 10,
+                      borderRadius: 10,
+                      backgroundColor: COLORS.white,
+                    }}
+                  >
+                    <Text
+                      style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}
+                    >
+                      {item.flightSchoolName}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        color: COLORS.gray,
+                        marginVertical: 5,
+                      }}
+                    >
+                      {item.flightSchoolDetails}
+                    </Text>
                     {item.images && item.images.length > 0 ? (
-                      <ImageBackground
-                        source={{ uri: item.images[0] }}
-                        style={{ height: 200, justifyContent: 'space-between', borderRadius: 10 }}
-                      >
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
-                          <Text style={{ backgroundColor: '#000000a0', color: COLORS.white, padding: 4, borderRadius: 5 }}>
-                            {item.city}, {item.state}
-                          </Text>
-                        </View>
-                      </ImageBackground>
+                      renderListingImages(item)
                     ) : (
-                      <Text style={{ textAlign: 'center', color: COLORS.gray, marginTop: 10 }}>No Images Available</Text>
+                      <Text
+                        style={{
+                          textAlign: 'center',
+                          color: COLORS.gray,
+                          marginTop: 10,
+                        }}
+                      >
+                        No Images Available
+                      </Text>
                     )}
                   </View>
+                ) : item.images && item.images.length > 0 ? (
+                  renderListingImages(item)
                 ) : (
-                  <ImageBackground
-                    source={{ uri: item.images && item.images[0] }}
-                    style={{ height: 200, justifyContent: 'space-between', borderRadius: 10 }}
+                  <Text
+                    style={{
+                      textAlign: 'center',
+                      color: COLORS.gray,
+                      marginTop: 10,
+                      padding: 10,
+                    }}
                   >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
-                      <Text style={{ backgroundColor: '#000000a0', color: COLORS.white, padding: 4, borderRadius: 5 }}>
-                        {item.city}, {item.state}
-                      </Text>
-                      <Text style={{ backgroundColor: '#000000a0', color: COLORS.white, padding: 4, borderRadius: 5 }}>
-                        ${item.price}
-                      </Text>
-                    </View>
-                  </ImageBackground>
+                    No Images Available
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
           ))
         ) : (
-          <Text style={{ textAlign: 'center', color: COLORS.gray }}>No listings available</Text>
+          <Text style={{ textAlign: 'center', color: COLORS.gray }}>
+            No listings available
+          </Text>
         )}
       </Animated.ScrollView>
 
@@ -832,20 +929,65 @@ const Classifieds = () => {
         onRequestClose={() => setJobDetailsModalVisible(false)}
         animationType="slide"
       >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
-          <SafeAreaView style={{ width: '90%', backgroundColor: COLORS.white, borderRadius: 20, padding: 20 }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <SafeAreaView
+            style={{
+              width: '90%',
+              backgroundColor: COLORS.white,
+              borderRadius: 20,
+              padding: 20,
+            }}
+          >
             <TouchableOpacity
               style={{ position: 'absolute', top: 10, right: 10, zIndex: 1 }}
               onPress={() => setJobDetailsModalVisible(false)}
             >
               <Ionicons name="close" size={30} color={COLORS.black} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 24, fontWeight: 'bold', color: COLORS.black, marginBottom: 10 }}>{selectedListing?.jobTitle}</Text>
-            <Text style={{ fontSize: 18, color: COLORS.secondary, marginBottom: 5 }}>{selectedListing?.companyName}</Text>
-            <Text style={{ fontSize: 16, color: COLORS.gray, marginBottom: 10 }}>{selectedListing?.city}, {selectedListing?.state}</Text>
-            <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 20 }}>{selectedListing?.jobDescription}</Text>
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: 'bold',
+                color: COLORS.black,
+                marginBottom: 10,
+              }}
+            >
+              {selectedListing?.jobTitle}
+            </Text>
+            <Text
+              style={{ fontSize: 18, color: COLORS.secondary, marginBottom: 5 }}
+            >
+              {selectedListing?.companyName}
+            </Text>
+            <Text
+              style={{ fontSize: 16, color: COLORS.gray, marginBottom: 10 }}
+            >
+              {selectedListing?.city}, {selectedListing?.state}
+            </Text>
+            <Text
+              style={{
+                fontSize: 16,
+                color: COLORS.black,
+                marginBottom: 20,
+              }}
+            >
+              {selectedListing?.jobDescription}
+            </Text>
             <TouchableOpacity
-              style={{ backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center', marginTop: 20 }}
+              style={{
+                backgroundColor: COLORS.primary,
+                padding: 10,
+                borderRadius: 10,
+                alignItems: 'center',
+                marginTop: 20,
+              }}
               onPress={handleAskQuestion}
             >
               <Text style={{ color: COLORS.white, fontSize: 16 }}>Apply Now</Text>
@@ -863,46 +1005,96 @@ const Classifieds = () => {
       >
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)' }}>
           <SafeAreaView style={{ flex: 1 }}>
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <View
+              style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+            >
               {renderEditAndDeleteButtons(selectedListing)}
 
-              {selectedListing?.images && (
-                <View style={{ width: '90%', height: '50%', position: 'relative' }}>
+              {selectedListing?.images && selectedListing.images.length > 0 ? (
+                <View
+                  style={{ width: '90%', height: '50%', position: 'relative' }}
+                >
                   <Image
                     source={{ uri: selectedListing.images[currentImageIndex] }}
-                    style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      resizeMode: 'contain',
+                    }}
                   />
                   <TouchableOpacity
-                    style={{ position: 'absolute', top: '45%', padding: 10, left: 10 }}
+                    style={{
+                      position: 'absolute',
+                      top: '45%',
+                      padding: 10,
+                      left: 10,
+                    }}
                     onPress={goToPreviousImage}
                   >
                     <Ionicons name="arrow-back" size={36} color="white" />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={{ position: 'absolute', top: '45%', padding: 10, right: 10 }}
+                    style={{
+                      position: 'absolute',
+                      top: '45%',
+                      padding: 10,
+                      right: 10,
+                    }}
                     onPress={goToNextImage}
                   >
                     <Ionicons name="arrow-forward" size={36} color="white" />
                   </TouchableOpacity>
                 </View>
+              ) : (
+                <Text style={{ color: COLORS.white, marginTop: 20 }}>
+                  No Images Available
+                </Text>
               )}
-              <Text style={{ color: COLORS.white, fontSize: 24, fontWeight: 'bold', marginTop: 20 }}>
+              <Text
+                style={{
+                  color: COLORS.white,
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  marginTop: 20,
+                }}
+              >
                 {selectedListing?.flightSchoolName || selectedListing?.title}
               </Text>
-              <Text style={{ color: COLORS.white, fontSize: 18, marginTop: 10, textAlign: 'center', paddingHorizontal: 20 }}>
-                {selectedListing?.flightSchoolDetails || selectedListing?.description}
+              <Text
+                style={{
+                  color: COLORS.white,
+                  fontSize: 18,
+                  marginTop: 10,
+                  textAlign: 'center',
+                  paddingHorizontal: 20,
+                }}
+              >
+                {selectedListing?.flightSchoolDetails ||
+                  selectedListing?.description}
               </Text>
               <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
                 {selectedListing?.city}, {selectedListing?.state}
               </Text>
               <TouchableOpacity
-                style={{ marginTop: 20, backgroundColor: COLORS.primary, padding: 10, borderRadius: 10 }}
+                style={{
+                  marginTop: 20,
+                  backgroundColor: COLORS.primary,
+                  padding: 10,
+                  borderRadius: 10,
+                }}
                 onPress={handleAskQuestion}
               >
-                <Text style={{ color: COLORS.white, fontSize: 16 }}>Ask a question</Text>
+                <Text style={{ color: COLORS.white, fontSize: 16 }}>
+                  Ask a question
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={{ marginTop: 20, backgroundColor: COLORS.red, padding: 10, borderRadius: 10 }}
+                style={{
+                  marginTop: 20,
+                  backgroundColor: COLORS.red,
+                  padding: 10,
+                  borderRadius: 10,
+                }}
                 onPress={() => setDetailsModalVisible(false)}
               >
                 <Text style={{ color: COLORS.white, fontSize: 16 }}>Close</Text>
@@ -918,40 +1110,94 @@ const Classifieds = () => {
         visible={filterModalVisible}
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          }}
+        >
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ width: '90%', maxHeight: '90%', backgroundColor: COLORS.white, borderRadius: 24, padding: 0 }}
+            style={{
+              width: '90%',
+              maxHeight: '90%',
+              backgroundColor: COLORS.white,
+              borderRadius: 24,
+              padding: 0,
+            }}
           >
-            <ScrollView contentContainerStyle={{ padding: 24 }} style={{ width: '100%' }} nestedScrollEnabled={true}>
+            <ScrollView
+              contentContainerStyle={{ padding: 24 }}
+              style={{ width: '100%' }}
+              nestedScrollEnabled={true}
+            >
               <View style={{ width: '100%' }}>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 'bold',
+                    marginBottom: 24,
+                    textAlign: 'center',
+                    color: COLORS.black,
+                  }}
+                >
                   Filter Listings
                 </Text>
 
                 <TouchableOpacity
                   onPress={() => filterListingsByDistance(100)}
-                  style={{ backgroundColor: COLORS.red, paddingVertical: 12, borderRadius: 50, marginBottom: 12 }}
+                  style={{
+                    backgroundColor: COLORS.red,
+                    paddingVertical: 12,
+                    borderRadius: 50,
+                    marginBottom: 12,
+                  }}
                 >
-                  <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                  <Text
+                    style={{
+                      color: COLORS.white,
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                    }}
+                  >
                     View Listings Within 100 Miles
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setFilteredListings(listings)}
-                  style={{ backgroundColor: COLORS.red, paddingVertical: 12, borderRadius: 50, marginBottom: 12 }}
+                  style={{
+                    backgroundColor: COLORS.red,
+                    paddingVertical: 12,
+                    borderRadius: 50,
+                    marginBottom: 12,
+                  }}
                 >
-                  <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                  <Text
+                    style={{
+                      color: COLORS.white,
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                    }}
+                  >
                     View All Listings
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setFilterModalVisible(false)}
-                  style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
+                  style={{
+                    marginTop: 16,
+                    paddingVertical: 8,
+                    borderRadius: 50,
+                    backgroundColor: COLORS.lightGray,
+                  }}
                 >
-                  <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
+                  <Text style={{ textAlign: 'center', color: COLORS.black }}>
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -965,7 +1211,14 @@ const Classifieds = () => {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          }}
+        >
           <Animated.View
             style={{
               width: '90%',
@@ -978,17 +1231,43 @@ const Classifieds = () => {
               shadowOpacity: 0.3,
               shadowRadius: 10,
               elevation: 10,
-              transform: [{ scale: scaleValue }]
+              transform: [{ scale: scaleValue }],
             }}
           >
-            <ScrollView contentContainerStyle={{ padding: 24 }} style={{ width: '100%' }} nestedScrollEnabled={true}>
+            <ScrollView
+              contentContainerStyle={{ padding: 24 }}
+              style={{ width: '100%' }}
+              nestedScrollEnabled={true}
+            >
               <View style={{ width: '100%' }}>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 'bold',
+                    marginBottom: 24,
+                    textAlign: 'center',
+                    color: COLORS.black,
+                  }}
+                >
                   Submit Your Listing
                 </Text>
 
-                <Text style={{ marginBottom: 8, color: COLORS.black, fontWeight: 'bold' }}>Select Pricing Package</Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                <Text
+                  style={{
+                    marginBottom: 8,
+                    color: COLORS.black,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Select Pricing Package
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    marginBottom: 16,
+                  }}
+                >
                   {Object.keys(pricingPackages).map((key) => (
                     <TouchableOpacity
                       key={key}
@@ -997,13 +1276,18 @@ const Classifieds = () => {
                         padding: 8,
                         borderWidth: 1,
                         borderRadius: 8,
-                        borderColor: selectedPricing === key ? COLORS.primary : COLORS.lightGray,
+                        borderColor:
+                          selectedPricing === key ? COLORS.primary : COLORS.lightGray,
                         width: (width - 64) / 3 - 8,
                         alignItems: 'center',
                       }}
                     >
-                      <Text style={{ textAlign: 'center', color: COLORS.black }}>{key}</Text>
-                      <Text style={{ textAlign: 'center', color: COLORS.black }}>${pricingPackages[key]}</Text>
+                      <Text style={{ textAlign: 'center', color: COLORS.black }}>
+                        {key}
+                      </Text>
+                      <Text style={{ textAlign: 'center', color: COLORS.black }}>
+                        ${pricingPackages[key]}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1220,7 +1504,15 @@ const Classifieds = () => {
 
                       {selectedCategory !== 'Aviation Jobs' && (
                         <>
-                          <Text style={{ marginBottom: 8, color: COLORS.black, fontWeight: 'bold' }}>Upload Images</Text>
+                          <Text
+                            style={{
+                              marginBottom: 8,
+                              color: COLORS.black,
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            Upload Images
+                          </Text>
                           <FlatList
                             data={images}
                             horizontal
@@ -1253,7 +1545,13 @@ const Classifieds = () => {
                           marginBottom: 16,
                         }}
                       >
-                        <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                        <Text
+                          style={{
+                            color: COLORS.white,
+                            textAlign: 'center',
+                            fontWeight: 'bold',
+                          }}
+                        >
                           Submit Without Payment (Test)
                         </Text>
                       </TouchableOpacity>
@@ -1269,7 +1567,13 @@ const Classifieds = () => {
                             borderRadius: 50,
                           }}
                         >
-                          <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                          <Text
+                            style={{
+                              color: COLORS.white,
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                            }}
+                          >
                             Submit Listing & Proceed to Pay
                           </Text>
                         </TouchableOpacity>
@@ -1280,9 +1584,16 @@ const Classifieds = () => {
 
                 <TouchableOpacity
                   onPress={() => setModalVisible(false)}
-                  style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
+                  style={{
+                    marginTop: 16,
+                    paddingVertical: 8,
+                    borderRadius: 50,
+                    backgroundColor: COLORS.lightGray,
+                  }}
                 >
-                  <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
+                  <Text style={{ textAlign: 'center', color: COLORS.black }}>
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -1296,14 +1607,39 @@ const Classifieds = () => {
         onRequestClose={() => setEditModalVisible(false)}
         animationType="slide"
       >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          }}
+        >
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ width: '90%', maxHeight: '90%', backgroundColor: COLORS.white, borderRadius: 24, padding: 0 }}
+            style={{
+              width: '90%',
+              maxHeight: '90%',
+              backgroundColor: COLORS.white,
+              borderRadius: 24,
+              padding: 0,
+            }}
           >
-            <ScrollView contentContainerStyle={{ padding: 24 }} style={{ width: '100%' }} nestedScrollEnabled={true}>
+            <ScrollView
+              contentContainerStyle={{ padding: 24 }}
+              style={{ width: '100%' }}
+              nestedScrollEnabled={true}
+            >
               <View style={{ width: '100%' }}>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 'bold',
+                    marginBottom: 24,
+                    textAlign: 'center',
+                    color: COLORS.black,
+                  }}
+                >
                   Edit Your Listing
                 </Text>
 
@@ -1434,16 +1770,29 @@ const Classifieds = () => {
                           marginTop: 16,
                         }}
                       >
-                        <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                        <Text
+                          style={{
+                            color: COLORS.white,
+                            textAlign: 'center',
+                            fontWeight: 'bold',
+                          }}
+                        >
                           Save Changes
                         </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
                         onPress={() => setEditModalVisible(false)}
-                        style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
+                        style={{
+                          marginTop: 16,
+                          paddingVertical: 8,
+                          borderRadius: 50,
+                          backgroundColor: COLORS.lightGray,
+                        }}
                       >
-                        <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
+                        <Text style={{ textAlign: 'center', color: COLORS.black }}>
+                          Cancel
+                        </Text>
                       </TouchableOpacity>
                     </>
                   )}

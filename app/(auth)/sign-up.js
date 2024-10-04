@@ -12,53 +12,74 @@ import {
   Alert,
 } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
-import { useRouter } from "expo-router";
-import RNPickerSelect from 'react-native-picker-select';
+import RNPickerSelect from "react-native-picker-select";
+import { useNavigation } from "@react-navigation/native";
 import { images } from "../../constants";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const SignUp = () => {
   const { signUp, setActive, isLoaded } = useSignUp();
-  const router = useRouter();
+  const navigation = useNavigation();
 
   // State variables for form data and visibility
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
   const [termsVisible, setTermsVisible] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [profileVisible, setProfileVisible] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [location, setLocation] = useState("");
-  const [profileType, setProfileType] = useState("renter"); // Default to "renter"
+  const [profileData, setProfileData] = useState({
+    firstName: "",
+    lastName: "",
+    location: "",
+    profileType: "renter", // Default to "renter"
+  });
   const [canResendVerification, setCanResendVerification] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Handle form input changes
+  const handleProfileChange = (field, value) => {
+    setProfileData((prevState) => ({
+      ...prevState,
+      [field]: value,
+    }));
+  };
 
   // Handle sign-up process
   const onSignUpPress = useCallback(async () => {
-    // Check if Clerk is loaded properly
     if (!isLoaded) {
       Alert.alert("Sign Up Error", "The sign-up process is not ready. Please try again later.");
       return;
     }
 
+    if (!emailAddress.trim() || !password.trim() || !confirmPassword.trim()) {
+      Alert.alert("Validation Error", "Please fill out all fields.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Password Mismatch", "The passwords do not match. Please try again.");
+      return;
+    }
+
+    setLoading(true);
     try {
       console.log("Attempting to sign up with:", { emailAddress, password });
-
-      const signUpAttempt = await signUp.create({
-        emailAddress,
-        password,
-      });
+      const signUpAttempt = await signUp.create({ emailAddress, password });
 
       if (signUpAttempt) {
-        // Show Terms of Service modal if sign-up is successful
-        setTermsVisible(true);
+        setTermsVisible(true); // Show Terms of Service modal if sign-up is successful
       }
     } catch (err) {
       console.error("Sign Up Error:", err);
       Alert.alert("Sign Up Error", "There was an error during sign up. Please check your email and password.");
+    } finally {
+      setLoading(false);
     }
-  }, [isLoaded, emailAddress, password, signUp]);
+  }, [isLoaded, emailAddress, password, confirmPassword, signUp]);
 
   // Handle terms acceptance and prepare verification
   const onAcceptTerms = useCallback(async () => {
@@ -68,9 +89,7 @@ const SignUp = () => {
 
     try {
       console.log("Preparing email verification...");
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-
-      // Start the timeout for enabling the resend button
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setTimeout(() => setCanResendVerification(true), 30000); // Enable after 30 seconds
     } catch (err) {
       console.error("Email Verification Preparation Error:", err);
@@ -80,22 +99,22 @@ const SignUp = () => {
 
   // Handle email verification
   const onPressVerify = useCallback(async () => {
-    // Check if Clerk is loaded properly
     if (!isLoaded) {
       Alert.alert("Verification Error", "The verification process is not ready. Please try again later.");
       return;
     }
 
+    setLoading(true);
     try {
       console.log("Verifying code:", code);
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      });
+      const completeSignUp = await signUp.attemptEmailAddressVerification({ code });
 
-      if (completeSignUp.status === 'complete') {
+      if (completeSignUp.status === "complete") {
         await setActive({ session: completeSignUp.createdSessionId });
         console.log("Email verification complete");
-        setProfileVisible(true); // Show profile modal after verification
+
+        // Show profile modal for user to complete their profile
+        setProfileVisible(true);
       } else {
         console.error("Verification Error:", completeSignUp);
         Alert.alert("Verification Error", "Verification failed. Please check your code and try again.");
@@ -103,164 +122,204 @@ const SignUp = () => {
     } catch (err) {
       console.error("Verification Error:", err);
       Alert.alert("Verification Error", "There was an error during verification. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }, [isLoaded, code, signUp, setActive]);
 
-  // Resend verification email
+  // Function to resend verification email
   const onResendVerification = useCallback(async () => {
+    if (!isLoaded) {
+      Alert.alert("Resend Error", "The resend process is not ready. Please try again later.");
+      return;
+    }
+
     try {
       console.log("Resending verification email...");
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      Alert.alert("Verification Sent", "A new verification email has been sent.");
-      
-      // Disable the resend button again for 30 seconds
-      setCanResendVerification(false);
-      setTimeout(() => setCanResendVerification(true), 30000);
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setCanResendVerification(false); // Disable button until timeout
+      setTimeout(() => setCanResendVerification(true), 30000); // Re-enable after 30 seconds
     } catch (err) {
       console.error("Resend Verification Error:", err);
       Alert.alert("Resend Error", "There was an error resending the verification email.");
     }
-  }, [signUp]);
+  }, [isLoaded, signUp]);
 
-  // Handle profile submission and route user to the main content (same as SignIn)
+  // Handle profile submission
   const onProfileSubmit = () => {
-    console.log({
-      firstName,
-      lastName,
-      location,
-      profileType,
-    });
+    console.log(profileData);
 
+    // Hide the profile modal
     setProfileVisible(false);
-    
-    // Route to the main content as done in the SignIn component
-    setTimeout(() => {
-      router.replace('/'); // Ensures the user is routed to the main content as intended
-    }, 100);
+
+    // Redirect to the home screen
+    navigation.navigate("(tabs)");
+  };
+
+  // Toggle password visibility
+  const togglePasswordVisibility = () => {
+    setPasswordVisible(!passwordVisible);
+  };
+
+  const renderForm = () => {
+    if (pendingVerification) {
+      return (
+        <>
+          <TextInput
+            value={code}
+            placeholder="Verification Code"
+            onChangeText={setCode}
+            style={{
+              borderWidth: 1,
+              borderColor: "#ccc",
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          />
+          <CustomButton
+            onPress={onPressVerify}
+            text="Verify Email"
+            loading={loading}
+            backgroundColor="#10b981"
+          />
+          {canResendVerification && (
+            <TouchableOpacity onPress={onResendVerification} style={{ marginTop: 16 }}>
+              <Text style={{ color: "#3b82f6", textAlign: "center", fontSize: 16 }}>
+                Resend Verification Email
+              </Text>
+            </TouchableOpacity>
+          )}
+        </>
+      );
+    }
+
+    return (
+      <>
+        <TextInput
+          autoCapitalize="none"
+          value={emailAddress}
+          placeholder="Email"
+          onChangeText={setEmailAddress}
+          style={{
+            borderWidth: 1,
+            borderColor: "#ccc",
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 16,
+          }}
+        />
+        <View style={{ position: 'relative', marginBottom: 16 }}>
+          <TextInput
+            value={password}
+            placeholder="Password"
+            secureTextEntry={!passwordVisible}
+            onChangeText={setPassword}
+            style={{
+              borderWidth: 1,
+              borderColor: "#ccc",
+              borderRadius: 8,
+              padding: 12,
+              paddingRight: 40, // Space for eye icon
+            }}
+          />
+          <TouchableOpacity
+            onPress={togglePasswordVisibility}
+            style={{ position: 'absolute', right: 10, top: 12 }}
+          >
+            <MaterialIcons
+              name={passwordVisible ? "visibility" : "visibility-off"}
+              size={24}
+              color="#555"
+            />
+          </TouchableOpacity>
+        </View>
+        <View style={{ position: 'relative', marginBottom: 16 }}>
+          <TextInput
+            value={confirmPassword}
+            placeholder="Confirm Password"
+            secureTextEntry={!passwordVisible}
+            onChangeText={setConfirmPassword}
+            style={{
+              borderWidth: 1,
+              borderColor: "#ccc",
+              borderRadius: 8,
+              padding: 12,
+              paddingRight: 40, // Space for eye icon
+            }}
+          />
+          <TouchableOpacity
+            onPress={togglePasswordVisibility}
+            style={{ position: 'absolute', right: 10, top: 12 }}
+          >
+            <MaterialIcons
+              name={passwordVisible ? "visibility" : "visibility-off"}
+              size={24}
+              color="#555"
+            />
+          </TouchableOpacity>
+        </View>
+        <CustomButton onPress={onSignUpPress} text="Sign Up" loading={loading} />
+      </>
+    );
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'white', padding: 16 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white", padding: 16 }}>
       <StatusBar barStyle="dark-content" />
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Image
-          source={images.logo}
-          resizeMode="contain"
-          style={{ width: 240, height: 160, marginBottom: 24 }}
-        />
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>
-          Sign up for Ready, Set, Fly!
-        </Text>
-        <View style={{ width: '75%', maxWidth: 400, gap: 16 }}>
-          {!pendingVerification ? (
-            <>
-              <TextInput
-                autoCapitalize="none"
-                value={emailAddress}
-                placeholder="Email"
-                onChangeText={setEmailAddress}
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  borderRadius: 8,
-                  padding: 12,
-                  marginBottom: 16,
-                }}
-              />
-              <TextInput
-                value={password}
-                placeholder="Password"
-                secureTextEntry
-                onChangeText={setPassword}
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  borderRadius: 8,
-                  padding: 12,
-                  marginBottom: 16,
-                }}
-              />
-              <TouchableOpacity
-                onPress={onSignUpPress}
-                style={{
-                  backgroundColor: '#3b82f6',
-                  borderRadius: 8,
-                  padding: 12,
-                }}
-              >
-                <Text style={{ color: 'white', textAlign: 'center', fontSize: 18, fontWeight: '600' }}>
-                  Sign Up
-                </Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TextInput
-                value={code}
-                placeholder="Verification Code"
-                onChangeText={setCode}
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  borderRadius: 8,
-                  padding: 12,
-                  marginBottom: 16,
-                }}
-              />
-              <TouchableOpacity
-                onPress={onPressVerify}
-                style={{
-                  backgroundColor: '#10b981',
-                  borderRadius: 8,
-                  padding: 12,
-                }}
-              >
-                <Text style={{ color: 'white', textAlign: 'center', fontSize: 18, fontWeight: '600' }}>
-                  Verify Email
-                </Text>
-              </TouchableOpacity>
-              {canResendVerification && (
-                <TouchableOpacity
-                  onPress={onResendVerification}
-                  style={{
-                    marginTop: 16,
-                  }}
-                >
-                  <Text style={{ color: '#3b82f6', textAlign: 'center', fontSize: 16 }}>
-                    Resend Verification Email
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 16 }}>
-            <Text style={{ fontSize: 18, color: '#4b5563' }}>
-              Already have an account?
-            </Text>
-            <TouchableOpacity onPress={() => router.push("/sign-in")}>
-              <Text style={{ fontSize: 18, color: '#3b82f6', marginLeft: 8, fontWeight: '600' }}>
-                Sign in
-              </Text>
-            </TouchableOpacity>
-          </View>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Image source={images.logo} resizeMode="contain" style={{ width: 240, height: 160, marginBottom: 24 }} />
+        <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>Sign up for Ready, Set, Fly!</Text>
+        <View style={{ width: "75%", maxWidth: 400, gap: 16 }}>{renderForm()}</View>
+        <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 16 }}>
+          <Text style={{ fontSize: 18, color: "#4b5563" }}>Already have an account?</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("SignIn")}>
+            <Text style={{ fontSize: 18, color: "#3b82f6", marginLeft: 8, fontWeight: "600" }}>Sign in</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* Terms of Service Modal */}
-      <Modal
-        visible={termsVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setTermsVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: 'white', padding: 16, borderRadius: 8, width: '90%', maxHeight: '80%' }}>
-            <ScrollView contentContainerStyle={{ padding: 8 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
-                Terms of Service
-              </Text>
-              <Text style={{ marginBottom: 16 }}>
-              Welcome to Ready, Set, Fly! (“Company”, “we”, “our”, or “us”). By accessing or using our mobile application (the “App”), website, or any services provided by Ready, Set, Fly! (collectively, the “Services”), you agree to comply with and be bound by the following Terms of Service. If you do not agree to these terms, please do not use our Services.
+      <TermsOfServiceModal visible={termsVisible} onAccept={onAcceptTerms} />
+
+      {/* Profile Information Modal */}
+      <ProfileModal
+        visible={profileVisible}
+        profileData={profileData}
+        onProfileChange={handleProfileChange}
+        onSave={onProfileSubmit}
+      />
+    </SafeAreaView>
+  );
+};
+
+// Reusable button component
+const CustomButton = ({ onPress, text, loading, backgroundColor = "#3b82f6" }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={{
+      backgroundColor: loading ? "#ccc" : backgroundColor,
+      borderRadius: 8,
+      padding: 12,
+    }}
+    disabled={loading}
+  >
+    <Text style={{ color: "white", textAlign: "center", fontSize: 18, fontWeight: "600" }}>
+      {loading ? "Please wait..." : text}
+    </Text>
+  </TouchableOpacity>
+);
+
+// Terms of Service Modal
+const TermsOfServiceModal = ({ visible, onAccept }) => (
+  <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={() => setTermsVisible(false)}>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
+      <View style={{ backgroundColor: "white", padding: 16, borderRadius: 8, width: "90%", maxHeight: "80%" }}>
+        <ScrollView contentContainerStyle={{ padding: 8 }}>
+          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>Terms of Service</Text>
+          <Text style={{ marginBottom: 16 }}>
+            {/* Full Terms of Service text */}
+            Welcome to Ready, Set, Fly! (“Company”, “we”, “our”, or “us”). By accessing or using our mobile application (the “App”), website, or any services provided by Ready, Set, Fly! (collectively, the “Services”), you agree to comply with and be bound by the following Terms of Service. If you do not agree to these terms, please do not use our Services.
 
 1. Acceptance of Terms
 By accessing or using the App, you agree to these Terms of Service and our Privacy Policy, which is incorporated herein by reference. If you do not agree to all of the terms and conditions, you may not access or use the Services.
@@ -319,116 +378,87 @@ These Terms and any disputes arising out of or related to the Services will be g
 If you have any questions about these Terms of Service, please contact us at:
 Email: info@readysetfly.us
 Address: Austin Ready, Set, Fly, LLC, Austin, TX
-              </Text>
-              <TouchableOpacity
-                onPress={onAcceptTerms}
-                style={{
-                  backgroundColor: '#10b981',
-                  borderRadius: 8,
-                  padding: 12,
-                }}
-              >
-                <Text style={{ color: 'white', textAlign: 'center', fontSize: 18, fontWeight: '600' }}>
-                  Accept Terms
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+            {/* Continue with the full terms as provided previously */}
+          </Text>
+          <CustomButton onPress={onAccept} text="Accept Terms" backgroundColor="#10b981" />
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>
+);
 
-      {/* Profile Information Modal */}
-      <Modal
-        visible={profileVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setProfileVisible(false)}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: 'white', borderRadius: 8, padding: 16, width: '90%', maxHeight: '80%' }}>
-            <ScrollView contentContainerStyle={{ padding: 8 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
-                Complete Your Profile
-              </Text>
-              <TextInput
-                placeholder="First Name"
-                value={firstName}
-                onChangeText={setFirstName}
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  borderRadius: 8,
-                  padding: 12,
-                  marginBottom: 16,
-                }}
-              />
-              <TextInput
-                placeholder="Last Name"
-                value={lastName}
-                onChangeText={setLastName}
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  borderRadius: 8,
-                  padding: 12,
-                  marginBottom: 16,
-                }}
-              />
-              <TextInput
-                placeholder="City and State"
-                value={location}
-                onChangeText={setLocation}
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  borderRadius: 8,
-                  padding: 12,
-                  marginBottom: 16,
-                }}
-              />
-              <RNPickerSelect
-                onValueChange={(value) => setProfileType(value)}
-                items={[
-                  { label: 'Looking to Rent an Aircraft', value: 'renter' },
-                  { label: 'Owner Looking to List an Aircraft', value: 'owner' }
-                ]}
-                value={profileType}
-                style={{
-                  inputIOS: {
-                    borderWidth: 1,
-                    borderColor: '#ccc',
-                    borderRadius: 8,
-                    padding: 12,
-                    marginBottom: 16,
-                  },
-                  inputAndroid: {
-                    borderWidth: 1,
-                    borderColor: '#ccc',
-                    borderRadius: 8,
-                    padding: 12,
-                    marginBottom: 16,
-                  }
-                }}
-              />
-              <TouchableOpacity
-                onPress={onProfileSubmit}
-                style={{
-                  backgroundColor: '#10b981',
-                  borderRadius: 8,
-                  padding: 12,
-                  marginBottom: 8,
-                }}
-              >
-                <Text style={{ color: 'white', textAlign: 'center', fontSize: 18, fontWeight: '600' }}>
-                  Save Profile
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
-  );
-};
+// Profile Information Modal
+const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
+  <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={() => setProfileVisible(false)}>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
+      <View style={{ backgroundColor: "white", borderRadius: 8, padding: 16, width: "90%", maxHeight: "80%" }}>
+        <ScrollView contentContainerStyle={{ padding: 8 }}>
+          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>Complete Your Profile</Text>
+          <TextInput
+            placeholder="First Name"
+            value={profileData.firstName}
+            onChangeText={(value) => onProfileChange("firstName", value)}
+            style={{
+              borderWidth: 1,
+              borderColor: "#ccc",
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          />
+          <TextInput
+            placeholder="Last Name"
+            value={profileData.lastName}
+            onChangeText={(value) => onProfileChange("lastName", value)}
+            style={{
+              borderWidth: 1,
+              borderColor: "#ccc",
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          />
+          <TextInput
+            placeholder="City and State"
+            value={profileData.location}
+            onChangeText={(value) => onProfileChange("location", value)}
+            style={{
+              borderWidth: 1,
+              borderColor: "#ccc",
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          />
+          <RNPickerSelect
+            onValueChange={(value) => onProfileChange("profileType", value)}
+            items={[
+              { label: "Looking to Rent an Aircraft", value: "renter" },
+              { label: "Owner Looking to List an Aircraft", value: "owner" },
+            ]}
+            value={profileData.profileType}
+            style={{
+              inputIOS: {
+                borderWidth: 1,
+                borderColor: "#ccc",
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+              },
+              inputAndroid: {
+                borderWidth: 1,
+                borderColor: "#ccc",
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+              },
+            }}
+          />
+          <CustomButton onPress={onSave} text="Save Profile" backgroundColor="#10b981" />
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>
+);
 
 export default SignUp;

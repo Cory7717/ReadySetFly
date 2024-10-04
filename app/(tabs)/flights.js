@@ -54,7 +54,6 @@ const UserHeader = ({ navigation, user }) => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
-    // Listen to unread notifications
     const q = query(
       collection(db, 'notifications'),
       where('toUserId', '==', user.id),
@@ -89,7 +88,6 @@ const UserHeader = ({ navigation, user }) => {
 
         if (selectedImage) {
           setUploading(true);
-
           const blob = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.onload = function () {
@@ -108,12 +106,7 @@ const UserHeader = ({ navigation, user }) => {
           await uploadBytes(storageRef, blob);
 
           const imageUrl = await getDownloadURL(storageRef);
-
-          // Update user's profile image using Clerk's API
-          await user.update({
-            image: imageUrl,
-          });
-
+          await user.update({ image: imageUrl });
           setProfileImage(imageUrl);
         } else {
           Alert.alert('Error', 'Failed to select image.');
@@ -211,34 +204,30 @@ const CreatePost = ({ onSubmit }) => {
   const handleSubmit = useCallback(async () => {
     if (content.trim() || image) {
       let imageUrl = null;
-
+  
       if (image) {
         setUploading(true);
         try {
-          const blob = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.onload = function () {
-              resolve(xhr.response);
-            };
-            xhr.onerror = function () {
-              reject(new TypeError('Network request failed'));
-            };
-            xhr.responseType = 'blob';
-            xhr.open('GET', image, true);
-            xhr.send(null);
-          });
-
+          const response = await fetch(image);
+          const blob = await response.blob();
+  
           if (!user.id || !blob) {
             throw new Error('Invalid user ID or image data.');
           }
-
-          const filename = `${user.id}/${user.id}_${Date.now()}_${Math.random()
+  
+          const filename = `${user.id}_${Date.now()}_${Math.random()
             .toString(36)
             .substr(2, 9)}`;
           const storageRef = ref(storage, `postImages/${filename}`);
           await uploadBytes(storageRef, blob);
-
+  
+          // Close the blob
+          blob.close();
+  
           imageUrl = await getDownloadURL(storageRef);
+  
+          // Log the image URL for debugging
+          console.log('Image URL:', imageUrl);
         } catch (error) {
           console.log(error);
           Alert.alert('Error', 'Could not upload image.');
@@ -247,7 +236,7 @@ const CreatePost = ({ onSubmit }) => {
         }
         setUploading(false);
       }
-
+  
       const newPost = {
         content,
         image: imageUrl || null,
@@ -258,7 +247,7 @@ const CreatePost = ({ onSubmit }) => {
         comments: [],
         likes: [],
       };
-
+  
       try {
         const docRef = await addDoc(collection(db, 'posts'), newPost);
         onSubmit({ ...newPost, id: docRef.id });
@@ -271,6 +260,7 @@ const CreatePost = ({ onSubmit }) => {
       Alert.alert('Error', 'Please enter some text or upload an image.');
     }
   }, [content, image, user, onSubmit]);
+  
 
   const removeImage = () => {
     setImage(null);
@@ -308,25 +298,25 @@ const CreatePost = ({ onSubmit }) => {
           <TouchableOpacity onPress={removeImage} style={styles.removeImageButton}>
             <Ionicons name="close" size={16} color="#fff" />
           </TouchableOpacity>
-        </View>
-      )}
-      <Button
-        mode="outlined"
-        icon="image-outline"
-        onPress={pickImage}
-        style={styles.addButton}
-      >
-        Add Photo
-      </Button>
-      {uploading && (
-        <ActivityIndicator
-          size="large"
-          color="#1D4ED8"
-          style={styles.uploadingIndicator}
-        />
-      )}
-    </View>
-  );
+                 </View>
+        )}
+        <Button
+          mode="outlined"
+          icon="image-outline"
+          onPress={pickImage}
+          style={styles.addButton}
+        >
+          Add Photo
+        </Button>
+        {uploading && (
+          <ActivityIndicator
+            size="large"
+            color="#1D4ED8"
+            style={styles.uploadingIndicator}
+          />
+        )}
+      </View>
+    );
 };
 
 // Post Component with image handling, comments, edit, and delete functionality
@@ -654,10 +644,7 @@ const Notifications = ({ navigation }) => {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={[
-              styles.notificationItem,
-              { backgroundColor: item.read ? '#fff' : '#E5E7EB' },
-            ]}
+            style={[styles.notificationItem, { backgroundColor: item.read ? '#fff' : '#E5E7EB' }]}
             onPress={() => {
               markAsRead(item.id);
               navigation.navigate('FullScreenPost', { postId: item.postId });
@@ -1031,13 +1018,15 @@ const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
     top: 10,
-    right: 70,
+    right: 130,
   },
   createPostContainer: {
     backgroundColor: 'white',
     padding: 10,
     borderBottomColor: '#E5E7EB',
     borderBottomWidth: 1,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   createPostHeader: {
     flexDirection: 'row',
@@ -1080,11 +1069,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   postContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     margin: 10,
     padding: 10,
     borderRadius: 20,
-    shadowOpacity: 0.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 5,
     elevation: 3,
   },
@@ -1306,7 +1297,7 @@ const styles = StyleSheet.create({
   },
   mainFeedContainer: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
   },
   loadingIndicator: {
     flex: 1,
@@ -1317,3 +1308,4 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
+
