@@ -7,12 +7,14 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "type": "module"
+    "type": "module",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@callstack/react-theme-provider": "^3.0.9",
     "@clerk/clerk-expo": "^1.2.9",
     "@clerk/clerk-js": "^5.13.2",
+    "@clerk/clerk-sdk-node": "^5.0.48",
     "@expo/metro-runtime": "^3.2.3",
     "@firebase/auth": "^1.7.9",
     "@firebasegen/default": "file:generated/javascript/default",

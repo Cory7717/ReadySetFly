@@ -47,7 +47,7 @@ const PaymentScreen = ({ route }) => {
       setLoading(true);
   
       // Fetch payment intent client secret from your server in test mode
-      const response = await fetch('http://localhost:8081/create-payment-intent', { // Use your actual backend endpoint
+      const response = await fetch('https://awaited-hippo-85.clerk.accounts.dev', { // Use your actual backend endpoint
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: totalCost }), // Total cost in cents

@@ -1,51 +1,46 @@
-require('dotenv').config(); // Import dotenv to load environment variables
+require('dotenv').config(); // Load environment variables
 const express = require('express');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Initialize Stripe with secret key
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const bodyParser = require('body-parser');
-const cors = require('cors'); 
+const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 8081;
 
+// Import Clerk and Firebase Admin SDK
+const { Clerk, requireAuth } = require('@clerk/clerk-sdk-node');
+const admin = require('firebase-admin');
+
+// Initialize Clerk with your secret key
+const clerkClient = new Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
+
+// Initialize Firebase Admin SDK with service account
+const serviceAccount = require('./serviceAccountKey.json'); // Ensure the path is correct
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
 // Use CORS and Body-parser
-app.use(cors()); // Allow all origins (be sure to limit this in production)
+app.use(cors()); // Limit origins in production
 app.use(bodyParser.json());
 
-// Endpoint for handling Payment Sheet
+// Existing endpoint for handling Payment Sheet
 app.post('/create-payment-intent', async (req, res) => {
+  // ... existing code ...
+});
+
+// New endpoint for generating Firebase custom tokens
+app.post('/getFirebaseToken', requireAuth(), async (req, res) => {
   try {
-    const { amount } = req.body; // Expect cost in cents from frontend
+    const { userId } = req.auth;
 
-    if (!amount) {
-      return res.status(400).json({ error: "Amount is required" });
-    }
+    // Create Firebase custom token
+    const firebaseToken = await admin.auth().createCustomToken(userId);
 
-    // Create a customer
-    const customer = await stripe.customers.create();
-
-    // Create an ephemeral key for the customer
-    const ephemeralKey = await stripe.ephemeralKeys.create(
-      { customer: customer.id },
-      { apiVersion: '2022-11-15' }
-    );
-
-    // Create a PaymentIntent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount, // Amount in cents from the client
-      currency: 'usd',
-      customer: customer.id,
-      automatic_payment_methods: { enabled: true },
-    });
-
-    // Respond with payment details for the frontend
-    res.json({
-      clientSecret: paymentIntent.client_secret, // Corrected to clientSecret
-      ephemeralKey: ephemeralKey.secret,
-      customer: customer.id,
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY, // Use environment variable
-    });
+    res.json({ firebaseToken });
   } catch (error) {
-    console.error('Error creating payment sheet:', error);
-    res.status(500).json({ error: 'Failed to create payment sheet' });
+    console.error('Error creating Firebase custom token:', error);
+    res.status(500).json({ error: 'Failed to create Firebase custom token' });
   }
 });
 

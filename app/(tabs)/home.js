@@ -27,13 +27,11 @@ import {
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
-import { useStripe } from "@stripe/stripe-react-native";
 import { Calendar } from "react-native-calendars";
 
 const Home = ({ route, navigation }) => {
   const { user } = useUser();
   const { signOut } = useAuth();
-  const stripe = useStripe();
   const [listings, setListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedListing, setSelectedListing] = useState(null);
@@ -167,31 +165,21 @@ const Home = ({ route, navigation }) => {
     try {
       const rentalRequestData = {
         renterId: user.id,
-        renterName: user.fullName,
+        renterName: user.fullName || "Anonymous",
         ownerId: selectedListing.ownerId,
         airplaneModel: selectedListing.airplaneModel,
         rentalPeriod: rentalDate, // Include selected rental date
         totalCost: totalCostValue.toFixed(2),
-        contact: user.email || "noemail@example.com",
+        contact: user.emailAddress || "noemail@example.com",
         createdAt: new Date(),
         status: "pending",
+        listingId: selectedListing.id, // Include listingId
       };
 
-      // Correct the path to add the rental request to the owner's rentalRequests subcollection
-      const rentalRequestRef = await addDoc(
+      // Add the rental request to the owner's rentalRequests subcollection
+      await addDoc(
         collection(db, "owners", selectedListing.ownerId, "rentalRequests"),
         rentalRequestData
-      );
-
-      // Create initial message in messages subcollection under the rental request
-      await addDoc(
-        collection(db, "owners", selectedListing.ownerId, "rentalRequests", rentalRequestRef.id, "messages"),
-        {
-          senderId: user.id,
-          senderName: user.fullName,
-          text: `Hi, I would like to rent your ${selectedListing.airplaneModel} on ${rentalDate}.`,
-          createdAt: new Date(),
-        }
       );
 
       Alert.alert(
@@ -320,7 +308,7 @@ const Home = ({ route, navigation }) => {
                   fontWeight: "bold",
                 }}
               >
-                {user?.fullName}
+                {user?.fullName || "User"}
               </Animated.Text>
             </View>
             <TouchableOpacity onPress={handleLogout}>
@@ -677,7 +665,9 @@ const Home = ({ route, navigation }) => {
           <Calendar
             onDayPress={handleDateSelection}
             markedDates={
-              rentalDate ? { [rentalDate]: { selected: true, marked: true, dotColor: "red" } } : {}
+              rentalDate
+                ? { [rentalDate]: { selected: true, marked: true, dotColor: "red" } }
+                : {}
             }
           />
           <TouchableOpacity
