@@ -273,7 +273,7 @@ const SignUp = () => {
         <View style={{ width: "75%", maxWidth: 400, gap: 16 }}>{renderForm()}</View>
         <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 16 }}>
           <Text style={{ fontSize: 18, color: "#4b5563" }}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate("SignIn")}>
+          <TouchableOpacity onPress={() => navigation.navigate("sign-in")}>
             <Text style={{ fontSize: 18, color: "#3b82f6", marginLeft: 8, fontWeight: "600" }}>Sign in</Text>
           </TouchableOpacity>
         </View>

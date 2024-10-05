@@ -28,7 +28,6 @@ import {
   onSnapshot,
   orderBy,
 } from 'firebase/firestore';
-import { Formik } from 'formik';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useUser } from '@clerk/clerk-expo';
@@ -41,6 +40,12 @@ import Fontisto from '@expo/vector-icons/Fontisto';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Octicons from '@expo/vector-icons/Octicons';
 import { useStripe } from '@stripe/stripe-react-native';
+import { createStackNavigator } from '@react-navigation/stack';
+
+// Import the CheckoutScreen component
+import CheckoutScreen from '../payment/CheckoutScreen.js'; // Update with the correct path to your CheckoutScreen
+
+const Stack = createStackNavigator();
 
 const BookingCalendar = ({ airplaneId, ownerId }) => {
   const { user } = useUser();
@@ -75,7 +80,8 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const [numHours, setNumHours] = useState('');
   const [costPerGallon, setCostPerGallon] = useState('');
   const [numGallons, setNumGallons] = useState('');
-  const [chatButtonActive, setChatButtonActive] = useState(false);
+  // Enable chat button for dev testing
+  const [chatButtonActive, setChatButtonActive] = useState(true);
 
   // New state variables
   const [rentalRequests, setRentalRequests] = useState([]);
@@ -86,11 +92,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const slideAnimation = useRef(new Animated.Value(300)).current;
 
   const renterId = user?.id;
-
-  useEffect(() => {
-    fetchCompletedRentals();
-    getCurrentLocation();
-  }, [ownerId, user]);
 
   useEffect(() => {
     const db = getFirestore();
@@ -104,6 +105,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         requests.push({ id: doc.id, ...doc.data() });
       });
       setRentalRequests(requests);
+      console.log('Rental Requests:', requests); // Debugging
     });
 
     return () => unsubscribe();
@@ -114,17 +116,25 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       setCurrentRentalRequest(rentalRequests[0]); // Assuming only one active rental request
       const approvedRequest = rentalRequests.find((request) => request.status === 'approved');
       if (approvedRequest) {
-        Alert.alert(
-          'Rental Request Approved',
-          'Your rental request has been approved. Please complete the payment.'
-        );
+        // Add approval message to chat
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            id: 'approval-msg',
+            senderId: ownerId,
+            senderName: 'Owner',
+            text: 'Your rental request has been approved! Please proceed with the payment.',
+            timestamp: new Date(),
+          },
+        ]);
         setChatButtonActive(true);
+        console.log('Approved Request Found:', approvedRequest); // Debugging
       }
     }
   }, [rentalRequests]);
 
   useEffect(() => {
-    if (currentRentalRequest && currentRentalRequest.status === 'completed') {
+    if (currentRentalRequest) {
       const db = getFirestore();
       const messagesRef = collection(db, 'messages');
 
@@ -140,11 +150,16 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           msgs.push({ id: doc.id, ...doc.data() });
         });
         setMessages(msgs);
+        console.log('Messages:', msgs); // Debugging
       });
 
       return () => unsubscribe();
     }
   }, [currentRentalRequest]);
+
+  const toggleMessagesModal = () => {
+    setMessagesModalVisible(!messagesModalVisible);
+  };
 
   const fetchCompletedRentals = async () => {
     const db = getFirestore();
@@ -244,7 +259,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
   const processPayment = async (amount) => {
     try {
-      const response = await fetch('https://api.stripe.com', {
+      const response = await fetch('http://localhost:8081', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -373,7 +388,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
       <SafeAreaView style={{ backgroundColor: 'white' }}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar hidden={true} />
       </SafeAreaView>
 
       <ScrollView
@@ -751,9 +766,74 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         </View>
       </Modal>
 
-      {/* Profile Modal, Rental Cost Estimator Modal, Messages Modal (unchanged) */}
-      {/* ... Include the modals code here ... */}
+      {/* Messages Modal */}
+      <Modal visible={messagesModalVisible} animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: 'white', padding: 16 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>Messages</Text>
+            <ScrollView style={{ flex: 1, marginBottom: 16 }}>
+              {messages.map((message) => (
+                <View key={message.id} style={{ marginBottom: 8 }}>
+                  <Text style={{ fontWeight: 'bold' }}>{message.senderName}</Text>
+                  <Text>{message.text}</Text>
+                  <Text style={{ fontSize: 12, color: '#718096' }}>
+                    {message.timestamp.toLocaleString()}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TextInput
+                placeholder="Type a message"
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: '#ccc',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginRight: 8,
+                }}
+                value={messageText}
+                onChangeText={setMessageText}
+              />
+              <TouchableOpacity onPress={sendMessage} style={{ padding: 12 }}>
+                <Ionicons name="send" size={24} color="#3182ce" />
+              </TouchableOpacity>
+            </View>
+          </View>
 
+          {/* Add a button to proceed to payment */}
+          <View style={{ padding: 16 }}>
+            <TouchableOpacity
+              onPress={() => finalizeRentalRequest(currentRentalRequest)}
+              style={{
+                backgroundColor: '#3182ce',
+                padding: 16,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>Proceed to Payment</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={toggleMessagesModal}
+            style={{
+              position: 'absolute',
+              top: 40,
+              right: 20,
+              backgroundColor: '#f56565',
+              padding: 12,
+              borderRadius: 50,
+            }}
+          >
+            <Ionicons name="close" size={24} color="white" />
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Chat Bubble Button */}
       <TouchableOpacity
         style={{
           position: 'absolute',
@@ -767,7 +847,11 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           justifyContent: 'center',
           zIndex: 1,
         }}
-        onPress={() => chatButtonActive && setMessagesModalVisible(true)}
+        onPress={() => {
+          if (chatButtonActive) {
+            toggleMessagesModal();
+          }
+        }}
       >
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />
       </TouchableOpacity>
@@ -775,4 +859,14 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   );
 };
 
-export default BookingCalendar;
+// Wrap BookingCalendar in a stack navigator for proper navigation to CheckoutScreen
+const BookingNavigator = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="BookingCalendar" component={BookingCalendar} />
+      <Stack.Screen name="CheckoutScreen" component={CheckoutScreen} />
+    </Stack.Navigator>
+  );
+};
+
+export default BookingNavigator;

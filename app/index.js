@@ -58,13 +58,13 @@ const App = () => {
           </View>
         </SignedOut>
 
-        <View style={styles.viewContentButtonContainer}>
+        {/* <View style={styles.viewContentButtonContainer}>
           <CustomButton
             title="View Content"
             handlePress={() => router.push("/home")}
             containerStyles={styles.viewContentButton}
           />
-        </View>
+        </View> */}
 
         {/* <TouchableOpacity onPress={() => router.push("/cfi")} style={styles.createCFIButtonContainer}>
           <View style={styles.createCFIButton}>

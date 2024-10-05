@@ -109,10 +109,11 @@ const OwnerProfile = ({ ownerId }) => {
   const [messages, setMessages] = useState([]);
   const [chatThreads, setChatThreads] = useState([]);
   const [selectedChatThreadId, setSelectedChatThreadId] = useState(null);
-
-  // State for rental date
+  const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
+  const [aircraftModalVisible, setAircraftModalVisible] = useState(false);
   const [rentalDate, setRentalDate] = useState(null);
 
+  // Fetch data and set state for rental history, messages, listings, etc.
   useEffect(() => {
     if (resolvedOwnerId) {
       const rentalHistoryQuery = query(
@@ -138,7 +139,6 @@ const OwnerProfile = ({ ownerId }) => {
         );
       });
 
-      // Corrected code to fetch rental requests from the owner's subcollection
       const rentalRequestsQuery = collection(
         db,
         "owners",
@@ -173,6 +173,7 @@ const OwnerProfile = ({ ownerId }) => {
     }
   }, [resolvedOwnerId]);
 
+  // Fetch aircraft and cost data for the owner
   useEffect(() => {
     const fetchData = async () => {
       if (resolvedOwnerId) {
@@ -191,6 +192,7 @@ const OwnerProfile = ({ ownerId }) => {
     fetchData();
   }, [resolvedOwnerId]);
 
+  // Subscribe to messages in a chat thread
   useEffect(() => {
     if (selectedChatThreadId) {
       const chatDocRef = doc(db, "messages", selectedChatThreadId);
@@ -284,37 +286,16 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  const pickDocument = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "application/pdf",
-    });
-
-    if (result.type === "success") {
-      setCurrentAnnualPdf(result.uri);
-    }
-  };
-
-  const pickInsuranceDocument = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "application/pdf",
-    });
-
-    if (result.type === "success") {
-      setInsurancePdf(result.uri);
-    }
-  };
-
-  // Update onDayPress to handle date selection for rental requests
   const onDayPress = (day) => {
     const selected = !selectedDates[day.dateString];
-    setRentalDate(day.dateString); // Set rental date to the selected date
+    setRentalDate(day.dateString);
     setSelectedDates({
       ...selectedDates,
       [day.dateString]: selected
         ? { selected: true, marked: true, dotColor: "red" }
         : undefined,
     });
-    setCalendarVisible(false); // Close calendar after date selection
+    setCalendarVisible(false);
   };
 
   const uploadFile = async (uri, folder) => {
@@ -322,7 +303,7 @@ const OwnerProfile = ({ ownerId }) => {
       const response = await fetch(uri);
       const blob = await response.blob();
       const filename = uri.substring(uri.lastIndexOf("/") + 1);
-      const storageRef = ref(storage, `${folder}/${user.id}/${filename}`);
+      const storageRef = ref(storage, `${folder}/${resolvedOwnerId}/${filename}`);
       await uploadBytes(storageRef, blob);
       return await getDownloadURL(storageRef);
     } catch (error) {
@@ -433,7 +414,7 @@ const OwnerProfile = ({ ownerId }) => {
       }
 
       Alert.alert("Success", "Your listing has been submitted.");
-      setFormVisible(false);
+      setAircraftModalVisible(false);
       setIsListedForRent(true);
     } catch (error) {
       console.error("Error submitting listing: ", error);
@@ -512,7 +493,7 @@ const OwnerProfile = ({ ownerId }) => {
       );
       await updateDoc(notificationRef, {
         status: "approved",
-        rentalDate: rentalDate, // Include rental date
+        rentalDate: rentalDate,
       });
 
       await addDoc(collection(db, "renters", request.renterId, "notifications"), {
@@ -520,7 +501,7 @@ const OwnerProfile = ({ ownerId }) => {
         message: "Your rental request has been approved. Please complete the payment.",
         listingId: request.listingId,
         ownerId: resolvedOwnerId,
-        rentalDate: rentalDate, // Include rental date
+        rentalDate: rentalDate,
         createdAt: new Date(),
       });
 
@@ -782,7 +763,7 @@ const OwnerProfile = ({ ownerId }) => {
                 </Text>
               ))}
               <TouchableOpacity
-                onPress={onEditAircraftDetails}
+                onPress={() => setAircraftModalVisible(true)}
                 style={{
                   backgroundColor: "#3182ce",
                   paddingVertical: 12,
@@ -798,53 +779,21 @@ const OwnerProfile = ({ ownerId }) => {
               </TouchableOpacity>
             </View>
           ) : (
-            <>
-              {/* Form Fields for Aircraft Details */}
-              {Object.keys(aircraftDetails).map((key) => (
-                <TextInput
-                  key={key}
-                  placeholder={key.replace(/([A-Z])/g, " $1")}
-                  value={aircraftDetails[key]}
-                  onChangeText={(value) => handleInputChange(key, value)}
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#ccc",
-                    marginBottom: 12,
-                    paddingVertical: 8,
-                  }}
-                />
-              ))}
-              <TouchableOpacity
-                onPress={onSaveAircraftDetails}
-                style={{
-                  backgroundColor: "#3182ce",
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  marginBottom: 16,
-                }}
+            <TouchableOpacity
+              onPress={() => setAircraftModalVisible(true)}
+              style={{
+                backgroundColor: "#3182ce",
+                paddingVertical: 12,
+                borderRadius: 8,
+                marginTop: 16,
+              }}
+            >
+              <Text
+                style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
               >
-                <Text
-                  style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
-                >
-                  Save Aircraft Details
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={onCancelAircraftEdit}
-                style={{
-                  backgroundColor: "#e53e3e",
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  marginBottom: 16,
-                }}
-              >
-                <Text
-                  style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
-                >
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </>
+                Add Aircraft Details
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -871,6 +820,19 @@ const OwnerProfile = ({ ownerId }) => {
                 </Text>
                 <Text>{listing.description}</Text>
                 <Text>Rate per Hour: ${listing.ratesPerHour}</Text>
+                {listing.images.length > 0 && (
+                  <FlatList
+                    data={listing.images}
+                    horizontal
+                    keyExtractor={(item, index) => index.toString()}
+                    renderItem={({ item }) => (
+                      <Image
+                        source={{ uri: item }}
+                        style={{ width: 100, height: 100, margin: 8 }}
+                      />
+                    )}
+                  />
+                )}
                 <TouchableOpacity
                   onPress={() => handleListForRentToggle(listing)}
                   style={{
@@ -896,7 +858,7 @@ const OwnerProfile = ({ ownerId }) => {
         {/* Create New Listing */}
         <View style={{ padding: 16 }}>
           <TouchableOpacity
-            onPress={() => setFormVisible(true)}
+            onPress={() => setFullScreenModalVisible(true)}
             style={{
               backgroundColor: "#3182ce",
               paddingVertical: 12,
@@ -1192,11 +1154,11 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* Create New Listing Modal */}
+      {/* Full-Screen Listing Modal */}
       <Modal
-        visible={formVisible}
+        visible={fullScreenModalVisible}
         animationType="slide"
-        onRequestClose={() => setFormVisible(false)}
+        onRequestClose={() => setFullScreenModalVisible(false)}
       >
         <ScrollView contentContainerStyle={{ padding: 16 }}>
           <Text
@@ -1205,7 +1167,37 @@ const OwnerProfile = ({ ownerId }) => {
             Create New Listing
           </Text>
           {/* Form Fields for New Listing */}
-          {/* ... Include form fields similar to aircraftDetails and profileData */}
+          {/* Include all form fields similar to aircraftDetails and profileData */}
+          <TouchableOpacity
+            onPress={pickImage}
+            style={{
+              backgroundColor: "#3182ce",
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginTop: 16,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Upload Image
+            </Text>
+          </TouchableOpacity>
+
+          {images.length > 0 && (
+            <FlatList
+              data={images}
+              horizontal
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item }) => (
+                <Image
+                  source={{ uri: item }}
+                  style={{ width: 100, height: 100, margin: 8 }}
+                />
+              )}
+            />
+          )}
+
           <TouchableOpacity
             onPress={() => onSubmitMethod({}, false)}
             style={{
@@ -1222,7 +1214,115 @@ const OwnerProfile = ({ ownerId }) => {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => setFormVisible(false)}
+            onPress={() => setFullScreenModalVisible(false)}
+            style={{
+              backgroundColor: "#e53e3e",
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginTop: 16,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </Modal>
+
+      {/* Aircraft Details Modal */}
+      <Modal
+        visible={aircraftModalVisible}
+        animationType="slide"
+        onRequestClose={() => setAircraftModalVisible(false)}
+      >
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <Text
+            style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}
+          >
+            Aircraft Details
+          </Text>
+          {/* Form Fields for Aircraft Details */}
+          {Object.keys(aircraftDetails).map((key) => (
+            <TextInput
+              key={key}
+              placeholder={key.replace(/([A-Z])/g, " $1")}
+              value={aircraftDetails[key]}
+              onChangeText={(value) => handleInputChange(key, value)}
+              style={{
+                borderBottomWidth: 1,
+                borderBottomColor: "#ccc",
+                marginBottom: 12,
+                paddingVertical: 8,
+              }}
+            />
+          ))}
+
+          {/* Image Picker */}
+          <TouchableOpacity
+            onPress={pickImage}
+            style={{
+              backgroundColor: "#3182ce",
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginTop: 16,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Upload Images
+            </Text>
+          </TouchableOpacity>
+
+          {images.length > 0 && (
+            <FlatList
+              data={images}
+              horizontal
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item }) => (
+                <Image
+                  source={{ uri: item }}
+                  style={{ width: 100, height: 100, margin: 8 }}
+                />
+              )}
+            />
+          )}
+
+          {/* Save and List for Rent Buttons */}
+          <TouchableOpacity
+            onPress={onSaveAircraftDetails}
+            style={{
+              backgroundColor: "#3182ce",
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginBottom: 16,
+              marginTop: 16,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Save Aircraft Details
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onSubmitMethod({}, false)}
+            style={{
+              backgroundColor: "#48bb78",
+              paddingVertical: 12,
+              borderRadius: 8,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              List for Rent
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setAircraftModalVisible(false)}
             style={{
               backgroundColor: "#e53e3e",
               paddingVertical: 12,
