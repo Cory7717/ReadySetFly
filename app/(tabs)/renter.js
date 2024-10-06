@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; 
 import {
   TextInput,
   Image,
@@ -328,12 +328,14 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   };
 
   const sendMessage = async () => {
-    if (messageText.trim() === '') return;
+    if (messageText.trim() === '' || !currentRentalRequest?.id) return;
+
+    console.log('Current Rental Request:', currentRentalRequest); // Debugging
 
     const db = getFirestore();
     try {
       await addDoc(collection(db, 'messages'), {
-        rentalRequestId: currentRentalRequest?.id,
+        rentalRequestId: currentRentalRequest.id, // Ensure this is not undefined
         senderId: renterId,
         senderName: user.fullName || 'Anonymous',
         text: messageText,

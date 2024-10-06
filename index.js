@@ -1,12 +1,10 @@
-// import { registerRootComponent } from 'expo';
-
-
-require('dotenv').config();
 const express = require('express');
 const Stripe = require('stripe');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+require('dotenv').config();
 
+// Initialize Express app
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -28,6 +26,7 @@ app.post('/create-payment-intent', async (req, res) => {
             clientSecret: paymentIntent.client_secret,
         });
     } catch (error) {
+        console.error('Error creating payment intent:', error);
         res.status(500).send({ error: error.message });
     }
 });
@@ -62,8 +61,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (request, respon
 });
 
 // Start the server
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
-

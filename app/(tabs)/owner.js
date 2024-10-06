@@ -112,22 +112,50 @@ const OwnerProfile = ({ ownerId }) => {
   const [aircraftModalVisible, setAircraftModalVisible] = useState(false);
   const [rentalDate, setRentalDate] = useState(null);
 
-  // Debug log: track current user
+  // Fetch stored data on mount
   useEffect(() => {
-    console.log("Current logged-in user:", user);
-    console.log("Resolved Owner ID:", resolvedOwnerId);
-  }, [user, resolvedOwnerId]);
+    const fetchOwnerData = async () => {
+      try {
+        const docRef = doc(db, "aircraftDetails", resolvedOwnerId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+
+          if (data.costData) {
+            setCostData(data.costData);
+            setCostSaved(true);
+          }
+
+          if (data.aircraftDetails) {
+            setAircraftDetails(data.aircraftDetails);
+            setInitialAircraftDetails(data.aircraftDetails);
+            setAircraftSaved(true);
+          }
+        } else {
+          console.log("No saved data found for this owner.");
+        }
+      } catch (error) {
+        console.error("Error fetching owner data:", error);
+        Alert.alert("Error", "Failed to fetch saved data.");
+      }
+    };
+
+    fetchOwnerData();
+  }, [resolvedOwnerId]);
 
   // Set Firebase token on mount
   useEffect(() => {
     const setFirebaseAuthToken = async () => {
       if (user) {
         try {
-          // Get Clerk session token
           const sessionToken = await getToken();
+          console.log('Session token obtained:', sessionToken);
 
-          // Call backend to get Firebase custom token
-          const response = await fetch('http://localhost:8081/getFirebaseToken', {
+          const url = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/getFirebaseToken';
+          console.log('Calling Firebase function at URL:', url);
+
+          const response = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -135,25 +163,25 @@ const OwnerProfile = ({ ownerId }) => {
             },
           });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Failed to fetch Firebase token: ${errorData.error}`);
+          const contentType = response.headers.get("content-type");
+          if (!response.ok || !contentType || !contentType.includes("application/json")) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch Firebase token: ${response.status} ${response.statusText}\n${errorText}`);
           }
 
           const { firebaseToken } = await response.json();
-
-          // Sign in to Firebase
           await db.app.auth().signInWithCustomToken(firebaseToken);
           console.log('Firebase token set successfully');
         } catch (error) {
-          console.error('Error setting Firebase auth token:', error);
+          console.error('Error setting Firebase auth token:', error.message);
+          Alert.alert("Error", "Failed to set Firebase auth token. Please try again.");
         }
       }
     };
     setFirebaseAuthToken();
   }, [user]);
 
-  // Fetch rental requests with renter details
+  // Fetch rental requests with renter details and chat thread data
   useEffect(() => {
     if (resolvedOwnerId) {
       const rentalRequestsQuery = collection(
@@ -162,36 +190,38 @@ const OwnerProfile = ({ ownerId }) => {
         resolvedOwnerId,
         "rentalRequests"
       );
-      
-      const unsubscribeRentalRequests = onSnapshot(rentalRequestsQuery, async (snapshot) => {
-        const requestsWithNames = await Promise.all(
-          snapshot.docs.map(async (docSnap) => {
-            const requestData = docSnap.data();
-            
-            // Fetch the renter's name using renterId
-            let renterName = "Anonymous"; // Default value
-            if (requestData.renterId) {
-              try {
-                const renterDocRef = doc(db, "renters", requestData.renterId);
-                const renterDoc = await getDoc(renterDocRef);
-                if (renterDoc.exists()) {
-                  renterName = renterDoc.data().fullName || "Anonymous";
-                }
-              } catch (error) {
-                console.error("Error fetching renter's name:", error);
-              }
-            }
 
-            return {
-              id: docSnap.id,
-              ...requestData,
-              renterName, // Add renter's name to request data
-            };
-          })
-        );
-        
-        setRentalRequests(requestsWithNames);
-      });
+      const unsubscribeRentalRequests = onSnapshot(
+        rentalRequestsQuery,
+        async (snapshot) => {
+          const requestsWithNames = await Promise.all(
+            snapshot.docs.map(async (docSnap) => {
+              const requestData = docSnap.data();
+
+              let renterName = "Anonymous";
+              if (requestData.renterId) {
+                try {
+                  const renterDocRef = doc(db, "renters", requestData.renterId);
+                  const renterDoc = await getDoc(renterDocRef);
+                  if (renterDoc.exists()) {
+                    renterName = renterDoc.data().fullName || "Anonymous";
+                  }
+                } catch (error) {
+                  console.error("Error fetching renter's name:", error);
+                }
+              }
+
+              return {
+                id: docSnap.id,
+                ...requestData,
+                renterName,
+              };
+            })
+          );
+
+          setRentalRequests(requestsWithNames);
+        }
+      );
 
       return () => {
         unsubscribeRentalRequests();
@@ -276,7 +306,7 @@ const OwnerProfile = ({ ownerId }) => {
       setProfileData((prev) => ({ ...prev, [name]: value }));
     }
   };
-  
+
   const pickImage = async () => {
     if (images.length >= 7) {
       Alert.alert("You can only upload up to 7 images.");
@@ -465,7 +495,7 @@ const OwnerProfile = ({ ownerId }) => {
       try {
         const listingDocRef = doc(db, "airplanes", listing.id);
         await deleteDoc(listingDocRef);
-  
+
         if (additional) {
           setAdditionalAircrafts(
             additionalAircrafts.filter((aircraft) => aircraft.id !== listing.id)
@@ -475,14 +505,14 @@ const OwnerProfile = ({ ownerId }) => {
             userListings.filter((aircraft) => aircraft.id !== listing.id)
           );
         }
-  
+
         navigation.navigate("Home", {
           updatedListings: userListings.filter(
             (aircraft) => aircraft.id !== listing.id
           ),
           unlistedId: listing.id,
         });
-  
+
         setIsListedForRent(false);
         Alert.alert("Success", "Your aircraft has been removed from the listings.");
       } catch (error) {
@@ -497,7 +527,6 @@ const OwnerProfile = ({ ownerId }) => {
       await onSubmitMethod(listing, additional);
     }
   };
-  
 
   const handleApproveRentalRequest = async (request) => {
     try {

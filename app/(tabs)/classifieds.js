@@ -293,7 +293,7 @@ const Classifieds = () => {
   const fetchPaymentSheetParams = async () => {
     try {
       console.log(`Making request to: ${API_URL}/create-payment-intent`);
-      const response = await fetch(`${API_URL}/create-payment-intent`, {
+      const response = await fetch ("https://us-central1-ready-set-fly-71506.cloudfunctions.net/paymentSheet",{
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
