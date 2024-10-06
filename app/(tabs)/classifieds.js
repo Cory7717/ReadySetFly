@@ -228,7 +228,6 @@ const Classifieds = () => {
   };
 
   const renderListingImages = (item) => {
-    // Matching the image rendering style to `flights` component
     return (
       <FlatList
         data={item.images}
