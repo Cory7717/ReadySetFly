@@ -16,8 +16,20 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
+// Initialize Clerk SDK
+const clerkApiKey = process.env.CLERK_API_KEY;
+if (!clerkApiKey) {
+  console.error('Clerk API key is not set in environment variables.');
+  process.exit(1);
+}
+
+// Clerk SDK uses environment variables CLERK_API_KEY and CLERK_API_VERSION
+// Ensure these are set in your environment
+
 // Use CORS and Body-parser
-app.use(cors()); // Limit origins in production
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*', // Replace with your frontend URL(s) in production
+}));
 app.use(bodyParser.json());
 
 // Existing endpoint for handling Payment Sheet
@@ -38,12 +50,30 @@ app.post('/create-payment-intent', async (req, res) => {
 });
 
 // New endpoint for generating Firebase custom tokens
-app.post('/getFirebaseToken', requireAuth(), async (req, res) => {
+app.post('/get-firebase-token', requireAuth(), async (req, res) => {
   try {
     const { userId } = req.auth;
 
+    console.log(`Received request for Firebase token for Clerk user ID: ${userId}`);
+
+    if (!userId) {
+      console.error('No userId found in request.auth');
+      return res.status(400).json({ error: 'Invalid request: Missing userId' });
+    }
+
+    // Fetch Clerk user details for verification
+    const clerkUser = await users.getUser(userId);
+    if (!clerkUser) {
+      console.error(`Clerk user not found: ${userId}`);
+      return res.status(404).json({ error: 'Clerk user not found' });
+    }
+
+    console.log(`Generating Firebase custom token for user: ${userId}`);
+
     // Create Firebase custom token
     const firebaseToken = await admin.auth().createCustomToken(userId);
+
+    console.log(`Successfully created Firebase custom token for user: ${userId}`);
 
     res.json({ firebaseToken });
   } catch (error) {

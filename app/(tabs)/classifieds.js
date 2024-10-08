@@ -46,7 +46,7 @@ import PaymentScreen from '../payment/PaymentScreen';
 const { width } = Dimensions.get('window');
 
 const COLORS = {
-  primary: '#1D4ED8',
+  primary: '#1D4ED8', // Blue color
   secondary: '#6B7280',
   background: '#F3F4F6',
   white: '#FFFFFF',
@@ -78,6 +78,7 @@ const Classifieds = () => {
   const [selectedListing, setSelectedListing] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [location, setLocation] = useState(null);
+  const [pricingModalVisible, setPricingModalVisible] = useState({ Basic: false, Featured: false, Enhanced: false });
 
   const scaleValue = useRef(new Animated.Value(0)).current;
 
@@ -92,6 +93,20 @@ const Classifieds = () => {
   const [pricingPackages, setPricingPackages] = useState(defaultPricingPackages);
 
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  const pricingDescriptions = {
+    Basic: 'Basic package includes 7 days of listing.',
+    Featured: 'Featured package includes 14 days of listing and enhanced visibility.',
+    Enhanced: 'Enhanced package includes 30 days of listing and premium placement.',
+  };
+
+  const openPricingInfo = (packageType) => {
+    setPricingModalVisible((prev) => ({ ...prev, [packageType]: true }));
+  };
+
+  const closePricingInfo = (packageType) => {
+    setPricingModalVisible((prev) => ({ ...prev, [packageType]: false }));
+  };
 
   useEffect(() => {
     const fetchLocation = async () => {
@@ -160,11 +175,14 @@ const Classifieds = () => {
   const pickImage = async () => {
     let maxImages = 1;
 
-    if (selectedCategory === 'Flight Schools') {
-      maxImages = 4;
+    if (selectedCategory === 'Aviation Jobs') {
+      maxImages = 3;
+    } else if (selectedCategory === 'Flight Schools') {
+      maxImages = 5;
     } else if (selectedCategory === 'Aircraft for Sale') {
+      // **Updated Image Limits for "Aircraft for Sale"**
       maxImages =
-        selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 12 : 16;
+        selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 14 : 18;
     }
 
     if (images.length >= maxImages) {
@@ -196,11 +214,14 @@ const Classifieds = () => {
 
   const renderImageUploadButton = () => {
     let maxImages = 1;
-    if (selectedCategory === 'Flight Schools') {
-      maxImages = 4;
+    if (selectedCategory === 'Aviation Jobs') {
+      maxImages = 3;
+    } else if (selectedCategory === 'Flight Schools') {
+      maxImages = 5;
     } else if (selectedCategory === 'Aircraft for Sale') {
+      // **Updated Image Limits for "Aircraft for Sale"**
       maxImages =
-        selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 12 : 16;
+        selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 14 : 18;
     }
 
     const remainingUploads = maxImages - images.length;
@@ -210,15 +231,15 @@ const Classifieds = () => {
         onPress={pickImage}
         disabled={images.length >= maxImages}
         style={{
-          backgroundColor: remainingUploads > 0 ? COLORS.background : COLORS.lightGray,
-          paddingVertical: 8,
+          backgroundColor: remainingUploads > 0 ? COLORS.primary : COLORS.lightGray,
+          paddingVertical: 10,
           paddingHorizontal: 16,
-          borderRadius: 50,
+          borderRadius: 8,
           marginTop: 8,
           marginBottom: 16,
         }}
       >
-        <Text style={{ textAlign: 'center', color: COLORS.black }}>
+        <Text style={{ textAlign: 'center', color: COLORS.white }}>
           {images.length >= maxImages
             ? `Maximum ${maxImages} Images Reached`
             : `Add Image (${remainingUploads} remaining)`}
@@ -271,7 +292,7 @@ const Classifieds = () => {
   };
 
   const getDistanceFromLatLonInMiles = (lat1, lon1, lat2, lon2) => {
-    const R = 3958.8;
+    const R = 3958.8; // Radius of the Earth in miles
     const dLat = deg2rad(lat2 - lat1);
     const dLon = deg2rad(lon2 - lon1);
     const a =
@@ -292,7 +313,7 @@ const Classifieds = () => {
   const fetchPaymentSheetParams = async () => {
     try {
       console.log(`Making request to: ${API_URL}/create-payment-intent`);
-      const response = await fetch ("https://us-central1-ready-set-fly-71506.cloudfunctions.net/paymentSheet",{
+      const response = await fetch("https://us-central1-ready-set-fly-71506.cloudfunctions.net/paymentSheet",{
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -922,6 +943,7 @@ const Classifieds = () => {
         )}
       </Animated.ScrollView>
 
+      {/* Job Details Modal */}
       <Modal
         visible={jobDetailsModalVisible}
         transparent={true}
@@ -996,6 +1018,7 @@ const Classifieds = () => {
         </View>
       </Modal>
 
+      {/* Details Modal */}
       <Modal
         visible={detailsModalVisible}
         transparent={true}
@@ -1103,6 +1126,7 @@ const Classifieds = () => {
         </View>
       </Modal>
 
+      {/* Filter Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1204,6 +1228,55 @@ const Classifieds = () => {
         </View>
       </Modal>
 
+      {/* Pricing Info Modals */}
+      {Object.keys(pricingDescriptions).map((key) => (
+        <Modal
+          key={key}
+          visible={pricingModalVisible[key]}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => closePricingInfo(key)}
+        >
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            }}
+          >
+            <View
+              style={{
+                width: '80%',
+                backgroundColor: COLORS.white,
+                borderRadius: 20,
+                padding: 20,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+                {key} Package
+              </Text>
+              <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+                {pricingDescriptions[key]}
+              </Text>
+              <TouchableOpacity
+                onPress={() => closePricingInfo(key)}
+                style={{
+                  backgroundColor: COLORS.primary,
+                  padding: 10,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: COLORS.white }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      ))}
+
+      {/* Submit Your Listing Modal */}
       <Modal
         animationType="none"
         transparent={true}
@@ -1256,6 +1329,7 @@ const Classifieds = () => {
                     marginBottom: 8,
                     color: COLORS.black,
                     fontWeight: 'bold',
+                    textAlign: 'center'
                   }}
                 >
                   Select Pricing Package
@@ -1263,31 +1337,46 @@ const Classifieds = () => {
                 <View
                   style={{
                     flexDirection: 'row',
-                    justifyContent: 'space-between',
+                    justifyContent: 'space-around', // Evenly space the buttons
                     marginBottom: 16,
                   }}
                 >
                   {Object.keys(pricingPackages).map((key) => (
-                    <TouchableOpacity
-                      key={key}
-                      onPress={() => setSelectedPricing(key)}
-                      style={{
-                        padding: 8,
-                        borderWidth: 1,
-                        borderRadius: 8,
-                        borderColor:
-                          selectedPricing === key ? COLORS.primary : COLORS.lightGray,
-                        width: (width - 64) / 3 - 8,
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Text style={{ textAlign: 'center', color: COLORS.black }}>
-                        {key}
-                      </Text>
-                      <Text style={{ textAlign: 'center', color: COLORS.black }}>
-                        ${pricingPackages[key]}
-                      </Text>
-                    </TouchableOpacity>
+                    <View key={key} style={{ alignItems: 'center', marginHorizontal: 10 }}>
+                      <TouchableOpacity
+                        onPress={() => setSelectedPricing(key)}
+                        style={{
+                          backgroundColor: selectedPricing === key ? COLORS.primary : COLORS.lightGray,
+                          paddingVertical: 12,
+                          paddingHorizontal: 20,
+                          borderRadius: 8,
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 3.84,
+                          elevation: 5,
+                          width: (width - 160) / 3, // Ensure all buttons have the same width
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ textAlign: 'center', color: selectedPricing === key ? COLORS.white : COLORS.black, fontWeight: 'bold', fontSize: 16 }}>
+                          {key}
+                        </Text>
+                        <Text style={{ textAlign: 'center', color: selectedPricing === key ? COLORS.white : COLORS.black, fontWeight: 'bold', fontSize: 16 }}>
+                          ${pricingPackages[key]}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => openPricingInfo(key)}
+                        style={{
+                          position: 'absolute',
+                          bottom: -12,
+                          left: (width - 160) / 6 - 12, // Position to the bottom left
+                        }}
+                      >
+                        <Ionicons name="information-circle-outline" size={24} color={selectedPricing === key ? COLORS.white : COLORS.gray} />
+                      </TouchableOpacity>
+                    </View>
                   ))}
                 </View>
 
@@ -1312,7 +1401,7 @@ const Classifieds = () => {
                     companyName: '',
                     jobTitle: '',
                     jobDescription: '',
-                    category: selectedCategory || 'Single Engine Piston',
+                    category: selectedCategory || 'Aircraft for Sale', // Default to 'Aircraft for Sale'
                     images: [],
                     flightSchoolName: '',
                     flightSchoolDetails: '',
@@ -1501,7 +1590,7 @@ const Classifieds = () => {
                         }}
                       />
 
-                      {selectedCategory !== 'Aviation Jobs' && (
+                      {['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale'].includes(selectedCategory) && (
                         <>
                           <Text
                             style={{
@@ -1600,6 +1689,7 @@ const Classifieds = () => {
         </View>
       </Modal>
 
+      {/* Edit Listing Modal */}
       <Modal
         visible={editModalVisible}
         transparent={true}

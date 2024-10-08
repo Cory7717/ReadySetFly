@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,10 +10,12 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useSignIn, useClerk } from "@clerk/clerk-expo"; // Import useClerk
 import { useNavigation } from "@react-navigation/native";
 import { images } from "../../constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -27,7 +29,97 @@ const SignIn = () => {
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
 
+  // Failed Attempts State
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutEndTime, setLockoutEndTime] = useState(null);
+  const [lockoutRemainingTime, setLockoutRemainingTime] = useState("");
+
+  // Constants
+  const MAX_FAILED_ATTEMPTS = 4;
+  const LOCKOUT_DURATION = 20 * 60 * 1000; // 20 minutes in milliseconds
+
+  // Load lockout data on mount
+  useEffect(() => {
+    const loadLockoutData = async () => {
+      try {
+        const attempts = await AsyncStorage.getItem("failedAttempts");
+        const lockoutTime = await AsyncStorage.getItem("lockoutEndTime");
+
+        if (attempts !== null) {
+          setFailedAttempts(parseInt(attempts, 10));
+        }
+
+        if (lockoutTime !== null) {
+          const endTime = new Date(parseInt(lockoutTime, 10));
+          const now = new Date();
+
+          if (now < endTime) {
+            setIsLockedOut(true);
+            setLockoutEndTime(endTime);
+            updateLockoutRemainingTime(endTime);
+            startLockoutTimer(endTime);
+          } else {
+            // Lockout period has passed
+            await AsyncStorage.removeItem("lockoutEndTime");
+            await AsyncStorage.setItem("failedAttempts", "0");
+            setFailedAttempts(0);
+            setIsLockedOut(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading lockout data:", error);
+      }
+    };
+
+    loadLockoutData();
+  }, []);
+
+  // Function to start a timer that updates remaining lockout time
+  const startLockoutTimer = (endTime) => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      if (now >= endTime) {
+        clearInterval(timer);
+        setIsLockedOut(false);
+        setFailedAttempts(0);
+        setLockoutEndTime(null);
+        setLockoutRemainingTime("");
+        AsyncStorage.removeItem("lockoutEndTime");
+        AsyncStorage.setItem("failedAttempts", "0");
+      } else {
+        updateLockoutRemainingTime(endTime);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  };
+
+  // Function to update the remaining lockout time string
+  const updateLockoutRemainingTime = (endTime) => {
+    const now = new Date();
+    const diff = endTime - now;
+
+    if (diff <= 0) {
+      setLockoutRemainingTime("");
+      return;
+    }
+
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    setLockoutRemainingTime(`${minutes}m ${seconds}s`);
+  };
+
+  // Function to handle sign-in attempts
   const onSignInPress = React.useCallback(async () => {
+    if (isLockedOut) {
+      Alert.alert(
+        "Account Locked",
+        `Too many failed attempts. Please try again in ${lockoutRemainingTime}.`
+      );
+      return;
+    }
+
     if (!isLoaded) return;
 
     try {
@@ -39,18 +131,64 @@ const SignIn = () => {
       if (signInAttempt.status === "complete") {
         await setActive({ session: signInAttempt.createdSessionId });
         navigation.navigate("(tabs)"); // Navigate to the main tabs screen
+        // Reset failed attempts on successful sign-in
+        setFailedAttempts(0);
+        await AsyncStorage.setItem("failedAttempts", "0");
       } else {
+        handleFailedAttempt();
         console.error(JSON.stringify(signInAttempt, null, 2));
       }
     } catch (err) {
+      handleFailedAttempt();
       console.error(JSON.stringify(err, null, 2));
     }
-  }, [isLoaded, emailAddress, password, navigation]);
+  }, [
+    isLoaded,
+    emailAddress,
+    password,
+    navigation,
+    isLockedOut,
+    lockoutRemainingTime,
+    signIn,
+    setActive,
+  ]);
 
+  // Function to handle failed sign-in attempts
+  const handleFailedAttempt = async () => {
+    const newFailedAttempts = failedAttempts + 1;
+    setFailedAttempts(newFailedAttempts);
+    await AsyncStorage.setItem("failedAttempts", newFailedAttempts.toString());
+
+    if (newFailedAttempts >= MAX_FAILED_ATTEMPTS) {
+      const endTime = new Date(new Date().getTime() + LOCKOUT_DURATION);
+      setIsLockedOut(true);
+      setLockoutEndTime(endTime);
+      setLockoutRemainingTime("20m 0s");
+      await AsyncStorage.setItem("lockoutEndTime", endTime.getTime().toString());
+
+      Alert.alert(
+        "Account Locked",
+        "You have been locked out due to multiple failed sign-in attempts. Please try again after 20 minutes."
+      );
+
+      // Start the lockout timer
+      startLockoutTimer(endTime);
+    } else {
+      Alert.alert(
+        "Sign In Failed",
+        `Invalid credentials. You have ${
+          MAX_FAILED_ATTEMPTS - newFailedAttempts
+        } attempt(s) left before lockout.`
+      );
+    }
+  };
+
+  // Function to handle forgot password press
   const onForgotPasswordPress = () => {
     setForgotPasswordModalVisible(true);
   };
 
+  // Function to handle password reset
   const handlePasswordReset = async () => {
     setIsSendingReset(true);
     setResetMessage("");
@@ -73,14 +211,8 @@ const SignIn = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.content}>
-        <Image
-          source={images.logo}
-          resizeMode="contain"
-          style={styles.logo}
-        />
-        <Text style={styles.title}>
-          Login to Ready, Set, Fly!
-        </Text>
+        <Image source={images.logo} resizeMode="contain" style={styles.logo} />
+        <Text style={styles.title}>Login to Ready, Set, Fly!</Text>
         <View style={styles.inputContainer}>
           <TextInput
             autoCapitalize="none"
@@ -88,6 +220,8 @@ const SignIn = () => {
             placeholder="Email"
             onChangeText={setEmailAddress}
             style={styles.input}
+            keyboardType="email-address"
+            editable={!isLockedOut}
           />
           <TextInput
             value={password}
@@ -95,32 +229,36 @@ const SignIn = () => {
             secureTextEntry
             onChangeText={setPassword}
             style={styles.input}
+            editable={!isLockedOut}
           />
           <TouchableOpacity
             onPress={onSignInPress}
-            style={styles.signInButton}
+            style={[
+              styles.signInButton,
+              isLockedOut && styles.disabledButton,
+            ]}
+            disabled={isLockedOut}
           >
-            <Text style={styles.signInButtonText}>
-              Sign In
-            </Text>
+            {isLockedOut ? (
+              <Text style={styles.signInButtonText}>
+                Locked ({lockoutRemainingTime})
+              </Text>
+            ) : (
+              <Text style={styles.signInButtonText}>Sign In</Text>
+            )}
           </TouchableOpacity>
           {/* Forgot password link */}
           <TouchableOpacity
             onPress={onForgotPasswordPress}
             style={styles.forgotPasswordButton}
+            disabled={isLockedOut}
           >
-            <Text style={styles.forgotPasswordText}>
-              Forgot password?
-            </Text>
+            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
           </TouchableOpacity>
           <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Don't have an account?
-            </Text>
+            <Text style={styles.footerText}>Don't have an account?</Text>
             <TouchableOpacity onPress={() => navigation.navigate("sign-up")}>
-              <Text style={styles.signUpText}>
-                Sign up
-              </Text>
+              <Text style={styles.signUpText}>Sign up</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -142,6 +280,7 @@ const SignIn = () => {
               placeholder="Enter your email"
               onChangeText={setRecoveryEmail}
               style={styles.input}
+              keyboardType="email-address"
             />
             {isSendingReset ? (
               <ActivityIndicator size="large" color="#3b82f6" />
@@ -206,6 +345,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#3b82f6',
     borderRadius: 8,
     padding: 12,
+  },
+  disabledButton: {
+    backgroundColor: '#a5b4fc',
   },
   signInButtonText: {
     color: 'white',
@@ -290,3 +432,4 @@ const styles = StyleSheet.create({
 });
 
 export default SignIn;
+
