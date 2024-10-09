@@ -1,56 +1,43 @@
 import * as React from 'react';
-import { TextInput, Button, View, StyleSheet } from 'react-native';
-import { useSignUp } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+import { TextInput, Button, View, StyleSheet, Alert } from 'react-native';
+import { getAuth, createUserWithEmailAndPassword, sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
+import { useNavigation } from '@react-navigation/native';
 
 export default function RenterSignUp() {
-  const { isLoaded, signUp, setActive } = useSignUp();
-  const router = useRouter();
-
   const [emailAddress, setEmailAddress] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [pendingVerification, setPendingVerification] = React.useState(false);
-  const [code, setCode] = React.useState('');
+  const auth = getAuth();
+  const navigation = useNavigation();
 
   const onSignUpPress = async () => {
-    if (!isLoaded) {
-      return;
-    }
-
     try {
-      await signUp.create({
-        emailAddress,
-        password,
-      });
+      const userCredential = await createUserWithEmailAndPassword(auth, emailAddress, password);
+      const user = userCredential.user;
 
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-
-      setPendingVerification(true);
-    } catch (err) {
-      console.error(JSON.stringify(err, null, 2));
-    }
-  };
-
-  const onPressVerify = async () => {
-    if (!isLoaded) {
-      return;
-    }
-
-    try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      });
-
-      if (completeSignUp.status === 'complete') {
-        await setActive({ session: completeSignUp.createdSessionId });
-        router.replace('/');
-      } else {
-        console.error(JSON.stringify(completeSignUp, null, 2));
+      if (user) {
+        // Send email verification
+        await sendEmailVerification(user);
+        setPendingVerification(true);
+        Alert.alert("Success", "Verification email sent! Please check your email.");
       }
-    } catch (err) {
-      console.error(JSON.stringify(err, null, 2));
+    } catch (error) {
+      console.error("Error during sign-up:", error);
+      Alert.alert("Error", error.message);
     }
   };
+
+  React.useEffect(() => {
+    // Listen for changes in auth state (e.g., when email is verified)
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && user.emailVerified) {
+        // If the email is verified, navigate to the home page
+        navigation.replace('/');
+      }
+    });
+
+    return () => unsubscribe(); // Clean up the listener on unmount
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -74,13 +61,7 @@ export default function RenterSignUp() {
         </>
       ) : (
         <>
-          <TextInput
-            value={code}
-            placeholder="Verification Code..."
-            onChangeText={setCode}
-            style={styles.input}
-          />
-          <Button title="Verify Email" onPress={onPressVerify} />
+          <Text style={styles.message}>Please check your email to verify your account.</Text>
         </>
       )}
     </View>
@@ -100,5 +81,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
+  },
+  message: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: 'green',
   },
 });

@@ -16,6 +16,7 @@ import {
 import { CardField, useConfirmPayment } from '@stripe/stripe-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { getAuth } from 'firebase/auth'; // Import Firebase Auth
 
 // Configuration Constants
 const BACKEND_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net';
@@ -23,6 +24,8 @@ const DISCOUNT_CODE = 'rsf2024';
 
 const PaymentScreen = ({ route }) => {
   const navigation = useNavigation();
+  const auth = getAuth(); // Initialize Firebase Auth
+  const user = auth.currentUser; // Get current Firebase user
   const { 
     totalCost: initialTotalCost = 0, 
     listingDetails = {}, 
@@ -39,7 +42,7 @@ const PaymentScreen = ({ route }) => {
   const [errorMessage, setErrorMessage] = useState('');
 
   // Cardholder name state
-  const [cardholderName, setCardholderName] = useState('');
+  const [cardholderName, setCardholderName] = useState(user?.displayName || ''); // Pre-fill with Firebase user's display name
 
   // Manage totalCost and selectedPricing as state to allow updates
   const [totalCost, setTotalCost] = useState(initialTotalCost);
@@ -253,13 +256,6 @@ const PaymentScreen = ({ route }) => {
       keyboardVerticalOffset={60}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Logo */}
-        {/* <Image 
-          source={require('../assets/images/fulllogo_transparent.png')} // Adjust the path based on your project structure
-          style={styles.logo}
-          resizeMode="contain"
-        /> */}
-
         {/* Cancel button */}
         <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
           <Ionicons name="close-outline" size={28} color="#FF5A5F" />
@@ -365,12 +361,6 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: 'flex-start', // Accommodate the logo and content
     flexGrow: 1,
-  },
-  logo: {
-    width: 150, // Adjust the width as needed
-    height: 50, // Adjust the height as needed
-    alignSelf: 'center',
-    marginBottom: 20,
   },
   cancelButton: {
     position: 'absolute',

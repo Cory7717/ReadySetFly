@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useUser } from '@clerk/clerk-expo';
+import { onAuthStateChanged } from 'firebase/auth'; // Firebase Auth import
 import {
   collection,
   addDoc,
@@ -36,7 +36,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../firebaseConfig';
+import { db, storage, auth } from '../../firebaseConfig';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Appbar, Avatar, Badge, Button } from 'react-native-paper';
@@ -48,22 +48,29 @@ const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150'; // Replace with
 const Stack = createStackNavigator();
 
 // User Header Component
-const UserHeader = ({ navigation, user }) => {
-  const [profileImage, setProfileImage] = useState(user?.imageUrl || DEFAULT_PROFILE_IMAGE);
+const UserHeader = ({ navigation }) => {
+  const [profileImage, setProfileImage] = useState(DEFAULT_PROFILE_IMAGE);
   const [uploading, setUploading] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'notifications'),
-      where('toUserId', '==', user.id),
-      where('read', '==', false)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setUnreadNotifications(snapshot.size);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        const q = query(
+          collection(db, 'notifications'),
+          where('toUserId', '==', firebaseUser.uid),
+          where('read', '==', false)
+        );
+        const unsubscribeNotifs = onSnapshot(q, (snapshot) => {
+          setUnreadNotifications(snapshot.size);
+        });
+        return () => unsubscribeNotifs();
+      }
     });
     return () => unsubscribe();
-  }, [user.id]);
+  }, []);
 
   const pickProfileImage = useCallback(async () => {
     try {
@@ -101,12 +108,12 @@ const UserHeader = ({ navigation, user }) => {
             xhr.send(null);
           });
 
-          const filename = `profileImages/${user.id}/${user.id}_${Date.now()}`;
+          const filename = `profileImages/${user.uid}/${user.uid}_${Date.now()}`;
           const storageRef = ref(storage, filename);
           await uploadBytes(storageRef, blob);
 
           const imageUrl = await getDownloadURL(storageRef);
-          await user.update({ image: imageUrl });
+          await updateDoc(doc(db, 'users', user.uid), { image: imageUrl });
           setProfileImage(imageUrl);
         } else {
           Alert.alert('Error', 'Failed to select image.');
@@ -162,10 +169,19 @@ const UserHeader = ({ navigation, user }) => {
 
 // Create Post Component with image handling
 const CreatePost = ({ onSubmit }) => {
-  const { user } = useUser();
   const [content, setContent] = useState('');
   const [image, setImage] = useState(null); // Single image URI
   const [uploading, setUploading] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const pickImage = useCallback(async () => {
     try {
@@ -204,30 +220,22 @@ const CreatePost = ({ onSubmit }) => {
   const handleSubmit = useCallback(async () => {
     if (content.trim() || image) {
       let imageUrl = null;
-  
+
       if (image) {
         setUploading(true);
         try {
           const response = await fetch(image);
           const blob = await response.blob();
-  
-          if (!user.id || !blob) {
-            throw new Error('Invalid user ID or image data.');
-          }
-  
-          const filename = `${user.id}_${Date.now()}_${Math.random()
+
+          const filename = `${user.uid}_${Date.now()}_${Math.random()
             .toString(36)
             .substr(2, 9)}`;
           const storageRef = ref(storage, `postImages/${filename}`);
           await uploadBytes(storageRef, blob);
-  
-          // Close the blob
+
           blob.close();
-  
+
           imageUrl = await getDownloadURL(storageRef);
-  
-          // Log the image URL for debugging
-          console.log('Image URL:', imageUrl);
         } catch (error) {
           console.log(error);
           Alert.alert('Error', 'Could not upload image.');
@@ -236,18 +244,18 @@ const CreatePost = ({ onSubmit }) => {
         }
         setUploading(false);
       }
-  
+
       const newPost = {
         content,
         image: imageUrl || null,
-        userName: user.fullName,
-        profileImage: user.imageUrl,
+        userName: user.displayName || 'Anonymous',
+        profileImage: user.photoURL || DEFAULT_PROFILE_IMAGE,
         createdAt: serverTimestamp(),
-        userId: user.id,
+        userId: user.uid,
         comments: [],
         likes: [],
       };
-  
+
       try {
         const docRef = await addDoc(collection(db, 'posts'), newPost);
         onSubmit({ ...newPost, id: docRef.id });
@@ -260,7 +268,6 @@ const CreatePost = ({ onSubmit }) => {
       Alert.alert('Error', 'Please enter some text or upload an image.');
     }
   }, [content, image, user, onSubmit]);
-  
 
   const removeImage = () => {
     setImage(null);
@@ -270,7 +277,7 @@ const CreatePost = ({ onSubmit }) => {
     <View style={styles.createPostContainer}>
       <View style={styles.createPostHeader}>
         <Image
-          source={{ uri: user?.imageUrl || DEFAULT_PROFILE_IMAGE }}
+          source={{ uri: user?.photoURL || DEFAULT_PROFILE_IMAGE }}
           style={styles.avatar}
         />
         <TextInput
@@ -298,35 +305,34 @@ const CreatePost = ({ onSubmit }) => {
           <TouchableOpacity onPress={removeImage} style={styles.removeImageButton}>
             <Ionicons name="close" size={16} color="#fff" />
           </TouchableOpacity>
-                 </View>
-        )}
-        <Button
-          mode="outlined"
-          icon="image-outline"
-          onPress={pickImage}
-          style={styles.addButton}
-        >
-          Add Photo
-        </Button>
-        {uploading && (
-          <ActivityIndicator
-            size="large"
-            color="#1D4ED8"
-            style={styles.uploadingIndicator}
-          />
-        )}
-      </View>
-    );
+        </View>
+      )}
+      <Button
+        mode="outlined"
+        icon="image-outline"
+        onPress={pickImage}
+        style={styles.addButton}
+      >
+        Add Photo
+      </Button>
+      {uploading && (
+        <ActivityIndicator
+          size="large"
+          color="#1D4ED8"
+          style={styles.uploadingIndicator}
+        />
+      )}
+    </View>
+  );
 };
 
 // Post Component with image handling, comments, edit, and delete functionality
 const Post = React.memo(({ post: initialPost, onViewPost }) => {
-  const { user } = useUser();
   const [post, setPost] = useState(initialPost);
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState(post.comments || []);
   const [likes, setLikes] = useState(post.likes || []);
-  const [liked, setLiked] = useState((post.likes || []).includes(user.id));
+  const [liked, setLiked] = useState((post.likes || []).includes(auth.currentUser.uid));
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editText, setEditText] = useState(post.content);
 
@@ -337,11 +343,11 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
         setPost(updatedPost);
         setComments(updatedPost.comments || []);
         setLikes(updatedPost.likes || []);
-        setLiked(updatedPost.likes?.includes(user.id));
+        setLiked(updatedPost.likes?.includes(auth.currentUser.uid));
       }
     });
     return () => unsubscribe();
-  }, [post.id, user.id]);
+  }, [post.id]);
 
   const handleEdit = async () => {
     try {
@@ -380,20 +386,20 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
       const postRef = doc(db, 'posts', post.id);
       if (liked) {
         await updateDoc(postRef, {
-          likes: arrayRemove(user.id),
+          likes: arrayRemove(auth.currentUser.uid),
         });
         setLiked(false);
       } else {
         await updateDoc(postRef, {
-          likes: arrayUnion(user.id),
+          likes: arrayUnion(auth.currentUser.uid),
         });
         setLiked(true);
 
-        if (post.userId !== user.id) {
+        if (post.userId !== auth.currentUser.uid) {
           await addDoc(collection(db, 'notifications'), {
             toUserId: post.userId,
-            fromUserId: user.id,
-            fromUserName: user.fullName || 'Anonymous',
+            fromUserId: auth.currentUser.uid,
+            fromUserName: auth.currentUser.displayName || 'Anonymous',
             type: 'like',
             postId: post.id,
             read: false,
@@ -404,22 +410,22 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
     } catch (error) {
       Alert.alert('Error', 'Could not update like.');
     }
-  }, [liked, post.id, post.userId, user]);
+  }, [liked, post.id, post.userId]);
 
   const handleShare = useCallback(async () => {
     Alert.alert('Share', `Sharing ${post.userName}'s post.`);
-    if (post.userId !== user.id) {
+    if (post.userId !== auth.currentUser.uid) {
       await addDoc(collection(db, 'notifications'), {
         toUserId: post.userId,
-        fromUserId: user.id,
-        fromUserName: user.fullName || 'Anonymous',
+        fromUserId: auth.currentUser.uid,
+        fromUserName: auth.currentUser.displayName || 'Anonymous',
         type: 'share',
         postId: post.id,
         read: false,
         createdAt: serverTimestamp(),
       });
     }
-  }, [post.userId, post.userName, user]);
+  }, [post.userId, post.userName]);
 
   const renderDate = useMemo(() => {
     if (post.createdAt) {
@@ -446,7 +452,7 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
             <Text style={styles.postDate}>{renderDate}</Text>
           </View>
           {/* Edit/Delete Menu */}
-          {post.userId === user.id && (
+          {post.userId === auth.currentUser.uid && (
             <TouchableOpacity
               onPress={() => setEditModalVisible(true)}
               style={styles.menuButton}
@@ -489,7 +495,7 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
               comment={cmt}
               onLikeComment={() => {}}
               onReplyComment={() => {}}
-              userId={user.id}
+              userId={auth.currentUser.uid}
             />
           ))}
           {comments.length > 3 && (
@@ -500,7 +506,7 @@ const Post = React.memo(({ post: initialPost, onViewPost }) => {
         {/* Comment Input */}
         <View style={styles.commentInputContainer}>
           <Image
-            source={{ uri: user?.imageUrl || DEFAULT_PROFILE_IMAGE }}
+            source={{ uri: auth.currentUser?.photoURL || DEFAULT_PROFILE_IMAGE }}
             style={styles.avatar}
           />
           <TextInput
@@ -613,13 +619,12 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId }) => {
 
 // Notifications Component
 const Notifications = ({ navigation }) => {
-  const { user } = useUser();
   const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     const q = query(
       collection(db, 'notifications'),
-      where('toUserId', '==', user.id),
+      where('toUserId', '==', auth.currentUser.uid),
       orderBy('createdAt', 'desc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -627,7 +632,7 @@ const Notifications = ({ navigation }) => {
       setNotifications(notifs);
     });
     return () => unsubscribe();
-  }, [user.id]);
+  }, []);
 
   const markAsRead = async (id) => {
     try {
@@ -676,12 +681,11 @@ const Notifications = ({ navigation }) => {
 
 // FullScreenPostModal Component with updated image handling
 const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
-  const { user } = useUser();
   const [post, setPost] = useState(initialPost);
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState(post.comments || []);
   const [likes, setLikes] = useState(post.likes || []);
-  const [liked, setLiked] = useState((post.likes || []).includes(user.id));
+  const [liked, setLiked] = useState((post.likes || []).includes(auth.currentUser.uid));
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'posts', post.id), (docSnap) => {
@@ -690,19 +694,19 @@ const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
         setPost(updatedPost);
         setComments(updatedPost.comments || []);
         setLikes(updatedPost.likes || []);
-        setLiked(updatedPost.likes?.includes(user.id));
+        setLiked(updatedPost.likes?.includes(auth.currentUser.uid));
       }
     });
     return () => unsubscribe();
-  }, [post.id, user.id]);
+  }, [post.id]);
 
   const handleAddComment = useCallback(async () => {
     if (comment.trim()) {
       const newComment = {
-        userId: user.id,
-        userName: user.fullName || 'Anonymous',
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || 'Anonymous',
         text: comment,
-        userImage: user.imageUrl || DEFAULT_PROFILE_IMAGE,
+        userImage: auth.currentUser.photoURL || DEFAULT_PROFILE_IMAGE,
         likes: [],
         replies: [],
       };
@@ -713,11 +717,11 @@ const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
         });
         setComment('');
 
-        if (post.userId !== user.id) {
+        if (post.userId !== auth.currentUser.uid) {
           await addDoc(collection(db, 'notifications'), {
             toUserId: post.userId,
-            fromUserId: user.id,
-            fromUserName: user.fullName || 'Anonymous',
+            fromUserId: auth.currentUser.uid,
+            fromUserName: auth.currentUser.displayName || 'Anonymous',
             type: 'comment',
             postId: post.id,
             read: false,
@@ -728,27 +732,27 @@ const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
         Alert.alert('Error', 'Could not add comment.');
       }
     }
-  }, [comment, post.id, post.userId, user]);
+  }, [comment, post.id, post.userId]);
 
   const handleLike = useCallback(async () => {
     try {
       const postRef = doc(db, 'posts', post.id);
       if (liked) {
         await updateDoc(postRef, {
-          likes: arrayRemove(user.id),
+          likes: arrayRemove(auth.currentUser.uid),
         });
         setLiked(false);
       } else {
         await updateDoc(postRef, {
-          likes: arrayUnion(user.id),
+          likes: arrayUnion(auth.currentUser.uid),
         });
         setLiked(true);
 
-        if (post.userId !== user.id) {
+        if (post.userId !== auth.currentUser.uid) {
           await addDoc(collection(db, 'notifications'), {
             toUserId: post.userId,
-            fromUserId: user.id,
-            fromUserName: user.fullName || 'Anonymous',
+            fromUserId: auth.currentUser.uid,
+            fromUserName: auth.currentUser.displayName || 'Anonymous',
             type: 'like',
             postId: post.id,
             read: false,
@@ -759,7 +763,7 @@ const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
     } catch (error) {
       Alert.alert('Error', 'Could not update like.');
     }
-  }, [liked, post.id, post.userId, user]);
+  }, [liked, post.id, post.userId]);
 
   return (
     <Modal visible={visible} transparent={false}>
@@ -812,7 +816,7 @@ const FullScreenPostModal = ({ post: initialPost, visible, onClose }) => {
                   comment={cmt}
                   onLikeComment={() => {}}
                   onReplyComment={() => {}}
-                  userId={user.id}
+                  userId={auth.currentUser.uid}
                 />
               ))}
             </View>
@@ -875,7 +879,6 @@ const FullScreenPost = ({ route, navigation }) => {
 
 // MainFeed Component with updated image handling in posts
 const MainFeed = ({ navigation }) => {
-  const { user } = useUser();
   const [posts, setPosts] = useState([]);
   const [lastVisible, setLastVisible] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -941,7 +944,7 @@ const MainFeed = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.mainFeedContainer}>
-      <UserHeader navigation={navigation} user={user} />
+      <UserHeader navigation={navigation} />
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -1308,4 +1311,3 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
-

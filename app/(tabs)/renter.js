@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'; 
+import React, { useState, useEffect, useRef } from 'react';
 import {
   TextInput,
   Image,
@@ -30,7 +30,7 @@ import {
 } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { useUser } from '@clerk/clerk-expo';
+import { getAuth } from 'firebase/auth'; // Import Firebase Auth
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
@@ -48,7 +48,8 @@ import CheckoutScreen from '../payment/CheckoutScreen.js'; // Update with the co
 const Stack = createStackNavigator();
 
 const BookingCalendar = ({ airplaneId, ownerId }) => {
-  const { user } = useUser();
+  const auth = getAuth(); // Initialize Firebase Auth
+  const user = auth.currentUser; // Get current user from Firebase
   const stripe = useStripe();
   const navigation = useNavigation();
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -91,7 +92,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
   const slideAnimation = useRef(new Animated.Value(300)).current;
 
-  const renterId = user?.id;
+  const renterId = user?.uid; // Use Firebase user's UID
 
   useEffect(() => {
     const db = getFirestore();
@@ -167,7 +168,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     const db = getFirestore();
     const rentalsRef = collection(db, 'orders');
 
-    const resolvedOwnerId = ownerId || user?.id;
+    const resolvedOwnerId = ownerId || user?.uid; // Use Firebase user UID
 
     if (resolvedOwnerId) {
       const q = query(
@@ -261,7 +262,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
   const processPayment = async (amount) => {
     try {
-      const response = await fetch('https://awaited-hippo-85.clerk.accounts.dev', {
+      const response = await fetch('https://your-api-endpoint.com/payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -337,7 +338,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       await addDoc(collection(db, 'messages'), {
         rentalRequestId: currentRentalRequest.id, // Ensure this is not undefined
         senderId: renterId,
-        senderName: user.fullName || 'Anonymous',
+        senderName: user?.displayName || 'Anonymous',
         text: messageText,
         timestamp: new Date(),
       });
@@ -425,7 +426,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         >
           <SafeAreaView style={{ flex: 1 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white' }}>
-              Good afternoon, {user?.fullName || 'User'}
+              Good afternoon, {user?.displayName || 'User'}
             </Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
               <TouchableOpacity

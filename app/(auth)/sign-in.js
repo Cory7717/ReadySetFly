@@ -12,15 +12,15 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useSignIn, useClerk } from "@clerk/clerk-expo"; // Import useClerk
+import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithCredential } from "firebase/auth"; // Import Firebase Auth methods
 import { useNavigation } from "@react-navigation/native";
 import { images } from "../../constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Google from 'expo-auth-session/providers/google'; // Import Google Auth Session
 
 const SignIn = () => {
-  const { signIn, setActive, isLoaded } = useSignIn();
-  const clerk = useClerk(); // Get Clerk client
   const navigation = useNavigation();
+  const auth = getAuth(); // Firebase Auth instance
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -28,6 +28,28 @@ const SignIn = () => {
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
+
+  // Google sign-in setup
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: '64600529166-fir2apdksujl8noihmff9n06seoql865.apps.googleusercontent.com', // Replace with your actual Google client ID
+  });
+
+  // Handle Google sign-in response
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      const credential = GoogleAuthProvider.credential(id_token);
+      signInWithCredential(auth, credential)
+        .then(() => {
+          console.log("Signed in with Google!");
+          navigation.navigate("(tabs)"); // Navigate to main tabs after login
+        })
+        .catch((error) => {
+          console.error("Google sign-in error: ", error);
+          Alert.alert("Error", "Google sign-in failed. Please try again.");
+        });
+    }
+  }, [response]);
 
   // Failed Attempts State
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -75,42 +97,6 @@ const SignIn = () => {
     loadLockoutData();
   }, []);
 
-  // Function to start a timer that updates remaining lockout time
-  const startLockoutTimer = (endTime) => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      if (now >= endTime) {
-        clearInterval(timer);
-        setIsLockedOut(false);
-        setFailedAttempts(0);
-        setLockoutEndTime(null);
-        setLockoutRemainingTime("");
-        AsyncStorage.removeItem("lockoutEndTime");
-        AsyncStorage.setItem("failedAttempts", "0");
-      } else {
-        updateLockoutRemainingTime(endTime);
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  };
-
-  // Function to update the remaining lockout time string
-  const updateLockoutRemainingTime = (endTime) => {
-    const now = new Date();
-    const diff = endTime - now;
-
-    if (diff <= 0) {
-      setLockoutRemainingTime("");
-      return;
-    }
-
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    setLockoutRemainingTime(`${minutes}m ${seconds}s`);
-  };
-
-  // Function to handle sign-in attempts
   const onSignInPress = React.useCallback(async () => {
     if (isLockedOut) {
       Alert.alert(
@@ -120,40 +106,30 @@ const SignIn = () => {
       return;
     }
 
-    if (!isLoaded) return;
-
     try {
-      const signInAttempt = await signIn.create({
-        identifier: emailAddress,
-        password,
-      });
+      const userCredential = await signInWithEmailAndPassword(auth, emailAddress, password);
+      const user = userCredential.user;
 
-      if (signInAttempt.status === "complete") {
-        await setActive({ session: signInAttempt.createdSessionId });
-        navigation.navigate("(tabs)"); // Navigate to the main tabs screen
-        // Reset failed attempts on successful sign-in
-        setFailedAttempts(0);
-        await AsyncStorage.setItem("failedAttempts", "0");
-      } else {
-        handleFailedAttempt();
-        console.error(JSON.stringify(signInAttempt, null, 2));
-      }
+      const idToken = await user.getIdToken(/* forceRefresh */ true);
+      console.log("Firebase ID Token:", idToken);
+
+      navigation.navigate("(tabs)");
+
+      setFailedAttempts(0);
+      await AsyncStorage.setItem("failedAttempts", "0");
+
     } catch (err) {
       handleFailedAttempt();
-      console.error(JSON.stringify(err, null, 2));
+      console.error(err);
     }
   }, [
-    isLoaded,
     emailAddress,
     password,
     navigation,
     isLockedOut,
     lockoutRemainingTime,
-    signIn,
-    setActive,
   ]);
 
-  // Function to handle failed sign-in attempts
   const handleFailedAttempt = async () => {
     const newFailedAttempts = failedAttempts + 1;
     setFailedAttempts(newFailedAttempts);
@@ -171,33 +147,25 @@ const SignIn = () => {
         "You have been locked out due to multiple failed sign-in attempts. Please try again after 20 minutes."
       );
 
-      // Start the lockout timer
       startLockoutTimer(endTime);
     } else {
       Alert.alert(
         "Sign In Failed",
-        `Invalid credentials. You have ${
-          MAX_FAILED_ATTEMPTS - newFailedAttempts
-        } attempt(s) left before lockout.`
+        `Invalid credentials. You have ${MAX_FAILED_ATTEMPTS - newFailedAttempts} attempt(s) left before lockout.`
       );
     }
   };
 
-  // Function to handle forgot password press
   const onForgotPasswordPress = () => {
     setForgotPasswordModalVisible(true);
   };
 
-  // Function to handle password reset
   const handlePasswordReset = async () => {
     setIsSendingReset(true);
     setResetMessage("");
 
     try {
-      // Use Clerk client to send reset password email
-      await clerk.sendPasswordResetEmail({
-        emailAddress: recoveryEmail,
-      });
+      await auth.sendPasswordResetEmail(recoveryEmail);
       setResetMessage("Reset email sent successfully! Please check your inbox.");
     } catch (err) {
       setResetMessage("Failed to send reset email. Please try again.");
@@ -247,7 +215,16 @@ const SignIn = () => {
               <Text style={styles.signInButtonText}>Sign In</Text>
             )}
           </TouchableOpacity>
-          {/* Forgot password link */}
+
+          {/* Google sign-in button */}
+          <TouchableOpacity
+            onPress={() => promptAsync()}
+            style={styles.googleButton}
+            disabled={!request}
+          >
+            <Text style={styles.googleButtonText}>Log in with Google</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={onForgotPasswordPress}
             style={styles.forgotPasswordButton}
@@ -346,6 +323,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
+  googleButton: {
+    backgroundColor: '#db4437',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
+  },
+  googleButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+  },
   disabledButton: {
     backgroundColor: '#a5b4fc',
   },
@@ -432,4 +421,3 @@ const styles = StyleSheet.create({
 });
 
 export default SignIn;
-

@@ -1,18 +1,30 @@
-import React, { useEffect } from "react"; 
+import React, { useEffect, useState } from "react";
 import { SplashScreen, Stack } from "expo-router";
 import { useFonts } from "expo-font";
-import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
 import * as SecureStore from "expo-secure-store";
 import { StripeProvider } from "@stripe/stripe-react-native";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { initializeApp, getApps, getApp } from "firebase/app";
 
-// Retrieve Clerk Publishable Key
-const getClerkPublishableKey = () => {
-  const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  if (!clerkPublishableKey) {
-    throw new Error('Missing Clerk Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env');
-  }
-  return clerkPublishableKey;
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
+
+// Initialize Firebase only if no app is initialized
+let app;
+if (getApps().length === 0) {
+  app = initializeApp(firebaseConfig); // Initialize if no apps exist
+} else {
+  app = getApp(); // Use the already initialized app
+}
+
+const auth = getAuth(app);
 
 // Retrieve Stripe Publishable Key
 const getStripePublishableKey = () => {
@@ -60,33 +72,41 @@ const RootLayout = () => {
     "Rubik-ExtraBold": require("../Assets/fonts/Rubik-ExtraBold.ttf"),
   });
 
+  const [user, setUser] = useState(null); // Track the authenticated user
+
   useEffect(() => {
     if (error) throw error;
     if (fontsLoaded) SplashScreen.hideAsync();
   }, [fontsLoaded, error]);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser); // Set the user if authenticated
+        console.log("User is authenticated:", currentUser);
+      } else {
+        setUser(null); // Clear user if not authenticated
+        console.log("No user is authenticated.");
+      }
+    });
+
+    return () => unsubscribe(); // Clean up the auth listener on component unmount
+  }, []);
+
   if (!fontsLoaded && !error) return null;
 
-  // Get keys separately
-  const clerkPublishableKey = getClerkPublishableKey();
   const stripePublishableKey = getStripePublishableKey();
 
   return (
     <StripeProvider publishableKey={stripePublishableKey}>
-      <ClerkProvider publishableKey={clerkPublishableKey}>
-        <ClerkLoaded>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            <Stack.Screen name="screens/renter_sign_in" options={{ headerShown: false }} />
-            <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
-            
-            {/* <Stack.Screen name="cfi" options={{ headerShown: false }} /> */}
-            {/* Other screens */}
-          </Stack>
-        </ClerkLoaded>
-      </ClerkProvider>
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="screens/renter_sign_in" options={{ headerShown: false }} />
+        <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
+        {/* Add other screens as necessary */}
+      </Stack>
     </StripeProvider>
   );
 };

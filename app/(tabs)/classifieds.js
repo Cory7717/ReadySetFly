@@ -18,7 +18,7 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
-import { useUser } from '@clerk/clerk-expo';
+import auth from '@react-native-firebase/auth'; // Firebase Auth import
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { db, storage } from '../../firebaseConfig';
@@ -46,7 +46,7 @@ import PaymentScreen from '../payment/PaymentScreen';
 const { width } = Dimensions.get('window');
 
 const COLORS = {
-  primary: '#1D4ED8', // Blue color
+  primary: '#1D4ED8',
   secondary: '#6B7280',
   background: '#F3F4F6',
   white: '#FFFFFF',
@@ -59,7 +59,7 @@ const COLORS = {
 const Stack = createStackNavigator();
 
 const Classifieds = () => {
-  const { user } = useUser();
+  const user = auth().currentUser; // Use Firebase's current user
   const { initPaymentSheet } = useStripe();
   const navigation = useNavigation();
   const [listings, setListings] = useState([]);
@@ -180,7 +180,6 @@ const Classifieds = () => {
     } else if (selectedCategory === 'Flight Schools') {
       maxImages = 5;
     } else if (selectedCategory === 'Aircraft for Sale') {
-      // **Updated Image Limits for "Aircraft for Sale"**
       maxImages =
         selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 14 : 18;
     }
@@ -219,7 +218,6 @@ const Classifieds = () => {
     } else if (selectedCategory === 'Flight Schools') {
       maxImages = 5;
     } else if (selectedCategory === 'Aircraft for Sale') {
-      // **Updated Image Limits for "Aircraft for Sale"**
       maxImages =
         selectedPricing === 'Basic' ? 7 : selectedPricing === 'Featured' ? 14 : 18;
     }
@@ -345,7 +343,7 @@ const Classifieds = () => {
   };
 
   const initializePaymentSheet = async () => {
-    if (!user || !user.id) {
+    if (!user) {
       Alert.alert('Error', 'User information is not available.');
       return false;
     }
@@ -360,7 +358,7 @@ const Classifieds = () => {
         paymentIntentClientSecret: paymentIntent,
         allowsDelayedPaymentMethods: true,
         defaultBillingDetails: {
-          name: user.fullName || 'Guest',
+          name: user.displayName || 'Guest',
         },
       });
 
@@ -395,7 +393,7 @@ const Classifieds = () => {
   };
 
   const handleCompletePayment = async () => {
-    if (!user || !user.id) {
+    if (!user) {
       Alert.alert('Error', 'User information is not available.');
       setLoading(false);
       return;
@@ -411,7 +409,7 @@ const Classifieds = () => {
             const blob = await response.blob();
             const storageRef = ref(
               storage,
-              `classifiedImages/${user.id}/${new Date().getTime()}_${user.id}`
+              `classifiedImages/${user.uid}/${new Date().getTime()}_${user.uid}`
             );
             const snapshot = await uploadBytes(storageRef, blob);
             return await getDownloadURL(snapshot.ref);
@@ -434,8 +432,8 @@ const Classifieds = () => {
         ...listingDetails,
         category: selectedCategory,
         images: uploadedImages,
-        ownerId: user.id,
-        userEmail: user.primaryEmailAddress.emailAddress,
+        ownerId: user.uid,
+        userEmail: user.email,
         contactEmail: listingDetails.email,
         contactPhone: listingDetails.phone,
         createdAt: new Date(),
@@ -462,7 +460,7 @@ const Classifieds = () => {
   };
 
   const handleTestSubmitListing = async (values) => {
-    if (!user || !user.id) {
+    if (!user) {
       Alert.alert('Error', 'User information is not available.');
       setLoading(false);
       return;
@@ -478,7 +476,7 @@ const Classifieds = () => {
             const blob = await response.blob();
             const storageRef = ref(
               storage,
-              `classifiedImages/${new Date().getTime()}_${user.id}`
+              `classifiedImages/${new Date().getTime()}_${user.uid}`
             );
             const snapshot = await uploadBytes(storageRef, blob);
             const downloadURL = await getDownloadURL(snapshot.ref);
@@ -496,8 +494,8 @@ const Classifieds = () => {
         ...values,
         category: selectedCategory,
         images: validUploadedImages,
-        ownerId: user.id,
-        userEmail: user.primaryEmailAddress.emailAddress,
+        ownerId: user.uid,
+        userEmail: user.email,
         createdAt: new Date(),
         pricingPackage: selectedPricing,
       };
@@ -515,7 +513,7 @@ const Classifieds = () => {
   };
   
   const renderEditAndDeleteButtons = (listing) => {
-    if (user && listing?.ownerId === user.id) {
+    if (user && listing?.ownerId === user.uid) {
       return (
         <View style={{ flexDirection: 'row', marginTop: 10 }}>
           <TouchableOpacity
@@ -587,7 +585,7 @@ const Classifieds = () => {
   };
 
   const handleSaveEdit = async (values) => {
-    if (!user || !user.id) {
+    if (!user) {
       Alert.alert('Error', 'User information is not available.');
       return;
     }
@@ -618,7 +616,7 @@ const Classifieds = () => {
   };
 
   const onSubmitMethod = async (values) => {
-    if (!user || !user.id) {
+    if (!user) {
       Alert.alert('Error', 'User information is not available.');
       setLoading(false);
       return;
@@ -767,7 +765,7 @@ const Classifieds = () => {
                 fontSize: Animated.add(headerFontSize, 6),
               }}
             >
-              {user?.fullName}
+              {user?.displayName}
             </Animated.Text>
           </Animated.View>
         </ImageBackground>
@@ -1688,209 +1686,6 @@ const Classifieds = () => {
           </Animated.View>
         </View>
       </Modal>
-
-      {/* Edit Listing Modal */}
-      <Modal
-        visible={editModalVisible}
-        transparent={true}
-        onRequestClose={() => setEditModalVisible(false)}
-        animationType="slide"
-      >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          }}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{
-              width: '90%',
-              maxHeight: '90%',
-              backgroundColor: COLORS.white,
-              borderRadius: 24,
-              padding: 0,
-            }}
-          >
-            <ScrollView
-              contentContainerStyle={{ padding: 24 }}
-              style={{ width: '100%' }}
-              nestedScrollEnabled={true}
-            >
-              <View style={{ width: '100%' }}>
-                <Text
-                  style={{
-                    fontSize: 24,
-                    fontWeight: 'bold',
-                    marginBottom: 24,
-                    textAlign: 'center',
-                    color: COLORS.black,
-                  }}
-                >
-                  Edit Your Listing
-                </Text>
-
-                <Formik
-                  initialValues={{
-                    title: selectedListing?.title || '',
-                    price: selectedListing?.price || '',
-                    description: selectedListing?.description || '',
-                    city: selectedListing?.city || '',
-                    state: selectedListing?.state || '',
-                    email: selectedListing?.email || '',
-                    phone: selectedListing?.phone || '',
-                    companyName: selectedListing?.companyName || '',
-                    jobTitle: selectedListing?.jobTitle || '',
-                    jobDescription: selectedListing?.jobDescription || '',
-                    category: selectedListing?.category || '',
-                    flightSchoolName: selectedListing?.flightSchoolName || '',
-                    flightSchoolDetails: selectedListing?.flightSchoolDetails || '',
-                  }}
-                  onSubmit={handleSaveEdit}
-                >
-                  {({ handleChange, handleBlur, handleSubmit, values }) => (
-                    <>
-                      <TextInput
-                        placeholder="Title"
-                        onChangeText={handleChange('title')}
-                        onBlur={handleBlur('title')}
-                        value={values.title}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: COLORS.lightGray,
-                          marginBottom: 16,
-                          padding: 8,
-                          color: COLORS.black,
-                        }}
-                      />
-                      <TextInput
-                        placeholder="Price"
-                        onChangeText={handleChange('price')}
-                        onBlur={handleBlur('price')}
-                        value={values.price}
-                        keyboardType="default"
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: COLORS.lightGray,
-                          marginBottom: 16,
-                          padding: 8,
-                          color: COLORS.black,
-                        }}
-                      />
-                      <TextInput
-                        placeholder="Description"
-                        onChangeText={handleChange('description')}
-                        onBlur={handleBlur('description')}
-                        value={values.description}
-                        multiline
-                        numberOfLines={4}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: COLORS.lightGray,
-                          marginBottom: 16,
-                          padding: 8,
-                          color: COLORS.black,
-                          textAlignVertical: 'top',
-                        }}
-                      />
-                      <TextInput
-                        placeholder="City"
-                        onChangeText={handleChange('city')}
-                        onBlur={handleBlur('city')}
-                        value={values.city}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: COLORS.lightGray,
-                          marginBottom: 16,
-                          padding: 8,
-                          color: COLORS.black,
-                        }}
-                      />
-                      <TextInput
-                        placeholder="State"
-                        onChangeText={handleChange('state')}
-                        onBlur={handleBlur('state')}
-                        value={values.state}
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: COLORS.lightGray,
-                          marginBottom: 16,
-                          padding: 8,
-                          color: COLORS.black,
-                        }}
-                      />
-                      <TextInput
-                        placeholder="Email"
-                        onChangeText={handleChange('email')}
-                        onBlur={handleBlur('email')}
-                        value={values.email}
-                        keyboardType="email-address"
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: COLORS.lightGray,
-                          marginBottom: 16,
-                          padding: 8,
-                          color: COLORS.black,
-                        }}
-                      />
-                      <TextInput
-                        placeholder="Phone"
-                        onChangeText={handleChange('phone')}
-                        onBlur={handleBlur('phone')}
-                        value={values.phone}
-                        keyboardType="phone-pad"
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: COLORS.lightGray,
-                          marginBottom: 16,
-                          padding: 8,
-                          color: COLORS.black,
-                        }}
-                      />
-
-                      <TouchableOpacity
-                        onPress={handleSubmit}
-                        style={{
-                          backgroundColor: COLORS.primary,
-                          paddingVertical: 12,
-                          borderRadius: 50,
-                          marginTop: 16,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: COLORS.white,
-                            textAlign: 'center',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          Save Changes
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => setEditModalVisible(false)}
-                        style={{
-                          marginTop: 16,
-                          paddingVertical: 8,
-                          borderRadius: 50,
-                          backgroundColor: COLORS.lightGray,
-                        }}
-                      >
-                        <Text style={{ textAlign: 'center', color: COLORS.black }}>
-                          Cancel
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </Formik>
-              </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -1902,12 +1697,12 @@ const AppNavigator = () => {
         <Stack.Screen
           name="Classifieds"
           component={Classifieds}
-          options={{ headerShown: false }}
+          options={{ headerShown: false }} // This hides the header for the Classifieds screen
         />
         <Stack.Screen
           name="PaymentScreen"
           component={PaymentScreen}
-          options={{ headerShown: false }}
+          options={{ headerShown: false }} // This hides the header for the PaymentScreen
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -13,8 +13,8 @@ import {
   FlatList,
   ScrollView,
 } from "react-native";
-import { useUser, useAuth } from "@clerk/clerk-expo";
-import { db } from "../../firebaseConfig";
+import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth"; // Firebase auth imports
+import { db, auth } from "../../firebaseConfig"; // Assuming you have auth in your firebaseConfig
 import {
   collection,
   onSnapshot,
@@ -30,8 +30,7 @@ import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { Calendar } from "react-native-calendars";
 
 const Home = ({ route, navigation }) => {
-  const { user } = useUser();
-  const { signOut } = useAuth();
+  const [user, setUser] = useState(null); // State to store Firebase user
   const [listings, setListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedListing, setSelectedListing] = useState(null);
@@ -42,8 +41,8 @@ const Home = ({ route, navigation }) => {
     location: "",
   });
   const [rentalHours, setRentalHours] = useState(1);
-  const [rentalDate, setRentalDate] = useState(null); // State for the selected rental date
-  const [calendarModalVisible, setCalendarModalVisible] = useState(false); // State for calendar modal visibility
+  const [rentalDate, setRentalDate] = useState(null);
+  const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [totalCost, setTotalCost] = useState({
     rentalCost: "0.00",
     bookingFee: "0.00",
@@ -62,11 +61,21 @@ const Home = ({ route, navigation }) => {
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  // Firebase auth state listener
   useEffect(() => {
-    if (!user) {
-      Alert.alert("Error", "User is not authenticated.");
-      return;
-    }
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+      } else {
+        Alert.alert("Error", "User is not authenticated.");
+        navigation.replace("SignIn"); // Redirect to SignIn screen if not authenticated
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
     const unsubscribe = subscribeToListings();
     return () => unsubscribe();
   }, [user]);
@@ -164,16 +173,16 @@ const Home = ({ route, navigation }) => {
 
     try {
       const rentalRequestData = {
-        renterId: user.id,
-        renterName: user.fullName || "Anonymous",
+        renterId: user.uid, // Firebase user ID
+        renterName: user.displayName || "Anonymous", // Firebase displayName
         ownerId: selectedListing.ownerId,
         airplaneModel: selectedListing.airplaneModel,
-        rentalPeriod: rentalDate, // Include selected rental date
+        rentalPeriod: rentalDate,
         totalCost: totalCostValue.toFixed(2),
-        contact: user.emailAddress || "noemail@example.com",
+        contact: user.email || "noemail@example.com", // Firebase email
         createdAt: new Date(),
         status: "pending",
-        listingId: selectedListing.id, // Include listingId
+        listingId: selectedListing.id,
       };
 
       // Add the rental request to the owner's rentalRequests subcollection
@@ -257,7 +266,7 @@ const Home = ({ route, navigation }) => {
         {
           text: "Logout",
           onPress: async () => {
-            await signOut();
+            await firebaseSignOut(auth); // Firebase sign out
             navigation.replace("SignIn");
           },
         },
@@ -308,7 +317,7 @@ const Home = ({ route, navigation }) => {
                   fontWeight: "bold",
                 }}
               >
-                {user?.fullName || "User"}
+                {user?.displayName || "User"}
               </Animated.Text>
             </View>
             <TouchableOpacity onPress={handleLogout}>
@@ -454,7 +463,7 @@ const Home = ({ route, navigation }) => {
                   </Text>
                 </View>
               </TouchableOpacity>
-              {item.ownerId === user.id && (
+              {item.ownerId === user.uid && (
                 <View
                   style={{
                     flexDirection: "row",

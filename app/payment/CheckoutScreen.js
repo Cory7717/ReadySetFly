@@ -3,8 +3,9 @@ import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, Ani
 import { CardField, useConfirmPayment, useStripe } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { getAuth } from 'firebase/auth'; // Import Firebase Auth
 
-const API_URL = 'https://api.stripe.com'; // Replace with your actual server URL
+const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net'; // Replace with your actual server URL
 const READY_SET_FLY_ACCOUNT = 'acct_readysetfly'; // Replace with actual Stripe account ID
 
 export default function CheckoutScreen({ route }) {
@@ -15,6 +16,9 @@ export default function CheckoutScreen({ route }) {
   const [isPaymentReady, setIsPaymentReady] = useState(false);
   const [totalAmount, setTotalAmount] = useState(0);
   const bounceValue = useRef(new Animated.Value(0)).current;
+
+  const auth = getAuth(); // Initialize Firebase Auth
+  const user = auth.currentUser; // Get current Firebase user
 
   // Safely retrieve params and set default values if undefined
   const rentalHours = route?.params?.rentalHours || 0;
@@ -67,7 +71,7 @@ export default function CheckoutScreen({ route }) {
           customerEphemeralKeySecret: ephemeralKey,
           paymentIntentClientSecret: paymentIntent,
           allowsDelayedPaymentMethods: true,
-          defaultBillingDetails: { name: 'Renter' },
+          defaultBillingDetails: { name: user?.displayName || 'Renter' }, // Use Firebase user name
         });
 
         if (!error) setIsPaymentReady(true);
@@ -100,7 +104,6 @@ export default function CheckoutScreen({ route }) {
           readySetFlyAmount: (taxAmount + processingFee + bookingFee) * 100, // Fees to Ready Set Fly in cents
           ownerAmount: ownerAmount * 100, // Owner's amount in cents
           readySetFlyAccount: READY_SET_FLY_ACCOUNT, // Destination account ID
-          // Add any additional metadata if needed
         }),
       });
 
@@ -115,7 +118,7 @@ export default function CheckoutScreen({ route }) {
       const { error, paymentIntent } = await confirmPayment(clientSecret, {
         paymentMethodType: 'Card',
         paymentMethodData: {
-          billingDetails: { name: 'Renter' },
+          billingDetails: { name: user?.displayName || 'Renter' }, // Use Firebase user's name
         },
       });
 
@@ -124,7 +127,6 @@ export default function CheckoutScreen({ route }) {
       } else if (paymentIntent.status === 'Succeeded') {
         Alert.alert('Success', 'Payment processed successfully');
         setIsPaymentSuccess(true);
-        // Optionally navigate back or show success
         navigation.navigate('Classifieds');
       }
     } catch (error) {

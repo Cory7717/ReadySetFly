@@ -1,27 +1,34 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
-import { ClerkProvider, SignedIn, SignedOut, useUser } from '@clerk/clerk-expo';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { Stack } from 'expo-router';
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import CustomButton from '../components/CustomButton';
 import { images } from '../constants';
 import { router } from 'expo-router';
-// Import React and other necessary modules
 
-import { useAuth } from '@clerk/clerk-expo';
-
-
-// Function to retrieve Clerk Publishable Key
-const getClerkPublishableKey = () => {
-  const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  if (!clerkPublishableKey) {
-    throw new Error('Missing Clerk Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env');
-  }
-  return clerkPublishableKey;
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
+
+// Initialize Firebase
+let app;
+if (getApps().length === 0) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
+const auth = getAuth(app);
 
 // Function to retrieve Stripe Publishable Key
 const getStripePublishableKey = () => {
@@ -33,7 +40,24 @@ const getStripePublishableKey = () => {
 };
 
 const App = () => {
-  const { user } = useUser();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => unsubscribe(); // Cleanup the listener on unmount
+  }, []);
+
+  const handleViewContent = () => {
+    // Navigate to the main home or content page
+    router.push('/home'); // Adjust this to your actual content route
+  };
 
   return (
     <SafeAreaProvider>
@@ -43,11 +67,18 @@ const App = () => {
           <Image source={images.logo} style={styles.logo} />
         </View>
 
-        <SignedIn>
-          <Text style={styles.greetingText}>Hello, {user?.firstName} {user?.lastName}</Text>
-        </SignedIn>
-
-        <SignedOut>
+        {user ? (
+          <>
+            <Text style={styles.greetingText}>Hello, {user.displayName || user.email}</Text>
+            <View style={styles.viewContentButtonContainer}>
+              <CustomButton
+                title="View Content"
+                handlePress={handleViewContent}
+                containerStyles={styles.viewContentButton}
+              />
+            </View>
+          </>
+        ) : (
           <View style={styles.signInContainer}>
             <TouchableOpacity
               onPress={() => router.push('/sign-in')}
@@ -56,50 +87,33 @@ const App = () => {
               <Text style={styles.signInButtonText}>Sign In or Create Account</Text>
             </TouchableOpacity>
           </View>
-        </SignedOut>
-
-        {/* <View style={styles.viewContentButtonContainer}>
-          <CustomButton
-            title="View Content"
-            handlePress={() => router.push("/home")}
-            containerStyles={styles.viewContentButton}
-          />
-        </View> */}
-
-        {/* <TouchableOpacity onPress={() => router.push("/cfi")} style={styles.createCFIButtonContainer}>
-          <View style={styles.createCFIButton}>
-            <Text style={styles.createCFIButtonText}>Create CFI Profile</Text>
-          </View>
-        </TouchableOpacity> */}
+        )}
       </ScrollView>
     </SafeAreaProvider>
   );
 };
 
 const Index = () => {
-  const clerkPublishableKey = getClerkPublishableKey();
   const stripePublishableKey = getStripePublishableKey();
 
   return (
-    <ClerkProvider publishableKey={clerkPublishableKey}>
-      <StripeProvider publishableKey={stripePublishableKey}>
-        <SafeAreaProvider>
-          <NavigationContainer>
-            <Stack>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              <Stack.Screen name="flights" options={{ headerShown: false }} />
-              <Stack.Screen name="classifieds" options={{ headerShown: false }} />
-              <Stack.Screen name="home" options={{ headerShown: false }} />
-              <Stack.Screen name="OwnerProfile" options={{ headerShown: false }} />
-              <Stack.Screen name="renter" options={{ headerShown: false }} />
-              <Stack.Screen name="PaymentScreen" options={{ headerShown: false }} />
-            </Stack>
-          </NavigationContainer>
-        </SafeAreaProvider>
-      </StripeProvider>
-    </ClerkProvider>
+    <StripeProvider publishableKey={stripePublishableKey}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="flights" options={{ headerShown: false }} />
+            <Stack.Screen name="classifieds" options={{ headerShown: false }} />
+            <Stack.Screen name="home" options={{ headerShown: false }} />
+            <Stack.Screen name="OwnerProfile" options={{ headerShown: false }} />
+            <Stack.Screen name="renter" options={{ headerShown: false }} />
+            <Stack.Screen name="PaymentScreen" options={{ headerShown: false }} />
+          </Stack>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </StripeProvider>
   );
 };
 

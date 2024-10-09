@@ -1,58 +1,47 @@
 import * as React from 'react';
-import { TextInput, View, TouchableOpacity, Text, StyleSheet, Picker } from 'react-native';
-import { useSignUp } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+import { TextInput, View, TouchableOpacity, Text, StyleSheet, Picker, Alert } from 'react-native';
+import { getAuth, createUserWithEmailAndPassword, sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
+import { useNavigation } from '@react-navigation/native';
 
 export default function RenterSignUp() {
-  const { isLoaded, signUp, setActive } = useSignUp();
-  const router = useRouter();
+  const auth = getAuth();
+  const navigation = useNavigation();
 
   const [emailAddress, setEmailAddress] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [pendingVerification, setPendingVerification] = React.useState(false);
-  const [code, setCode] = React.useState('');
+  const [code, setCode] = React.useState(''); // Not needed for Firebase email verification
   const [userType, setUserType] = React.useState('renter');
 
   const onSignUpPress = async () => {
-    if (!isLoaded) {
-      return;
-    }
-
     try {
-      await signUp.create({
-        emailAddress,
-        password,
-        publicMetadata: { userType }, // Storing user type in metadata
-      });
+      const userCredential = await createUserWithEmailAndPassword(auth, emailAddress, password);
 
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      if (userCredential.user) {
+        // Store userType in the user's profile metadata (if needed).
+        // Sending email verification
+        await sendEmailVerification(userCredential.user);
+        setPendingVerification(true);
 
-      setPendingVerification(true);
-    } catch (err) {
-      console.error(JSON.stringify(err, null, 2));
-    }
-  };
-
-  const onPressVerify = async () => {
-    if (!isLoaded) {
-      return;
-    }
-
-    try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      });
-
-      if (completeSignUp.status === 'complete') {
-        await setActive({ session: completeSignUp.createdSessionId });
-        router.replace('/');
-      } else {
-        console.error(JSON.stringify(completeSignUp, null, 2));
+        Alert.alert('Verification Email Sent', 'Please check your email to verify your account.');
       }
     } catch (err) {
-      console.error(JSON.stringify(err, null, 2));
+      console.error(err.message);
+      Alert.alert('Error', err.message);
     }
   };
+
+  React.useEffect(() => {
+    // Firebase listener for authentication state changes
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && user.emailVerified) {
+        // Once the email is verified, navigate to the home page
+        navigation.replace('/');
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -92,18 +81,7 @@ export default function RenterSignUp() {
       )}
       {pendingVerification && (
         <>
-          <TextInput 
-            value={code} 
-            placeholder="Verification Code..." 
-            onChangeText={(code) => setCode(code)} 
-            style={styles.input}
-          />
-          <TouchableOpacity 
-            onPress={onPressVerify} 
-            style={styles.verifyButton}
-          >
-            <Text style={styles.buttonText}>Verify Email</Text>
-          </TouchableOpacity>
+          <Text>Please check your email and verify your account to proceed.</Text>
         </>
       )}
     </View>
@@ -135,12 +113,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 20,
-  },
-  verifyButton: {
-    backgroundColor: '#28a745',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
   },
   buttonText: {
     color: '#fff',

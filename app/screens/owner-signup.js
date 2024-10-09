@@ -8,21 +8,36 @@ import {
   StatusBar,
   StyleSheet,
 } from "react-native";
-import { useSignUp } from "@clerk/clerk-expo";
-import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
+import { getAuth, signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
 
 const OwnerSignup = () => {
-  const { signUp, setActive, isLoaded } = useSignUp();
-  const router = useRouter();
-
+  const navigation = useNavigation();
+  const auth = getAuth();
+  
   const [emailAddress, setEmailAddress] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [pendingVerification, setPendingVerification] = useState(false);
   const [profile, setProfile] = useState({ firstName: "", lastName: "" });
   const [step, setStep] = useState(1);
+  const [confirmationResult, setConfirmationResult] = useState(null); // For Firebase phone verification
 
-  const onCreateProfilePress = async () => {
+  // Set up reCAPTCHA verifier
+  const setUpRecaptcha = () => {
+    window.recaptchaVerifier = new RecaptchaVerifier(
+      "recaptcha-container",
+      {
+        size: "invisible",
+        callback: (response) => {
+          console.log("reCAPTCHA solved!");
+        },
+      },
+      auth
+    );
+  };
+
+  const onCreateProfilePress = () => {
     if (step === 1 && profile.firstName && profile.lastName) {
       setStep(2); // Move to the phone number verification step
     }
@@ -30,33 +45,45 @@ const OwnerSignup = () => {
 
   const onVerifyPhonePress = async () => {
     if (step === 2 && phoneNumber) {
-      await signUp.preparePhoneNumberVerification({ strategy: "sms_code" });
-      setPendingVerification(true);
-      setStep(3); // Move to the email verification step
+      try {
+        setUpRecaptcha();
+        const appVerifier = window.recaptchaVerifier;
+        const confirmation = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+        setConfirmationResult(confirmation);
+        setPendingVerification(true);
+        setStep(3); // Move to the email verification step
+      } catch (error) {
+        console.error("Phone verification error:", error.message);
+      }
     }
   };
 
   const onVerifyEmailPress = async () => {
     if (step === 3 && emailAddress) {
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setPendingVerification(true);
+      try {
+        // Optionally, send a verification email if email verification is required.
+        // You can do this using Firebase's email authentication methods.
+        // Currently, Firebase handles email verification separately.
+
+        setPendingVerification(true);
+      } catch (error) {
+        console.error("Email verification error:", error.message);
+      }
     }
   };
 
   const onPressVerify = async () => {
     try {
-      const completeSignUp = await signUp.attemptPhoneNumberVerification({
-        code: verificationCode,
-      });
-
-      if (completeSignUp.status === "complete") {
-        await setActive({ session: completeSignUp.createdSessionId });
-        router.replace("/home"); // Navigate to the owner's home page after verification
-      } else {
-        console.error(JSON.stringify(completeSignUp, null, 2));
+      if (confirmationResult) {
+        // Complete phone number verification
+        const result = await confirmationResult.confirm(verificationCode);
+        if (result.user) {
+          // After successful verification, navigate to the owner's home page
+          navigation.replace("/home");
+        }
       }
     } catch (err) {
-      console.error(JSON.stringify(err, null, 2));
+      console.error("Verification error:", err.message);
     }
   };
 
@@ -105,6 +132,7 @@ const OwnerSignup = () => {
             >
               <Text style={styles.buttonText}>Verify Phone Number</Text>
             </TouchableOpacity>
+            <View id="recaptcha-container" />
           </>
         )}
 

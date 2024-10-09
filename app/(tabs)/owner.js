@@ -17,8 +17,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { useUser, useAuth } from "@clerk/clerk-expo";
-import { db, storage } from "../../firebaseConfig";
+import { db, storage, auth } from "../../firebaseConfig"; // Import Firebase Auth
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import {
@@ -38,11 +37,10 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Calendar } from "react-native-calendars";
 
 const OwnerProfile = ({ ownerId }) => {
-  const { user } = useUser();
-  const { getToken } = useAuth(); // Extract getToken from useAuth
-  const stripe = useStripe();
   const navigation = useNavigation();
-  const resolvedOwnerId = ownerId || user?.id;
+  const user = auth.currentUser; // Get current Firebase user
+  const stripe = useStripe();
+  const resolvedOwnerId = ownerId || user?.uid; // Resolve ownerId or default to Firebase user ID
 
   const [profileData, setProfileData] = useState({
     airplaneModel: "",
@@ -144,43 +142,6 @@ const OwnerProfile = ({ ownerId }) => {
     fetchOwnerData();
   }, [resolvedOwnerId]);
 
-  // Set Firebase token on mount
-  useEffect(() => {
-    const setFirebaseAuthToken = async () => {
-      if (user) {
-        try {
-          const sessionToken = await getToken();
-          console.log('Session token obtained:', sessionToken);
-
-          const url = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/getFirebaseToken';
-          console.log('Calling Firebase function at URL:', url);
-
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${sessionToken}`,
-            },
-          });
-
-          const contentType = response.headers.get("content-type");
-          if (!response.ok || !contentType || !contentType.includes("application/json")) {
-            const errorText = await response.text();
-            throw new Error(`Failed to fetch Firebase token: ${response.status} ${response.statusText}\n${errorText}`);
-          }
-
-          const { firebaseToken } = await response.json();
-          await db.app.auth().signInWithCustomToken(firebaseToken);
-          console.log('Firebase token set successfully');
-        } catch (error) {
-          console.error('Error setting Firebase auth token:', error.message);
-          Alert.alert("Error", "Failed to set Firebase auth token. Please try again.");
-        }
-      }
-    };
-    setFirebaseAuthToken();
-  }, [user]);
-
   // Fetch rental requests with renter details and chat thread data
   useEffect(() => {
     if (resolvedOwnerId) {
@@ -264,7 +225,7 @@ const OwnerProfile = ({ ownerId }) => {
     const numberOfPayments = parseFloat(loanTerm) * 12;
     const mortgageExpense = loanAmount
       ? (
-          (parseFloat(loanAmount) * monthlyInterestRate) /
+          (parseFloat(loanAmount) * monthlyInterestRate) / 
           (1 - Math.pow(1 + monthlyInterestRate, -numberOfPayments))
         ).toFixed(2)
       : 0;
@@ -633,8 +594,8 @@ const OwnerProfile = ({ ownerId }) => {
     if (!messageInput.trim()) return;
 
     const messageData = {
-      senderId: user.id,
-      senderName: user.fullName || "Owner",
+      senderId: user.uid, // Use Firebase user UID
+      senderName: user.displayName || "Owner", // Use Firebase displayName
       text: messageInput,
       createdAt: new Date(),
     };
@@ -653,7 +614,7 @@ const OwnerProfile = ({ ownerId }) => {
       setMessageInput("");
       setMessages((prevMessages) => [...prevMessages, messageData]);
     } catch (error) {
-      console.error("Error sending message: ", error);
+      console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message.");
     }
   };
@@ -665,7 +626,7 @@ const OwnerProfile = ({ ownerId }) => {
       if (chatThreadId) {
         const chatDocRef = doc(db, "messages", chatThreadId);
         const chatDoc = await getDoc(chatDocRef);
-        if (chatDoc.exists()) {
+        if (chatDoc.exists()) { // Corrected this line
           const chatData = chatDoc.data();
           setMessages(chatData.messages || []);
         } else {
@@ -675,10 +636,11 @@ const OwnerProfile = ({ ownerId }) => {
         setMessages([]);
       }
     } catch (error) {
-      console.error("Error opening message modal: ", error);
+      console.error("Error opening message modal:", error);
       Alert.alert("Error", "Failed to open messages.");
     }
   };
+  
 
   const handleRating = async (orderId, rating) => {
     try {
@@ -729,7 +691,7 @@ const OwnerProfile = ({ ownerId }) => {
                 Good Morning
               </Text>
               <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
-                {user?.fullName || "User"}
+                {user?.displayName || "User"}
               </Text>
             </View>
           </View>
@@ -1170,8 +1132,8 @@ const OwnerProfile = ({ ownerId }) => {
                 <View
                   style={{
                     padding: 8,
-                    backgroundColor: item.senderId === user.id ? "#e2e8f0" : "#bee3f8",
-                    alignSelf: item.senderId === user.id ? "flex-end" : "flex-start",
+                    backgroundColor: item.senderId === user.uid ? "#e2e8f0" : "#bee3f8",
+                    alignSelf: item.senderId === user.uid ? "flex-end" : "flex-start",
                     borderRadius: 8,
                     marginVertical: 4,
                   }}
