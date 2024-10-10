@@ -11,10 +11,9 @@ module.exports = (async () => {
   // Resolve symlinks (especially for Windows environments)
   config.resolver.blockList = exclusionList([
     /node_modules\/.*\/node_modules\/react-native\/.*/,  // Exclude duplicate react-native instances
-    /unsupportedIterableToArray\.js/,                   // Exclude the problematic file
   ]);
 
-  // This ensures that symlinks and dependencies are properly handled
+  // Ensure symlinks and dependencies are handled correctly
   config.resolver.extraNodeModules = {
     ...config.resolver.extraNodeModules,
     'react-native': path.resolve(__dirname, 'node_modules/react-native'),
@@ -22,4 +21,3 @@ module.exports = (async () => {
 
   return config;
 })();
-

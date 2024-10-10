@@ -10,6 +10,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import CustomButton from '../components/CustomButton';
 import { images } from '../constants';
 import { router } from 'expo-router';
+import firebase from '@react-native-firebase/app'; // Import firebase app
+
 
 // Firebase configuration
 const firebaseConfig = {

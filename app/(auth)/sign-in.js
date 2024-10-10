@@ -17,6 +17,8 @@ import { useNavigation } from "@react-navigation/native";
 import { images } from "../../constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Google from 'expo-auth-session/providers/google'; // Import Google Auth Session
+import firebase from '@react-native-firebase/app'; // Import firebase app
+import auth from '@react-native-firebase/auth'; // Import firebase auth
 
 const SignIn = () => {
   const navigation = useNavigation();

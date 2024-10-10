@@ -3,7 +3,7 @@
     "name": "rsf_app",
     "slug": "rsf_app",
     "version": "1.0.0",
-    "scheme": "scheme",
+    "scheme": "rsfapp",  // <-- Add this line
     "orientation": "portrait",
     "icon": "./Assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -30,7 +30,7 @@
     ],
     "jsEngine": "hermes",
     "extra": {
-      "API_URL": "https://api.stripe.com",
+      "API_URL": "https://us-central1-ready-set-fly-71506.cloudfunctions.net/getFirebaseToken",
       "eas": {
         "projectId": "e3d26a84-3e0e-4879-971f-dc5a82b1a37a"
       }
