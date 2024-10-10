@@ -18,7 +18,7 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
-import auth from '@react-native-firebase/auth'; // Firebase Auth import
+import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Updated Firebase Auth import
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { db, storage } from '../../firebaseConfig';
@@ -59,7 +59,8 @@ const COLORS = {
 const Stack = createStackNavigator();
 
 const Classifieds = () => {
-  const user = auth().currentUser; // Use Firebase's current user
+  const auth = getAuth(); // Initialize Firebase Auth
+  const user = auth.currentUser; // Use Firebase's current user
   const { initPaymentSheet } = useStripe();
   const navigation = useNavigation();
   const [listings, setListings] = useState([]);

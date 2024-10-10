@@ -1,3 +1,5 @@
+// SignUp.js
+
 import React, { useState, useCallback } from "react";
 import {
   View,
@@ -11,7 +13,13 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import auth from '@react-native-firebase/auth'; // Firebase Auth import
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+} from "firebase/auth";
+import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { app } from "../../firebaseConfig"; // Adjust the path to your firebaseConfig.js
 import RNPickerSelect from "react-native-picker-select";
 import { useNavigation } from "@react-navigation/native";
 import { images } from "../../constants";
@@ -25,10 +33,7 @@ const SignUp = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [pendingVerification, setPendingVerification] = useState(false);
-  const [code, setCode] = useState("");
   const [termsVisible, setTermsVisible] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [profileVisible, setProfileVisible] = useState(false);
   const [profileData, setProfileData] = useState({
     firstName: "",
@@ -37,6 +42,9 @@ const SignUp = () => {
     profileType: "renter", // Default to "renter"
   });
   const [loading, setLoading] = useState(false);
+
+  const auth = getAuth(app); // Initialize Firebase Auth
+  const db = getFirestore(app); // Initialize Firestore
 
   // Handle form input changes
   const handleProfileChange = (field, value) => {
@@ -61,41 +69,60 @@ const SignUp = () => {
     setLoading(true);
     try {
       // Create a new user with Firebase Authentication
-      await auth().createUserWithEmailAndPassword(emailAddress, password);
-      const user = auth().currentUser;
+      await createUserWithEmailAndPassword(auth, emailAddress, password);
+      const user = auth.currentUser;
 
       // Send email verification
       if (user) {
-        await user.sendEmailVerification();
+        await sendEmailVerification(user);
         setTermsVisible(true); // Show Terms of Service modal if sign-up is successful
       }
     } catch (err) {
       console.error("Sign Up Error:", err);
-      Alert.alert("Sign Up Error", "There was an error during sign up. Please check your email and password.");
+      Alert.alert(
+        "Sign Up Error",
+        "There was an error during sign up. Please check your email and password."
+      );
     } finally {
       setLoading(false);
     }
-  }, [emailAddress, password, confirmPassword]);
+  }, [auth, emailAddress, password, confirmPassword]);
 
   // Handle terms acceptance
-  const onAcceptTerms = useCallback(async () => {
-    setAcceptedTerms(true);
+  const onAcceptTerms = useCallback(() => {
     setTermsVisible(false);
-    setPendingVerification(true);
 
     // Email verification is already sent during sign-up
     setProfileVisible(true); // Show profile modal for user to complete their profile
   }, []);
 
   // Handle profile submission
-  const onProfileSubmit = () => {
-    console.log(profileData);
+  const onProfileSubmit = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        // Save profile data to Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          email: user.email,
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          location: profileData.location,
+          profileType: profileData.profileType,
+          createdAt: new Date(),
+        });
 
-    // Hide the profile modal
-    setProfileVisible(false);
+        // Hide the profile modal
+        setProfileVisible(false);
 
-    // Redirect to the home screen
-    navigation.navigate("(tabs)");
+        // Redirect to the home screen
+        navigation.navigate("(tabs)");
+      } catch (error) {
+        console.error("Error saving profile data:", error);
+        Alert.alert("Error", "Failed to save profile data. Please try again.");
+      }
+    } else {
+      Alert.alert("Error", "No authenticated user found.");
+    }
   };
 
   // Toggle password visibility
@@ -118,7 +145,7 @@ const SignUp = () => {
           marginBottom: 16,
         }}
       />
-      <View style={{ position: 'relative', marginBottom: 16 }}>
+      <View style={{ position: "relative", marginBottom: 16 }}>
         <TextInput
           value={password}
           placeholder="Password"
@@ -134,7 +161,7 @@ const SignUp = () => {
         />
         <TouchableOpacity
           onPress={togglePasswordVisibility}
-          style={{ position: 'absolute', right: 10, top: 12 }}
+          style={{ position: "absolute", right: 10, top: 12 }}
         >
           <MaterialIcons
             name={passwordVisible ? "visibility" : "visibility-off"}
@@ -143,7 +170,7 @@ const SignUp = () => {
           />
         </TouchableOpacity>
       </View>
-      <View style={{ position: 'relative', marginBottom: 16 }}>
+      <View style={{ position: "relative", marginBottom: 16 }}>
         <TextInput
           value={confirmPassword}
           placeholder="Confirm Password"
@@ -159,7 +186,7 @@ const SignUp = () => {
         />
         <TouchableOpacity
           onPress={togglePasswordVisibility}
-          style={{ position: 'absolute', right: 10, top: 12 }}
+          style={{ position: "absolute", right: 10, top: 12 }}
         >
           <MaterialIcons
             name={passwordVisible ? "visibility" : "visibility-off"}
@@ -176,13 +203,35 @@ const SignUp = () => {
     <SafeAreaView style={{ flex: 1, backgroundColor: "white", padding: 16 }}>
       <StatusBar barStyle="dark-content" />
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Image source={images.logo} resizeMode="contain" style={{ width: 240, height: 160, marginBottom: 24 }} />
-        <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>Sign up for Ready, Set, Fly!</Text>
+        <Image
+          source={images.logo}
+          resizeMode="contain"
+          style={{ width: 240, height: 160, marginBottom: 24 }}
+        />
+        <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+          Sign up for Ready, Set, Fly!
+        </Text>
         <View style={{ width: "75%", maxWidth: 400, gap: 16 }}>{renderForm()}</View>
-        <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 16 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            marginTop: 16,
+          }}
+        >
           <Text style={{ fontSize: 18, color: "#4b5563" }}>Already have an account?</Text>
           <TouchableOpacity onPress={() => navigation.navigate("sign-in")}>
-            <Text style={{ fontSize: 18, color: "#3b82f6", marginLeft: 8, fontWeight: "600" }}>Sign in</Text>
+            <Text
+              style={{
+                fontSize: 18,
+                color: "#3b82f6",
+                marginLeft: 8,
+                fontWeight: "600",
+              }}
+            >
+              Sign in
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -212,7 +261,9 @@ const CustomButton = ({ onPress, text, loading, backgroundColor = "#3b82f6" }) =
     }}
     disabled={loading}
   >
-    <Text style={{ color: "white", textAlign: "center", fontSize: 18, fontWeight: "600" }}>
+    <Text
+      style={{ color: "white", textAlign: "center", fontSize: 18, fontWeight: "600" }}
+    >
       {loading ? "Please wait..." : text}
     </Text>
   </TouchableOpacity>
@@ -220,11 +271,33 @@ const CustomButton = ({ onPress, text, loading, backgroundColor = "#3b82f6" }) =
 
 // Terms of Service Modal
 const TermsOfServiceModal = ({ visible, onAccept }) => (
-  <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={() => setTermsVisible(false)}>
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
-      <View style={{ backgroundColor: "white", padding: 16, borderRadius: 8, width: "90%", maxHeight: "80%" }}>
+  <Modal
+    visible={visible}
+    animationType="slide"
+    transparent={true}
+    onRequestClose={() => {}}
+  >
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0,0,0,0.5)",
+      }}
+    >
+      <View
+        style={{
+          backgroundColor: "white",
+          padding: 16,
+          borderRadius: 8,
+          width: "90%",
+          maxHeight: "80%",
+        }}
+      >
         <ScrollView contentContainerStyle={{ padding: 8 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>Terms of Service</Text>
+          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
+            Terms of Service
+          </Text>
           <Text style={{ marginBottom: 16 }}>
             {/* Terms of service content goes here */}
           </Text>
@@ -237,11 +310,33 @@ const TermsOfServiceModal = ({ visible, onAccept }) => (
 
 // Profile Information Modal
 const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
-  <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={() => setProfileVisible(false)}>
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
-      <View style={{ backgroundColor: "white", borderRadius: 8, padding: 16, width: "90%", maxHeight: "80%" }}>
+  <Modal
+    visible={visible}
+    animationType="slide"
+    transparent={true}
+    onRequestClose={() => {}}
+  >
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0,0,0,0.5)",
+      }}
+    >
+      <View
+        style={{
+          backgroundColor: "white",
+          borderRadius: 8,
+          padding: 16,
+          width: "90%",
+          maxHeight: "80%",
+        }}
+      >
         <ScrollView contentContainerStyle={{ padding: 8 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>Complete Your Profile</Text>
+          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
+            Complete Your Profile
+          </Text>
           <TextInput
             placeholder="First Name"
             value={profileData.firstName}

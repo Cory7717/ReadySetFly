@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+// SignIn.js
+
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,17 +14,14 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithCredential } from "firebase/auth"; // Import Firebase Auth methods
+import { auth } from '../../firebaseConfig'; // Import 'auth' from firebaseConfig.js
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { useNavigation } from "@react-navigation/native";
 import { images } from "../../constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Google from 'expo-auth-session/providers/google'; // Import Google Auth Session
-import firebase from '@react-native-firebase/app'; // Import firebase app
-import auth from '@react-native-firebase/auth'; // Import firebase auth
 
 const SignIn = () => {
   const navigation = useNavigation();
-  const auth = getAuth(); // Firebase Auth instance
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -30,28 +29,6 @@ const SignIn = () => {
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
-
-  // Google sign-in setup
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: '64600529166-fir2apdksujl8noihmff9n06seoql865.apps.googleusercontent.com', // Replace with your actual Google client ID
-  });
-
-  // Handle Google sign-in response
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential)
-        .then(() => {
-          console.log("Signed in with Google!");
-          navigation.navigate("(tabs)"); // Navigate to main tabs after login
-        })
-        .catch((error) => {
-          console.error("Google sign-in error: ", error);
-          Alert.alert("Error", "Google sign-in failed. Please try again.");
-        });
-    }
-  }, [response]);
 
   // Failed Attempts State
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -81,8 +58,9 @@ const SignIn = () => {
           if (now < endTime) {
             setIsLockedOut(true);
             setLockoutEndTime(endTime);
-            updateLockoutRemainingTime(endTime);
-            startLockoutTimer(endTime);
+            // You may need to implement updateLockoutRemainingTime and startLockoutTimer functions
+            // updateLockoutRemainingTime(endTime);
+            // startLockoutTimer(endTime);
           } else {
             // Lockout period has passed
             await AsyncStorage.removeItem("lockoutEndTime");
@@ -99,7 +77,7 @@ const SignIn = () => {
     loadLockoutData();
   }, []);
 
-  const onSignInPress = React.useCallback(async () => {
+  const onSignInPress = async () => {
     if (isLockedOut) {
       Alert.alert(
         "Account Locked",
@@ -119,18 +97,11 @@ const SignIn = () => {
 
       setFailedAttempts(0);
       await AsyncStorage.setItem("failedAttempts", "0");
-
     } catch (err) {
       handleFailedAttempt();
       console.error(err);
     }
-  }, [
-    emailAddress,
-    password,
-    navigation,
-    isLockedOut,
-    lockoutRemainingTime,
-  ]);
+  };
 
   const handleFailedAttempt = async () => {
     const newFailedAttempts = failedAttempts + 1;
@@ -149,7 +120,8 @@ const SignIn = () => {
         "You have been locked out due to multiple failed sign-in attempts. Please try again after 20 minutes."
       );
 
-      startLockoutTimer(endTime);
+      // You may need to implement startLockoutTimer function
+      // startLockoutTimer(endTime);
     } else {
       Alert.alert(
         "Sign In Failed",
@@ -218,15 +190,6 @@ const SignIn = () => {
             )}
           </TouchableOpacity>
 
-          {/* Google sign-in button */}
-          <TouchableOpacity
-            onPress={() => promptAsync()}
-            style={styles.googleButton}
-            disabled={!request}
-          >
-            <Text style={styles.googleButtonText}>Log in with Google</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             onPress={onForgotPasswordPress}
             style={styles.forgotPasswordButton}
@@ -288,6 +251,7 @@ const SignIn = () => {
 };
 
 const styles = StyleSheet.create({
+  // ... (Your styles remain unchanged)
   container: {
     flex: 1,
     backgroundColor: 'white',
@@ -324,18 +288,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#3b82f6',
     borderRadius: 8,
     padding: 12,
-  },
-  googleButton: {
-    backgroundColor: '#db4437',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-  },
-  googleButtonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '600',
   },
   disabledButton: {
     backgroundColor: '#a5b4fc',

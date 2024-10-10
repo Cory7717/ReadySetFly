@@ -1,3 +1,5 @@
+// index.js
+
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -5,32 +7,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { Stack } from 'expo-router';
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebaseConfig'; // Adjust the path if necessary
 import CustomButton from '../components/CustomButton';
 import { images } from '../constants';
 import { router } from 'expo-router';
-import firebase from '@react-native-firebase/app'; // Import firebase app
-
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-};
-
-// Initialize Firebase
-let app;
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
-const auth = getAuth(app);
 
 // Function to retrieve Stripe Publishable Key
 const getStripePublishableKey = () => {
@@ -46,11 +27,7 @@ const App = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-      } else {
-        setUser(null);
-      }
+      setUser(currentUser);
     });
 
     return () => unsubscribe(); // Cleanup the listener on unmount
