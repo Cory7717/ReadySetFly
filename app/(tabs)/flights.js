@@ -1,3 +1,5 @@
+// app/(tabs)/flights.js
+
 import React, {
   useState,
   useEffect,
@@ -50,9 +52,6 @@ import { db, storage, auth } from '../../firebaseConfig';
 import { Avatar, Badge, Button } from 'react-native-paper';
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
-import Carousel from 'react-native-snap-carousel';
-import { Audio, Video } from 'expo-av';
-
 
 // Constants
 const DEFAULT_PROFILE_IMAGE = 'https://via.placeholder.com/150';
@@ -71,33 +70,13 @@ const generateUniqueId = () => {
   return `unknown_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
-// Detects URLs, mentions, and hashtags in the text and makes them clickable
-const handleTextWithLinks = (text, onMentionPress, onHashtagPress) => {
-  const regex = /(@\w+|#\w+|https?:\/\/[^\s]+)/g;
-  const parts = text.split(regex);
+// Detects URLs in the text and makes them clickable
+const handleTextWithLinks = (text) => {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
 
   return parts.map((part, index) => {
-    if (part.startsWith('@')) {
-      return (
-        <Text
-          key={`mention-${index}`}
-          style={styles.linkText}
-          onPress={() => onMentionPress(part.substring(1))}
-        >
-          {part}
-        </Text>
-      );
-    } else if (part.startsWith('#')) {
-      return (
-        <Text
-          key={`hashtag-${index}`}
-          style={styles.linkText}
-          onPress={() => onHashtagPress(part.substring(1))}
-        >
-          {part}
-        </Text>
-      );
-    } else if (part.startsWith('http')) {
+    if (urlRegex.test(part)) {
       return (
         <Text
           key={`link-${index}`}
@@ -167,7 +146,6 @@ const Comment = ({
   postId,
   depth = 0, // Default depth
   onProfileImagePress,
-  onReportContent, // For reporting comments
 }) => {
   const [liked, setLiked] = useState((comment.likes || []).includes(userId));
   const [showReplyInput, setShowReplyInput] = useState(false);
@@ -276,13 +254,7 @@ const Comment = ({
         </TouchableOpacity>
         <View style={styles.commentContent}>
           <Text style={styles.commentUserName}>{comment.userName}</Text>
-          <Text>
-            {handleTextWithLinks(
-              comment.text,
-              () => {},
-              () => {}
-            )}
-          </Text>
+          <Text>{comment.text}</Text>
           <View style={styles.commentActions}>
             <TouchableOpacity
               onPress={handleLike}
@@ -306,15 +278,6 @@ const Comment = ({
               accessibilityLabel="Reply to Comment"
             >
               <Text style={styles.replyText}>Reply</Text>
-            </TouchableOpacity>
-            {/* Report Comment */}
-            <TouchableOpacity
-              onPress={() => onReportContent('comment', comment.id)}
-              style={styles.commentReplyButton}
-              accessible={true}
-              accessibilityLabel="Report Comment"
-            >
-              <Text style={styles.reportText}>Report</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -352,7 +315,6 @@ const Comment = ({
               userId={userId}
               depth={reply.depth || 0} // Initialize depth, default to 0
               onProfileImagePress={onProfileImagePress} // Pass it down
-              onReportContent={onReportContent}
             />
           ))}
           {comment.replies.length > 3 && (
@@ -365,460 +327,422 @@ const Comment = ({
 };
 
 // Post Component
-const Post = React.memo(
-  ({
-    post,
-    onViewPost,
-    onProfileImagePress,
-    onReportContent, // For reporting posts
-  }) => {
-    const [currentPost, setCurrentPost] = useState(post);
-    const [commentText, setCommentText] = useState('');
-    const [comments, setComments] = useState(currentPost.comments || []);
-    const [likes, setLikes] = useState(currentPost.likes || []);
-    const [liked, setLiked] = useState(
-      (currentPost.likes || []).includes(auth.currentUser.uid)
+const Post = React.memo(({ post, onViewPost, onProfileImagePress }) => {
+  const [currentPost, setCurrentPost] = useState(post);
+  const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState(currentPost.comments || []);
+  const [likes, setLikes] = useState(currentPost.likes || []);
+  const [liked, setLiked] = useState(
+    (currentPost.likes || []).includes(auth.currentUser.uid)
+  );
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editText, setEditText] = useState(currentPost.content);
+
+  // Fetch the latest user profile
+  const userProfile = useUserProfile(currentPost.userId);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, 'posts', currentPost.id),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const updatedPost = { id: docSnap.id, ...docSnap.data() };
+          setCurrentPost(updatedPost);
+          setComments(updatedPost.comments || []);
+          setLikes(updatedPost.likes || []);
+          setLiked(updatedPost.likes?.includes(auth.currentUser.uid));
+        }
+      }
     );
-    const [editModalVisible, setEditModalVisible] = useState(false);
-    const [editText, setEditText] = useState(currentPost.content);
+    return () => unsubscribe();
+  }, [currentPost.id]);
 
-    // Fetch the latest user profile
-    const userProfile = useUserProfile(currentPost.userId);
+  const handleEdit = async () => {
+    try {
+      const postRef = doc(db, 'posts', currentPost.id);
+      await updateDoc(postRef, {
+        content: editText,
+      });
+      setEditModalVisible(false);
+    } catch (error) {
+      Alert.alert('Error', 'Could not update post.');
+      console.log(error);
+    }
+  };
 
-    useEffect(() => {
-      const unsubscribe = onSnapshot(
-        doc(db, 'posts', currentPost.id),
-        (docSnap) => {
-          if (docSnap.exists()) {
-            const updatedPost = { id: docSnap.id, ...docSnap.data() };
-            setCurrentPost(updatedPost);
-            setComments(updatedPost.comments || []);
-            setLikes(updatedPost.likes || []);
-            setLiked(updatedPost.likes?.includes(auth.currentUser.uid));
-          }
-        }
-      );
-      return () => unsubscribe();
-    }, [currentPost.id]);
+  const handleDelete = async () => {
+    Alert.alert(
+      'Confirm Delete',
+      'Are you sure you want to delete this post?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, 'posts', currentPost.id));
+            } catch (error) {
+              Alert.alert('Error', 'Could not delete post.');
+              console.log(error);
+            }
+          },
+        },
+      ]
+    );
+  };
 
-    const handleEdit = async () => {
-      try {
-        const postRef = doc(db, 'posts', currentPost.id);
+  const handleLike = useCallback(async () => {
+    try {
+      const postRef = doc(db, 'posts', currentPost.id);
+      if (liked) {
         await updateDoc(postRef, {
-          content: editText,
+          likes: arrayRemove(auth.currentUser.uid),
         });
-        setEditModalVisible(false);
-      } catch (error) {
-        Alert.alert('Error', 'Could not update post.');
-        console.log(error);
-      }
-    };
+        setLiked(false);
+      } else {
+        await updateDoc(postRef, {
+          likes: arrayUnion(auth.currentUser.uid),
+        });
+        setLiked(true);
 
-    const handleDelete = async () => {
-      Alert.alert(
-        'Confirm Delete',
-        'Are you sure you want to delete this post?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await deleteDoc(doc(db, 'posts', currentPost.id));
-              } catch (error) {
-                Alert.alert('Error', 'Could not delete post.');
-                console.log(error);
-              }
-            },
-          },
-        ]
-      );
-    };
-
-    const handleLike = useCallback(async () => {
-      try {
-        const postRef = doc(db, 'posts', currentPost.id);
-        if (liked) {
-          await updateDoc(postRef, {
-            likes: arrayRemove(auth.currentUser.uid),
-          });
-          setLiked(false);
-        } else {
-          await updateDoc(postRef, {
-            likes: arrayUnion(auth.currentUser.uid),
-          });
-          setLiked(true);
-
-          if (currentPost.userId !== auth.currentUser.uid) {
-            await addDoc(collection(db, 'notifications'), {
-              toUserId: currentPost.userId,
-              fromUserId: auth.currentUser.uid,
-              fromUserName: auth.currentUser.displayName || 'Anonymous',
-              type: 'like',
-              postId: currentPost.id,
-              read: false,
-              createdAt: serverTimestamp(),
-            });
-          }
-        }
-      } catch (error) {
-        Alert.alert('Error', 'Could not update like.');
-        console.log(error);
-      }
-    }, [liked, currentPost.id, currentPost.userId]);
-
-    const handleShare = useCallback(async () => {
-      Alert.alert('Share', `Sharing ${currentPost.userName}'s post.`);
-      if (currentPost.userId !== auth.currentUser.uid) {
-        try {
+        if (currentPost.userId !== auth.currentUser.uid) {
           await addDoc(collection(db, 'notifications'), {
             toUserId: currentPost.userId,
             fromUserId: auth.currentUser.uid,
             fromUserName: auth.currentUser.displayName || 'Anonymous',
-            type: 'share',
+            type: 'like',
             postId: currentPost.id,
             read: false,
             createdAt: serverTimestamp(),
           });
-        } catch (error) {
-          Alert.alert('Error', 'Could not send share notification.');
-          console.log(error);
         }
       }
-    }, [currentPost.userId, currentPost.userName, currentPost.id]);
+    } catch (error) {
+      Alert.alert('Error', 'Could not update like.');
+      console.log(error);
+    }
+  }, [liked, currentPost.id, currentPost.userId]);
 
-    const renderDate = useMemo(() => {
-      if (currentPost.createdAt) {
-        if (currentPost.createdAt.toDate) {
-          return new Date(currentPost.createdAt.toDate()).toLocaleDateString();
-        } else if (currentPost.createdAt instanceof Date) {
-          return currentPost.createdAt.toLocaleDateString();
-        }
+  const handleShare = useCallback(async () => {
+    Alert.alert('Share', `Sharing ${currentPost.userName}'s post.`);
+    if (currentPost.userId !== auth.currentUser.uid) {
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          toUserId: currentPost.userId,
+          fromUserId: auth.currentUser.uid,
+          fromUserName: auth.currentUser.displayName || 'Anonymous',
+          type: 'share',
+          postId: currentPost.id,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (error) {
+        Alert.alert('Error', 'Could not send share notification.');
+        console.log(error);
       }
-      return 'Unknown Date';
-    }, [currentPost.createdAt]);
+    }
+  }, [currentPost.userId, currentPost.userName, currentPost.id]);
 
-    // Function to handle adding a comment from the main screen
-    const handleAddComment = useCallback(async () => {
-      if (commentText.trim()) {
-        const newComment = {
-          id: generateUniqueId(), // Unique ID
-          userId: auth.currentUser.uid,
-          userName: auth.currentUser.displayName || 'Anonymous',
-          text: commentText.trim(),
-          likes: [],
-          replies: [],
-          depth: 0, // Initial depth for top-level comments
-        };
-        try {
-          const postRef = doc(db, 'posts', currentPost.id);
-          await updateDoc(postRef, {
-            comments: arrayUnion(newComment),
+  const renderDate = useMemo(() => {
+    if (currentPost.createdAt) {
+      if (currentPost.createdAt.toDate) {
+        return new Date(currentPost.createdAt.toDate()).toLocaleDateString();
+      } else if (currentPost.createdAt instanceof Date) {
+        return currentPost.createdAt.toLocaleDateString();
+      }
+    }
+    return 'Unknown Date';
+  }, [currentPost.createdAt]);
+
+  // Function to handle adding a comment from the main screen
+  const handleAddComment = useCallback(async () => {
+    if (commentText.trim()) {
+      const newComment = {
+        id: generateUniqueId(), // Unique ID
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || 'Anonymous',
+        text: commentText.trim(),
+        likes: [],
+        replies: [],
+        depth: 0, // Initial depth for top-level comments
+      };
+      try {
+        const postRef = doc(db, 'posts', currentPost.id);
+        await updateDoc(postRef, {
+          comments: arrayUnion(newComment),
+        });
+        setCommentText('');
+
+        if (currentPost.userId !== auth.currentUser.uid) {
+          await addDoc(collection(db, 'notifications'), {
+            toUserId: currentPost.userId,
+            fromUserId: auth.currentUser.uid,
+            fromUserName: auth.currentUser.displayName || 'Anonymous',
+            type: 'comment',
+            postId: currentPost.id,
+            commentId: newComment.id,
+            read: false,
+            createdAt: serverTimestamp(),
           });
-          setCommentText('');
-
-          if (currentPost.userId !== auth.currentUser.uid) {
-            await addDoc(collection(db, 'notifications'), {
-              toUserId: currentPost.userId,
-              fromUserId: auth.currentUser.uid,
-              fromUserName: auth.currentUser.displayName || 'Anonymous',
-              type: 'comment',
-              postId: currentPost.id,
-              commentId: newComment.id,
-              read: false,
-              createdAt: serverTimestamp(),
-            });
-          }
-        } catch (error) {
-          Alert.alert('Error', 'Could not add comment.');
-          console.log(error);
         }
+      } catch (error) {
+        Alert.alert('Error', 'Could not add comment.');
+        console.log(error);
       }
-    }, [commentText, currentPost.id, currentPost.userId]);
+    }
+  }, [commentText, currentPost.id, currentPost.userId]);
 
-    // Function to handle liking/unliking a comment
-    const handleLikeComment = useCallback(
-      async (commentId, commentAuthorId) => {
-        try {
-          const postRef = doc(db, 'posts', currentPost.id);
-          const currentComments = comments;
+  // Function to handle liking/unliking a comment
+  const handleLikeComment = useCallback(
+    async (commentId, commentAuthorId) => {
+      try {
+        const postRef = doc(db, 'posts', currentPost.id);
+        const currentComments = comments;
 
-          const updatedComments = currentComments.map((cmt) => {
-            if (cmt.id === commentId) {
-              if (cmt.likes.includes(auth.currentUser.uid)) {
-                return {
-                  ...cmt,
-                  likes: cmt.likes.filter((uid) => uid !== auth.currentUser.uid),
-                };
-              } else {
-                return {
-                  ...cmt,
-                  likes: [...cmt.likes, auth.currentUser.uid],
-                };
-              }
+        const updatedComments = currentComments.map((cmt) => {
+          if (cmt.id === commentId) {
+            if (cmt.likes.includes(auth.currentUser.uid)) {
+              return {
+                ...cmt,
+                likes: cmt.likes.filter((uid) => uid !== auth.currentUser.uid),
+              };
+            } else {
+              return {
+                ...cmt,
+                likes: [...cmt.likes, auth.currentUser.uid],
+              };
             }
-            return cmt;
-          });
-
-          await updateDoc(postRef, { comments: updatedComments });
-
-          // Find the updated comment
-          const updatedComment = updatedComments.find(
-            (cmt) => cmt.id === commentId
-          );
-
-          // If the comment is liked, send a notification
-          if (updatedComment.likes.includes(auth.currentUser.uid)) {
-            await addDoc(collection(db, 'notifications'), {
-              toUserId: commentAuthorId,
-              fromUserId: auth.currentUser.uid,
-              fromUserName: auth.currentUser.displayName || 'Anonymous',
-              type: 'like_comment',
-              postId: currentPost.id,
-              commentId: commentId,
-              read: false,
-              createdAt: serverTimestamp(),
-            });
           }
-        } catch (error) {
-          console.log(error);
-          Alert.alert('Error', 'Could not update comment like.');
+          return cmt;
+        });
+
+        await updateDoc(postRef, { comments: updatedComments });
+
+        // Find the updated comment
+        const updatedComment = updatedComments.find(
+          (cmt) => cmt.id === commentId
+        );
+
+        // If the comment is liked, send a notification
+        if (updatedComment.likes.includes(auth.currentUser.uid)) {
+          await addDoc(collection(db, 'notifications'), {
+            toUserId: commentAuthorId,
+            fromUserId: auth.currentUser.uid,
+            fromUserName: auth.currentUser.displayName || 'Anonymous',
+            type: 'like_comment',
+            postId: currentPost.id,
+            commentId: commentId,
+            read: false,
+            createdAt: serverTimestamp(),
+          });
         }
-      },
-      [comments, currentPost.id]
-    );
+      } catch (error) {
+        console.log(error);
+        Alert.alert('Error', 'Could not update comment like.');
+      }
+    },
+    [comments, currentPost.id]
+  );
 
-    const onMentionPress = (username) => {
-      // Implement logic to fetch user by username and open their profile
-      Alert.alert('Mention', `You mentioned @${username}`);
-    };
-
-    const onHashtagPress = (hashtag) => {
-      // Implement logic to navigate to posts with this hashtag
-      Alert.alert('Hashtag', `You clicked on #${hashtag}`);
-    };
-
-    return (
-      <TouchableOpacity
-        onPress={() => onViewPost(currentPost)}
-        accessible={true}
-        accessibilityLabel="View Full Post"
-      >
-        <View style={styles.postContainer}>
-          <View style={styles.postHeader}>
-            <TouchableOpacity
-              onPress={() => {
-                if (currentPost.userId) {
-                  onProfileImagePress(currentPost.userId);
-                } else {
-                  Alert.alert('Error', 'User ID not available.');
-                }
-              }}
-              accessible={true}
-              accessibilityLabel="View User Profile"
-            >
-              {userProfile ? (
-                <Image
-                  source={{ uri: userProfile.image || DEFAULT_PROFILE_IMAGE }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <Image
-                  source={{ uri: DEFAULT_PROFILE_IMAGE }}
-                  style={styles.avatar}
-                />
-              )}
-            </TouchableOpacity>
-            <View style={styles.postUserInfo}>
-              <Text style={styles.postUserName}>
-                {currentPost?.userName || 'Unknown User'}
-              </Text>
-              <Text style={styles.postDate}>{renderDate}</Text>
-            </View>
-            {currentPost.userId === auth.currentUser?.uid && (
-              <TouchableOpacity
-                onPress={() => setEditModalVisible(true)}
-                style={styles.menuButton}
-                accessible={true}
-                accessibilityLabel="Edit Post"
-              >
-                <Ionicons name="ellipsis-vertical" size={24} color="gray" />
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text numberOfLines={4} ellipsizeMode="tail" style={styles.postContent}>
-            {handleTextWithLinks(
-              currentPost?.content || '',
-              onMentionPress,
-              onHashtagPress
-            )}
-          </Text>
-          {currentPost.images && currentPost.images.length > 0 && (
-            <View style={styles.postImageContainer}>
-              {/* Display image gallery */}
-              <ScrollView horizontal>
-                {currentPost.images.map((imgUri, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    onPress={() => onViewPost(currentPost)}
-                    accessible={true}
-                    accessibilityLabel="View Post Image"
-                  >
-                    <Image
-                      source={{ uri: imgUri }}
-                      style={styles.postImage}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          <View style={styles.postActions}>
-            <TouchableOpacity
-              style={styles.postActionButton}
-              onPress={handleLike}
-              accessible={true}
-              accessibilityLabel="Like Post"
-            >
-              <Ionicons
-                name={liked ? 'heart' : 'heart-outline'}
-                size={24}
-                color={liked ? 'red' : 'gray'}
-              />
-              <Text style={styles.postActionText}>
-                {likes.length > 0 ? likes.length : ''}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.postActionButton}
-              onPress={handleShare}
-              accessible={true}
-              accessibilityLabel="Share Post"
-            >
-              <Ionicons name="share-social-outline" size={24} color="gray" />
-              <Text style={styles.postActionText}>Share</Text>
-            </TouchableOpacity>
-            {/* Report Post */}
-            <TouchableOpacity
-              style={styles.postActionButton}
-              onPress={() => onReportContent('post', currentPost.id)}
-              accessible={true}
-              accessibilityLabel="Report Post"
-            >
-              <Ionicons name="flag-outline" size={24} color="gray" />
-              <Text style={styles.postActionText}>Report</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.commentsSection}>
-            {comments.slice(0, 3).map((cmt) => (
-              <Comment
-                key={cmt.id || generateUniqueId()} // Ensure 'id' exists and is unique
-                comment={cmt}
-                postId={currentPost.id} // Pass 'postId' to Comment
-                onLikeComment={handleLikeComment}
-                onReplyComment={() => {}} // Implement reply functionality as needed
-                userId={auth.currentUser.uid}
-                depth={cmt.depth || 0} // Initialize depth, default to 0
-                onProfileImagePress={onProfileImagePress}
-                onReportContent={onReportContent}
-              />
-            ))}
-            {comments.length > 3 && (
-              <Text style={styles.viewMoreComments}>View more comments...</Text>
-            )}
-          </View>
-
-          <View style={styles.commentInputContainer}>
-            <TouchableOpacity
-              onPress={() => {
-                if (auth.currentUser?.uid) {
-                  onProfileImagePress(auth.currentUser.uid);
-                } else {
-                  Alert.alert('Error', 'User not authenticated.');
-                }
-              }}
-              disabled={!auth.currentUser?.uid} // Disable if user not authenticated
-              accessible={true}
-              accessibilityLabel="View Your Profile"
-            >
+  return (
+    <TouchableOpacity
+      onPress={() => onViewPost(currentPost)}
+      accessible={true}
+      accessibilityLabel="View Full Post"
+    >
+      <View style={styles.postContainer}>
+        <View style={styles.postHeader}>
+          <TouchableOpacity
+            onPress={() => {
+              if (currentPost.userId) {
+                onProfileImagePress(currentPost.userId);
+              } else {
+                Alert.alert('Error', 'User ID not available.');
+              }
+            }}
+            accessible={true}
+            accessibilityLabel="View User Profile"
+          >
+            {userProfile ? (
               <Image
-                source={{
-                  uri: auth.currentUser?.photoURL || DEFAULT_PROFILE_IMAGE,
-                }}
+                source={{ uri: userProfile.image || DEFAULT_PROFILE_IMAGE }}
                 style={styles.avatar}
               />
-            </TouchableOpacity>
-            <TextInput
-              placeholder="Add a comment..."
-              value={commentText}
-              onChangeText={setCommentText}
-              style={styles.commentInput}
-              accessible={true}
-              accessibilityLabel="Add a comment input field"
-            />
+            ) : (
+              <Image
+                source={{ uri: DEFAULT_PROFILE_IMAGE }}
+                style={styles.avatar}
+              />
+            )}
+          </TouchableOpacity>
+          <View style={styles.postUserInfo}>
+            <Text style={styles.postUserName}>
+              {currentPost?.userName || 'Unknown User'}
+            </Text>
+            <Text style={styles.postDate}>{renderDate}</Text>
+          </View>
+          {currentPost.userId === auth.currentUser?.uid && (
             <TouchableOpacity
-              onPress={handleAddComment}
-              disabled={!commentText.trim()}
+              onPress={() => setEditModalVisible(true)}
+              style={styles.menuButton}
               accessible={true}
-              accessibilityLabel="Submit Comment"
+              accessibilityLabel="Edit Post"
             >
-              <Ionicons
-                name="send"
-                size={24}
-                color="#1D4ED8"
-                style={styles.sendIcon}
+              <Ionicons name="ellipsis-vertical" size={24} color="gray" />
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text numberOfLines={4} ellipsizeMode="tail" style={styles.postContent}>
+          {handleTextWithLinks(currentPost?.content || '')}
+        </Text>
+        {currentPost.image && (
+          <View style={styles.postImageContainer}>
+            <TouchableOpacity
+              onPress={() => onViewPost(currentPost)}
+              accessible={true}
+              accessibilityLabel="View Post Image"
+            >
+              <Image
+                source={{ uri: currentPost.image }}
+                style={styles.postImage}
+                resizeMode="cover"
               />
             </TouchableOpacity>
           </View>
+        )}
 
-          <Modal
-            visible={editModalVisible}
-            transparent={true}
-            animationType="slide"
+        <View style={styles.postActions}>
+          <TouchableOpacity
+            style={styles.postActionButton}
+            onPress={handleLike}
+            accessible={true}
+            accessibilityLabel="Like Post"
           >
-            <View style={styles.editModalContainer}>
-              <View style={styles.editModal}>
-                <TextInput
-                  style={styles.editInput}
-                  value={editText}
-                  onChangeText={setEditText}
-                  multiline
-                  accessible={true}
-                  accessibilityLabel="Edit post content"
-                />
-                <View style={styles.modalButtons}>
-                  <Button onPress={handleEdit} accessibilityLabel="Save Edit">
-                    Save
-                  </Button>
-                  <Button
-                    onPress={() => setEditModalVisible(false)}
-                    accessibilityLabel="Cancel Edit"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onPress={handleDelete}
-                    color="red"
-                    accessibilityLabel="Delete Post"
-                  >
-                    Delete
-                  </Button>
-                </View>
+            <Ionicons
+              name={liked ? 'heart' : 'heart-outline'}
+              size={24}
+              color={liked ? 'red' : 'gray'}
+            />
+            <Text style={styles.postActionText}>
+              {likes.length > 0 ? likes.length : ''}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.postActionButton}
+            onPress={handleShare}
+            accessible={true}
+            accessibilityLabel="Share Post"
+          >
+            <Ionicons name="share-social-outline" size={24} color="gray" />
+            <Text style={styles.postActionText}>Share</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.commentsSection}>
+          {comments.slice(0, 3).map((cmt) => (
+            <Comment
+              key={cmt.id || generateUniqueId()} // Ensure 'id' exists and is unique
+              comment={cmt}
+              postId={currentPost.id} // Pass 'postId' to Comment
+              onLikeComment={handleLikeComment}
+              onReplyComment={() => {}} // Implement reply functionality as needed
+              userId={auth.currentUser.uid}
+              depth={cmt.depth || 0} // Initialize depth, default to 0
+              onProfileImagePress={onProfileImagePress}
+            />
+          ))}
+          {comments.length > 3 && (
+            <Text style={styles.viewMoreComments}>View more comments...</Text>
+          )}
+        </View>
+
+        <View style={styles.commentInputContainer}>
+          <TouchableOpacity
+            onPress={() => {
+              if (auth.currentUser?.uid) {
+                onProfileImagePress(auth.currentUser.uid);
+              } else {
+                Alert.alert('Error', 'User not authenticated.');
+              }
+            }}
+            disabled={!auth.currentUser?.uid} // Disable if user not authenticated
+            accessible={true}
+            accessibilityLabel="View Your Profile"
+          >
+            <Image
+              source={{
+                uri: auth.currentUser?.photoURL || DEFAULT_PROFILE_IMAGE,
+              }}
+              style={styles.avatar}
+            />
+          </TouchableOpacity>
+          <TextInput
+            placeholder="Add a comment..."
+            value={commentText}
+            onChangeText={setCommentText}
+            style={styles.commentInput}
+            accessible={true}
+            accessibilityLabel="Add a comment input field"
+          />
+          <TouchableOpacity
+            onPress={handleAddComment}
+            disabled={!commentText.trim()}
+            accessible={true}
+            accessibilityLabel="Submit Comment"
+          >
+            <Ionicons
+              name="send"
+              size={24}
+              color="#1D4ED8"
+              style={styles.sendIcon}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <Modal
+          visible={editModalVisible}
+          transparent={true}
+          animationType="slide"
+        >
+          <View style={styles.editModalContainer}>
+            <View style={styles.editModal}>
+              <TextInput
+                style={styles.editInput}
+                value={editText}
+                onChangeText={setEditText}
+                multiline
+                accessible={true}
+                accessibilityLabel="Edit post content"
+              />
+              <View style={styles.modalButtons}>
+                <Button onPress={handleEdit} accessibilityLabel="Save Edit">
+                  Save
+                </Button>
+                <Button
+                  onPress={() => setEditModalVisible(false)}
+                  accessibilityLabel="Cancel Edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onPress={handleDelete}
+                  color="red"
+                  accessibilityLabel="Delete Post"
+                >
+                  Delete
+                </Button>
               </View>
             </View>
-          </Modal>
-        </View>
-      </TouchableOpacity>
-    );
-  }
-);
+          </View>
+        </Modal>
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 Post.displayName = 'Post';
 
@@ -913,7 +837,9 @@ const UserHeader = ({ navigation, onProfileImagePress }) => {
             xhr.send(null);
           });
 
-          const filename = `profileImages/${user.uid}/${user.uid}_${Date.now()}`;
+          const filename = `profileImages/${user.uid}/${
+            user.uid
+          }_${Date.now()}`;
           const storageRef = ref(storage, filename);
           await uploadBytes(storageRef, blob);
 
@@ -1010,10 +936,10 @@ const UserHeader = ({ navigation, onProfileImagePress }) => {
   );
 };
 
-// Create Post Component with multiple image handling
+// Create Post Component with image handling
 const CreatePost = () => {
   const [content, setContent] = useState('');
-  const [images, setImages] = useState([]);
+  const [image, setImage] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState(null);
 
@@ -1026,7 +952,7 @@ const CreatePost = () => {
     return () => unsubscribe();
   }, []);
 
-  const pickImages = useCallback(async () => {
+  const pickImage = useCallback(async () => {
     try {
       const { status } = await ImagePicker.getMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
@@ -1043,50 +969,46 @@ const CreatePost = () => {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
         quality: 1,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selectedImages = result.assets.map((asset) => asset.uri);
+        const selectedImage = result.assets[0].uri;
 
-        if (selectedImages) {
-          setImages([...images, ...selectedImages]);
+        if (selectedImage) {
+          setImage(selectedImage);
         } else {
-          Alert.alert('Error', 'Failed to select images.');
+          Alert.alert('Error', 'Failed to select image.');
         }
       }
     } catch (error) {
       console.log(error);
-      Alert.alert('Error', 'Could not pick images.');
+      Alert.alert('Error', 'Could not pick image.');
     }
-  }, [images]);
+  }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (content.trim() || images.length > 0) {
-      let imageUrls = [];
+    if (content.trim() || image) {
+      let imageUrl = null;
 
-      if (images.length > 0) {
+      if (image) {
         setUploading(true);
         try {
-          for (const image of images) {
-            const response = await fetch(image);
-            const blob = await response.blob();
+          const response = await fetch(image);
+          const blob = await response.blob();
 
-            const filename = `${user.uid}_${Date.now()}_${Math.random()
-              .toString(36)
-              .substr(2, 9)}`;
-            const storageRef = ref(storage, `postImages/${filename}`);
-            await uploadBytes(storageRef, blob);
+          const filename = `${user.uid}_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
+          const storageRef = ref(storage, `postImages/${filename}`);
+          await uploadBytes(storageRef, blob);
 
-            blob.close();
+          blob.close();
 
-            const imageUrl = await getDownloadURL(storageRef);
-            imageUrls.push(imageUrl);
-          }
+          imageUrl = await getDownloadURL(storageRef);
         } catch (error) {
           console.log(error);
-          Alert.alert('Error', 'Could not upload images.');
+          Alert.alert('Error', 'Could not upload image.');
           setUploading(false);
           return;
         }
@@ -1095,7 +1017,7 @@ const CreatePost = () => {
 
       const newPost = {
         content,
-        images: imageUrls,
+        image: imageUrl || null,
         createdAt: serverTimestamp(),
         userId: user.uid,
         userName: user.displayName || 'Anonymous',
@@ -1106,18 +1028,18 @@ const CreatePost = () => {
       try {
         await addDoc(collection(db, 'posts'), newPost);
         setContent('');
-        setImages([]);
+        setImage(null);
       } catch (error) {
         Alert.alert('Error', 'Could not submit post.');
         console.log(error);
       }
     } else {
-      Alert.alert('Error', 'Please enter some text or upload images.');
+      Alert.alert('Error', 'Please enter some text or upload an image.');
     }
-  }, [content, images, user]);
+  }, [content, image, user]);
 
-  const removeImage = (index) => {
-    setImages(images.filter((_, i) => i !== index));
+  const removeImage = () => {
+    setImage(null);
   };
 
   return (
@@ -1138,7 +1060,7 @@ const CreatePost = () => {
         />
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={uploading || (!content.trim() && images.length === 0)}
+          disabled={uploading || (!content.trim() && !image)}
           accessible={true}
           accessibilityLabel="Submit Post"
         >
@@ -1150,33 +1072,27 @@ const CreatePost = () => {
           />
         </TouchableOpacity>
       </View>
-      {images.length > 0 && (
+      {image && (
         <View style={styles.imagePreviewContainer}>
-          <ScrollView horizontal>
-            {images.map((imgUri, index) => (
-              <View key={index} style={styles.imageThumbnailContainer}>
-                <Image source={{ uri: imgUri }} style={styles.imageThumbnail} />
-                <TouchableOpacity
-                  onPress={() => removeImage(index)}
-                  style={styles.removeImageButton}
-                  accessible={true}
-                  accessibilityLabel="Remove Image"
-                >
-                  <Ionicons name="close" size={16} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </ScrollView>
+          <Image source={{ uri: image }} style={styles.imagePreview} />
+          <TouchableOpacity
+            onPress={removeImage}
+            style={styles.removeImageButton}
+            accessible={true}
+            accessibilityLabel="Remove Image"
+          >
+            <Ionicons name="close" size={16} color="#fff" />
+          </TouchableOpacity>
         </View>
       )}
       <Button
         mode="outlined"
         icon="image-outline"
-        onPress={pickImages}
+        onPress={pickImage}
         style={styles.addButton}
-        accessibilityLabel="Add Photos to Post"
+        accessibilityLabel="Add Photo to Post"
       >
-        Add Photos
+        Add Photo
       </Button>
       {uploading && (
         <ActivityIndicator
@@ -1188,6 +1104,7 @@ const CreatePost = () => {
     </View>
   );
 };
+
 // Notifications Component
 const Notifications = ({ navigation, onProfileImagePress }) => {
   const [notifications, setNotifications] = useState([]);
@@ -1269,98 +1186,232 @@ const Notifications = ({ navigation, onProfileImagePress }) => {
   );
 };
 
-// ProfileModal Component
-const ProfileModal = ({ visible, onClose, userId }) => {
+// FullScreenProfileImageModal Component
+const FullScreenProfileImageModal = ({ visible, onClose, userId }) => {
+  const [profileImageLikes, setProfileImageLikes] = useState([]);
+  const [profileImageComments, setProfileImageComments] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
-  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [commentText, setCommentText] = useState('');
+  const [liking, setLiking] = useState(false);
+  const [commenting, setCommenting] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
+
+    setLoading(true);
     const userRef = doc(db, 'users', userId);
     const unsubscribe = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
-        setUserProfile(docSnap.data());
+        const data = docSnap.data();
+        setUserProfile(data);
+        setProfileImageLikes(data.profileImageLikes || []);
+        setProfileImageComments(data.profileImageComments || []);
       } else {
         setUserProfile(null);
       }
+      setLoading(false);
     });
+
     return () => unsubscribe();
   }, [userId]);
+
+  const hasLiked = useMemo(() => {
+    return profileImageLikes.includes(auth.currentUser.uid);
+  }, [profileImageLikes]);
+
+  const handleLikeImage = useCallback(async () => {
+    if (liking) return; // Prevent multiple taps
+    setLiking(true);
+    try {
+      const userRef = doc(db, 'users', userId);
+      if (hasLiked) {
+        await updateDoc(userRef, {
+          profileImageLikes: arrayRemove(auth.currentUser.uid),
+        });
+      } else {
+        await updateDoc(userRef, {
+          profileImageLikes: arrayUnion(auth.currentUser.uid),
+        });
+
+        if (userId !== auth.currentUser.uid) {
+          await addDoc(collection(db, 'notifications'), {
+            toUserId: userId,
+            fromUserId: auth.currentUser.uid,
+            fromUserName: auth.currentUser.displayName || 'Anonymous',
+            type: 'like_profile_image',
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Could not update like.');
+      console.log(error);
+    }
+    setLiking(false);
+  }, [hasLiked, userId, liking]);
+
+  const handleAddComment = useCallback(async () => {
+    if (commentText.trim()) {
+      setCommenting(true);
+      const newComment = {
+        id: generateUniqueId(),
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || 'Anonymous',
+        text: commentText.trim(),
+        createdAt: serverTimestamp(),
+        depth: 0, // Initial depth for top-level comments in profile image
+      };
+      try {
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+          profileImageComments: arrayUnion(newComment),
+        });
+        setCommentText('');
+
+        if (userId !== auth.currentUser.uid) {
+          await addDoc(collection(db, 'notifications'), {
+            toUserId: userId,
+            fromUserId: auth.currentUser.uid,
+            fromUserName: auth.currentUser.displayName || 'Anonymous',
+            type: 'comment_profile_image',
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Could not add comment.');
+        console.log(error);
+      }
+      setCommenting(false);
+    }
+  }, [commentText, userId]);
+
+  // Function to handle opening profile images within comments inside the modal
+  const handleNestedProfileImagePress = (nestedUserId) => {
+    if (nestedUserId && nestedUserId !== userId) {
+      // Implement logic to handle nested profile image press if needed
+    }
+  };
 
   if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent={false}>
-      <SafeAreaView style={styles.profileModalContainer}>
-        <ScrollView contentContainerStyle={styles.profileModalContent}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+      <SafeAreaView style={styles.fullScreenProfileContainer}>
+        <ScrollView contentContainerStyle={styles.fullScreenProfileContent}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            accessible={true}
+            accessibilityLabel="Close Profile Image Modal"
+          >
             <Ionicons name="close-outline" size={30} color="black" />
           </TouchableOpacity>
-          {userProfile ? (
+          {loading ? (
+            <ActivityIndicator size="large" color="#1D4ED8" />
+          ) : userProfile ? (
             <>
               <Image
                 source={{ uri: userProfile.image || DEFAULT_PROFILE_IMAGE }}
-                style={styles.profileImage}
+                style={styles.fullScreenProfileImage}
+                resizeMode="contain"
               />
-              <Text style={styles.profileName}>{userProfile.displayName}</Text>
-              <Text style={styles.profileBio}>{userProfile.bio}</Text>
-              <Text style={styles.profileLocation}>{userProfile.location}</Text>
-              {userId === auth.currentUser.uid && (
-                <Button onPress={() => setEditProfileVisible(true)}>
-                  Edit Profile
-                </Button>
-              )}
+              <View style={styles.fullScreenProfileActions}>
+                <TouchableOpacity
+                  onPress={handleLikeImage}
+                  style={styles.likeButton}
+                  accessible={true}
+                  accessibilityLabel="Like Profile Image"
+                >
+                  <Ionicons
+                    name={hasLiked ? 'heart' : 'heart-outline'}
+                    size={30}
+                    color={hasLiked ? 'red' : 'gray'}
+                  />
+                  <Text style={styles.likeCount}>
+                    {profileImageLikes.length}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.fullScreenProfileComments}>
+                <Text style={styles.commentsHeader}>Comments</Text>
+                {profileImageComments.map((cmt) => (
+                  <View
+                    key={cmt.id || generateUniqueId()}
+                    style={styles.profileComment}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (cmt.userId) {
+                          handleNestedProfileImagePress(cmt.userId);
+                        } else {
+                          Alert.alert('Error', 'User ID not available.');
+                        }
+                      }}
+                      accessible={true}
+                      accessibilityLabel={`View ${cmt.userName}'s Profile`}
+                    >
+                      <Image
+                        source={{
+                          uri: cmt.userProfileImage || DEFAULT_PROFILE_IMAGE,
+                        }}
+                        style={styles.commentAvatar}
+                      />
+                    </TouchableOpacity>
+                    <View style={styles.commentTextContainer}>
+                      <Text style={styles.commentUserName}>{cmt.userName}</Text>
+                      <Text>{cmt.text}</Text>
+                      <Text style={styles.commentDate}>
+                        {cmt.createdAt?.toDate
+                          ? cmt.createdAt.toDate().toLocaleString()
+                          : ''}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.fullScreenProfileCommentInput}>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (auth.currentUser?.uid) {
+                      // Handle user's own profile image press if needed
+                    } else {
+                      Alert.alert('Error', 'User not authenticated.');
+                    }
+                  }}
+                  accessible={true}
+                  accessibilityLabel="View Your Profile"
+                >
+                  <Image
+                    source={{
+                      uri: auth.currentUser?.photoURL || DEFAULT_PROFILE_IMAGE,
+                    }}
+                    style={styles.avatar}
+                  />
+                </TouchableOpacity>
+                <TextInput
+                  placeholder="Add a comment..."
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  style={styles.profileCommentInput}
+                  accessible={true}
+                  accessibilityLabel="Add a comment input field"
+                />
+                <TouchableOpacity
+                  onPress={handleAddComment}
+                  disabled={!commentText.trim() || commenting}
+                  accessible={true}
+                  accessibilityLabel="Submit Comment"
+                >
+                  <Ionicons name="send" size={24} color="#1D4ED8" />
+                </TouchableOpacity>
+              </View>
             </>
           ) : (
-            <ActivityIndicator size="large" color="#1D4ED8" />
+            <Text>User not found.</Text>
           )}
-        </ScrollView>
-      </SafeAreaView>
-      {/* EditProfileModal */}
-      {editProfileVisible && userProfile && (
-        <EditProfileModal
-          visible={editProfileVisible}
-          onClose={() => setEditProfileVisible(false)}
-          userProfile={userProfile}
-        />
-      )}
-    </Modal>
-  );
-};
-
-// EditProfileModal Component
-const EditProfileModal = ({ visible, onClose, userProfile }) => {
-  const [bio, setBio] = useState(userProfile.bio || '');
-  const [location, setLocation] = useState(userProfile.location || '');
-
-  const handleSave = async () => {
-    try {
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userRef, { bio, location });
-      onClose();
-    } catch (error) {
-      Alert.alert('Error', 'Could not update profile.');
-    }
-  };
-
-  return (
-    <Modal visible={visible} transparent={false}>
-      <SafeAreaView style={styles.editProfileContainer}>
-        <ScrollView contentContainerStyle={styles.editProfileContent}>
-          <TextInput
-            value={bio}
-            onChangeText={setBio}
-            placeholder="Bio"
-            style={styles.input}
-          />
-          <TextInput
-            value={location}
-            onChangeText={setLocation}
-            placeholder="Location"
-            style={styles.input}
-          />
-          <Button onPress={handleSave}>Save</Button>
-          <Button onPress={onClose}>Cancel</Button>
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -1530,21 +1581,6 @@ const FullScreenPostModal = ({ onProfileImagePress }) => {
     }
   }, [liked, post?.id, post?.userId]);
 
-  const onReportContent = async (contentType, contentId) => {
-    try {
-      await addDoc(collection(db, 'reports'), {
-        reportedBy: auth.currentUser.uid,
-        contentId: contentId,
-        contentType: contentType,
-        reason: 'Inappropriate content',
-        createdAt: serverTimestamp(),
-      });
-      Alert.alert('Report submitted', 'Thank you for your feedback.');
-    } catch (error) {
-      Alert.alert('Error', 'Could not submit report.');
-    }
-  };
-
   if (!post) {
     return null;
   }
@@ -1596,28 +1632,23 @@ const FullScreenPostModal = ({ onProfileImagePress }) => {
               </Text>
             </View>
             <Text>{post?.content || ''}</Text>
-            {post.images && post.images.length > 0 && (
+            {post.image && (
               <View style={styles.fullScreenImageContainer}>
-                <ScrollView horizontal>
-                  {post.images.map((imgUri, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => {
-                        if (post.userId) {
-                          onProfileImagePress(post.userId);
-                        }
-                      }}
-                      accessible={true}
-                      accessibilityLabel="View Post Image"
-                    >
-                      <Image
-                        source={{ uri: imgUri }}
-                        style={styles.fullScreenImage}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (post.userId) {
+                      onProfileImagePress(post.userId);
+                    }
+                  }}
+                  accessible={true}
+                  accessibilityLabel="View Post Image"
+                >
+                  <Image
+                    source={{ uri: post.image }}
+                    style={styles.fullScreenImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
               </View>
             )}
             <View style={styles.postActions}>
@@ -1636,16 +1667,6 @@ const FullScreenPostModal = ({ onProfileImagePress }) => {
                   {likes.length > 0 ? likes.length : ''}
                 </Text>
               </TouchableOpacity>
-              {/* Report Post */}
-              <TouchableOpacity
-                style={styles.postActionButton}
-                onPress={() => onReportContent('post', post.id)}
-                accessible={true}
-                accessibilityLabel="Report Post"
-              >
-                <Ionicons name="flag-outline" size={24} color="gray" />
-                <Text style={styles.postActionText}>Report</Text>
-              </TouchableOpacity>
             </View>
 
             <View style={{ marginTop: 20 }}>
@@ -1660,7 +1681,6 @@ const FullScreenPostModal = ({ onProfileImagePress }) => {
                   userId={auth.currentUser.uid}
                   depth={cmt.depth || 0} // Initialize depth, default to 0
                   onProfileImagePress={onProfileImagePress}
-                  onReportContent={onReportContent}
                 />
               ))}
             </View>
@@ -1707,6 +1727,7 @@ const FullScreenPostModal = ({ onProfileImagePress }) => {
     </Modal>
   );
 };
+
 // MainFeed Component with updated image handling in posts and header visibility
 const MainFeed = ({ navigation, onProfileImagePress }) => {
   const [posts, setPosts] = useState([]);
@@ -1816,21 +1837,6 @@ const MainFeed = ({ navigation, onProfileImagePress }) => {
     previousScrollY.current = currentScrollY;
   };
 
-  const onReportContent = async (contentType, contentId) => {
-    try {
-      await addDoc(collection(db, 'reports'), {
-        reportedBy: auth.currentUser.uid,
-        contentId: contentId,
-        contentType: contentType,
-        reason: 'Inappropriate content',
-        createdAt: serverTimestamp(),
-      });
-      Alert.alert('Report submitted', 'Thank you for your feedback.');
-    } catch (error) {
-      Alert.alert('Error', 'Could not submit report.');
-    }
-  };
-
   return (
     <SafeAreaView style={styles.mainFeedContainer}>
       <View style={{ flex: 1 }}>
@@ -1850,7 +1856,6 @@ const MainFeed = ({ navigation, onProfileImagePress }) => {
               post={item}
               onViewPost={handleViewPost}
               onProfileImagePress={onProfileImagePress}
-              onReportContent={onReportContent}
             />
           )}
           refreshControl={
@@ -1868,7 +1873,9 @@ const MainFeed = ({ navigation, onProfileImagePress }) => {
             )
           }
           ListEmptyComponent={
-            !loading && <Text style={styles.emptyPosts}>No posts available.</Text>
+            !loading && (
+              <Text style={styles.emptyPosts}>No posts available.</Text>
+            )
           }
           onScroll={handleScroll}
           scrollEventThrottle={16}
@@ -1894,13 +1901,13 @@ const MainFeed = ({ navigation, onProfileImagePress }) => {
 
 // Root App Component
 export default function App() {
-  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [profileImageModalVisible, setProfileImageModalVisible] = useState(false);
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
 
   const onProfileImagePress = (userId) => {
     if (userId) {
       setSelectedProfileUserId(userId);
-      setProfileModalVisible(true);
+      setProfileImageModalVisible(true);
     } else {
       Alert.alert('Error', 'User ID is not available.');
     }
@@ -1911,7 +1918,10 @@ export default function App() {
       <NavigationContainer independent={true}>
         <Stack.Navigator initialRouteName="flights">
           {/* Include all your routes here */}
-          <Stack.Screen name="flights" options={{ headerShown: false }}>
+          <Stack.Screen
+            name="flights"
+            options={{ headerShown: false }}
+          >
             {(props) => (
               <MainFeed {...props} onProfileImagePress={onProfileImagePress} />
             )}
@@ -1932,18 +1942,235 @@ export default function App() {
       </NavigationContainer>
       {/* FullScreenPostModal */}
       <FullScreenPostModal onProfileImagePress={onProfileImagePress} />
-      {/* ProfileModal */}
-      {profileModalVisible && (
-        <ProfileModal
-          visible={profileModalVisible}
-          onClose={() => setProfileModalVisible(false)}
+      {/* FullScreenProfileImageModal */}
+      {profileImageModalVisible && (
+        <FullScreenProfileImageModal
+          visible={profileImageModalVisible}
+          onClose={() => setProfileImageModalVisible(false)}
           userId={selectedProfileUserId}
         />
       )}
     </PostModalProvider>
   );
 }
+
+// Stylesheet
 const styles = StyleSheet.create({
+  // ... [Your existing styles go here]
+
+  profileModalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  profileModalContent: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  profileImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    marginBottom: 20,
+  },
+  profileName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  profileBio: {
+    fontSize: 16,
+    marginVertical: 10,
+  },
+  profileLocation: {
+    fontSize: 16,
+    color: 'gray',
+  },
+  editProfileContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  editProfileContent: {
+    padding: 20,
+  },
+  input: {
+    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+  },
+  commentContainer: {
+    marginBottom: 10,
+    padding: 10,
+    borderColor: '#E5E7EB',
+    borderBottomWidth: 1,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentContent: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  commentUserName: {
+    fontWeight: 'bold',
+  },
+  commentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  commentActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  commentReplyButton: {
+    marginLeft: 20,
+  },
+  replyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    marginLeft: 50,
+  },
+  replyInput: {
+    flex: 1,
+    padding: 5,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 5,
+  },
+  sendReplyButton: {
+    marginLeft: 5,
+  },
+  repliesContainer: {
+    marginTop: 10,
+  },
+  viewMoreReplies: {
+    marginLeft: 50,
+    color: 'gray',
+  },
+  headerContainer: {
+    backgroundColor: '#1D4ED8',
+    padding: 20,
+    overflow: 'hidden',
+  },
+  pilotsLoungeText: {
+    fontSize: 22,
+    color: '#fff',
+    textAlign: 'left',
+    marginBottom: 0,
+    paddingTop: 10,
+  },
+  // Post Styles
+  postContainer: {
+    backgroundColor: '#fff',
+    margin: 10,
+    padding: 10,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  postUserInfo: {
+    marginLeft: 10,
+  },
+  postUserName: {
+    fontWeight: 'bold',
+  },
+  postDate: {
+    color: 'gray',
+    fontSize: 12,
+  },
+  postContent: {
+    color: '#4B5563',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  postImageContainer: {
+    marginBottom: 10,
+  },
+  postImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 20,
+  },
+  postActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  postActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  postActionText: {
+    marginLeft: 5,
+  },
+  commentsSection: {
+    marginTop: 10,
+  },
+  commentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    padding: 10,
+    borderTopWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  commentInput: {
+    flex: 1,
+    marginLeft: 10,
+    padding: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+  },
+  sendIcon: {
+    marginLeft: 10,
+  },
+  // Fullscreen Modal Styles
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  fullScreenPost: {
+    backgroundColor: 'white',
+    margin: 16,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  fullScreenAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  fullScreenUserName: {
+    fontWeight: 'bold',
+    fontSize: 18,
+    marginTop: 8,
+  },
+  fullScreenDate: {
+    color: 'gray',
+    fontSize: 12,
+  },
   profileModalContainer: {
     flex: 1,
     backgroundColor: '#fff',

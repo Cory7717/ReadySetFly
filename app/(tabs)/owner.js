@@ -53,7 +53,7 @@ const OwnerProfile = ({ ownerId }) => {
   });
 
   const [aircraftDetails, setAircraftDetails] = useState({
-    year: "2020",
+    year: "",
     make: "",
     model: "",
     engine: "",
@@ -225,7 +225,7 @@ const OwnerProfile = ({ ownerId }) => {
     const numberOfPayments = parseFloat(loanTerm) * 12;
     const mortgageExpense = loanAmount
       ? (
-          (parseFloat(loanAmount) * monthlyInterestRate) / 
+          (parseFloat(loanAmount) * monthlyInterestRate) /
           (1 - Math.pow(1 + monthlyInterestRate, -numberOfPayments))
         ).toFixed(2)
       : 0;
@@ -298,21 +298,15 @@ const OwnerProfile = ({ ownerId }) => {
 
   const uploadFile = async (uri, folder) => {
     try {
-      console.log("Fetching file from URI:", uri);
       const response = await fetch(uri);
-      console.log("Converting file to blob...");
       const blob = await response.blob();
       const filename = uri.substring(uri.lastIndexOf("/") + 1);
-      console.log("Generated filename:", filename);
 
       const storageRef = ref(storage, `${folder}/${resolvedOwnerId}/${filename}`);
-      console.log("Uploading file to Firebase Storage path:", storageRef.fullPath);
 
       await uploadBytes(storageRef, blob);
-      console.log("File uploaded successfully!");
 
       const downloadURL = await getDownloadURL(storageRef);
-      console.log("Download URL:", downloadURL);
 
       return downloadURL;
     } catch (error) {
@@ -401,6 +395,8 @@ const OwnerProfile = ({ ownerId }) => {
         : "";
 
       const newListing = sanitizeData({
+        year: aircraftDetails.year || "",
+        make: aircraftDetails.make || "",
         airplaneModel: aircraftDetails.model || "",
         description: profileData.description || "",
         location: aircraftDetails.location || "",
@@ -452,7 +448,6 @@ const OwnerProfile = ({ ownerId }) => {
         Alert.alert("Error", "Listing ID is missing.");
         return;
       }
-      // Proceed to unlist the aircraft
       try {
         const listingDocRef = doc(db, "airplanes", listing.id);
         await deleteDoc(listingDocRef);
@@ -484,7 +479,6 @@ const OwnerProfile = ({ ownerId }) => {
         );
       }
     } else {
-      // Proceed to list the aircraft
       await onSubmitMethod(listing, additional);
     }
   };
@@ -522,6 +516,7 @@ const OwnerProfile = ({ ownerId }) => {
       const chatThread = {
         participants: [resolvedOwnerId, request.renterId],
         messages: [],
+        rentalRequestId: request.id, 
       };
       const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
       chatThread.id = chatDocRef.id;
@@ -578,7 +573,6 @@ const OwnerProfile = ({ ownerId }) => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    // Add any data refreshing logic here
     setRefreshing(false);
   };
 
@@ -594,8 +588,8 @@ const OwnerProfile = ({ ownerId }) => {
     if (!messageInput.trim()) return;
 
     const messageData = {
-      senderId: user.uid, // Use Firebase user UID
-      senderName: user.displayName || "Owner", // Use Firebase displayName
+      senderId: user.uid, 
+      senderName: user.displayName || "Owner", 
       text: messageInput,
       createdAt: new Date(),
     };
@@ -626,7 +620,7 @@ const OwnerProfile = ({ ownerId }) => {
       if (chatThreadId) {
         const chatDocRef = doc(db, "messages", chatThreadId);
         const chatDoc = await getDoc(chatDocRef);
-        if (chatDoc.exists()) { // Corrected this line
+        if (chatDoc.exists()) {
           const chatData = chatDoc.data();
           setMessages(chatData.messages || []);
         } else {
@@ -640,7 +634,6 @@ const OwnerProfile = ({ ownerId }) => {
       Alert.alert("Error", "Failed to open messages.");
     }
   };
-  
 
   const handleRating = async (orderId, rating) => {
     try {
@@ -703,7 +696,6 @@ const OwnerProfile = ({ ownerId }) => {
             Cost of Ownership Calculator
           </Text>
           {costSaved ? (
-            // Show summary card
             <View style={{ backgroundColor: "#edf2f7", padding: 16, borderRadius: 16 }}>
               <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8 }}>
                 Estimated Cost per Hour: ${costData.costPerHour}
@@ -724,7 +716,6 @@ const OwnerProfile = ({ ownerId }) => {
             </View>
           ) : (
             <>
-              {/* Loan Details Section */}
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Loan Details</Text>
                 <TextInput
@@ -755,11 +746,9 @@ const OwnerProfile = ({ ownerId }) => {
                   keyboardType="numeric"
                   style={styles.input}
                 />
-                {/* Display calculated Mortgage Expense */}
                 <Text style={{ marginTop: 8 }}>Mortgage Expense: ${costData.mortgageExpense}</Text>
               </View>
 
-              {/* Annual Costs Section */}
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Annual Costs</Text>
                 <TextInput
@@ -792,7 +781,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
               </View>
 
-              {/* Operational Costs Section */}
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Operational Costs</Text>
                 <TextInput
@@ -811,7 +799,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
               </View>
 
-              {/* Save Button */}
               <TouchableOpacity
                 onPress={saveCostData}
                 style={{
@@ -829,13 +816,11 @@ const OwnerProfile = ({ ownerId }) => {
           )}
         </View>
 
-        {/* Aircraft Details */}
         <View style={{ padding: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Aircraft Details
           </Text>
           {aircraftSaved ? (
-            // Show summary card
             <View
               style={{
                 backgroundColor: "#edf2f7",
@@ -925,7 +910,6 @@ const OwnerProfile = ({ ownerId }) => {
           )}
         </View>
 
-        {/* Current Listings */}
         <View style={{ padding: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Current Listings
@@ -981,7 +965,6 @@ const OwnerProfile = ({ ownerId }) => {
           )}
         </View>
 
-        {/* Create New Listing */}
         <View style={{ padding: 16 }}>
           <TouchableOpacity
             onPress={() => setFullScreenModalVisible(true)}
@@ -999,7 +982,6 @@ const OwnerProfile = ({ ownerId }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Rental History Section */}
         <View style={{ padding: 16 }}>
           <Text
             style={{
@@ -1084,7 +1066,6 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </ScrollView>
 
-      {/* Messaging Modal */}
       <Modal
         visible={messageModalVisible}
         animationType="slide"
@@ -1111,7 +1092,6 @@ const OwnerProfile = ({ ownerId }) => {
               shadowRadius: 8,
             }}
           >
-            {/* Close Button */}
             <TouchableOpacity
               onPress={() => setMessageModalVisible(false)}
               style={{
@@ -1124,7 +1104,6 @@ const OwnerProfile = ({ ownerId }) => {
               <Ionicons name="close-circle" size={32} color="#2d3748" />
             </TouchableOpacity>
 
-            {/* Chat Thread Content */}
             <FlatList
               data={messages}
               keyExtractor={(item, index) => index.toString()}
@@ -1147,7 +1126,6 @@ const OwnerProfile = ({ ownerId }) => {
               )}
             />
 
-            {/* Message Input */}
             <View
               style={{
                 flexDirection: "row",
@@ -1185,7 +1163,6 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* Full-Screen Listing Modal */}
       <Modal
         visible={fullScreenModalVisible}
         animationType="slide"
@@ -1195,8 +1172,6 @@ const OwnerProfile = ({ ownerId }) => {
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Create New Listing
           </Text>
-          {/* Form Fields for New Listing */}
-          {/* Include all form fields similar to aircraftDetails and profileData */}
           {Object.keys(profileData).map((key) => (
             <TextInput
               key={key}
@@ -1259,12 +1234,7 @@ const OwnerProfile = ({ ownerId }) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setFullScreenModalVisible(false)}
-            style={{
-              backgroundColor: "#e53e3e",
-              paddingVertical: 12,
-              borderRadius: 8,
-              marginTop: 16,
-            }}
+            style={styles.cancelButton}
           >
             <Text
               style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
@@ -1275,7 +1245,6 @@ const OwnerProfile = ({ ownerId }) => {
         </ScrollView>
       </Modal>
 
-      {/* Aircraft Details Modal */}
       <Modal
         visible={aircraftModalVisible}
         animationType="slide"
@@ -1286,7 +1255,6 @@ const OwnerProfile = ({ ownerId }) => {
             Aircraft Details
           </Text>
 
-          {/* General Information Section */}
           <View style={{ marginBottom: 16 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>General Information</Text>
             <TextInput
@@ -1323,7 +1291,6 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </View>
 
-          {/* Location Information Section */}
           <View style={{ marginBottom: 16 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Location Information</Text>
             <TextInput
@@ -1340,7 +1307,6 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </View>
 
-          {/* Cost Information Section */}
           <View style={{ marginBottom: 16 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Cost Information</Text>
             <TextInput
@@ -1352,7 +1318,6 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </View>
 
-          {/* Description */}
           <View style={{ marginBottom: 16 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Description</Text>
             <TextInput
@@ -1364,15 +1329,9 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </View>
 
-          {/* Image Picker */}
           <TouchableOpacity
             onPress={pickImage}
-            style={{
-              backgroundColor: "#3182ce",
-              paddingVertical: 12,
-              borderRadius: 8,
-              marginTop: 16,
-            }}
+            style={styles.uploadButton}
           >
             <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
               Upload Images
@@ -1393,16 +1352,9 @@ const OwnerProfile = ({ ownerId }) => {
             />
           )}
 
-          {/* Save and List for Rent Buttons */}
           <TouchableOpacity
             onPress={onSaveAircraftDetails}
-            style={{
-              backgroundColor: "#3182ce",
-              paddingVertical: 12,
-              borderRadius: 8,
-              marginBottom: 16,
-              marginTop: 16,
-            }}
+            style={styles.saveButton}
           >
             <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
               Save Aircraft Details
@@ -1410,11 +1362,7 @@ const OwnerProfile = ({ ownerId }) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => onSubmitMethod({}, false)}
-            style={{
-              backgroundColor: "#48bb78",
-              paddingVertical: 12,
-              borderRadius: 8,
-            }}
+            style={styles.listForRentButton}
           >
             <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
               List for Rent
@@ -1422,12 +1370,7 @@ const OwnerProfile = ({ ownerId }) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setAircraftModalVisible(false)}
-            style={{
-              backgroundColor: "#e53e3e",
-              paddingVertical: 12,
-              borderRadius: 8,
-              marginTop: 16,
-            }}
+            style={styles.cancelButton}
           >
             <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
               Cancel
@@ -1436,7 +1379,6 @@ const OwnerProfile = ({ ownerId }) => {
         </ScrollView>
       </Modal>
 
-      {/* Calendar Modal */}
       <Modal
         visible={calendarVisible}
         animationType="slide"
@@ -1462,36 +1404,14 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* Blue Chat Bubble Icon */}
       <TouchableOpacity
-        style={{
-          position: "absolute",
-          bottom: 20,
-          right: 20,
-          backgroundColor: "#3182ce",
-          width: 60,
-          height: 60,
-          borderRadius: 30,
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 1,
-        }}
+        style={styles.chatBubbleIcon}
         onPress={() => openMessageModal()}
       >
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />
         {rentalRequests.length > 0 && (
           <View
-            style={{
-              position: "absolute",
-              top: -5,
-              right: -5,
-              backgroundColor: "red",
-              borderRadius: 10,
-              width: 20,
-              height: 20,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
+            style={styles.notificationBadge}
           >
             <Text style={{ color: "white", fontSize: 12 }}>
               {rentalRequests.length}
@@ -1509,6 +1429,53 @@ const styles = StyleSheet.create({
     borderBottomColor: "#ccc",
     marginBottom: 12,
     paddingVertical: 8,
+  },
+  uploadButton: {
+    backgroundColor: "#3182ce",
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  saveButton: {
+    backgroundColor: "#3182ce",
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    marginTop: 16,
+  },
+  listForRentButton: {
+    backgroundColor: "#48bb78",
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  cancelButton: {
+    backgroundColor: "#e53e3e",
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  chatBubbleIcon: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: "#3182ce",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: "red",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

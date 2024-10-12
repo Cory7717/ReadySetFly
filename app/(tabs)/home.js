@@ -13,8 +13,8 @@ import {
   FlatList,
   ScrollView,
 } from "react-native";
-import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth"; // Firebase auth imports
-import { db, auth } from "../../firebaseConfig"; // Assuming you have auth in your firebaseConfig
+import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
+import { db, auth } from "../../firebaseConfig";
 import {
   collection,
   onSnapshot,
@@ -37,6 +37,8 @@ const Home = ({ route, navigation }) => {
   const [imageIndex, setImageIndex] = useState(0);
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
   const [filter, setFilter] = useState({
+    year: "",
+    model: "",
     make: "",
     location: "",
   });
@@ -61,14 +63,13 @@ const Home = ({ route, navigation }) => {
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Firebase auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
       } else {
         Alert.alert("Error", "User is not authenticated.");
-        navigation.replace("SignIn"); // Redirect to SignIn screen if not authenticated
+        navigation.replace("SignIn");
       }
     });
     return () => unsubscribe();
@@ -173,29 +174,30 @@ const Home = ({ route, navigation }) => {
 
     try {
       const rentalRequestData = {
-        renterId: user.uid, // Firebase user ID
-        renterName: user.displayName || "Anonymous", // Firebase displayName
+        renterId: user.uid,
+        renterName: user.displayName || "Anonymous",
         ownerId: selectedListing.ownerId,
         airplaneModel: selectedListing.airplaneModel,
         rentalPeriod: rentalDate,
         totalCost: totalCostValue.toFixed(2),
-        contact: user.email || "noemail@example.com", // Firebase email
+        contact: user.email || "noemail@example.com",
         createdAt: new Date(),
         status: "pending",
         listingId: selectedListing.id,
       };
 
-      // Add the rental request to the owner's rentalRequests subcollection
-      await addDoc(
-        collection(db, "owners", selectedListing.ownerId, "rentalRequests"),
-        rentalRequestData
-      );
+      navigation.navigate("Owner", {
+        screen: "MessagingModal",
+        params: {
+          rentalRequest: rentalRequestData,
+        },
+      });
 
+      setFullScreenModalVisible(false);
       Alert.alert(
         "Request Sent",
         "Your rental request has been sent to the owner. You will be notified once the owner reviews the request."
       );
-      setFullScreenModalVisible(false);
     } catch (error) {
       console.error("Error sending rental request: ", error);
       Alert.alert("Error", "Failed to send rental request to the owner.");
@@ -266,7 +268,7 @@ const Home = ({ route, navigation }) => {
         {
           text: "Logout",
           onPress: async () => {
-            await firebaseSignOut(auth); // Firebase sign out
+            await firebaseSignOut(auth);
             navigation.replace("SignIn");
           },
         },
@@ -274,6 +276,117 @@ const Home = ({ route, navigation }) => {
       { cancelable: false }
     );
   };
+
+  const renderItem = ({ item }) => (
+    <View style={{ flex: 1, margin: 5 }}>
+      <TouchableOpacity
+        onPress={() => {
+          setSelectedListing(item);
+          setImageIndex(0);
+          setFullScreenModalVisible(true);
+        }}
+        style={{
+          borderRadius: 10,
+          overflow: "hidden",
+          backgroundColor: "white",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 2,
+          flex: 1, // Ensures the item spans the entire width of its column
+        }}
+      >
+        <View style={{ padding: 10 }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "bold",
+              color: "#2d3748",
+            }}
+          >
+            {item.year} {item.make} {item.airplaneModel}
+          </Text>
+        </View>
+        {item.images && item.images.length > 0 && (
+          <ImageBackground
+            source={{ uri: item.images[0] }}
+            style={{ height: 150, justifyContent: "space-between" }} // Adjusted height for smaller cards
+            imageStyle={{ borderRadius: 10 }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                padding: 8,
+              }}
+            >
+              <Text
+                style={{
+                  backgroundColor: "#000000a0",
+                  color: "white",
+                  padding: 4,
+                  borderRadius: 5,
+                }}
+              >
+                {item.location}
+              </Text>
+              <Text
+                style={{
+                  backgroundColor: "#000000a0",
+                  color: "white",
+                  padding: 4,
+                  borderRadius: 5,
+                }}
+              >
+                ${item.ratesPerHour}/hour
+              </Text>
+            </View>
+          </ImageBackground>
+        )}
+        <View style={{ padding: 10 }}>
+          <Text
+            numberOfLines={2}
+            style={{
+              color: "#4a5568",
+            }}
+          >
+            {item.description}
+          </Text>
+        </View>
+      </TouchableOpacity>
+      {item.ownerId === user.uid && (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "flex-end",
+            marginTop: 8,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => handleEditListing(item.id)}
+            style={{
+              backgroundColor: "#1E90FF",
+              padding: 8,
+              borderRadius: 8,
+              marginRight: 8,
+            }}
+          >
+            <Text style={{ color: "white" }}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleDeleteListing(item.id)}
+            style={{
+              backgroundColor: "#FF6347",
+              padding: 8,
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: "white" }}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
@@ -389,113 +502,19 @@ const Home = ({ route, navigation }) => {
         </Text>
 
         {listings.length > 0 ? (
-          listings.map((item) => (
-            <View style={{ marginBottom: 20 }} key={item.id}>
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedListing(item);
-                  setImageIndex(0);
-                  setFullScreenModalVisible(true);
-                }}
-                style={{
-                  borderRadius: 10,
-                  overflow: "hidden",
-                  backgroundColor: "white",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 2,
-                }}
-              >
-                {item.images && item.images.length > 0 && (
-                  <ImageBackground
-                    source={{ uri: item.images[0] }}
-                    style={{ height: 200, justifyContent: "space-between" }}
-                    imageStyle={{ borderRadius: 10 }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        padding: 8,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          backgroundColor: "#000000a0",
-                          color: "white",
-                          padding: 4,
-                          borderRadius: 5,
-                        }}
-                      >
-                        {item.location}
-                      </Text>
-                      <Text
-                        style={{
-                          backgroundColor: "#000000a0",
-                          color: "white",
-                          padding: 4,
-                          borderRadius: 5,
-                        }}
-                      >
-                        ${item.ratesPerHour}/hour
-                      </Text>
-                    </View>
-                  </ImageBackground>
-                )}
-                <View style={{ padding: 10 }}>
-                  <Text
-                    style={{
-                      fontSize: 18,
-                      fontWeight: "bold",
-                      color: "#2d3748",
-                    }}
-                  >
-                    {item.airplaneModel}
-                  </Text>
-                  <Text
-                    numberOfLines={2}
-                    style={{
-                      color: "#4a5568",
-                    }}
-                  >
-                    {item.description}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              {item.ownerId === user.uid && (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    marginTop: 8,
-                  }}
-                >
-                  <TouchableOpacity
-                    onPress={() => handleEditListing(item.id)}
-                    style={{
-                      backgroundColor: "#1E90FF",
-                      padding: 8,
-                      borderRadius: 8,
-                      marginRight: 8,
-                    }}
-                  >
-                    <Text style={{ color: "white" }}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDeleteListing(item.id)}
-                    style={{
-                      backgroundColor: "#FF6347",
-                      padding: 8,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <Text style={{ color: "white" }}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          ))
+          <FlatList
+            data={listings}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            numColumns={2} // Two listings per row
+            columnWrapperStyle={{ justifyContent: "space-between" }} // Ensures items are spaced properly
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <Text style={{ textAlign: "center", color: "#4a5568" }}>
+                No listings available
+              </Text>
+            }
+          />
         ) : (
           <Text style={{ textAlign: "center", color: "#4a5568" }}>
             No listings available
@@ -600,7 +619,6 @@ const Home = ({ route, navigation }) => {
                   />
                 </View>
 
-                {/* Calendar Button */}
                 <TouchableOpacity
                   onPress={() => setCalendarModalVisible(true)}
                   style={{
@@ -663,7 +681,6 @@ const Home = ({ route, navigation }) => {
         </SafeAreaView>
       </Modal>
 
-      {/* Calendar Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -688,7 +705,9 @@ const Home = ({ route, navigation }) => {
               margin: 16,
             }}
           >
-            <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
               Close Calendar
             </Text>
           </TouchableOpacity>
