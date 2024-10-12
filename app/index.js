@@ -1,14 +1,13 @@
-// index.js
-
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { Stack } from 'expo-router';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebaseConfig'; // Adjust the path if necessary
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput } from 'react-native';
+import { onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { auth, db } from '../firebaseConfig'; // Add Firestore database
+import { doc, setDoc } from 'firebase/firestore';
 import CustomButton from '../components/CustomButton';
 import { images } from '../constants';
 import { router } from 'expo-router';
@@ -24,6 +23,18 @@ const getStripePublishableKey = () => {
 
 const App = () => {
   const [user, setUser] = useState(null);
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [profileData, setProfileData] = useState({
+    firstName: '',
+    lastName: '',
+    role: '',
+    city: '',
+    state: '',
+    aircraftType: '',
+    medicalStatus: '',
+    insuranceStatus: '',
+    annualDate: ''
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -33,9 +44,29 @@ const App = () => {
     return () => unsubscribe(); // Cleanup the listener on unmount
   }, []);
 
+  const handleSaveProfile = async () => {
+    if (user) {
+      const userDoc = doc(db, 'users', user.uid);
+      try {
+        // Save profile data to Firestore
+        await setDoc(userDoc, profileData);
+        
+        // Update user's displayName in Firebase Auth
+        await updateProfile(user, {
+          displayName: `${profileData.firstName} ${profileData.lastName}`
+        });
+
+        // Close modal and navigate to the home page
+        setModalVisible(false);
+        router.push('/home');
+      } catch (error) {
+        console.error("Error saving profile data: ", error);
+      }
+    }
+  };
+
   const handleViewContent = () => {
-    // Navigate to the main home or content page
-    router.push('/home'); // Adjust this to your actual content route
+    router.push('/home');
   };
 
   return (
@@ -48,11 +79,16 @@ const App = () => {
 
         {user ? (
           <>
-            <Text style={styles.greetingText}>Hello, {user.displayName || user.email}</Text>
+            <Text style={styles.greetingText}>Hello, {user.displayName || 'User'}</Text>
             <View style={styles.viewContentButtonContainer}>
               <CustomButton
                 title="View Content"
                 handlePress={handleViewContent}
+                containerStyles={styles.viewContentButton}
+              />
+              <CustomButton
+                title="Complete Profile"
+                handlePress={() => setModalVisible(true)}
                 containerStyles={styles.viewContentButton}
               />
             </View>
@@ -67,6 +103,73 @@ const App = () => {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Profile Modal */}
+        <Modal visible={isModalVisible} transparent={true} animationType="slide">
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Complete Your Profile</Text>
+
+              <TextInput
+                placeholder="First Name"
+                style={styles.input}
+                value={profileData.firstName}
+                onChangeText={(text) => setProfileData({ ...profileData, firstName: text })}
+              />
+              <TextInput
+                placeholder="Last Name"
+                style={styles.input}
+                value={profileData.lastName}
+                onChangeText={(text) => setProfileData({ ...profileData, lastName: text })}
+              />
+              <TextInput
+                placeholder="Role (Renter/Owner/Both)"
+                style={styles.input}
+                value={profileData.role}
+                onChangeText={(text) => setProfileData({ ...profileData, role: text })}
+              />
+              <TextInput
+                placeholder="City"
+                style={styles.input}
+                value={profileData.city}
+                onChangeText={(text) => setProfileData({ ...profileData, city: text })}
+              />
+              <TextInput
+                placeholder="State"
+                style={styles.input}
+                value={profileData.state}
+                onChangeText={(text) => setProfileData({ ...profileData, state: text })}
+              />
+              <TextInput
+                placeholder="Type of Aircraft"
+                style={styles.input}
+                value={profileData.aircraftType}
+                onChangeText={(text) => setProfileData({ ...profileData, aircraftType: text })}
+              />
+              <TextInput
+                placeholder="Current Medical"
+                style={styles.input}
+                value={profileData.medicalStatus}
+                onChangeText={(text) => setProfileData({ ...profileData, medicalStatus: text })}
+              />
+              <TextInput
+                placeholder="Insurance Current (Yes/No)"
+                style={styles.input}
+                value={profileData.insuranceStatus}
+                onChangeText={(text) => setProfileData({ ...profileData, insuranceStatus: text })}
+              />
+              <TextInput
+                placeholder="Date of Last Annual"
+                style={styles.input}
+                value={profileData.annualDate}
+                onChangeText={(text) => setProfileData({ ...profileData, annualDate: text })}
+              />
+
+              <CustomButton title="Save Profile" handlePress={handleSaveProfile} containerStyles={styles.saveButton} />
+              <CustomButton title="Close" handlePress={() => setModalVisible(false)} containerStyles={styles.closeButton} />
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaProvider>
   );
@@ -145,20 +248,42 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 8,
   },
-  createCFIButtonContainer: {
-    marginTop: 20,
-  },
-  createCFIButton: {
-    backgroundColor: '#1E90FF',
-    paddingVertical: 15,
-    borderRadius: 25,
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  createCFIButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+  modalContent: {
+    width: '90%',
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
   },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  saveButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  closeButton: {
+    backgroundColor: '#dc3545',
+    paddingVertical: 15,
+    borderRadius: 8,
+  }
 });
 
 export default App;
