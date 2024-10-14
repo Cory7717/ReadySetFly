@@ -13,7 +13,7 @@ import {
   FlatList,
   ScrollView,
 } from "react-native";
-import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../../firebaseConfig";
 import {
   collection,
@@ -21,9 +21,9 @@ import {
   query,
   orderBy,
   where,
-  addDoc,
   deleteDoc,
   doc,
+  addDoc, // Imported addDoc for Firestore write operations
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -32,13 +32,10 @@ import { Calendar } from "react-native-calendars";
 const Home = ({ route, navigation }) => {
   const [user, setUser] = useState(null); // State to store Firebase user
   const [listings, setListings] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedListing, setSelectedListing] = useState(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
   const [filter, setFilter] = useState({
-    year: "",
-    model: "",
     make: "",
     location: "",
   });
@@ -52,16 +49,12 @@ const Home = ({ route, navigation }) => {
     salesTax: "0.00",
     total: "0.00",
   });
-
-  const categories = [
-    "Single Engine Piston",
-    "Twin Engine Piston",
-    "Turbo Prop",
-    "Helicopter",
-    "Jet",
-  ];
-
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef(null);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [cityState, setCityState] = useState("");
+  const [makeModel, setMakeModel] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -79,7 +72,7 @@ const Home = ({ route, navigation }) => {
     if (!user) return;
     const unsubscribe = subscribeToListings();
     return () => unsubscribe();
-  }, [user]);
+  }, [user, filter]);
 
   useEffect(() => {
     if (selectedListing && rentalHours > 0) {
@@ -103,12 +96,12 @@ const Home = ({ route, navigation }) => {
     const listingsRef = collection(db, "airplanes");
     let q = query(listingsRef, orderBy("createdAt", "desc"));
 
-    if (filter.make) {
-      q = query(q, where("airplaneModel", "==", filter.make.toLowerCase()));
-    }
-
     if (filter.location) {
       q = query(q, where("location", "==", filter.location.toLowerCase()));
+    }
+
+    if (filter.make) {
+      q = query(q, where("airplaneModel", "==", filter.make.toLowerCase()));
     }
 
     return onSnapshot(
@@ -186,12 +179,14 @@ const Home = ({ route, navigation }) => {
         listingId: selectedListing.id,
       };
 
-      navigation.navigate("Owner", {
-        screen: "MessagingModal",
-        params: {
-          rentalRequest: rentalRequestData,
-        },
-      });
+      // Write the rental request to Firestore
+      const rentalRequestsRef = collection(
+        db,
+        "owners",
+        selectedListing.ownerId,
+        "rentalRequests"
+      );
+      await addDoc(rentalRequestsRef, rentalRequestData);
 
       setFullScreenModalVisible(false);
       Alert.alert(
@@ -199,7 +194,11 @@ const Home = ({ route, navigation }) => {
         "Your rental request has been sent to the owner. You will be notified once the owner reviews the request."
       );
     } catch (error) {
-      console.error("Error sending rental request: ", error);
+      console.error("Error sending rental request:", {
+        errorMessage: error.message,
+        errorCode: error.code,
+        rentalRequestData,
+      });
       Alert.alert("Error", "Failed to send rental request to the owner.");
     }
   };
@@ -223,7 +222,10 @@ const Home = ({ route, navigation }) => {
   };
 
   const handleEditListing = async (listingId) => {
-    Alert.alert("Edit Listing", `This would edit the listing with ID ${listingId}`);
+    Alert.alert(
+      "Edit Listing",
+      `This would edit the listing with ID ${listingId}`
+    );
   };
 
   const handleNextImage = () => {
@@ -238,161 +240,142 @@ const Home = ({ route, navigation }) => {
     }
   };
 
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, 150],
-    outputRange: [200, 70],
-    extrapolate: "clamp",
-  });
-
-  const headerFontSize = scrollY.interpolate({
-    inputRange: [0, 150],
-    outputRange: [24, 16],
-    extrapolate: "clamp",
-  });
-
-  const headerPaddingTop = scrollY.interpolate({
-    inputRange: [0, 150],
-    outputRange: [40, 10],
-    extrapolate: "clamp",
-  });
-
-  const handleLogout = () => {
-    Alert.alert(
-      "Confirm Logout",
-      "Are you sure you want to log out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Logout",
-          onPress: async () => {
-            await firebaseSignOut(auth);
-            navigation.replace("SignIn");
-          },
-        },
-      ],
-      { cancelable: false }
-    );
+  const handleScroll = (event) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setShowScrollToTop(offsetY > 200);
   };
 
-  const renderItem = ({ item }) => (
-    <View style={{ flex: 1, margin: 5 }}>
-      <TouchableOpacity
-        onPress={() => {
-          setSelectedListing(item);
-          setImageIndex(0);
-          setFullScreenModalVisible(true);
-        }}
-        style={{
-          borderRadius: 10,
-          overflow: "hidden",
-          backgroundColor: "white",
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.2,
-          shadowRadius: 2,
-          flex: 1, // Ensures the item spans the entire width of its column
-        }}
-      >
-        <View style={{ padding: 10 }}>
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "bold",
-              color: "#2d3748",
-            }}
-          >
-            {item.year} {item.make} {item.airplaneModel}
-          </Text>
-        </View>
-        {item.images && item.images.length > 0 && (
-          <ImageBackground
-            source={{ uri: item.images[0] }}
-            style={{ height: 150, justifyContent: "space-between" }} // Adjusted height for smaller cards
-            imageStyle={{ borderRadius: 10 }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                padding: 8,
-              }}
-            >
-              <Text
-                style={{
-                  backgroundColor: "#000000a0",
-                  color: "white",
-                  padding: 4,
-                  borderRadius: 5,
-                }}
-              >
-                {item.location}
-              </Text>
-              <Text
-                style={{
-                  backgroundColor: "#000000a0",
-                  color: "white",
-                  padding: 4,
-                  borderRadius: 5,
-                }}
-              >
-                ${item.ratesPerHour}/hour
-              </Text>
-            </View>
-          </ImageBackground>
-        )}
-        <View style={{ padding: 10 }}>
-          <Text
-            numberOfLines={2}
-            style={{
-              color: "#4a5568",
-            }}
-          >
-            {item.description}
-          </Text>
-        </View>
-      </TouchableOpacity>
-      {item.ownerId === user.uid && (
-        <View
+  const handleScrollToTop = () => {
+    scrollViewRef.current?.scrollToOffset({ animated: true, offset: 0 });
+  };
+
+  const clearFilter = () => {
+    setFilter({ location: "", make: "" });
+    setCityState("");
+    setMakeModel("");
+  };
+
+  const applyFilter = () => {
+    setFilter({
+      location: cityState.toLowerCase(),
+      make: makeModel.toLowerCase(),
+    });
+    setFilterModalVisible(false);
+  };
+
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, 150],
+    outputRange: [200, 0],
+    extrapolate: "clamp",
+  });
+
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 150],
+    outputRange: [1, 0],
+    extrapolate: "clamp",
+  });
+
+  const renderItem = ({ item }) => {
+    const abbreviateText = (text, maxLength) => {
+      if (text.length > maxLength) {
+        return `${text.slice(0, maxLength - 3)}...`;
+      }
+      return text;
+    };
+
+    return (
+      <View style={{ flex: 1, margin: 5 }}>
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedListing(item);
+            setImageIndex(0);
+            setFullScreenModalVisible(true);
+          }}
           style={{
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            marginTop: 8,
+            borderRadius: 10,
+            overflow: "hidden",
+            backgroundColor: "white",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 2,
+            flex: 1,
           }}
         >
-          <TouchableOpacity
-            onPress={() => handleEditListing(item.id)}
-            style={{
-              backgroundColor: "#1E90FF",
-              padding: 8,
-              borderRadius: 8,
-              marginRight: 8,
-            }}
-          >
-            <Text style={{ color: "white" }}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleDeleteListing(item.id)}
-            style={{
-              backgroundColor: "#FF6347",
-              padding: 8,
-              borderRadius: 8,
-            }}
-          >
-            <Text style={{ color: "white" }}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+          <View style={{ padding: 10, alignItems: "center" }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "bold",
+                color: "#2d3748",
+              }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.5}
+            >
+              {abbreviateText(
+                `${item.year} ${item.make} ${item.airplaneModel}`,
+                25
+              )}
+            </Text>
+          </View>
+          {item.images && item.images.length > 0 && (
+            <ImageBackground
+              source={{ uri: item.images[0] }}
+              style={{ height: 150, justifyContent: "space-between" }}
+              imageStyle={{ borderRadius: 10 }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  padding: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    backgroundColor: "#000000a0",
+                    color: "white",
+                    padding: 4,
+                    borderRadius: 5,
+                  }}
+                >
+                  {item.location}
+                </Text>
+                <Text
+                  style={{
+                    backgroundColor: "#000000a0",
+                    color: "white",
+                    padding: 4,
+                    borderRadius: 5,
+                  }}
+                >
+                  ${item.ratesPerHour}/hour
+                </Text>
+              </View>
+            </ImageBackground>
+          )}
+          <View style={{ padding: 10 }}>
+            <Text
+              numberOfLines={2}
+              style={{
+                color: "#4a5568",
+              }}
+            >
+              {item.description}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
       <Animated.View
         style={{
           height: headerHeight,
+          opacity: headerOpacity,
           overflow: "hidden",
         }}
       >
@@ -400,32 +383,32 @@ const Home = ({ route, navigation }) => {
           source={wingtipClouds}
           style={{
             flex: 1,
-            justifyContent: "flex-end",
+            justifyContent: "flex-start",
           }}
           resizeMode="cover"
         >
           <Animated.View
             style={{
               paddingHorizontal: 16,
-              paddingTop: headerPaddingTop,
-              paddingBottom: 20,
+              paddingTop: 30, // Ensure sufficient padding from the top
+              paddingBottom: 10, // Reduce padding to keep it close to the top
               flexDirection: "row",
-              justifyContent: "space-between",
+              alignItems: "flex-start", // Align items to the start (top left)
             }}
           >
-            <View>
+            <View style={{ marginTop: 10 }}>
               <Animated.Text
                 style={{
-                  fontSize: headerFontSize,
+                  fontSize: 24,
                   color: "white",
                   fontWeight: "bold",
                 }}
               >
-                Good Morning
+                Welcome
               </Animated.Text>
               <Animated.Text
                 style={{
-                  fontSize: Animated.add(headerFontSize, 6),
+                  fontSize: 28,
                   color: "white",
                   fontWeight: "bold",
                 }}
@@ -433,94 +416,83 @@ const Home = ({ route, navigation }) => {
                 {user?.displayName || "User"}
               </Animated.Text>
             </View>
-            <TouchableOpacity onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={28} color="white" />
-            </TouchableOpacity>
           </Animated.View>
         </ImageBackground>
       </Animated.View>
 
-      <Animated.ScrollView
-        contentContainerStyle={{ padding: 16 }}
-        scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
-        >
-          <Text style={{ fontSize: 18, color: "#4A4A4A" }}>
-            Filter by location or Aircraft Make
-          </Text>
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert("Filter Modal", "This will open the filter modal")
-            }
-            style={{ backgroundColor: "#E2E2E2", padding: 8, borderRadius: 50 }}
-          >
-            <Ionicons name="filter" size={24} color="gray" />
-          </TouchableOpacity>
-        </View>
-
-        <FlatList
-          data={categories}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => setSelectedCategory(item)}
+      <FlatList
+        data={listings}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={{ justifyContent: "space-between" }}
+        ListHeaderComponent={
+          <>
+            <View
               style={{
-                padding: 8,
-                backgroundColor:
-                  selectedCategory === item ? "#808080" : "#E2E2E2",
-                borderRadius: 8,
-                marginRight: 8,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 16,
+                paddingTop: 10, // Added padding to separate from header
               }}
             >
-              <Text style={{ fontSize: 14, fontWeight: "bold" }}>{item}</Text>
-            </TouchableOpacity>
-          )}
-          horizontal
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 16 }}
-        />
-        <Text
-          style={{
-            fontSize: 24,
-            fontWeight: "bold",
-            marginBottom: 16,
-            textAlign: "center",
-            color: "#2d3748",
-          }}
-        >
-          Available Listings
-        </Text>
-
-        {listings.length > 0 ? (
-          <FlatList
-            data={listings}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            numColumns={2} // Two listings per row
-            columnWrapperStyle={{ justifyContent: "space-between" }} // Ensures items are spaced properly
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <Text style={{ textAlign: "center", color: "#4a5568" }}>
-                No listings available
+              <Text style={{ fontSize: 18, color: "#4A4A4A" }}>
+                Filter by location or Aircraft Make
               </Text>
-            }
-          />
-        ) : (
+              <TouchableOpacity
+                onPress={() => setFilterModalVisible(true)}
+                style={{
+                  backgroundColor: "#E2E2E2",
+                  padding: 8,
+                  borderRadius: 50,
+                }}
+              >
+                <Ionicons name="filter" size={24} color="gray" />
+              </TouchableOpacity>
+            </View>
+
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "bold",
+                marginBottom: 16,
+                textAlign: "center",
+                color: "#2d3748",
+              }}
+            >
+              Available Listings
+            </Text>
+          </>
+        }
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
           <Text style={{ textAlign: "center", color: "#4a5568" }}>
             No listings available
           </Text>
+        }
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false, listener: handleScroll }
         )}
-      </Animated.ScrollView>
+        ref={scrollViewRef}
+      />
+
+      {showScrollToTop && (
+        <TouchableOpacity
+          style={{
+            position: "absolute",
+            right: 20,
+            bottom: 40,
+            backgroundColor: "#1E90FF",
+            padding: 10,
+            borderRadius: 50,
+            elevation: 5,
+          }}
+          onPress={handleScrollToTop}
+        >
+          <Ionicons name="arrow-up" size={24} color="white" />
+        </TouchableOpacity>
+      )}
 
       <Modal
         animationType="slide"
@@ -561,7 +533,7 @@ const Home = ({ route, navigation }) => {
                   <Ionicons name="arrow-forward" size={30} color="black" />
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ flex: 1 }}>
+              <ScrollView showsVerticalScrollIndicator={false}>
                 <Text
                   style={{
                     fontSize: 28,
@@ -571,7 +543,7 @@ const Home = ({ route, navigation }) => {
                     color: "#2d3748",
                   }}
                 >
-                  {selectedListing.airplaneModel}
+                  {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
                 </Text>
                 <Text
                   style={{
@@ -585,6 +557,16 @@ const Home = ({ route, navigation }) => {
                 </Text>
                 <Text
                   style={{
+                    textAlign: "center",
+                    color: "#4a5568",
+                    marginBottom: 16,
+                  }}
+                >
+                  Location: {selectedListing.location}
+                </Text>
+
+                <Text
+                  style={{
                     marginBottom: 16,
                     textAlign: "center",
                     color: "#4a5568",
@@ -592,6 +574,38 @@ const Home = ({ route, navigation }) => {
                 >
                   {selectedListing.description}
                 </Text>
+
+                {selectedListing.ownerId === user.uid && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "center",
+                      marginVertical: 16,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => handleEditListing(selectedListing.id)}
+                      style={{
+                        backgroundColor: "#1E90FF",
+                        padding: 8,
+                        borderRadius: 8,
+                        marginRight: 8,
+                      }}
+                    >
+                      <Text style={{ color: "white" }}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteListing(selectedListing.id)}
+                      style={{
+                        backgroundColor: "#FF6347",
+                        padding: 8,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text style={{ color: "white" }}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 <View
                   style={{
@@ -692,7 +706,13 @@ const Home = ({ route, navigation }) => {
             onDayPress={handleDateSelection}
             markedDates={
               rentalDate
-                ? { [rentalDate]: { selected: true, marked: true, dotColor: "red" } }
+                ? {
+                    [rentalDate]: {
+                      selected: true,
+                      marked: true,
+                      dotColor: "red",
+                    },
+                  }
                 : {}
             }
           />
@@ -706,12 +726,125 @@ const Home = ({ route, navigation }) => {
             }}
           >
             <Text
-              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+              style={{
+                color: "white",
+                textAlign: "center",
+                fontWeight: "bold",
+              }}
             >
               Close Calendar
             </Text>
           </TouchableOpacity>
         </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={filterModalVisible}
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            justifyContent: "flex-end",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}
+          onPressOut={() => setFilterModalVisible(false)}
+        >
+          <View
+            style={{
+              backgroundColor: "white",
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              padding: 20,
+              height: "50%",
+            }}
+          >
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <Text
+                style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
+              >
+                Filter Listings
+              </Text>
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                <Ionicons name="close" size={24} color="black" />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              placeholder="Enter City, State"
+              value={cityState}
+              onChangeText={setCityState}
+              style={{
+                borderColor: "#CBD5E0",
+                borderWidth: 1,
+                padding: 10,
+                borderRadius: 8,
+                marginBottom: 10,
+              }}
+            />
+            <Text style={{ textAlign: "center", marginBottom: 10 }}>OR</Text>
+            <TextInput
+              placeholder="Enter Make and Model"
+              value={makeModel}
+              onChangeText={setMakeModel}
+              style={{
+                borderColor: "#CBD5E0",
+                borderWidth: 1,
+                padding: 10,
+                borderRadius: 8,
+                marginBottom: 10,
+              }}
+            />
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <TouchableOpacity
+                onPress={clearFilter}
+                style={{
+                  backgroundColor: "#FF6347",
+                  padding: 10,
+                  borderRadius: 8,
+                  flex: 1,
+                  marginRight: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "white",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Clear Filter
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={applyFilter}
+                style={{
+                  backgroundColor: "#1E90FF",
+                  padding: 10,
+                  borderRadius: 8,
+                  flex: 1,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "white",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Apply Filter
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );

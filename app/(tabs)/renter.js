@@ -27,10 +27,11 @@ import {
   doc,
   onSnapshot,
   orderBy,
+  getDoc,
 } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { getAuth } from 'firebase/auth'; // Import Firebase Auth
+import { getAuth } from 'firebase/auth';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
@@ -42,14 +43,13 @@ import Octicons from '@expo/vector-icons/Octicons';
 import { useStripe } from '@stripe/stripe-react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 
-// Import the CheckoutScreen component
 import CheckoutScreen from '../payment/CheckoutScreen.js'; // Update with the correct path to your CheckoutScreen
 
 const Stack = createStackNavigator();
 
 const BookingCalendar = ({ airplaneId, ownerId }) => {
-  const auth = getAuth(); // Initialize Firebase Auth
-  const user = auth.currentUser; // Get current user from Firebase
+  const auth = getAuth();
+  const user = auth.currentUser;
   const stripe = useStripe();
   const navigation = useNavigation();
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -81,57 +81,112 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const [numHours, setNumHours] = useState('');
   const [costPerGallon, setCostPerGallon] = useState('');
   const [numGallons, setNumGallons] = useState('');
-  // Enable chat button for dev testing
-  const [chatButtonActive, setChatButtonActive] = useState(true);
+  const [chatButtonActive, setChatButtonActive] = useState(false);
 
-  // New state variables
   const [rentalRequests, setRentalRequests] = useState([]);
   const [currentRentalRequest, setCurrentRentalRequest] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   const slideAnimation = useRef(new Animated.Value(300)).current;
-
-  const renterId = user?.uid; // Use Firebase user's UID
+  const renterId = user?.uid;
 
   useEffect(() => {
     const db = getFirestore();
-    const rentalRequestsRef = collection(db, 'rentalRequests');
 
-    const q = query(rentalRequestsRef, where('renterId', '==', renterId));
+    if (!renterId) {
+      console.error('Error: renterId is undefined.');
+      Alert.alert('Error', 'User is not authenticated.');
+      return;
+    }
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const requests = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log('Rental Request Data:', data); // Debugging
-        requests.push({ id: doc.id, ...data });
-      });
-      setRentalRequests(requests);
-      console.log('Rental Requests:', requests); // Debugging
-    });
+    const rentalRequestsRef = collection(db, 'renters', renterId, 'rentalRequests');
+    const rentalRequestsQuery = query(
+      rentalRequestsRef,
+      where('rentalStatus', 'in', ['pending', 'approved', 'denied']),
+      orderBy('createdAt', 'desc')
+    );
 
-    return () => unsubscribe();
+    const unsubscribeRentalRequests = onSnapshot(
+      rentalRequestsQuery,
+      async (snapshot) => {
+        const requests = [];
+        for (const docSnap of snapshot.docs) {
+          const requestData = docSnap.data();
+          let ownerName = 'Unknown Owner';
+          if (requestData.ownerId) {
+            try {
+              const ownerDocRef = doc(db, 'owners', requestData.ownerId);
+              const ownerDoc = await getDoc(ownerDocRef);
+              if (ownerDoc.exists()) {
+                ownerName = ownerDoc.data().fullName || 'Unknown Owner';
+              }
+            } catch (error) {
+              console.error('Error fetching owner details:', error);
+            }
+          }
+
+          requests.push({
+            id: docSnap.id,
+            ...requestData,
+            ownerName,
+          });
+        }
+        setRentalRequests(requests);
+      },
+      (error) => {
+        console.error('Error fetching rental requests:', error);
+        Alert.alert('Error', 'Failed to fetch rental requests.');
+      }
+    );
+
+    const notificationsRef = collection(db, 'renters', renterId, 'notifications');
+    const notificationsQuery = query(notificationsRef, orderBy('createdAt', 'desc'));
+
+    const unsubscribeNotifications = onSnapshot(
+      notificationsQuery,
+      (snapshot) => {
+        const notifs = [];
+        snapshot.docs.forEach((docSnap) => {
+          const notifData = docSnap.data();
+          notifs.push({
+            id: docSnap.id,
+            ...notifData,
+          });
+        });
+        setNotifications(notifs);
+        setNotificationCount(notifs.length);
+      },
+      (error) => {
+        console.error('Error fetching notifications:', error);
+        Alert.alert('Error', 'Failed to fetch notifications.');
+      }
+    );
+
+    return () => {
+      unsubscribeRentalRequests();
+      unsubscribeNotifications();
+    };
   }, [renterId]);
 
   useEffect(() => {
     if (rentalRequests.length > 0) {
-      setCurrentRentalRequest(rentalRequests[0]); // Assuming only one active rental request
-      const approvedRequest = rentalRequests.find((request) => request.status === 'approved');
+      setCurrentRentalRequest(rentalRequests[0]); // Assume first rental request for now
+      const approvedRequest = rentalRequests.find((request) => request.rentalStatus === 'approved');
       if (approvedRequest) {
-        // Add approval message to chat
         setMessages((prevMessages) => [
           ...prevMessages,
           {
             id: 'approval-msg',
-            senderId: ownerId,
-            senderName: 'Owner',
+            senderId: approvedRequest.ownerId,
+            senderName: approvedRequest.ownerName,
             text: 'Your rental request has been approved! Please proceed with the payment.',
             timestamp: new Date(),
           },
         ]);
         setChatButtonActive(true);
-        console.log('Approved Request Found:', approvedRequest); // Debugging
       }
     }
   }, [rentalRequests]);
@@ -139,26 +194,31 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   useEffect(() => {
     if (currentRentalRequest) {
       const db = getFirestore();
-      const messagesRef = collection(db, 'messages');
-
-      const q = query(
+      const messagesRef = collection(db, 'renters', renterId, 'messages');
+      const messagesQuery = query(
         messagesRef,
         where('rentalRequestId', '==', currentRentalRequest.id),
         orderBy('timestamp', 'asc')
       );
 
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const msgs = [];
-        querySnapshot.forEach((doc) => {
-          msgs.push({ id: doc.id, ...doc.data() });
-        });
-        setMessages(msgs);
-        console.log('Messages:', msgs); // Debugging
-      });
+      const unsubscribeMessages = onSnapshot(
+        messagesQuery,
+        (snapshot) => {
+          const msgs = [];
+          snapshot.docs.forEach((docSnap) => {
+            msgs.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          setMessages(msgs);
+        },
+        (error) => {
+          console.error('Error fetching messages:', error);
+          Alert.alert('Error', 'Failed to fetch messages.');
+        }
+      );
 
-      return () => unsubscribe();
+      return () => unsubscribeMessages();
     }
-  }, [currentRentalRequest]);
+  }, [currentRentalRequest, renterId]);
 
   const toggleMessagesModal = () => {
     setMessagesModalVisible(!messagesModalVisible);
@@ -167,14 +227,14 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const fetchCompletedRentals = async () => {
     const db = getFirestore();
     const rentalsRef = collection(db, 'orders');
+    const resolvedRenterId = renterId || user?.uid;
 
-    const resolvedOwnerId = ownerId || user?.uid; // Use Firebase user UID
-
-    if (resolvedOwnerId) {
+    if (resolvedRenterId) {
       const q = query(
         rentalsRef,
-        where('ownerId', '==', resolvedOwnerId),
-        where('status', '==', 'completed')
+        where('renterId', '==', resolvedRenterId),
+        where('status', '==', 'completed'),
+        orderBy('completedAt', 'desc')
       );
 
       try {
@@ -186,10 +246,11 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         setCompletedRentals(rentals);
       } catch (error) {
         console.error('Error fetching completed rentals:', error);
+        Alert.alert('Error', 'Failed to fetch completed rentals.');
       }
     } else {
-      console.error('Error: ownerId is undefined.');
-      Alert.alert('Error', 'Owner ID is undefined.');
+      console.error('Error: renterId is undefined.');
+      Alert.alert('Error', 'Renter ID is undefined.');
     }
   };
 
@@ -316,8 +377,8 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     if (paymentSuccessful) {
       const db = getFirestore();
       try {
-        const rentalRequestRef = doc(db, 'rentalRequests', rentalRequest.id);
-        await updateDoc(rentalRequestRef, { status: 'completed' });
+        const rentalRequestRef = doc(db, 'renters', renterId, 'rentalRequests', rentalRequest.id);
+        await updateDoc(rentalRequestRef, { rentalStatus: 'completed', completedAt: new Date() });
 
         setChatButtonActive(true);
         Alert.alert('Rental Confirmed', 'Your payment has been received.');
@@ -331,12 +392,10 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const sendMessage = async () => {
     if (messageText.trim() === '' || !currentRentalRequest?.id) return;
 
-    console.log('Current Rental Request:', currentRentalRequest); // Debugging
-
     const db = getFirestore();
     try {
-      await addDoc(collection(db, 'messages'), {
-        rentalRequestId: currentRentalRequest.id, // Ensure this is not undefined
+      await addDoc(collection(db, 'renters', renterId, 'messages'), {
+        rentalRequestId: currentRentalRequest.id,
         senderId: renterId,
         senderName: user?.displayName || 'Anonymous',
         text: messageText,
@@ -345,6 +404,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       setMessageText('');
     } catch (error) {
       console.error('Error sending message:', error);
+      Alert.alert('Error', 'Failed to send message.');
     }
   };
 
@@ -489,7 +549,10 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             <Ionicons name="airplane-outline" size={32} color="#3182ce" />
             <Text>Jets</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={{ alignItems: 'center' }} onPress={() => handleNavigation('pistons')}>
+          <TouchableOpacity
+            style={{ alignItems: 'center' }}
+            onPress={() => handleNavigation('pistons')}
+          >
             <MaterialCommunityIcons name="engine-outline" size={32} color="#3182ce" />
             <Text>Pistons</Text>
           </TouchableOpacity>
@@ -646,7 +709,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
               <Text style={{ fontWeight: 'bold', color: '#2d3748', flex: 1 }}>Name:</Text>
               <Text style={{ color: '#718096', flex: 2 }}>{profileData.name}</Text>
             </View>
-            {/* ... other profile fields ... */}
+            {/* Add other profile fields as needed */}
             {profileData.image && (
               <Image
                 source={{ uri: profileData.image }}
@@ -687,8 +750,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           </View>
         )}
       </ScrollView>
-
-      {/* Menu and other modals remain unchanged */}
 
       <TouchableOpacity
         style={{
@@ -744,7 +805,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           >
             <Ionicons name="close" size={24} color="white" />
           </TouchableOpacity>
-          {/* Additional Map UI elements can be added here */}
         </View>
       </Modal>
 
@@ -784,7 +844,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             </View>
           </View>
 
-          {/* Add a button to proceed to payment */}
           {currentRentalRequest ? (
             <View style={{ padding: 16 }}>
               <TouchableOpacity
@@ -816,7 +875,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
               borderRadius: 50,
             }}
           >
-            <Ionicons name="close" size={24} color="white" />
+            <Ionicons name="close-circle" size={32} color="#2d3748" />
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>

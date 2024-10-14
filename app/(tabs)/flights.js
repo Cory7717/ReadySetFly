@@ -1728,12 +1728,13 @@ const FullScreenPostModal = ({ onProfileImagePress }) => {
   );
 };
 
-// MainFeed Component with updated image handling in posts and header visibility
+// MainFeed Component with updated error handling
 const MainFeed = ({ navigation, onProfileImagePress }) => {
   const [posts, setPosts] = useState([]);
   const [lastVisible, setLastVisible] = useState(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null); // Added error state
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const previousScrollY = useRef(0);
   const flatListRef = useRef(null);
@@ -1781,10 +1782,14 @@ const MainFeed = ({ navigation, onProfileImagePress }) => {
             loadMore ? [...prevPosts, ...newPosts] : newPosts
           );
           setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+          setError(null); // Reset error on successful fetch
+        } else {
+          // No more posts to fetch
+          setLastVisible(null);
         }
       } catch (error) {
-        Alert.alert('Error', 'Could not fetch posts.');
-        console.log(error);
+        console.log('Fetch Posts Error:', error);
+        setError('Failed to fetch posts. Please try again later.');
       }
       setLoading(false);
     },
@@ -1792,7 +1797,7 @@ const MainFeed = ({ navigation, onProfileImagePress }) => {
   );
 
   const handleLoadMore = () => {
-    if (!loading) {
+    if (!loading && lastVisible) {
       fetchPosts(true);
     }
   };
@@ -1840,6 +1845,14 @@ const MainFeed = ({ navigation, onProfileImagePress }) => {
   return (
     <SafeAreaView style={styles.mainFeedContainer}>
       <View style={{ flex: 1 }}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={() => fetchPosts()}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <FlatList
           ref={flatListRef}
           data={posts}
@@ -1958,6 +1971,21 @@ export default function App() {
 const styles = StyleSheet.create({
   // ... [Your existing styles go here]
 
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: '#FDEDEC',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  retryText: {
+    color: '#1D4ED8',
+    fontSize: 16,
+    textDecorationLine: 'underline',
+  },
   profileModalContainer: {
     flex: 1,
     backgroundColor: '#fff',
@@ -2023,10 +2051,15 @@ const styles = StyleSheet.create({
   commentActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 10,
+  },
+  commentActionText: {
+    marginLeft: 5,
   },
   commentReplyButton: {
     marginLeft: 20,
+  },
+  replyText: {
+    color: 'blue',
   },
   replyInputContainer: {
     flexDirection: 'row',
@@ -2062,7 +2095,103 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     paddingTop: 10,
   },
-  // Post Styles
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profileImageContainer: {
+    position: 'relative',
+  },
+  largeProfileImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderColor: '#fff',
+    borderWidth: 2,
+  },
+  userInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  userName: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  stats: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: 120,
+    marginTop: 10,
+  },
+  uploadingIndicator: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+  },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#FF4500',
+  },
+  linkText: {
+    color: '#1D4ED8',
+    textDecorationLine: 'underline',
+  },
+  createPostContainer: {
+    backgroundColor: 'white',
+    padding: 10,
+    borderBottomColor: '#E5E7EB',
+    borderBottomWidth: 1,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  createPostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  postInput: {
+    flex: 1,
+    marginLeft: 10,
+    padding: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    textAlignVertical: 'top',
+  },
+  sendIcon: {
+    marginLeft: 10,
+  },
+  imagePreviewContainer: {
+    marginTop: 10,
+    position: 'relative',
+  },
+  imagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 15,
+    padding: 5,
+  },
+  addButton: {
+    marginTop: 10,
+  },
   postContainer: {
     backgroundColor: '#fff',
     margin: 10,
@@ -2102,6 +2231,12 @@ const styles = StyleSheet.create({
     height: 300,
     borderRadius: 20,
   },
+  fullScreenPostImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
   postActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -2121,6 +2256,10 @@ const styles = StyleSheet.create({
   commentsSection: {
     marginTop: 10,
   },
+  viewMoreComments: {
+    color: 'gray',
+    marginLeft: 50,
+  },
   commentInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2136,10 +2275,106 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 20,
   },
-  sendIcon: {
-    marginLeft: 10,
+  editModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  // Fullscreen Modal Styles
+  editModal: {
+    width: '80%',
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    elevation: 5,
+  },
+  editInput: {
+    height: 100,
+    textAlignVertical: 'top',
+    marginBottom: 20,
+    padding: 10,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  menuButton: {
+    marginLeft: 'auto',
+  },
+  commentContainer: {
+    marginBottom: 10,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentContent: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  commentUserName: {
+    fontWeight: 'bold',
+  },
+  commentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  commentActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentActionText: {
+    marginLeft: 5,
+  },
+  commentReplyButton: {
+    marginLeft: 20,
+  },
+  replyText: {
+    color: 'blue',
+  },
+  replyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    marginLeft: 50,
+  },
+  replyInput: {
+    flex: 1,
+    padding: 5,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 5,
+  },
+  sendReplyButton: {
+    marginLeft: 5,
+  },
+  repliesContainer: {
+    marginTop: 10,
+  },
+  viewMoreReplies: {
+    marginLeft: 50,
+    color: 'gray',
+  },
+  notificationsContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  notificationItem: {
+    padding: 15,
+    borderBottomColor: '#E5E7EB',
+    borderBottomWidth: 1,
+  },
+  notificationDate: {
+    color: 'gray',
+    fontSize: 12,
+  },
+  emptyNotifications: {
+    textAlign: 'center',
+    marginTop: 20,
+  },
   fullScreenContainer: {
     flex: 1,
     backgroundColor: '#fff',
@@ -2157,387 +2392,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  fullScreenAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  fullScreenUserName: {
-    fontWeight: 'bold',
-    fontSize: 18,
-    marginTop: 8,
-  },
-  fullScreenDate: {
-    color: 'gray',
-    fontSize: 12,
-  },
-  profileModalContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  profileModalContent: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  profileImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    marginBottom: 20,
-  },
-  profileName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  profileBio: {
-    fontSize: 16,
-    marginVertical: 10,
-  },
-  profileLocation: {
-    fontSize: 16,
-    color: 'gray',
-  },
-  editProfileContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  editProfileContent: {
-    padding: 20,
-  },
-  input: {
-    borderColor: '#E5E7EB',
-    borderWidth: 1,
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-  },
-  imageThumbnailContainer: {
-    position: 'relative',
-    marginRight: 10,
-  },
-  imageThumbnail: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
-  },
-  reportText: {
-    color: 'red',
-    marginLeft: 10,
-  },
-  headerContainer: {
-    backgroundColor: "#1D4ED8",
-    padding: 20,
-    overflow: "hidden",
-  },
-  pilotsLoungeText: {
-    fontSize: 22,
-    color: "#fff",
-    textAlign: "left",
-    marginBottom: 0,
-    paddingTop: 10,
-  },
-  headerTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  profileImageContainer: {
-    position: "relative",
-  },
-  largeProfileImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderColor: "#fff",
-    borderWidth: 2,
-  },
-  userInfo: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  userName: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  stats: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: 120,
-    marginTop: 10,
-  },
-  uploadingIndicator: {
-    position: "absolute",
-    top: 20,
-    left: 20,
-  },
-  badge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#FF4500",
-  },
-  linkText: {
-    color: "#1D4ED8",
-    textDecorationLine: "underline",
-  },
-  createPostContainer: {
-    backgroundColor: "white",
-    padding: 10,
-    borderBottomColor: "#E5E7EB",
-    borderBottomWidth: 1,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-  },
-  createPostHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  postInput: {
-    flex: 1,
-    marginLeft: 10,
-    padding: 10,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 20,
-    textAlignVertical: "top",
-  },
-  sendIcon: {
-    marginLeft: 10,
-  },
-  imagePreviewContainer: {
-    marginTop: 10,
-    position: "relative",
-  },
-  imagePreview: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
-  },
-  removeImageButton: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: 15,
-    padding: 5,
-  },
-  addButton: {
-    marginTop: 10,
-  },
-  postContainer: {
-    backgroundColor: "#fff",
-    margin: 10,
-    padding: 10,
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  postHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  postUserInfo: {
-    marginLeft: 10,
-  },
-  postUserName: {
-    fontWeight: "bold",
-  },
-  postDate: {
-    color: "gray",
-    fontSize: 12,
-  },
-  postContent: {
-    color: "#4B5563",
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  postImageContainer: {
-    marginBottom: 10,
-  },
-  postImage: {
-    width: "100%",
-    height: 300,
-    borderRadius: 20,
-  },
-  fullScreenPostImage: {
-    width: "100%",
-    height: 300,
-    borderRadius: 20,
-    marginBottom: 10,
-  },
-  postActions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 8,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  postActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  postActionText: {
-    marginLeft: 5,
-  },
-  commentsSection: {
-    marginTop: 10,
-  },
-  viewMoreComments: {
-    color: "gray",
-    marginLeft: 50,
-  },
-  commentInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 10,
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  commentInput: {
-    flex: 1,
-    marginLeft: 10,
-    padding: 10,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 20,
-  },
-  editModalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  editModal: {
-    width: "80%",
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 10,
-    elevation: 5,
-  },
-  editInput: {
-    height: 100,
-    textAlignVertical: "top",
-    marginBottom: 20,
-    padding: 10,
-    borderColor: "gray",
-    borderWidth: 1,
-    borderRadius: 10,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  menuButton: {
-    marginLeft: "auto",
-  },
-  commentContainer: {
-    marginBottom: 10,
-  },
-  commentHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  commentContent: {
-    marginLeft: 10,
-    flex: 1,
-  },
-  commentUserName: {
-    fontWeight: "bold",
-  },
-  commentActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  commentActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  commentActionText: {
-    marginLeft: 5,
-  },
-  commentReplyButton: {
-    marginLeft: 20,
-  },
-  replyText: {
-    color: "blue",
-  },
-  replyInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-    marginLeft: 50,
-  },
-  replyInput: {
-    flex: 1,
-    padding: 5,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 5,
-  },
-  sendReplyButton: {
-    marginLeft: 5,
-  },
-  repliesContainer: {
-    marginTop: 10,
-  },
-  viewMoreReplies: {
-    marginLeft: 50,
-    color: "gray",
-  },
-  notificationsContainer: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  notificationItem: {
-    padding: 15,
-    borderBottomColor: "#E5E7EB",
-    borderBottomWidth: 1,
-  },
-  notificationDate: {
-    color: "gray",
-    fontSize: 12,
-  },
-  emptyNotifications: {
-    textAlign: "center",
-    marginTop: 20,
-  },
-  fullScreenContainer: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  fullScreenPost: {
-    backgroundColor: "white",
-    margin: 16,
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   closeButton: {
-    alignSelf: "flex-end",
+    alignSelf: 'flex-end',
   },
   fullScreenHeader: {
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 16,
   },
   fullScreenAvatar: {
@@ -2546,24 +2405,24 @@ const styles = StyleSheet.create({
     borderRadius: 30,
   },
   fullScreenUserName: {
-    fontWeight: "bold",
+    fontWeight: 'bold',
     fontSize: 18,
     marginTop: 8,
   },
   fullScreenDate: {
-    color: "gray",
+    color: 'gray',
     fontSize: 12,
   },
   fullScreenImageContainer: {
     marginBottom: 10,
   },
   fullScreenImage: {
-    width: "100%",
+    width: '100%',
     height: 300,
     borderRadius: 20,
   },
   commentsHeader: {
-    fontWeight: "bold",
+    fontWeight: 'bold',
     marginBottom: 10,
   },
   sendButton: {
@@ -2571,62 +2430,62 @@ const styles = StyleSheet.create({
   },
   mainFeedContainer: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
   },
   loadingIndicator: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
   },
   emptyPosts: {
-    textAlign: "center",
+    textAlign: 'center',
     marginTop: 20,
   },
   scrollToTopButton: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 30,
     right: 20,
-    backgroundColor: "#1D4ED8",
+    backgroundColor: '#1D4ED8',
     borderRadius: 25,
     padding: 15,
     elevation: 5,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
   },
   fullScreenProfileContainer: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
   },
   fullScreenProfileContent: {
-    alignItems: "center",
+    alignItems: 'center',
     padding: 20,
   },
   fullScreenProfileImage: {
-    width: "100%",
+    width: '100%',
     height: 400,
     borderRadius: 10,
   },
   fullScreenProfileActions: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 10,
   },
   likeButton: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   likeCount: {
     marginLeft: 5,
     fontSize: 18,
   },
   fullScreenProfileComments: {
-    width: "100%",
+    width: '100%',
     marginTop: 20,
   },
   profileComment: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 10,
   },
   commentAvatar: {
@@ -2636,7 +2495,7 @@ const styles = StyleSheet.create({
   },
   commentTextContainer: {
     marginLeft: 10,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: '#F3F4F6',
     padding: 10,
     borderRadius: 10,
     flex: 1,
@@ -2644,16 +2503,16 @@ const styles = StyleSheet.create({
   profileCommentInput: {
     flex: 1,
     padding: 10,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: '#F3F4F6',
     borderRadius: 20,
     marginRight: 10,
   },
   fullScreenProfileCommentInput: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 10,
     borderTopWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: '#E5E7EB',
   },
   videoContainer: {
     width: '100%',

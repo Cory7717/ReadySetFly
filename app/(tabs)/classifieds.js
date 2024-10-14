@@ -18,7 +18,7 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
-import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Updated Firebase Auth import
+import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Firebase Auth
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { db, storage } from '../../firebaseConfig';
@@ -60,9 +60,10 @@ const Stack = createStackNavigator();
 
 const Classifieds = () => {
   const auth = getAuth(); // Initialize Firebase Auth
-  const user = auth.currentUser; // Use Firebase's current user
-  const { initPaymentSheet } = useStripe();
   const navigation = useNavigation();
+  const [user, setUser] = useState(null); // Manage authenticated user state
+  const [loadingAuth, setLoadingAuth] = useState(true); // Track auth loading state
+  const { initPaymentSheet } = useStripe();
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -109,31 +110,45 @@ const Classifieds = () => {
     setPricingModalVisible((prev) => ({ ...prev, [packageType]: false }));
   };
 
+  // Listen to authentication state changes
   useEffect(() => {
-    const fetchLocation = async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission denied', 'Location access is required.');
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoadingAuth(false);
+    });
+
+    return () => unsubscribeAuth();
+  }, [auth]);
+
+  // Fetch user location if authenticated
+  useEffect(() => {
+    if (user) {
+      const fetchLocation = async () => {
+        try {
+          let { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission denied', 'Location access is required.');
+            setLocation(null);
+            return;
+          }
+
+          let currentLocation = await Location.getCurrentPositionAsync({});
+          setLocation(currentLocation);
+        } catch (error) {
+          console.error('Error fetching location: ', error);
+          Alert.alert(
+            'Error fetching location',
+            'Location is unavailable. Make sure that location services are enabled.'
+          );
           setLocation(null);
-          return;
         }
+      };
 
-        let currentLocation = await Location.getCurrentPositionAsync({});
-        setLocation(currentLocation);
-      } catch (error) {
-        console.error('Error fetching location: ', error);
-        Alert.alert(
-          'Error fetching location',
-          'Location is unavailable. Make sure that location services are enabled.'
-        );
-        setLocation(null);
-      }
-    };
-
-    fetchLocation();
+      fetchLocation();
+    }
   }, [user]);
 
+  // Update pricing packages based on selected category
   useEffect(() => {
     if (selectedCategory === 'Aviation Jobs') {
       setPricingPackages({
@@ -151,28 +166,43 @@ const Classifieds = () => {
     }
   }, [selectedCategory]);
 
+  // Listen to Firestore listings based on selected category and user authentication
   useEffect(() => {
-    const q = selectedCategory
-      ? query(
-          collection(db, 'UserPost'),
-          where('category', '==', selectedCategory),
-          orderBy('createdAt', 'desc')
-        )
-      : query(collection(db, 'UserPost'), orderBy('createdAt', 'desc'));
+    if (user) {
+      const collectionName = 'UserPost'; // Ensure 'UserPost' matches your Firestore rules
+      const q = selectedCategory
+        ? query(
+            collection(db, collectionName),
+            where('category', '==', selectedCategory),
+            orderBy('createdAt', 'desc')
+          )
+        : query(collection(db, collectionName), orderBy('createdAt', 'desc'));
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const listingsData = [];
-      querySnapshot.forEach((doc) => {
-        listingsData.push({ id: doc.id, ...doc.data() });
-      });
+      const unsubscribe = onSnapshot(
+        q,
+        (querySnapshot) => {
+          const listingsData = [];
+          querySnapshot.forEach((doc) => {
+            listingsData.push({ id: doc.id, ...doc.data() });
+          });
 
-      setListings(listingsData);
-      setFilteredListings(listingsData);
-    });
+          setListings(listingsData);
+          setFilteredListings(listingsData);
+        },
+        (error) => {
+          console.error('Error fetching listings:', error);
+          Alert.alert('Error', 'Failed to fetch listings. Please try again later.');
+        }
+      );
 
-    return () => unsubscribe();
-  }, [selectedCategory]);
+      return () => unsubscribe();
+    } else {
+      setListings([]);
+      setFilteredListings([]);
+    }
+  }, [selectedCategory, user]);
 
+  // Image picker functionality
   const pickImage = async () => {
     let maxImages = 1;
 
@@ -212,6 +242,7 @@ const Classifieds = () => {
     }
   };
 
+  // Render image upload button with dynamic limits
   const renderImageUploadButton = () => {
     let maxImages = 1;
     if (selectedCategory === 'Aviation Jobs') {
@@ -247,6 +278,7 @@ const Classifieds = () => {
     );
   };
 
+  // Render listing images in FlatList
   const renderListingImages = (item) => {
     return (
       <FlatList
@@ -270,6 +302,7 @@ const Classifieds = () => {
     );
   };
 
+  // Filter listings by distance (in miles)
   const filterListingsByDistance = (radiusMiles) => {
     if (!location) {
       Alert.alert('Error', 'Location is not available.');
@@ -290,6 +323,7 @@ const Classifieds = () => {
     setFilteredListings(filtered);
   };
 
+  // Helper function to calculate distance between two coordinates
   const getDistanceFromLatLonInMiles = (lat1, lon1, lat2, lon2) => {
     const R = 3958.8; // Radius of the Earth in miles
     const dLat = deg2rad(lat2 - lat1);
@@ -305,10 +339,12 @@ const Classifieds = () => {
     return distance;
   };
 
+  // Convert degrees to radians
   const deg2rad = (deg) => {
     return deg * (Math.PI / 180);
   };
 
+  // Fetch payment sheet parameters from backend
   const fetchPaymentSheetParams = async () => {
     try {
       console.log(`Making request to: ${API_URL}/create-payment-intent`);
@@ -343,6 +379,7 @@ const Classifieds = () => {
     }
   };
 
+  // Initialize Stripe payment sheet
   const initializePaymentSheet = async () => {
     if (!user) {
       Alert.alert('Error', 'User information is not available.');
@@ -377,6 +414,7 @@ const Classifieds = () => {
     }
   };
 
+  // Handle payment submission
   const handleSubmitPayment = async () => {
     try {
       navigation.navigate('PaymentScreen', {
@@ -393,6 +431,7 @@ const Classifieds = () => {
     }
   };
 
+  // Complete payment and submit listing
   const handleCompletePayment = async () => {
     if (!user) {
       Alert.alert('Error', 'User information is not available.');
@@ -460,6 +499,7 @@ const Classifieds = () => {
     }
   };
 
+  // Handle test submission without payment
   const handleTestSubmitListing = async (values) => {
     if (!user) {
       Alert.alert('Error', 'User information is not available.');
@@ -513,6 +553,7 @@ const Classifieds = () => {
     }
   };
   
+  // Render Edit and Delete buttons for owner
   const renderEditAndDeleteButtons = (listing) => {
     if (user && listing?.ownerId === user.uid) {
       return (
@@ -546,6 +587,7 @@ const Classifieds = () => {
     return null;
   };
 
+  // Handle listing press to show details
   const handleListingPress = (listing) => {
     setSelectedListing(listing);
     if (listing.category === 'Aviation Jobs') {
@@ -555,11 +597,13 @@ const Classifieds = () => {
     }
   };
 
+  // Handle editing a listing
   const handleEditListing = (listing) => {
     setSelectedListing(listing);
     setEditModalVisible(true);
   };
 
+  // Handle deleting a listing
   const handleDeleteListing = async (listingId) => {
     try {
       Alert.alert(
@@ -585,6 +629,7 @@ const Classifieds = () => {
     }
   };
 
+  // Handle saving edits to a listing
   const handleSaveEdit = async (values) => {
     if (!user) {
       Alert.alert('Error', 'User information is not available.');
@@ -601,6 +646,7 @@ const Classifieds = () => {
     }
   };
 
+  // Handle asking a question via email
   const handleAskQuestion = () => {
     if (selectedListing && selectedListing.contactEmail) {
       const email = selectedListing.contactEmail;
@@ -616,6 +662,7 @@ const Classifieds = () => {
     }
   };
 
+  // Handle form submission for listing
   const onSubmitMethod = async (values) => {
     if (!user) {
       Alert.alert('Error', 'User information is not available.');
@@ -646,6 +693,7 @@ const Classifieds = () => {
     setLoading(false);
   };
 
+  // Reset modals when screen gains focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       setModalVisible(false);
@@ -658,6 +706,7 @@ const Classifieds = () => {
     return unsubscribe;
   }, [navigation]);
 
+  // Render category items
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       key={item}
@@ -681,6 +730,7 @@ const Classifieds = () => {
     </TouchableOpacity>
   );
 
+  // Navigate through images in listing details modal
   const goToNextImage = () => {
     if (
       selectedListing?.images &&
@@ -709,6 +759,7 @@ const Classifieds = () => {
     setCurrentImageIndex(0);
   }, [selectedListing]);
 
+  // Animated header styles
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 150],
     outputRange: [200, 70],
@@ -727,6 +778,7 @@ const Classifieds = () => {
     extrapolate: 'clamp',
   });
 
+  // Animate modal scaling
   useEffect(() => {
     if (modalVisible) {
       Animated.spring(scaleValue, {
@@ -739,6 +791,32 @@ const Classifieds = () => {
     }
   }, [modalVisible]);
 
+  // If authentication state is loading
+  if (loadingAuth) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white }}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ marginTop: 10, color: COLORS.black }}>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // If user is not authenticated
+  if (!user) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white, padding: 16 }}>
+        <Text style={{ fontSize: 18, color: COLORS.black, marginBottom: 20, textAlign: 'center' }}>
+          You need to be signed in to view classifieds. Please sign in or create an account.
+        </Text>
+        {/* 
+          Removed navigation to 'SignIn' screen as per your request.
+          You can implement sign-in prompts or redirects as needed elsewhere in your app.
+        */}
+      </SafeAreaView>
+    );
+  }
+
+  // Main content when user is authenticated
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
       <Animated.View style={{ overflow: 'hidden', height: headerHeight }}>
@@ -1698,13 +1776,17 @@ const AppNavigator = () => {
         <Stack.Screen
           name="Classifieds"
           component={Classifieds}
-          options={{ headerShown: false }} // This hides the header for the Classifieds screen
+          options={{ headerShown: false }} // Hides the header for the Classifieds screen
         />
         <Stack.Screen
           name="PaymentScreen"
           component={PaymentScreen}
-          options={{ headerShown: false }} // This hides the header for the PaymentScreen
+          options={{ headerShown: false }} // Hides the header for the PaymentScreen
         />
+        {/* 
+          Removed the SignIn screen from the stack navigator as per your request.
+          Ensure that sign-in functionality is handled appropriately elsewhere in your app.
+        */}
       </Stack.Navigator>
     </NavigationContainer>
   );

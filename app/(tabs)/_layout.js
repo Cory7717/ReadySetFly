@@ -1,13 +1,12 @@
 import { StatusBar } from "expo-status-bar";
 import { View, Text, Image } from "react-native";
 import React from "react";
-import { Tabs, Redirect } from "expo-router";
+import { Tabs } from "expo-router";
 import { NativeWindStyleSheet } from "nativewind";
 import { images } from "../../constants";
 import CustomButton from "../../components/CustomButton";
 import {
   Ionicons,
-  MaterialCommunityIcons,
   FontAwesome5,
   Feather,
   AntDesign,
@@ -16,7 +15,6 @@ import {
   FontAwesome6
 } from "@expo/vector-icons";
 import { createStackNavigator } from "@react-navigation/stack";
-
 
 const Stack = createStackNavigator();
 
@@ -27,6 +25,7 @@ NativeWindStyleSheet.setOutput({
 <View className="flex items-center justify-center gap-2">
   <Image source={images.logo} />
 </View>;
+
 const TabIcon = ({ icon, color, focused, name }) => {
   return (
     <View className="flex items-center justify-center gap-2">
@@ -40,7 +39,7 @@ const TabIcon = ({ icon, color, focused, name }) => {
         className={`${focused ? "font-rubikbold" : "font-rubikbold"} text-xs `}
         style={{ color: color }}
       >
-        name={name}
+        {name}
       </Text>
     </View>
   );
@@ -52,8 +51,8 @@ const TabsLayout = () => {
       <Tabs
         screenOptions={{
           tabBarShowLabel: true,
-          tabBarActiveTintColor: "#404040",
-          tabBarInactiveTintColor: "#e6e6e6",
+          tabBarActiveTintColor: "#404040", // Darker color for active tab
+          tabBarInactiveTintColor: "#808080", // Darker gray for better legibility
           tabBarStyle: {
             paddingBottom: "auto",
             backgroundColor: "#fff",
@@ -72,7 +71,7 @@ const TabsLayout = () => {
             headerStyle: {
               backgroundColor: "#f2f2f2",
             },
-            tabBarIcon: ({ name, icon, color, focused, size }) => (
+            tabBarIcon: ({ color }) => (
               <AntDesign name="home" size={32} color={color} />
             ),
           }}
@@ -82,7 +81,7 @@ const TabsLayout = () => {
           options={{
             title: "Owner Dashboard",
             headerShown: false,
-            tabBarIcon: ({ name, icon, color, focused }) => (
+            tabBarIcon: ({ color }) => (
               <FontAwesome name="sign-in" size={32} color={color} />
             ),
           }}
@@ -92,7 +91,7 @@ const TabsLayout = () => {
           options={{
             title: "Renter Dashboard",
             headerShown: false,
-            tabBarIcon: ({ name, icon, color, focused }) => (
+            tabBarIcon: ({ color }) => (
               <Octicons name="paper-airplane" size={26} color={color} />
             ),
           }}
@@ -102,22 +101,17 @@ const TabsLayout = () => {
           options={{
             title: "Social",
             headerShown: false,
-            tabBarIcon: ({ name, icon, color, focused }) => (
-              <Ionicons
-                name="people-outline"
-                size={32}
-                color={color}
-              />
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="people-outline" size={32} color={color} />
             ),
           }}
         />
-        
         <Tabs.Screen
           name="classifieds"
           options={{
             title: "Classifieds",
             headerShown: false,
-            tabBarIcon: ({ name, icon, color, focused }) => (
+            tabBarIcon: ({ color }) => (
               <FontAwesome6 name="money-bill-1" size={24} color={color} />
             ),
           }}

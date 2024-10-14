@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react"; 
 import {
   View,
   TextInput,
@@ -8,18 +8,17 @@ import {
   Image,
   Text,
   ActivityIndicator,
-  FlatList,
   ImageBackground,
   Modal,
   StatusBar,
   RefreshControl,
   Platform,
   StyleSheet,
+  FlatList,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { db, storage, auth } from "../../firebaseConfig"; // Import Firebase Auth
 import * as ImagePicker from "expo-image-picker";
-import * as DocumentPicker from "expo-document-picker";
 import {
   collection,
   addDoc,
@@ -28,6 +27,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs, // Imported getDocs for querying Firestore
   setDoc,
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
@@ -62,23 +62,33 @@ const OwnerProfile = ({ ownerId }) => {
     costPerHour: "",
     location: "",
     airportIdentifier: "",
+    mainImage: "", // New field for main image
+    images: [], // Ensure images are part of aircraftDetails
   });
 
   const [initialAircraftDetails, setInitialAircraftDetails] = useState(null);
-  const [additionalAircrafts, setAdditionalAircrafts] = useState([]);
+  const [allAircrafts, setAllAircrafts] = useState([]); // Combined list of all aircraft
   const [costData, setCostData] = useState({
     purchasePrice: "",
     loanAmount: "",
     interestRate: "",
     loanTerm: "",
+    depreciationRate: "",
+    usefulLife: "",
     estimatedAnnualCost: "",
     insuranceCost: "",
-    hangerCost: "",
-    fuelCostPerHour: "",
+    hangarCost: "",
+    annualRegistrationFees: "",
     maintenanceReserve: "",
-    mortgageExpense: "",
+    oilCostPerHour: "",
+    routineMaintenancePerHour: "",
+    tiresPerHour: "",
+    otherConsumablesPerHour: "",
+    fuelCostPerHour: "",
     flightHoursPerYear: "",
     costPerHour: "",
+    mortgageExpense: "",
+    depreciationExpense: "",
   });
 
   const [costSaved, setCostSaved] = useState(false);
@@ -100,6 +110,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [debitModalVisible, setDebitModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
+  const [activeRentals, setActiveRentals] = useState([]); // New State Variable for Active Rentals
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [messageInput, setMessageInput] = useState("");
   const [messageModalVisible, setMessageModalVisible] = useState(false);
@@ -108,7 +119,14 @@ const OwnerProfile = ({ ownerId }) => {
   const [selectedChatThreadId, setSelectedChatThreadId] = useState(null);
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
   const [aircraftModalVisible, setAircraftModalVisible] = useState(false);
+  const [selectedAircraft, setSelectedAircraft] = useState(null); // New state for selected aircraft
+  const [isEditing, setIsEditing] = useState(false); // New state for edit mode
   const [rentalDate, setRentalDate] = useState(null);
+  const [selectedAircraftIds, setSelectedAircraftIds] = useState([]); // Track selected aircraft for listing
+
+  // New State Variables for Rental Request Modal
+  const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
+  const [selectedListingDetails, setSelectedListingDetails] = useState(null);
 
   // Fetch stored data on mount
   useEffect(() => {
@@ -129,6 +147,11 @@ const OwnerProfile = ({ ownerId }) => {
             setAircraftDetails(data.aircraftDetails);
             setInitialAircraftDetails(data.aircraftDetails);
             setAircraftSaved(true);
+            setAllAircrafts([data.aircraftDetails]); // Initialize with initial aircraft
+          }
+
+          if (data.additionalAircrafts && Array.isArray(data.additionalAircrafts)) {
+            setAllAircrafts((prev) => [...prev, ...data.additionalAircrafts]);
           }
         } else {
           console.log("No saved data found for this owner.");
@@ -155,7 +178,7 @@ const OwnerProfile = ({ ownerId }) => {
       const unsubscribeRentalRequests = onSnapshot(
         rentalRequestsQuery,
         async (snapshot) => {
-          const requestsWithNames = await Promise.all(
+          const requestsWithNamesAndListings = await Promise.all(
             snapshot.docs.map(async (docSnap) => {
               const requestData = docSnap.data();
 
@@ -172,15 +195,27 @@ const OwnerProfile = ({ ownerId }) => {
                 }
               }
 
+              const listingDetails = await fetchListingDetails(requestData.listingId);
+
               return {
                 id: docSnap.id,
                 ...requestData,
                 renterName,
+                listingDetails,
               };
             })
           );
 
-          setRentalRequests(requestsWithNames);
+          // Separate rental requests into pending and approved (active) rentals
+          const pendingRequests = requestsWithNamesAndListings.filter(
+            (req) => req.status === "pending"
+          );
+          const approvedRentals = requestsWithNamesAndListings.filter(
+            (req) => req.status === "approved"
+          );
+
+          setRentalRequests(pendingRequests);
+          setActiveRentals(approvedRentals); // Set Active Rentals
         }
       );
 
@@ -213,49 +248,111 @@ const OwnerProfile = ({ ownerId }) => {
       loanAmount,
       interestRate,
       loanTerm,
+      depreciationRate,
+      usefulLife,
       estimatedAnnualCost,
       insuranceCost,
-      hangerCost,
-      fuelCostPerHour,
+      hangarCost,
+      annualRegistrationFees,
       maintenanceReserve,
+      oilCostPerHour,
+      routineMaintenancePerHour,
+      tiresPerHour,
+      otherConsumablesPerHour,
+      fuelCostPerHour,
       flightHoursPerYear,
     } = costData;
 
+    // Validate Inputs
+    if (
+      !purchasePrice ||
+      !loanAmount ||
+      !interestRate ||
+      !loanTerm ||
+      !depreciationRate ||
+      !usefulLife ||
+      !estimatedAnnualCost ||
+      !insuranceCost ||
+      !hangarCost ||
+      !annualRegistrationFees ||
+      !maintenanceReserve ||
+      !oilCostPerHour ||
+      !routineMaintenancePerHour ||
+      !tiresPerHour ||
+      !otherConsumablesPerHour ||
+      !fuelCostPerHour ||
+      !flightHoursPerYear
+    ) {
+      Alert.alert("Error", "Please fill in all fields for accurate calculation.");
+      setLoading(false);
+      return;
+    }
+
+    // Calculate Monthly Mortgage Expense
     const monthlyInterestRate = parseFloat(interestRate) / 100 / 12;
     const numberOfPayments = parseFloat(loanTerm) * 12;
-    const mortgageExpense = loanAmount
+    const principal = parseFloat(loanAmount);
+    const mortgageExpense = principal
       ? (
-          (parseFloat(loanAmount) * monthlyInterestRate) /
+          (principal * monthlyInterestRate) /
           (1 - Math.pow(1 + monthlyInterestRate, -numberOfPayments))
         ).toFixed(2)
       : 0;
 
-    const totalCost =
-      parseFloat(estimatedAnnualCost || 0) +
-      parseFloat(insuranceCost || 0) +
-      parseFloat(hangerCost || 0) +
-      parseFloat(fuelCostPerHour || 0) * parseFloat(flightHoursPerYear || 1) +
-      parseFloat(maintenanceReserve || 0) +
-      parseFloat(mortgageExpense || 0);
+    // Calculate Depreciation Expense
+    const depreciationExpense = (
+      (parseFloat(purchasePrice) * parseFloat(depreciationRate)) / 100
+    ).toFixed(2);
 
+    // Total Fixed Costs per Year
+    const totalFixedCosts =
+      parseFloat(mortgageExpense) * 12 +
+      parseFloat(depreciationExpense) +
+      parseFloat(insuranceCost) +
+      parseFloat(hangarCost) +
+      parseFloat(maintenanceReserve) +
+      parseFloat(annualRegistrationFees);
+
+    // Total Variable Costs per Year
+    const totalVariableCosts =
+      (parseFloat(fuelCostPerHour) +
+        parseFloat(oilCostPerHour) +
+        parseFloat(routineMaintenancePerHour) +
+        parseFloat(tiresPerHour) +
+        parseFloat(otherConsumablesPerHour)) *
+      parseFloat(flightHoursPerYear);
+
+    // Total Cost per Year
+    const totalCostPerYear = totalFixedCosts + totalVariableCosts;
+
+    // Cost per Hour
     const costPerHour = (
-      totalCost / parseFloat(flightHoursPerYear || 1)
+      totalCostPerYear / parseFloat(flightHoursPerYear)
     ).toFixed(2);
 
     setCostData((prev) => ({
       ...prev,
       costPerHour,
       mortgageExpense: mortgageExpense,
+      depreciationExpense: depreciationExpense,
     }));
     setCostSaved(true);
     setLoading(false);
 
-    await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
-      costData,
-      aircraftDetails,
-    });
+    try {
+      await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
+        costData,
+        aircraftDetails: initialAircraftDetails, // Save only initial aircraft here
+        additionalAircrafts: allAircrafts.filter(
+          (aircraft) => aircraft.id !== initialAircraftDetails?.id
+        ), // Save additional aircraft separately
+      });
 
-    Alert.alert("Success", `Estimated cost per hour: $${costPerHour}`);
+      Alert.alert("Success", `Estimated cost per hour: $${costPerHour}`);
+    } catch (error) {
+      console.error("Error saving cost data:", error);
+      Alert.alert("Error", "Failed to save cost data.");
+    }
   };
 
   const handleInputChange = (name, value) => {
@@ -270,7 +367,7 @@ const OwnerProfile = ({ ownerId }) => {
 
   const pickImage = async () => {
     if (images.length >= 7) {
-      Alert.alert("You can only upload up to 7 images.");
+      Alert.alert("Limit Reached", "You can only upload up to 7 images.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -285,6 +382,10 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
+  const removeImage = (uri) => {
+    setImages(images.filter((image) => image !== uri));
+  };
+
   const onDayPress = (day) => {
     const selected = !selectedDates[day.dateString];
     setRentalDate(day.dateString);
@@ -293,6 +394,13 @@ const OwnerProfile = ({ ownerId }) => {
         ? { selected: true, marked: true, dotColor: "red" }
         : undefined,
     });
+
+    // If a request is selected, handle approval with the selected date
+    if (selectedRequest) {
+      handleApproveRentalRequest(selectedRequest, day.dateString);
+      setSelectedRequest(null); // Reset after approval
+    }
+
     setCalendarVisible(false);
   };
 
@@ -334,26 +442,60 @@ const OwnerProfile = ({ ownerId }) => {
       Alert.alert("Error", "Location is required.");
       return;
     }
-
+  
     setAircraftSaved(true);
-    Alert.alert("Aircraft Details Saved", "Your aircraft details have been saved.");
-
-    await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
-      costData,
-      aircraftDetails,
-    });
+    Alert.alert("Success", "Your aircraft details have been saved.");
+  
+    try {
+      let updatedAircrafts = [...allAircrafts];
+  
+      // Sanitize aircraftDetails before saving
+      const sanitizedAircraftDetails = sanitizeData(aircraftDetails);
+  
+      if (initialAircraftDetails) {
+        // Update existing initial aircraft
+        updatedAircrafts = updatedAircrafts.map((aircraft) =>
+          aircraft.id === initialAircraftDetails.id
+            ? { ...sanitizedAircraftDetails, id: aircraft.id }
+            : aircraft
+        );
+      } else {
+        // Add new initial aircraft
+        const newInitialAircraft = { ...sanitizedAircraftDetails, id: "initial" };
+        updatedAircrafts = [newInitialAircraft, ...updatedAircrafts];
+        setInitialAircraftDetails(newInitialAircraft);
+      }
+  
+      setAllAircrafts(updatedAircrafts);
+  
+      await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
+        costData,
+        aircraftDetails: initialAircraftDetails
+          ? updatedAircrafts.find((a) => a.id === initialAircraftDetails.id)
+          : updatedAircrafts[0],
+        additionalAircrafts: updatedAircrafts.filter(
+          (aircraft) => aircraft.id !== "initial"
+        ),
+      });
+    } catch (error) {
+      console.error("Error saving aircraft details:", error);
+      Alert.alert("Error", "Failed to save aircraft details.");
+    }
   };
+  
 
   const onEditAircraftDetails = () => {
-    setAircraftSaved(false);
+    setIsEditing(true);
   };
 
   const onCancelAircraftEdit = () => {
     if (initialAircraftDetails) {
       setAircraftDetails(initialAircraftDetails);
+      setImages(initialAircraftDetails.images || []);
       setAircraftSaved(true);
+      setIsEditing(false);
       Alert.alert(
-        "Changes Canceled",
+        "Canceled",
         "Aircraft details reverted to the original state."
       );
     }
@@ -381,6 +523,7 @@ const OwnerProfile = ({ ownerId }) => {
 
     setLoading(true);
     try {
+      // Upload images to Firebase Storage and get download URLs
       const uploadedImages = [];
       for (const image of images) {
         const downloadURL = await uploadFile(image, "airplaneImages");
@@ -394,6 +537,7 @@ const OwnerProfile = ({ ownerId }) => {
         ? await uploadFile(insurancePdf, "documents")
         : "";
 
+      // Prepare new listing data
       const newListing = sanitizeData({
         year: aircraftDetails.year || "",
         make: aircraftDetails.make || "",
@@ -404,6 +548,7 @@ const OwnerProfile = ({ ownerId }) => {
         ratesPerHour: aircraftDetails.costPerHour || "0",
         minimumHours: profileData.minimumHours || "1",
         images: uploadedImages.length > 0 ? uploadedImages : [],
+        mainImage: uploadedImages.length > 0 ? uploadedImages[0] : "", // Set the first image as main image by default
         currentAnnualPdf: annualProofURL || "",
         insurancePdf: insuranceProofURL || "",
         ownerId: resolvedOwnerId,
@@ -416,74 +561,54 @@ const OwnerProfile = ({ ownerId }) => {
       newListing.id = docRef.id;
 
       if (additional) {
-        setAdditionalAircrafts([...additionalAircrafts, newListing]);
+        setAllAircrafts([...allAircrafts, newListing]);
       } else {
         setUserListings([...userListings, newListing]);
+        setAllAircrafts([...allAircrafts, newListing]);
       }
 
       Alert.alert("Success", "Your listing has been submitted.");
-      setAircraftModalVisible(false);
+      setFullScreenModalVisible(false);
       setIsListedForRent(true);
     } catch (error) {
       console.error("Error submitting listing: ", error);
-      if (error.message.includes("Network request failed")) {
-        Alert.alert(
-          "Network Error",
-          "There was an error submitting your listing due to network issues. Please check your internet connection and try again."
-        );
-      } else {
-        Alert.alert(
-          "Error",
-          `There was an error submitting your listing: ${error.message}`
-        );
-      }
+      Alert.alert("Error", `There was an error submitting your listing: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleListForRentToggle = async (listing, additional = false) => {
-    if (isListedForRent) {
-      if (!listing?.id) {
-        Alert.alert("Error", "Listing ID is missing.");
-        return;
+  const handleListForRentToggle = async () => {
+    if (selectedAircraftIds.length === 0) {
+      Alert.alert("No Selection", "Please select at least one aircraft to list.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Fetch the selected aircraft details
+      const selectedAircrafts = allAircrafts.filter((aircraft) =>
+        selectedAircraftIds.includes(aircraft.id)
+      );
+
+      // List each selected aircraft
+      for (const aircraft of selectedAircrafts) {
+        await onSubmitMethod(aircraft, true);
       }
-      try {
-        const listingDocRef = doc(db, "airplanes", listing.id);
-        await deleteDoc(listingDocRef);
 
-        if (additional) {
-          setAdditionalAircrafts(
-            additionalAircrafts.filter((aircraft) => aircraft.id !== listing.id)
-          );
-        } else {
-          setUserListings(
-            userListings.filter((aircraft) => aircraft.id !== listing.id)
-          );
-        }
-
-        navigation.navigate("Home", {
-          updatedListings: userListings.filter(
-            (aircraft) => aircraft.id !== listing.id
-          ),
-          unlistedId: listing.id,
-        });
-
-        setIsListedForRent(false);
-        Alert.alert("Success", "Your aircraft has been removed from the listings.");
-      } catch (error) {
-        console.error("Error removing listing: ", error);
-        Alert.alert(
-          "Error",
-          "There was an error removing your listing. Please check your network or try again."
-        );
-      }
-    } else {
-      await onSubmitMethod(listing, additional);
+      // Reset selection after listing
+      setSelectedAircraftIds([]);
+      Alert.alert("Success", "Selected aircraft have been listed for rent.");
+    } catch (error) {
+      console.error("Error listing aircraft: ", error);
+      Alert.alert("Error", "There was an error listing the selected aircraft.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleApproveRentalRequest = async (request) => {
+  // Updated handleApproveRentalRequest to accept rentalDate
+  const handleApproveRentalRequest = async (request, rentalDate) => {
     try {
       if (!request.renterId || !request.listingId || !rentalDate) {
         console.error("Invalid request data: ", request);
@@ -491,6 +616,7 @@ const OwnerProfile = ({ ownerId }) => {
         return;
       }
 
+      // Update the rental request status
       const notificationRef = doc(
         db,
         "owners",
@@ -503,6 +629,7 @@ const OwnerProfile = ({ ownerId }) => {
         rentalDate: rentalDate,
       });
 
+      // Notify the renter
       await addDoc(collection(db, "renters", request.renterId, "notifications"), {
         type: "rentalApproved",
         message:
@@ -513,20 +640,44 @@ const OwnerProfile = ({ ownerId }) => {
         createdAt: new Date(),
       });
 
-      const chatThread = {
-        participants: [resolvedOwnerId, request.renterId],
-        messages: [],
-        rentalRequestId: request.id, 
-      };
-      const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
-      chatThread.id = chatDocRef.id;
-      setChatThreads([...chatThreads, chatThread]);
+      // Create a chat thread if not exists
+      const chatThreadsQuery = collection(db, "messages");
+      const querySnapshot = await getDocs(chatThreadsQuery);
+      let existingChatThread = null;
+
+      querySnapshot.forEach((docSnap) => {
+        const chatData = docSnap.data();
+        if (
+          chatData.participants?.includes(resolvedOwnerId) &&
+          chatData.participants?.includes(request.renterId)
+        ) {
+          existingChatThread = { id: docSnap.id, ...chatData };
+        }
+      });
+
+      let chatThreadId = existingChatThread ? existingChatThread.id : null;
+
+      if (!chatThreadId) {
+        const chatThread = {
+          participants: [resolvedOwnerId, request.renterId],
+          messages: [],
+          rentalRequestId: request.id,
+          createdAt: new Date(),
+        };
+        const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
+        chatThread.id = chatDocRef.id;
+        setChatThreads([...chatThreads, chatThread]);
+        chatThreadId = chatDocRef.id;
+      }
 
       Alert.alert(
         "Request Approved",
         `The rental request for ${rentalDate} has been approved.`
       );
-      setMessageModalVisible(false);
+
+      // Optionally, open the message modal for the chat thread
+      openMessageModal(chatThreadId);
+      setRentalRequestModalVisible(false);
     } catch (error) {
       console.error("Error approving rental request: ", error);
       Alert.alert("Error", "There was an error approving the rental request.");
@@ -564,10 +715,25 @@ const OwnerProfile = ({ ownerId }) => {
       });
 
       Alert.alert("Request Denied", "The rental request has been denied.");
-      setMessageModalVisible(false);
+      setRentalRequestModalVisible(false);
     } catch (error) {
       console.error("Error denying rental request: ", error);
       Alert.alert("Error", "There was an error denying the rental request.");
+    }
+  };
+
+  const fetchListingDetails = async (listingId) => {
+    try {
+      const listingDocRef = doc(db, "airplanes", listingId);
+      const listingDoc = await getDoc(listingDocRef);
+      if (listingDoc.exists()) {
+        return listingDoc.data();
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error("Error fetching listing details:", error);
+      return null;
     }
   };
 
@@ -588,8 +754,8 @@ const OwnerProfile = ({ ownerId }) => {
     if (!messageInput.trim()) return;
 
     const messageData = {
-      senderId: user.uid, 
-      senderName: user.displayName || "Owner", 
+      senderId: user.uid,
+      senderName: user.displayName || "Owner",
       text: messageInput,
       createdAt: new Date(),
     };
@@ -647,6 +813,30 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
+  // Function to handle selecting a main image
+  const selectMainImage = (imageUrl) => {
+    if (selectedAircraft) {
+      const updatedAircrafts = allAircrafts.map((aircraft) =>
+        aircraft.id === selectedAircraft.id
+          ? { ...aircraft, mainImage: imageUrl }
+          : aircraft
+      );
+      setAllAircrafts(updatedAircrafts);
+      setSelectedAircraft((prev) => ({ ...prev, mainImage: imageUrl }));
+      setIsEditing(false);
+      Alert.alert("Main Image Selected", "The main image has been updated.");
+    }
+  };
+
+  // Function to toggle selection of an aircraft
+  const toggleSelectAircraft = (aircraftId) => {
+    if (selectedAircraftIds.includes(aircraftId)) {
+      setSelectedAircraftIds(selectedAircraftIds.filter(id => id !== aircraftId));
+    } else {
+      setSelectedAircraftIds([...selectedAircraftIds, aircraftId]);
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
       <StatusBar
@@ -700,6 +890,26 @@ const OwnerProfile = ({ ownerId }) => {
               <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8 }}>
                 Estimated Cost per Hour: ${costData.costPerHour}
               </Text>
+              <Text style={{ fontSize: 16, marginBottom: 4 }}>
+                Total Fixed Costs per Year: ${(
+                  parseFloat(costData.mortgageExpense) * 12 +
+                  parseFloat(costData.depreciationExpense) +
+                  parseFloat(costData.insuranceCost) +
+                  parseFloat(costData.hangarCost) +
+                  parseFloat(costData.maintenanceReserve) +
+                  parseFloat(costData.annualRegistrationFees)
+                ).toFixed(2)}
+              </Text>
+              <Text style={{ fontSize: 16, marginBottom: 4 }}>
+                Total Variable Costs per Year: ${(
+                  (parseFloat(costData.fuelCostPerHour) +
+                    parseFloat(costData.oilCostPerHour) +
+                    parseFloat(costData.routineMaintenancePerHour) +
+                    parseFloat(costData.tiresPerHour) +
+                    parseFloat(costData.otherConsumablesPerHour)) *
+                  parseFloat(costData.flightHoursPerYear)
+                ).toFixed(2)}
+              </Text>
               <TouchableOpacity
                 onPress={onEditCostData}
                 style={{
@@ -715,18 +925,18 @@ const OwnerProfile = ({ ownerId }) => {
               </TouchableOpacity>
             </View>
           ) : (
-            <>
+            <View>
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Loan Details</Text>
                 <TextInput
-                  placeholder="Purchase Price"
+                  placeholder="Purchase Price ($)"
                   value={costData.purchasePrice}
                   onChangeText={(value) => handleInputChange('purchasePrice', value)}
                   keyboardType="numeric"
                   style={styles.input}
                 />
                 <TextInput
-                  placeholder="Loan Amount"
+                  placeholder="Loan Amount ($)"
                   value={costData.loanAmount}
                   onChangeText={(value) => handleInputChange('loanAmount', value)}
                   keyboardType="numeric"
@@ -746,34 +956,56 @@ const OwnerProfile = ({ ownerId }) => {
                   keyboardType="numeric"
                   style={styles.input}
                 />
+                <TextInput
+                  placeholder="Depreciation Rate (%)"
+                  value={costData.depreciationRate}
+                  onChangeText={(value) => handleInputChange('depreciationRate', value)}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+                <TextInput
+                  placeholder="Useful Life (years)"
+                  value={costData.usefulLife}
+                  onChangeText={(value) => handleInputChange('usefulLife', value)}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
                 <Text style={{ marginTop: 8 }}>Mortgage Expense: ${costData.mortgageExpense}</Text>
+                <Text style={{ marginTop: 4 }}>Depreciation Expense: ${costData.depreciationExpense}</Text>
               </View>
 
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Annual Costs</Text>
                 <TextInput
-                  placeholder="Estimated Annual Cost"
+                  placeholder="Estimated Annual Cost ($)"
                   value={costData.estimatedAnnualCost}
                   onChangeText={(value) => handleInputChange('estimatedAnnualCost', value)}
                   keyboardType="numeric"
                   style={styles.input}
                 />
                 <TextInput
-                  placeholder="Insurance Cost"
+                  placeholder="Insurance Cost ($)"
                   value={costData.insuranceCost}
                   onChangeText={(value) => handleInputChange('insuranceCost', value)}
                   keyboardType="numeric"
                   style={styles.input}
                 />
                 <TextInput
-                  placeholder="Hangar Cost"
-                  value={costData.hangerCost}
-                  onChangeText={(value) => handleInputChange('hangerCost', value)}
+                  placeholder="Hangar Cost ($)"
+                  value={costData.hangarCost}
+                  onChangeText={(value) => handleInputChange('hangarCost', value)}
                   keyboardType="numeric"
                   style={styles.input}
                 />
                 <TextInput
-                  placeholder="Maintenance Reserve"
+                  placeholder="Annual Registration & Fees ($)"
+                  value={costData.annualRegistrationFees}
+                  onChangeText={(value) => handleInputChange('annualRegistrationFees', value)}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+                <TextInput
+                  placeholder="Maintenance Reserve ($)"
                   value={costData.maintenanceReserve}
                   onChangeText={(value) => handleInputChange('maintenanceReserve', value)}
                   keyboardType="numeric"
@@ -784,9 +1016,37 @@ const OwnerProfile = ({ ownerId }) => {
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Operational Costs</Text>
                 <TextInput
-                  placeholder="Fuel Cost Per Hour"
+                  placeholder="Fuel Cost Per Hour ($)"
                   value={costData.fuelCostPerHour}
                   onChangeText={(value) => handleInputChange('fuelCostPerHour', value)}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+                <TextInput
+                  placeholder="Oil Cost Per Hour ($)"
+                  value={costData.oilCostPerHour}
+                  onChangeText={(value) => handleInputChange('oilCostPerHour', value)}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+                <TextInput
+                  placeholder="Routine Maintenance Per Hour ($)"
+                  value={costData.routineMaintenancePerHour}
+                  onChangeText={(value) => handleInputChange('routineMaintenancePerHour', value)}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+                <TextInput
+                  placeholder="Tires Per Hour ($)"
+                  value={costData.tiresPerHour}
+                  onChangeText={(value) => handleInputChange('tiresPerHour', value)}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+                <TextInput
+                  placeholder="Other Consumables Per Hour ($)"
+                  value={costData.otherConsumablesPerHour}
+                  onChangeText={(value) => handleInputChange('otherConsumablesPerHour', value)}
                   keyboardType="numeric"
                   style={styles.input}
                 />
@@ -812,104 +1072,144 @@ const OwnerProfile = ({ ownerId }) => {
                   Save Cost Data
                 </Text>
               </TouchableOpacity>
-            </>
+              {loading && (
+                <ActivityIndicator size="large" color="#3182ce" style={{ marginTop: 16 }} />
+              )}
+            </View>
           )}
         </View>
 
+        {/* ************* Updated Section: Your Aircraft ************* */}
         <View style={{ padding: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
-            Aircraft Details
+            Your Aircraft
           </Text>
-          {aircraftSaved ? (
-            <View
-              style={{
-                backgroundColor: "#edf2f7",
-                padding: 16,
-                borderRadius: 16,
-                marginBottom: 16,
-              }}
+
+          {/* Add Aircraft Button */}
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedAircraft(null);
+              setIsEditing(true);
+              setAircraftDetails({
+                year: "",
+                make: "",
+                model: "",
+                engine: "",
+                description: "",
+                totalTime: "",
+                costPerHour: "",
+                location: "",
+                airportIdentifier: "",
+                mainImage: "",
+                images: [],
+              });
+              setImages([]);
+              setAircraftModalVisible(true);
+            }}
+            style={{
+              backgroundColor: "#3182ce",
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginBottom: 16,
+            }}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
             >
-              <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>
-                {aircraftDetails.year} {aircraftDetails.make} {aircraftDetails.model}
-              </Text>
-              <Text style={{ marginBottom: 8 }}>
-                Engine: {aircraftDetails.engine}
-              </Text>
-              <Text style={{ marginBottom: 8 }}>
-                Total Time: {aircraftDetails.totalTime} hours
-              </Text>
-              <Text style={{ marginBottom: 8 }}>
-                Location: {aircraftDetails.location} ({aircraftDetails.airportIdentifier})
-              </Text>
-              <Text style={{ marginBottom: 8 }}>
-                Cost Per Hour: ${aircraftDetails.costPerHour}
-              </Text>
-              <Text style={{ marginBottom: 8 }}>
-                Description: {aircraftDetails.description}
-              </Text>
-              {images.length > 0 && (
-                <FlatList
-                  data={images}
-                  horizontal
-                  keyExtractor={(item, index) => index.toString()}
-                  renderItem={({ item }) => (
-                    <Image
-                      source={{ uri: item }}
-                      style={{ width: 100, height: 100, margin: 8 }}
-                    />
+              Add Aircraft
+            </Text>
+          </TouchableOpacity>
+
+          {/* List of All Aircraft with Selection */}
+          {allAircrafts.length > 0 ? (
+            allAircrafts.map((item) => (
+              <View key={item.id} style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                {/* Selection Circle */}
+                <TouchableOpacity
+                  onPress={() => toggleSelectAircraft(item.id)}
+                  style={styles.selectionCircle}
+                >
+                  {selectedAircraftIds.includes(item.id) && (
+                    <View style={styles.selectedCircle} />
                   )}
-                />
-              )}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-                <TouchableOpacity
-                  onPress={() => handleListForRentToggle(aircraftDetails)}
-                  style={{
-                    backgroundColor: isListedForRent ? "#e53e3e" : "#48bb78",
-                    paddingVertical: 12,
-                    borderRadius: 8,
-                    flex: 1,
-                    marginRight: 8,
-                  }}
-                >
-                  <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-                    {isListedForRent ? "Unlist" : "List"}
-                  </Text>
                 </TouchableOpacity>
+
+                {/* Aircraft Details */}
                 <TouchableOpacity
-                  onPress={() => setAircraftModalVisible(true)}
+                  onPress={() => {
+                    setSelectedAircraft(item);
+                    setIsEditing(false);
+                    setAircraftDetails(item);
+                    setImages(item.images || []);
+                    setAircraftModalVisible(true);
+                  }}
                   style={{
-                    backgroundColor: "#3182ce",
-                    paddingVertical: 12,
-                    borderRadius: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: "#edf2f7",
+                    padding: 16,
+                    borderRadius: 16,
                     flex: 1,
-                    marginLeft: 8,
                   }}
                 >
-                  <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-                    Edit
-                  </Text>
+                  {/* Main Image */}
+                  {item.mainImage ? (
+                    <Image
+                      source={{ uri: item.mainImage }}
+                      style={{ width: 80, height: 80, borderRadius: 8, marginRight: 12 }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 8,
+                        backgroundColor: "#cbd5e0",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginRight: 12,
+                      }}
+                    >
+                      <Text style={{ color: "#a0aec0" }}>No Image</Text>
+                    </View>
+                  )}
+
+                  {/* Aircraft Info */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "bold" }}>
+                      {item.year} {item.make} {item.model}
+                    </Text>
+                    <Text>Engine: {item.engine}</Text>
+                    <Text>Total Time: {item.totalTime} hours</Text>
+                    <Text>Location: {item.location} ({item.airportIdentifier})</Text>
+                    <Text>Cost Per Hour: ${item.costPerHour}</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
-            </View>
+            ))
           ) : (
-            <TouchableOpacity
-              onPress={() => setAircraftModalVisible(true)}
-              style={{
-                backgroundColor: "#3182ce",
-                paddingVertical: 12,
-                borderRadius: 8,
-                marginTop: 16,
-              }}
-            >
-              <Text
-                style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
-              >
-                Add Aircraft Details
-              </Text>
-            </TouchableOpacity>
+            <Text>No aircraft added yet.</Text>
           )}
-        </View>
 
+          {/* List Selected Aircraft Button */}
+          <TouchableOpacity
+            onPress={handleListForRentToggle}
+            style={{
+              backgroundColor: "#48bb78",
+              paddingVertical: 12,
+              borderRadius: 8,
+              marginTop: 16,
+              marginBottom: 16,
+            }}
+          >
+            <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+              List Selected Aircraft
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {/* ************* End of Updated Section: Your Aircraft ************* */}
+
+        {/* Current Listings */}
         <View style={{ padding: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Current Listings
@@ -934,7 +1234,7 @@ const OwnerProfile = ({ ownerId }) => {
                   <FlatList
                     data={listing.images}
                     horizontal
-                    keyExtractor={(item, index) => index.toString()}
+                    keyExtractor={(item) => item} // Use image URI as key
                     renderItem={({ item }) => (
                       <Image
                         source={{ uri: item }}
@@ -944,7 +1244,30 @@ const OwnerProfile = ({ ownerId }) => {
                   />
                 )}
                 <TouchableOpacity
-                  onPress={() => handleListForRentToggle(listing)}
+                  onPress={() => {
+                    Alert.alert(
+                      "Remove Listing",
+                      "Are you sure you want to remove this listing?",
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        { 
+                          text: "Remove", 
+                          style: "destructive", 
+                          onPress: async () => {
+                            try {
+                              await deleteDoc(doc(db, "airplanes", listing.id));
+                              setUserListings(userListings.filter(l => l.id !== listing.id));
+                              setAllAircrafts(allAircrafts.filter(a => a.id !== listing.id));
+                              Alert.alert("Removed", "The listing has been removed.");
+                            } catch (error) {
+                              console.error("Error removing listing:", error);
+                              Alert.alert("Error", "Failed to remove the listing.");
+                            }
+                          } 
+                        },
+                      ]
+                    );
+                  }}
                   style={{
                     backgroundColor: "#e53e3e",
                     paddingVertical: 12,
@@ -965,6 +1288,7 @@ const OwnerProfile = ({ ownerId }) => {
           )}
         </View>
 
+        {/* Create New Listing Button */}
         <View style={{ padding: 16 }}>
           <TouchableOpacity
             onPress={() => setFullScreenModalVisible(true)}
@@ -982,6 +1306,83 @@ const OwnerProfile = ({ ownerId }) => {
           </TouchableOpacity>
         </View>
 
+        {/* ************* New Section: Incoming Rental Requests ************* */}
+        <View style={{ padding: 16 }}>
+          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+            Incoming Rental Requests
+          </Text>
+          {rentalRequests.length > 0 ? (
+            rentalRequests.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={async () => {
+                  setSelectedRequest(item);
+                  const listing = await fetchListingDetails(item.listingId);
+                  setSelectedListingDetails(listing);
+                  setRentalRequestModalVisible(true);
+                }}
+                style={{
+                  backgroundColor: "#edf2f7",
+                  padding: 16,
+                  borderRadius: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+                  Renter: {item.renterName}
+                </Text>
+                {/* Display Year, Make, Model */}
+                <Text>
+                  Listing: {item.listingDetails ? `${item.listingDetails.year} ${item.listingDetails.make} ${item.listingDetails.model}` : "Listing details not available"}
+                </Text>
+                <Text>Total Cost: ${item.totalCost}</Text>
+                <Text>Requested Date: {item.rentalPeriod || "N/A"}</Text>
+                <Text>Status: {item.status}</Text>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text>No incoming rental requests.</Text>
+          )}
+        </View>
+        {/* ************* End of Incoming Rental Requests ************* */}
+
+        {/* ************* New Section: Active Rentals ************* */}
+        <View style={{ padding: 16 }}>
+          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+            Active Rentals
+          </Text>
+          {activeRentals.length > 0 ? (
+            activeRentals.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => {
+                  setSelectedRequest(item);
+                  setSelectedListingDetails(item.listingDetails);
+                  setRentalRequestModalVisible(true); // Reuse the same modal for Active Rentals
+                }}
+                style={{
+                  backgroundColor: "#edf2f7",
+                  padding: 16,
+                  borderRadius: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+                  {item.listingDetails ? `${item.listingDetails.year} ${item.listingDetails.make} ${item.listingDetails.model}` : "Listing details not available"}
+                </Text>
+                <Text>Renter: {item.renterName}</Text>
+                <Text>Total Cost: ${item.totalCost}</Text>
+                <Text>Rental Date: {item.rentalDate || "N/A"}</Text>
+                <Text>Status: {item.status}</Text>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text>No active rentals.</Text>
+          )}
+        </View>
+        {/* ************* End of Active Rentals ************* */}
+
+        {/* Rental History */}
         <View style={{ padding: 16 }}>
           <Text
             style={{
@@ -997,7 +1398,7 @@ const OwnerProfile = ({ ownerId }) => {
           {rentalHistory.length > 0 ? (
             rentalHistory.map((order, index) => (
               <View
-                key={index}
+                key={order.id || index} // Preferably use order.id if available
                 style={{
                   backgroundColor: "#edf2f7",
                   padding: 16,
@@ -1066,49 +1467,149 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </ScrollView>
 
+      {/* Rental Request Details Modal */}
+      <Modal
+        visible={rentalRequestModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setRentalRequestModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {selectedRequest && selectedListingDetails ? (
+              <>
+                <Text style={styles.modalTitle}>Rental Request Details</Text>
+                <Text style={styles.modalText}>
+                  <Text style={styles.modalLabel}>Renter Name: </Text>
+                  {selectedRequest.renterName}
+                </Text>
+                {/* Display Year, Make, Model in Modal */}
+                <Text style={styles.modalText}>
+                  <Text style={styles.modalLabel}>Listing: </Text>
+                  {selectedListingDetails ? `${selectedListingDetails.year} ${selectedListingDetails.make} ${selectedListingDetails.model}` : "Listing details not available"}
+                </Text>
+                <Text style={styles.modalText}>
+                  <Text style={styles.modalLabel}>Rate per Hour: </Text>${selectedListingDetails.ratesPerHour}
+                </Text>
+                <Text style={styles.modalText}>
+                  <Text style={styles.modalLabel}>Minimum Hours: </Text>{selectedListingDetails.minimumHours}
+                </Text>
+                <Text style={styles.modalText}>
+                  <Text style={styles.modalLabel}>Total Amount: </Text>${(
+                    parseFloat(selectedListingDetails.ratesPerHour) *
+                    parseFloat(selectedListingDetails.minimumHours)
+                  ).toFixed(2)}
+                </Text>
+                <Text style={styles.modalText}>
+                  <Text style={styles.modalLabel}>Requested Date: </Text>
+                  {selectedRequest.rentalPeriod || "N/A"}
+                </Text>
+                <Text style={styles.modalText}>
+                  <Text style={styles.modalLabel}>Status: </Text>
+                  {selectedRequest.status}
+                </Text>
+
+                {selectedRequest.status === "pending" && (
+                  <>
+                    <View style={styles.modalButtonsContainer}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setRentalRequestModalVisible(false);
+                          setSelectedRequest(selectedRequest);
+                          setCalendarVisible(true); // Open calendar to select rental date
+                        }}
+                        style={styles.approveButton}
+                      >
+                        <Text style={styles.buttonText}>Approve</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDenyRentalRequest(selectedRequest)}
+                        style={styles.denyButton}
+                      >
+                        <Text style={styles.buttonText}>Deny</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+
+                {/* If the rental is approved (Active Rental), show relevant actions */}
+                {selectedRequest.status === "approved" && (
+                  <>
+                    <View style={styles.modalButtonsContainer}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          // Implement any actions for active rentals if needed
+                          Alert.alert("Info", "Active rentals details can be managed here.");
+                        }}
+                        style={styles.approveButton}
+                      >
+                        <Text style={styles.buttonText}>Manage Rental</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => setRentalRequestModalVisible(false)}
+                  style={styles.closeModalButton}
+                >
+                  <Ionicons name="close" size={24} color="#2d3748" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <ActivityIndicator size="large" color="#3182ce" />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rental Request Approval Calendar Modal */}
+      <Modal
+        visible={calendarVisible}
+        animationType="slide"
+        onRequestClose={() => {
+          setCalendarVisible(false);
+          setSelectedRequest(null);
+        }}
+      >
+        <View style={{ flex: 1, padding: 16 }}>
+          <Calendar onDayPress={onDayPress} markedDates={selectedDates} />
+          <TouchableOpacity
+            onPress={() => {
+              setCalendarVisible(false);
+              setSelectedRequest(null);
+            }}
+            style={styles.cancelButton}
+          >
+            <Text
+              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+            >
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Rental Request Message Modal */}
       <Modal
         visible={messageModalVisible}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setMessageModalVisible(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
-        >
-          <View
-            style={{
-              flex: 1,
-              marginTop: 50,
-              marginHorizontal: 16,
-              backgroundColor: "white",
-              borderRadius: 24,
-              padding: 24,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 8,
-            }}
-          >
+        <View style={styles.modalOverlay}>
+          <View style={styles.messageModalContainer}>
             <TouchableOpacity
               onPress={() => setMessageModalVisible(false)}
-              style={{
-                position: "absolute",
-                top: 16,
-                right: 16,
-                zIndex: 1,
-              }}
+              style={styles.closeModalButton}
             >
               <Ionicons name="close-circle" size={32} color="#2d3748" />
             </TouchableOpacity>
 
-            <FlatList
-              data={messages}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item }) => (
+            {messages.length > 0 ? (
+              messages.map((item, index) => (
                 <View
+                  key={index.toString()} // Use index if no unique identifier
                   style={{
                     padding: 8,
                     backgroundColor: item.senderId === user.uid ? "#e2e8f0" : "#bee3f8",
@@ -1123,8 +1624,10 @@ const OwnerProfile = ({ ownerId }) => {
                     {item.createdAt.toDate().toLocaleString()}
                   </Text>
                 </View>
-              )}
-            />
+              ))
+            ) : (
+              <Text>No messages yet.</Text>
+            )}
 
             <View
               style={{
@@ -1163,6 +1666,7 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
+      {/* Create New Listing Modal */}
       <Modal
         visible={fullScreenModalVisible}
         animationType="slide"
@@ -1178,12 +1682,7 @@ const OwnerProfile = ({ ownerId }) => {
               placeholder={key.replace(/([A-Z])/g, " $1")}
               value={profileData[key]}
               onChangeText={(value) => handleInputChange(key, value)}
-              style={{
-                borderBottomWidth: 1,
-                borderBottomColor: "#ccc",
-                marginBottom: 12,
-                paddingVertical: 8,
-              }}
+              style={styles.input}
             />
           ))}
 
@@ -1207,12 +1706,20 @@ const OwnerProfile = ({ ownerId }) => {
             <FlatList
               data={images}
               horizontal
-              keyExtractor={(item, index) => index.toString()}
+              keyExtractor={(item) => item} // Use image URI as key
               renderItem={({ item }) => (
-                <Image
-                  source={{ uri: item }}
-                  style={{ width: 100, height: 100, margin: 8 }}
-                />
+                <View style={{ position: "relative", marginRight: 8 }}>
+                  <Image
+                    source={{ uri: item }}
+                    style={{ width: 100, height: 100, borderRadius: 8 }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => removeImage(item)}
+                    style={styles.removeImageButton}
+                  >
+                    <Ionicons name="close-circle" size={24} color="red" />
+                  </TouchableOpacity>
+                </View>
               )}
             />
           )}
@@ -1245,6 +1752,7 @@ const OwnerProfile = ({ ownerId }) => {
         </ScrollView>
       </Modal>
 
+      {/* Aircraft Details Modal */}
       <Modal
         visible={aircraftModalVisible}
         animationType="slide"
@@ -1252,7 +1760,7 @@ const OwnerProfile = ({ ownerId }) => {
       >
         <ScrollView contentContainerStyle={{ padding: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
-            Aircraft Details
+            {isEditing ? "Edit Aircraft Details" : "Aircraft Details"}
           </Text>
 
           <View style={{ marginBottom: 16 }}>
@@ -1263,24 +1771,28 @@ const OwnerProfile = ({ ownerId }) => {
               onChangeText={(value) => handleInputChange('year', value)}
               keyboardType="numeric"
               style={styles.input}
+              editable={isEditing}
             />
             <TextInput
               placeholder="Make"
               value={aircraftDetails.make}
               onChangeText={(value) => handleInputChange('make', value)}
               style={styles.input}
+              editable={isEditing}
             />
             <TextInput
               placeholder="Model"
               value={aircraftDetails.model}
               onChangeText={(value) => handleInputChange('model', value)}
               style={styles.input}
+              editable={isEditing}
             />
             <TextInput
               placeholder="Engine"
               value={aircraftDetails.engine}
               onChangeText={(value) => handleInputChange('engine', value)}
               style={styles.input}
+              editable={isEditing}
             />
             <TextInput
               placeholder="Total Time"
@@ -1288,6 +1800,7 @@ const OwnerProfile = ({ ownerId }) => {
               onChangeText={(value) => handleInputChange('totalTime', value)}
               keyboardType="numeric"
               style={styles.input}
+              editable={isEditing}
             />
           </View>
 
@@ -1298,23 +1811,26 @@ const OwnerProfile = ({ ownerId }) => {
               value={aircraftDetails.location}
               onChangeText={(value) => handleInputChange('location', value)}
               style={styles.input}
+              editable={isEditing}
             />
             <TextInput
               placeholder="Airport Identifier"
               value={aircraftDetails.airportIdentifier}
               onChangeText={(value) => handleInputChange('airportIdentifier', value)}
               style={styles.input}
+              editable={isEditing}
             />
           </View>
 
           <View style={{ marginBottom: 16 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Cost Information</Text>
             <TextInput
-              placeholder="Cost Per Hour"
+              placeholder="Cost Per Hour ($)"
               value={aircraftDetails.costPerHour}
               onChangeText={(value) => handleInputChange('costPerHour', value)}
               keyboardType="numeric"
               style={styles.input}
+              editable={isEditing}
             />
           </View>
 
@@ -1326,99 +1842,130 @@ const OwnerProfile = ({ ownerId }) => {
               onChangeText={(value) => handleInputChange('description', value)}
               style={[styles.input, { height: 100 }]}
               multiline={true}
+              editable={isEditing}
             />
           </View>
 
-          <TouchableOpacity
-            onPress={pickImage}
-            style={styles.uploadButton}
-          >
-            <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-              Upload Images
-            </Text>
-          </TouchableOpacity>
-
-          {images.length > 0 && (
+          {/* Images Section */}
+          <View style={{ marginBottom: 16 }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Images</Text>
             <FlatList
               data={images}
               horizontal
-              keyExtractor={(item, index) => index.toString()}
+              keyExtractor={(item, index) => `${item}_${index}`}
               renderItem={({ item }) => (
-                <Image
-                  source={{ uri: item }}
-                  style={{ width: 100, height: 100, margin: 8 }}
-                />
+                <View style={{ position: "relative", alignItems: "center", marginRight: 8 }}>
+                  <Image
+                    source={{ uri: item }}
+                    style={{ width: 100, height: 100, borderRadius: 8 }}
+                  />
+                  {isEditing && (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => selectMainImage(item)}
+                        style={{
+                          position: "absolute",
+                          bottom: 4,
+                          left: 4,
+                          backgroundColor: "#3182ce",
+                          paddingVertical: 2,
+                          paddingHorizontal: 4,
+                          borderRadius: 4,
+                        }}
+                      >
+                        <Text style={{ color: "white", fontSize: 10 }}>Set Main</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => removeImage(item)}
+                        style={styles.removeImageButton}
+                      >
+                        <Ionicons name="close-circle" size={20} color="red" />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               )}
             />
-          )}
-
-          <TouchableOpacity
-            onPress={onSaveAircraftDetails}
-            style={styles.saveButton}
-          >
-            <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-              Save Aircraft Details
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => onSubmitMethod({}, false)}
-            style={styles.listForRentButton}
-          >
-            <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-              List for Rent
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setAircraftModalVisible(false)}
-            style={styles.cancelButton}
-          >
-            <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-              Cancel
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </Modal>
-
-      <Modal
-        visible={calendarVisible}
-        animationType="slide"
-        onRequestClose={() => setCalendarVisible(false)}
-      >
-        <View style={{ flex: 1 }}>
-          <Calendar onDayPress={onDayPress} markedDates={selectedDates} />
-          <TouchableOpacity
-            onPress={() => setCalendarVisible(false)}
-            style={{
-              backgroundColor: "#3182ce",
-              paddingVertical: 12,
-              borderRadius: 8,
-              margin: 16,
-            }}
-          >
-            <Text
-              style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
-            >
-              Close Calendar
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
-
-      <TouchableOpacity
-        style={styles.chatBubbleIcon}
-        onPress={() => openMessageModal()}
-      >
-        <Ionicons name="chatbubble-ellipses" size={32} color="white" />
-        {rentalRequests.length > 0 && (
-          <View
-            style={styles.notificationBadge}
-          >
-            <Text style={{ color: "white", fontSize: 12 }}>
-              {rentalRequests.length}
+            <Text style={{ marginTop: 4, color: "#4a5568" }}>
+              {images.length}/7 images
             </Text>
           </View>
-        )}
-      </TouchableOpacity>
+
+          {isEditing && (
+            <>
+              <TouchableOpacity
+                onPress={pickImage}
+                style={{
+                  backgroundColor: "#3182ce",
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  marginTop: 16,
+                }}
+              >
+                <Text
+                  style={{ color: "white", textAlign: "center", fontWeight: "bold" }}
+                >
+                  Upload Images
+                </Text>
+              </TouchableOpacity>
+              {images.length >= 7 && (
+                <Text style={{ color: "red", marginTop: 4 }}>
+                  Maximum of 7 images reached.
+                </Text>
+              )}
+            </>
+          )}
+
+          {/* Main Image Display */}
+          {selectedAircraft && selectedAircraft.mainImage && (
+            <View style={{ marginTop: 16, alignItems: "center" }}>
+              <Text style={{ fontSize: 16, fontWeight: "bold" }}>Main Image:</Text>
+              <Image
+                source={{ uri: selectedAircraft.mainImage }}
+                style={{ width: 200, height: 200, borderRadius: 8, marginTop: 8 }}
+              />
+            </View>
+          )}
+
+          {/* Buttons */}
+          <View style={{ marginTop: 24 }}>
+            {isEditing ? (
+              <>
+                <TouchableOpacity
+                  onPress={onSaveAircraftDetails}
+                  style={styles.saveButton}
+                >
+                  <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                    Save Aircraft Details
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onCancelAircraftEdit}
+                  style={styles.cancelButton}
+                >
+                  <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                onPress={onEditAircraftDetails}
+                style={{
+                  backgroundColor: "#48bb78",
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+                  Edit Aircraft
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+      </Modal>
     </View>
   );
 };
@@ -1447,6 +1994,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#48bb78",
     paddingVertical: 12,
     borderRadius: 8,
+    marginBottom: 16,
   },
   cancelButton: {
     backgroundColor: "#e53e3e",
@@ -1476,6 +2024,96 @@ const styles = StyleSheet.create({
     height: 20,
     justifyContent: "center",
     alignItems: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "90%",
+    backgroundColor: "white",
+    borderRadius: 24,
+    padding: 24,
+    position: "relative",
+    maxHeight: "80%",
+  },
+  messageModalContainer: {
+    flex: 1,
+    marginTop: 10,
+    marginHorizontal: 16,
+    backgroundColor: "white",
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  modalLabel: {
+    fontWeight: "bold",
+  },
+  modalButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 24,
+  },
+  approveButton: {
+    backgroundColor: "#48bb78",
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 8,
+  },
+  denyButton: {
+    backgroundColor: "#e53e3e",
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 8,
+  },
+  buttonText: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  closeModalButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 1,
+  },
+  selectionCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#3182ce",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  selectedCircle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#3182ce",
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: -10,
+    right: -10,
   },
 });
 
