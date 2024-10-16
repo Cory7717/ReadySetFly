@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { getFirestore, doc, updateDoc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, onSnapshot } from "firebase/firestore";
+import { getAuth } from "firebase/auth"; // Import Firebase Auth
 
 const ConfirmationScreen = () => {
   const navigation = useNavigation();
@@ -11,7 +12,11 @@ const ConfirmationScreen = () => {
   const { rentalRequestId } = route.params || {}; // Destructure with default
 
   const [loading, setLoading] = useState(true);
+  const [rentalRequest, setRentalRequest] = useState(null);
   const [error, setError] = useState(null);
+
+  const auth = getAuth();
+  const user = auth.currentUser;
 
   useEffect(() => {
     if (!rentalRequestId) {
@@ -20,35 +25,36 @@ const ConfirmationScreen = () => {
       return;
     }
 
-    const updatePaymentStatus = async () => {
-      const db = getFirestore();
-      const rentalRef = doc(db, "renters", "RENTER_ID", "rentalRequests", rentalRequestId); // Replace 'RENTER_ID' with dynamic ID if possible
+    if (!user) {
+      setError("User not authenticated.");
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const rentalSnap = await getDoc(rentalRef);
+    const db = getFirestore();
+    const rentalRef = doc(db, "renters", user.uid, "rentalRequests", rentalRequestId);
 
-        if (!rentalSnap.exists()) {
+    const unsubscribe = onSnapshot(
+      rentalRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setRentalRequest(docSnap.data());
+          setLoading(false);
+        } else {
           setError("Rental request not found.");
           setLoading(false);
-          return;
         }
-
-        await updateDoc(rentalRef, {
-          paymentStatus: "paid",
-          rentalStatus: "paid", // Update status if necessary
-          paidAt: new Date(),
-        });
-
-        setLoading(false);
-      } catch (err) {
-        console.error("Error updating payment status:", err);
-        setError("Failed to update payment status.");
+      },
+      (err) => {
+        console.error("Error fetching rental request:", err);
+        setError("Failed to fetch rental request.");
         setLoading(false);
       }
-    };
+    );
 
-    updatePaymentStatus();
-  }, [rentalRequestId]);
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, [rentalRequestId, user]);
 
   const handleContinueMessaging = () => {
     navigation.navigate("Messages", { rentalRequestId });
@@ -78,18 +84,39 @@ const ConfirmationScreen = () => {
     );
   }
 
+  // Determine the payment status
+  const { paymentStatus, rentalStatus, paidAt } = rentalRequest;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Payment Successful!</Text>
-      <Text style={styles.message}>
-        Thank you for your payment. Your rental request is now active.
-      </Text>
-      <TouchableOpacity style={styles.button} onPress={handleContinueMessaging}>
-        <Text style={styles.buttonText}>Continue Messaging</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.buttonOutline} onPress={handleGoHome}>
-        <Text style={styles.buttonOutlineText}>Go to Home</Text>
-      </TouchableOpacity>
+      {paymentStatus === "paid" ? (
+        <>
+          <Text style={styles.title}>Payment Successful!</Text>
+          <Text style={styles.message}>
+            Thank you for your payment. Your rental request is now active.
+          </Text>
+          <Text style={styles.detail}>
+            Paid At: {paidAt ? new Date(paidAt.seconds * 1000).toLocaleString() : "N/A"}
+          </Text>
+          <TouchableOpacity style={styles.button} onPress={handleContinueMessaging}>
+            <Text style={styles.buttonText}>Continue Messaging</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.buttonOutline} onPress={handleGoHome}>
+            <Text style={styles.buttonOutlineText}>Go to Home</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          <Text style={styles.title}>Payment Pending</Text>
+          <Text style={styles.message}>
+            Your payment is being processed. Please wait a moment.
+          </Text>
+          <ActivityIndicator size="small" color="#3182ce" style={{ marginBottom: 20 }} />
+          <TouchableOpacity style={styles.buttonOutline} onPress={handleGoHome}>
+            <Text style={styles.buttonOutlineText}>Go to Home</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 };
@@ -115,7 +142,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#4a5568",
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 20,
+  },
+  detail: {
+    fontSize: 14,
+    color: "#4a5568",
+    textAlign: "center",
+    marginBottom: 20,
   },
   errorText: {
     fontSize: 16,

@@ -1,50 +1,92 @@
+// src/screens/CheckoutScreen.js
+
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, Animated, Easing } from 'react-native';
-import { CardField, useConfirmPayment, useStripe } from '@stripe/stripe-react-native';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  Alert, 
+  ActivityIndicator, 
+  StyleSheet, 
+  Animated, 
+  Easing, 
+  TextInput, 
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { CardField, useConfirmPayment } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { getAuth } from 'firebase/auth'; // Import Firebase Auth
 
-const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net'; // Replace with your actual server URL
-const READY_SET_FLY_ACCOUNT = 'acct_readysetfly'; // Replace with actual Stripe account ID
+// Configuration Constants
+const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api'; // Replace with your actual server URL
 
-export default function CheckoutScreen({ route }) {
+export default function CheckoutScreen() {
   const navigation = useNavigation();
-  const { initPaymentSheet, confirmPayment } = useStripe();
-  const [loading, setLoading] = useState(false);
-  const [isPaymentSuccess, setIsPaymentSuccess] = useState(false);
-  const [isPaymentReady, setIsPaymentReady] = useState(false);
-  const [totalAmount, setTotalAmount] = useState(0);
-  const bounceValue = useRef(new Animated.Value(0)).current;
+  const route = useRoute();
+  const { confirmPayment } = useConfirmPayment();
 
   const auth = getAuth(); // Initialize Firebase Auth
   const user = auth.currentUser; // Get current Firebase user
 
-  // Safely retrieve params and set default values if undefined
-  const rentalHours = route?.params?.rentalHours || 0;
-  const costPerHour = route?.params?.costPerHour || 0;
-  const taxAmount = route?.params?.taxAmount || 0;
-  const processingFee = route?.params?.processingFee || 0;
-  const bookingFee = route?.params?.bookingFee || 0;
-  const ownerAmount = route?.params?.ownerAmount || 0;
-  const total = route?.params?.total || 0;
+  // Extract parameters from navigation route
+  const {
+    paymentType = 'rental', // 'classified' or 'rental'
+    amount: initialAmount = 0, // For Classifieds (in cents)
+    perHour: initialPerHour = 0, // For Rentals
+    ownerId = '', // For Rentals
+    rentalRequestId = '', // For Rentals
+    listingDetails = {}, // Additional details for listing creation
+    selectedPricing: initialSelectedPricing = '', // Initial pricing tier
+  } = route.params || {};
+
+  // State Variables
+  const [loading, setLoading] = useState(false);
+  const [isPaymentSuccess, setIsPaymentSuccess] = useState(false);
+  
+  // Discount Code State
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountApplied, setDiscountApplied] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Cardholder Name State
+  const [cardholderName, setCardholderName] = useState(user?.displayName || '');
+
+  // Manage totalAmount and selectedPricing as state to allow updates
+  const [totalAmount, setTotalAmount] = useState(paymentType === 'rental' ? 0 : initialAmount);
+  const [selectedPricing, setSelectedPricing] = useState(initialSelectedPricing);
+
+  // For displaying animation
+  const bounceValue = useRef(new Animated.Value(0)).current;
+
+  // Convert totalAmount to a fixed amount for displaying
+  const displayTotal = (totalAmount / 100).toFixed(2);
 
   useEffect(() => {
     startBouncing();
-    setTotalAmount(total); // Set the pre-calculated total amount
-  }, [total]);
+    if (paymentType === 'rental') {
+      // For Rentals, totalAmount is calculated based on perHour and fees
+      calculateRentalTotal(initialPerHour);
+    } else if (paymentType === 'classified') {
+      // For Classifieds, use the initialAmount passed
+      setTotalAmount(initialAmount);
+    }
+  }, [initialAmount, paymentType, initialPerHour]);
 
+  // Start the bouncing animation
   const startBouncing = () => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(bounceValue, {
-          toValue: -20,
+          toValue: -20, // Move up
           duration: 1000,
           easing: Easing.bounce,
           useNativeDriver: true,
         }),
         Animated.timing(bounceValue, {
-          toValue: 0,
+          toValue: 0, // Move back down
           duration: 1000,
           easing: Easing.bounce,
           useNativeDriver: true,
@@ -53,81 +95,193 @@ export default function CheckoutScreen({ route }) {
     ).start();
   };
 
-  // Initialize payment sheet
-  const initializePaymentSheet = async () => {
-    if (totalAmount > 0) {
-      try {
-        const response = await fetch(`${API_URL}/PaymentScreen`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: totalAmount * 100 }), // Amount in cents
-        });
+  // Function to calculate total amount for Rentals
+  const calculateRentalTotal = (perHour) => {
+    const bookingFee = perHour * 0.06; // 6%
+    const processingFee = perHour * 0.03; // 3%
+    const tax = (perHour + bookingFee) * 0.0825; // 8.25% on (perHour + bookingFee)
+    const total = Math.round((perHour + bookingFee + processingFee + tax) * 100); // Convert to cents
+    setTotalAmount(total);
+  };
 
-        const { paymentIntent, ephemeralKey, customer } = await response.json();
+  // Function to apply discount code by validating it with the backend
+  const applyDiscount = async () => {
+    const code = discountCode.trim().toLowerCase();
 
-        const { error } = await initPaymentSheet({
-          merchantDisplayName: "Ready Set Fly",
-          customerId: customer,
-          customerEphemeralKeySecret: ephemeralKey,
-          paymentIntentClientSecret: paymentIntent,
-          allowsDelayedPaymentMethods: true,
-          defaultBillingDetails: { name: user?.displayName || 'Renter' }, // Use Firebase user name
-        });
-
-        if (!error) setIsPaymentReady(true);
-        return !error;
-      } catch (error) {
-        console.error("Error initializing payment sheet:", error);
-        Alert.alert("Error", "Failed to initialize payment.");
-      }
-    } else {
-      Alert.alert("Invalid Payment Details", "Payment details are incorrect.");
+    if (code === '') {
+      setErrorMessage('Please enter a discount code.');
+      return;
     }
-    return false;
+
+    try {
+      setLoading(true);
+      setErrorMessage('');
+
+      // Send discount code to backend for validation and get discount details
+      const response = await fetch(`${API_URL}/validateDiscount`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discountCode: code }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.valid) {
+        setDiscountApplied(true);
+        setTotalAmount(data.adjustedAmount); // Updated amount from backend
+        setSelectedPricing(data.pricingTier); // Updated pricing tier from backend
+        Alert.alert(
+          'Discount Applied',
+          data.message || 'Discount has been successfully applied.',
+          [{ text: 'OK' }],
+          { cancelable: false }
+        );
+      } else {
+        setDiscountApplied(false);
+        if (paymentType === 'rental') {
+          calculateRentalTotal(initialPerHour); // Recalculate for Rentals
+        } else {
+          setTotalAmount(initialAmount); // Reset to initial amount for Classifieds
+        }
+        setErrorMessage(data.message || 'Invalid discount code.');
+      }
+    } catch (error) {
+      console.error('Discount application error:', error);
+      setErrorMessage('Failed to apply discount. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle payment processing
   const handlePayment = async () => {
-    // Initialize payment sheet before proceeding
-    const initialized = await initializePaymentSheet();
-    if (!initialized) return;
+    // Validate cardholder name
+    if (cardholderName.trim() === '') {
+      Alert.alert('Validation Error', 'Please enter the name on the credit card.');
+      return;
+    }
+
+    // If discount is applied and totalAmount is zero (free listing)
+    if (discountApplied && totalAmount === 0) {
+      try {
+        setLoading(true);
+        const listingCreated = await createListing();
+        if (listingCreated) {
+          Alert.alert(
+            'Success',
+            'Your listing has been created with a free package.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (paymentType === 'rental') {
+                    navigation.navigate('ConfirmationScreen', { rentalRequestId });
+                  } else {
+                    navigation.navigate('Classifieds', { refresh: true });
+                  }
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       setLoading(true);
 
-      // Create payment intent and transfer details
-      const response = await fetch(`${API_URL}/create-payment-intent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: totalAmount * 100, // Total cost in cents
-          readySetFlyAmount: (taxAmount + processingFee + bookingFee) * 100, // Fees to Ready Set Fly in cents
-          ownerAmount: ownerAmount * 100, // Owner's amount in cents
-          readySetFlyAccount: READY_SET_FLY_ACCOUNT, // Destination account ID
-        }),
-      });
+      let clientSecret = '';
 
-      const { clientSecret } = await response.json();
+      if (paymentType === 'rental') {
+        // For Rentals, call /create-rental-payment-intent
+        const response = await fetch(`${API_URL}/create-rental-payment-intent`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
+          },
+          body: JSON.stringify({ 
+            perHour: initialPerHour, 
+            ownerId: ownerId,
+            rentalRequestId: rentalRequestId, // Pass rentalRequestId
+          }),
+        });
+
+        const { clientSecret: rentalClientSecret, error } = await response.json();
+
+        if (error) {
+          Alert.alert('Error', error);
+          setLoading(false);
+          return;
+        }
+
+        clientSecret = rentalClientSecret;
+      } else if (paymentType === 'classified') {
+        // For Classifieds, call /create-classified-payment-intent
+        const response = await fetch(`${API_URL}/create-classified-payment-intent`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
+          },
+          body: JSON.stringify({ 
+            amount: initialAmount, // Amount in cents
+            currency: 'usd', // Default to USD or pass as needed
+          }),
+        });
+
+        const { clientSecret: classifiedClientSecret, error } = await response.json();
+
+        if (error) {
+          Alert.alert('Error', error);
+          setLoading(false);
+          return;
+        }
+
+        clientSecret = classifiedClientSecret;
+      }
+
       if (!clientSecret) {
-        Alert.alert('Error', 'Unable to process payment');
+        Alert.alert('Error', 'Payment details are missing.');
         setLoading(false);
         return;
       }
 
       // Confirm the payment with Stripe using the client secret
       const { error, paymentIntent } = await confirmPayment(clientSecret, {
-        paymentMethodType: 'Card',
-        paymentMethodData: {
-          billingDetails: { name: user?.displayName || 'Renter' }, // Use Firebase user's name
-        },
+        type: 'Card',
+        billingDetails: { name: cardholderName.trim() }, // Use user's input name
       });
 
       if (error) {
         Alert.alert('Payment failed', error.message);
       } else if (paymentIntent.status === 'Succeeded') {
-        Alert.alert('Success', 'Payment processed successfully');
-        setIsPaymentSuccess(true);
-        navigation.navigate('Classifieds');
+        // After successful payment, create the listing
+        const listingCreated = await createListing();
+        if (listingCreated) {
+          Alert.alert(
+            'Success',
+            'Payment processed successfully and your listing has been created.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (paymentType === 'rental') {
+                    navigation.navigate('ConfirmationScreen', { rentalRequestId });
+                  } else {
+                    navigation.navigate('Classifieds', { refresh: true });
+                  }
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+          setIsPaymentSuccess(true); // Update state to reflect successful payment
+        }
       }
     } catch (error) {
       console.error('Payment error:', error);
@@ -137,6 +291,44 @@ export default function CheckoutScreen({ route }) {
     }
   };
 
+  // Function to get Firebase ID Token
+  const getFirebaseIdToken = async () => {
+    try {
+      const token = await user.getIdToken(true);
+      return token;
+    } catch (error) {
+      console.error("Error fetching Firebase ID token:", error);
+      Alert.alert('Authentication Error', 'Failed to authenticate user.');
+      return '';
+    }
+  };
+
+  // Function to create the listing on the backend
+  const createListing = async () => {
+    try {
+      const response = await fetch(`${API_URL}/createListing`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
+        },
+        body: JSON.stringify({ listingDetails }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create listing');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Listing creation error:', error);
+      Alert.alert('Error', error.message || 'Failed to create listing.');
+      return false;
+    }
+  };
+
+  // Handle cancellation
   const handleCancel = () => {
     if (!loading) {
       navigation.goBack();
@@ -146,68 +338,145 @@ export default function CheckoutScreen({ route }) {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Cancel button */}
-      <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-        <Ionicons name="close-outline" size={28} color="#FF5A5F" />
-      </TouchableOpacity>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={60}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Cancel button */}
+        <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
+          <Ionicons name="close-outline" size={28} color="#FF5A5F" />
+        </TouchableOpacity>
 
-      {/* Bouncing animation */}
-      <Animated.View style={[styles.animatedContainer, { transform: [{ translateY: bounceValue }] }]}>
-        <Ionicons
-          name={isPaymentSuccess ? "checkmark-circle-outline" : "card-outline"}
-          size={80}
-          color={isPaymentSuccess ? "#32CD32" : "#FF5A5F"} // Green on success, red otherwise
-        />
-      </Animated.View>
+        {/* Main Content */}
+        <View style={styles.content}>
+          {/* Bouncing animation */}
+          <Animated.View style={[styles.animatedContainer, { transform: [{ translateY: bounceValue }] }]}>
+            <Ionicons
+              name={isPaymentSuccess ? "checkmark-circle-outline" : "card-outline"}
+              size={80}
+              color={isPaymentSuccess ? "#32CD32" : "#FF5A5F"} // Green on success, red otherwise
+            />
+          </Animated.View>
 
-      <Text style={styles.title}>Complete Your Payment</Text>
-      <Text style={styles.description}>Verify your payment details below.</Text>
+          <Text style={styles.title}>Complete Your Payment</Text>
+          <Text style={styles.description}>Verify your payment details below.</Text>
 
-      {/* Display Payment Details */}
-      <Text style={styles.detail}>Hours: {rentalHours}</Text>
-      <Text style={styles.detail}>Cost per Hour: ${costPerHour}</Text>
-      <Text style={styles.detail}>Tax: ${taxAmount}</Text>
-      <Text style={styles.detail}>Processing Fee: ${processingFee}</Text>
-      <Text style={styles.detail}>Booking Fee: ${bookingFee}</Text>
-      <Text style={styles.amount}>Total Amount: ${totalAmount}</Text>
+          {/* Display Payment Details */}
+          {paymentType === 'rental' ? (
+            <View style={styles.detailsContainer}>
+              <Text style={styles.detail}>Per Hour Amount: ${initialPerHour.toFixed(2)}</Text>
+              <Text style={styles.detail}>Booking Fee (6%): ${(initialPerHour * 0.06).toFixed(2)}</Text>
+              <Text style={styles.detail}>Processing Fee (3%): ${(initialPerHour * 0.03).toFixed(2)}</Text>
+              <Text style={styles.detail}>Tax (8.25%): ${((initialPerHour + initialPerHour * 0.06) * 0.0825).toFixed(2)}</Text>
+              <Text style={styles.amount}>
+                Total Amount: $
+                {((initialPerHour + initialPerHour * 0.06 + initialPerHour * 0.03 + (initialPerHour + initialPerHour * 0.06) * 0.0825) / 100).toFixed(2)}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.detailsContainer}>
+              <Text style={styles.detail}>Listing Type: {listingDetails.type || 'N/A'}</Text>
+              <Text style={styles.detail}>Amount: ${(initialAmount / 100).toFixed(2)}</Text>
+            </View>
+          )}
 
-      {/* Stripe CardField component */}
-      <CardField
-        postalCodeEnabled={true}
-        placeholders={{ number: '4242 4242 4242 4242' }} // Stripe test card
-        style={styles.cardField}
-        onCardChange={(cardDetails) => console.log('Card details:', cardDetails)}
-      />
+          {/* Discount Code Input */}
+          {!discountApplied && (
+            <View style={styles.discountContainer}>
+              <TextInput
+                style={styles.discountInput}
+                placeholder="Enter Discount Code"
+                value={discountCode}
+                onChangeText={setDiscountCode}
+                autoCapitalize="characters"
+                editable={!loading}
+              />
+              <TouchableOpacity 
+                onPress={applyDiscount} 
+                style={styles.applyButton}
+                disabled={loading || discountApplied}
+              >
+                <Text style={styles.applyButtonText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-      {/* Pay Button */}
-      <TouchableOpacity
-        onPress={handlePayment}
-        disabled={loading}
-        style={styles.payButton}
-      >
-        {loading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.payButtonText}>Pay ${totalAmount}</Text>
-        )}
-      </TouchableOpacity>
-    </View>
+          {/* Display error message if any */}
+          {errorMessage !== '' && (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          )}
+
+          {/* Cardholder Name Input */}
+          <TextInput
+            style={styles.nameInput}
+            placeholder="Name on Card"
+            value={cardholderName}
+            onChangeText={setCardholderName}
+            autoCapitalize="words"
+            editable={!loading}
+          />
+
+          {/* Stripe CardField component */}
+          <CardField
+            postalCodeEnabled={true}
+            placeholders={{ number: '4242 4242 4242 4242' }} // Stripe test card
+            style={styles.cardField}
+            onCardChange={(cardDetails) => console.log('Card details:', cardDetails)}
+            editable={!discountApplied || totalAmount > 0} // Disable card input if discount makes it free
+          />
+
+          {/* Pay Button */}
+          <TouchableOpacity
+            onPress={handlePayment}
+            disabled={loading || (discountApplied && totalAmount === 0)}
+            style={[
+              styles.payButton, 
+              (loading || (discountApplied && totalAmount === 0)) && styles.payButtonDisabled
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.payButtonText}>
+                {discountApplied && totalAmount === 0 ? 'Finalize Listing' : `Pay $${displayTotal}`}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Secure Payment Text */}
+          <View style={styles.securePaymentContainer}>
+            <Ionicons name="lock-closed-outline" size={16} color="#555" />
+            <Text style={styles.securePaymentText}>
+              Your payment is secure and encrypted.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'center',
     backgroundColor: '#f9f9f9',
+  },
+  scrollContent: {
+    padding: 20,
+    justifyContent: 'flex-start', // Accommodate the logo and content
+    flexGrow: 1,
   },
   cancelButton: {
     position: 'absolute',
     top: 40,
     right: 20,
     zIndex: 10,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
   },
   animatedContainer: {
     alignSelf: 'center',
@@ -225,23 +494,68 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#555',
   },
+  detailsContainer: {
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
   detail: {
     fontSize: 16,
     marginBottom: 5,
-    textAlign: 'center',
     color: '#333',
   },
   amount: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 20,
+    marginTop: 10,
     textAlign: 'center',
     color: '#000',
+  },
+  discountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  discountInput: {
+    flex: 1,
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: 'white',
+    fontSize: 16,
+  },
+  applyButton: {
+    marginLeft: 10,
+    backgroundColor: '#32CD32',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  applyButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  errorText: {
+    color: '#FF5A5F',
+    marginTop: 10,
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  nameInput: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: 'white',
+    marginBottom: 15,
+    fontSize: 16,
   },
   cardField: {
     width: '100%',
     height: 50,
-    marginVertical: 30,
+    marginVertical: 10,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
@@ -250,13 +564,30 @@ const styles = StyleSheet.create({
   },
   payButton: {
     backgroundColor: '#FF5A5F',
-    padding: 15,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
     borderRadius: 8,
+    marginTop: 20,
+    width: '100%',
     alignItems: 'center',
+  },
+  payButtonDisabled: {
+    backgroundColor: '#ccc',
   },
   payButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: '600',
+    fontSize: 16,
+  },
+  securePaymentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 30,
+    justifyContent: 'center',
+  },
+  securePaymentText: {
+    marginLeft: 5,
+    color: '#555',
+    fontSize: 14,
   },
 });

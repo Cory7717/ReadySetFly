@@ -47,8 +47,11 @@ import Octicons from "@expo/vector-icons/Octicons";
 import { useStripe } from "@stripe/stripe-react-native";
 import { createStackNavigator } from "@react-navigation/stack";
 
+// Import environment variables
+import { API_URL } from "@env"; // Ensure react-native-dotenv is configured
+
 // Import your CheckoutScreen component
-import CheckoutScreen from "../payment/CheckoutScreen.js"; // Update with the correct path to your CheckoutScreen
+import CheckoutScreen from "../payment/CheckoutScreen"; // Update with the correct path
 import ConfirmationScreen from "../payment/ConfirmationScreen"; // Ensure correct path
 import MessagesScreen from "../screens/MessagesScreen"; // Ensure correct path
 
@@ -547,26 +550,77 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     return totalCost.toFixed(2);
   };
 
-  // Navigate to CheckoutScreen with calculated amount
-  const navigateToCheckout = () => {
+  // ************* Add createPaymentIntent Function *************
+  const createPaymentIntent = async (amount) => {
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert("Invalid Amount", "The payment amount is invalid.");
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/create-payment-intent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ amount }), // Amount should be in the smallest currency unit (e.g., cents)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return data.clientSecret;
+      } else {
+        console.error("Error creating payment intent:", data);
+        Alert.alert("Payment Error", data.message || "Failed to create payment intent.");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error creating payment intent:", error);
+      Alert.alert("Payment Error", "An unexpected error occurred.");
+      return null;
+    }
+  };
+  // ************* End of createPaymentIntent Function *************
+
+  // ************* Update navigateToCheckout Function *************
+  const navigateToCheckout = async () => {
     if (!currentRentalRequest) {
       Alert.alert("Error", "No rental request selected.");
       console.error("navigateToCheckout called without a currentRentalRequest.");
       return;
     }
 
-    const totalCost =
-      currentRentalRequest.totalCost ||
-      currentRentalRequest.rentalDetails?.totalCost ||
-      calculateRentalCost(); // Fallback to calculated cost
+    let totalCost = parseFloat(currentRentalRequest.totalCost) ||
+      parseFloat(currentRentalRequest.rentalDetails?.totalCost) ||
+      parseFloat(calculateRentalCost());
 
-    console.log(`Navigating to CheckoutScreen with rentalRequestId: ${currentRentalRequest.id} and amount: ${parseFloat(totalCost)}`);
+    if (isNaN(totalCost) || totalCost <= 0) {
+      Alert.alert("Invalid Total Cost", "The total cost for this rental is invalid.");
+      return;
+    }
 
-    navigation.navigate("CheckoutScreen", {
-      rentalRequestId: currentRentalRequest.id,
-      amount: parseFloat(totalCost),
-    });
+    // Convert amount to the smallest currency unit (e.g., cents)
+    const amountInCents = Math.round(totalCost * 100);
+
+    // Create Payment Intent
+    const clientSecret = await createPaymentIntent(amountInCents);
+
+    if (clientSecret) {
+      console.log(
+        `Navigating to CheckoutScreen with rentalRequestId: ${currentRentalRequest.id}, amount: ${totalCost}`
+      );
+
+      navigation.navigate("CheckoutScreen", {
+        rentalRequestId: currentRentalRequest.id,
+        amount: totalCost,
+        clientSecret, // Pass the clientSecret to the CheckoutScreen
+      });
+    } else {
+      Alert.alert("Payment Error", "Unable to proceed with payment.");
+    }
   };
+  // ************* End of navigateToCheckout Function *************
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
@@ -872,6 +926,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             </Text>
           )}
         </View>
+        {/* ************* End of Completed Rentals Section ************* */}
 
         {/* ************* Approved Rentals Section ************* */}
         <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>

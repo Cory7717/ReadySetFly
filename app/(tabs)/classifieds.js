@@ -1,3 +1,5 @@
+// src/screens/Classifieds.js
+
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Text,
@@ -20,7 +22,7 @@ import {
 } from 'react-native';
 import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Firebase Auth
 import { createStackNavigator } from '@react-navigation/stack';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { NavigationContainer, useNavigation, useRoute } from '@react-navigation/native';
 import { db, storage } from '../../firebaseConfig';
 import {
   collection,
@@ -41,7 +43,7 @@ import { Formik } from 'formik';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useStripe } from '@stripe/stripe-react-native';
 import { API_URL } from '@env';
-import PaymentScreen from '../payment/PaymentScreen';
+import CheckoutScreen from '../payment/CheckoutScreen'; // Standardized Import
 
 const { width } = Dimensions.get('window');
 
@@ -344,249 +346,6 @@ const Classifieds = () => {
     return deg * (Math.PI / 180);
   };
 
-  // Fetch payment sheet parameters from backend
-  const fetchPaymentSheetParams = async () => {
-    try {
-      console.log(`Making request to: ${API_URL}/create-payment-intent`);
-      const response = await fetch("https://us-central1-ready-set-fly-71506.cloudfunctions.net/paymentSheet",{
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ amount: totalCost }),
-      });
-
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log('Error data:', errorData);
-        throw new Error(errorData.error || 'Failed to fetch payment sheet parameters.');
-      }
-
-      const { paymentIntent, ephemeralKey, customer } = await response.json();
-      console.log('Fetched payment sheet params:', { paymentIntent, ephemeralKey, customer });
-
-      return {
-        paymentIntent,
-        ephemeralKey,
-        customer,
-      };
-    } catch (error) {
-      console.error('Error fetching payment sheet parameters:', error);
-      Alert.alert('Error', 'Failed to fetch payment sheet parameters.');
-      throw error;
-    }
-  };
-
-  // Initialize Stripe payment sheet
-  const initializePaymentSheet = async () => {
-    if (!user) {
-      Alert.alert('Error', 'User information is not available.');
-      return false;
-    }
-
-    try {
-      const { paymentIntent, ephemeralKey, customer } = await fetchPaymentSheetParams();
-
-      const { error } = await initPaymentSheet({
-        merchantDisplayName: 'Ready Set Fly',
-        customerId: customer,
-        customerEphemeralKeySecret: ephemeralKey,
-        paymentIntentClientSecret: paymentIntent,
-        allowsDelayedPaymentMethods: true,
-        defaultBillingDetails: {
-          name: user.displayName || 'Guest',
-        },
-      });
-
-      if (error) {
-        console.error('Payment Sheet initialization error:', error);
-        Alert.alert('Error', 'Failed to initialize payment sheet');
-        return false;
-      } else {
-        return true;
-      }
-    } catch (error) {
-      console.error('Error initializing payment sheet:', error);
-      Alert.alert('Error', 'Failed to initialize payment sheet');
-      return false;
-    }
-  };
-
-  // Handle payment submission
-  const handleSubmitPayment = async () => {
-    try {
-      navigation.navigate('PaymentScreen', {
-        totalCost,
-        listingDetails,
-        images,
-        selectedCategory,
-        selectedPricing,
-      });
-    } catch (error) {
-      console.error('Payment Error:', error);
-      Alert.alert('Error', 'Failed to process payment.');
-      setLoading(false);
-    }
-  };
-
-  // Complete payment and submit listing
-  const handleCompletePayment = async () => {
-    if (!user) {
-      Alert.alert('Error', 'User information is not available.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const uploadedImages = await Promise.all(
-        images.map(async (imageUri) => {
-          try {
-            const response = await fetch(imageUri);
-            const blob = await response.blob();
-            const storageRef = ref(
-              storage,
-              `classifiedImages/${user.uid}/${new Date().getTime()}_${user.uid}`
-            );
-            const snapshot = await uploadBytes(storageRef, blob);
-            return await getDownloadURL(snapshot.ref);
-          } catch (error) {
-            if (__DEV__) {
-              console.error('Error uploading image: ', error);
-              Alert.alert(
-                'Development Mode',
-                'Error uploading image. This will render in development mode, but you must fix this error before deploying.'
-              );
-              return imageUri;
-            } else {
-              throw error;
-            }
-          }
-        })
-      );
-
-      const newListing = {
-        ...listingDetails,
-        category: selectedCategory,
-        images: uploadedImages,
-        ownerId: user.uid,
-        userEmail: user.email,
-        contactEmail: listingDetails.email,
-        contactPhone: listingDetails.phone,
-        createdAt: new Date(),
-        pricingPackage: selectedPricing,
-        pricingPackageDuration:
-          selectedPricing === 'Basic'
-            ? 7
-            : selectedPricing === 'Featured'
-            ? 14
-            : 30,
-        totalCost: totalCost / 100,
-      };
-
-      await addDoc(collection(db, 'UserPost'), newListing);
-
-      Alert.alert('Payment Completed', 'Your listing has been successfully submitted!');
-      setModalVisible(false);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error completing payment: ', error);
-      Alert.alert('Error', 'Failed to complete payment and submit listing.');
-      setLoading(false);
-    }
-  };
-
-  // Handle test submission without payment
-  const handleTestSubmitListing = async (values) => {
-    if (!user) {
-      Alert.alert('Error', 'User information is not available.');
-      setLoading(false);
-      return;
-    }
-  
-    try {
-      setLoading(true);
-  
-      const uploadedImages = await Promise.all(
-        images.map(async (imageUri) => {
-          try {
-            const response = await fetch(imageUri);
-            const blob = await response.blob();
-            const storageRef = ref(
-              storage,
-              `classifiedImages/${new Date().getTime()}_${user.uid}`
-            );
-            const snapshot = await uploadBytes(storageRef, blob);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            return downloadURL;
-          } catch (error) {
-            console.error('Error uploading image: ', error);
-            return null;
-          }
-        })
-      );
-  
-      const validUploadedImages = uploadedImages.filter((url) => url !== null);
-  
-      const testListing = {
-        ...values,
-        category: selectedCategory,
-        images: validUploadedImages,
-        ownerId: user.uid,
-        userEmail: user.email,
-        createdAt: new Date(),
-        pricingPackage: selectedPricing,
-      };
-  
-      await addDoc(collection(db, 'UserPost'), testListing);
-  
-      Alert.alert('Test Listing Submitted', 'Your test listing has been added successfully.');
-      setModalVisible(false);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error submitting listing for testing: ', error);
-      Alert.alert('Error', 'Failed to submit the listing for testing.');
-      setLoading(false);
-    }
-  };
-  
-  // Render Edit and Delete buttons for owner
-  const renderEditAndDeleteButtons = (listing) => {
-    if (user && listing?.ownerId === user.uid) {
-      return (
-        <View style={{ flexDirection: 'row', marginTop: 10 }}>
-          <TouchableOpacity
-            style={{
-              backgroundColor: COLORS.primary,
-              padding: 10,
-              borderRadius: 10,
-              alignItems: 'center',
-              marginRight: 10,
-            }}
-            onPress={() => handleEditListing(listing)}
-          >
-            <Text style={{ color: COLORS.white, fontSize: 16 }}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{
-              backgroundColor: COLORS.red,
-              padding: 10,
-              borderRadius: 10,
-              alignItems: 'center',
-            }}
-            onPress={() => handleDeleteListing(listing.id)}
-          >
-            <Text style={{ color: COLORS.white, fontSize: 16 }}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    return null;
-  };
-
   // Handle listing press to show details
   const handleListingPress = (listing) => {
     setSelectedListing(listing);
@@ -662,6 +421,43 @@ const Classifieds = () => {
     }
   };
 
+  // Function to create the listing on the backend (if needed)
+  const createListing = async () => {
+    try {
+      const response = await fetch(`${API_URL}/createListing`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
+        },
+        body: JSON.stringify({ listingDetails }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create listing');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Listing creation error:', error);
+      Alert.alert('Error', error.message || 'Failed to create listing.');
+      return false;
+    }
+  };
+
+  // Function to get Firebase ID Token
+  const getFirebaseIdToken = async () => {
+    try {
+      const token = await user.getIdToken(true);
+      return token;
+    } catch (error) {
+      console.error("Error fetching Firebase ID token:", error);
+      Alert.alert('Authentication Error', 'Failed to authenticate user.');
+      return '';
+    }
+  };
+
   // Handle form submission for listing
   const onSubmitMethod = async (values) => {
     if (!user) {
@@ -682,8 +478,10 @@ const Classifieds = () => {
     setJobDetailsModalVisible(false);
     setEditModalVisible(false);
 
-    navigation.navigate('PaymentScreen', {
-      totalCost: totalWithTaxInCents,
+    // Navigate to CheckoutScreen instead of PaymentScreen
+    navigation.navigate('CheckoutScreen', {
+      paymentType: 'classified', // Specifies the payment type
+      amount: totalWithTaxInCents, // Total cost in cents
       listingDetails: values,
       images,
       selectedCategory,
@@ -693,6 +491,60 @@ const Classifieds = () => {
     setLoading(false);
   };
 
+  // Handle test submission without payment
+  const handleTestSubmitListing = async (values) => {
+    if (!user) {
+      Alert.alert('Error', 'User information is not available.');
+      setLoading(false);
+      return;
+    }
+  
+    try {
+      setLoading(true);
+  
+      const uploadedImages = await Promise.all(
+        images.map(async (imageUri) => {
+          try {
+            const response = await fetch(imageUri);
+            const blob = await response.blob();
+            const storageRef = ref(
+              storage,
+              `classifiedImages/${new Date().getTime()}_${user.uid}`
+            );
+            const snapshot = await uploadBytes(storageRef, blob);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            return downloadURL;
+          } catch (error) {
+            console.error('Error uploading image: ', error);
+            return null;
+          }
+        })
+      );
+  
+      const validUploadedImages = uploadedImages.filter((url) => url !== null);
+  
+      const testListing = {
+        ...values,
+        category: selectedCategory,
+        images: validUploadedImages,
+        ownerId: user.uid,
+        userEmail: user.email,
+        createdAt: new Date(),
+        pricingPackage: selectedPricing,
+      };
+  
+      await addDoc(collection(db, 'UserPost'), testListing);
+  
+      Alert.alert('Test Listing Submitted', 'Your test listing has been added successfully.');
+      setModalVisible(false);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error submitting listing for testing: ', error);
+      Alert.alert('Error', 'Failed to submit the listing for testing.');
+      setLoading(false);
+    }
+  };
+  
   // Reset modals when screen gains focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -815,6 +667,40 @@ const Classifieds = () => {
       </SafeAreaView>
     );
   }
+
+  // Render Edit and Delete buttons
+  const renderEditAndDeleteButtons = (listing) => {
+    if (user && listing?.ownerId === user.uid) {
+      return (
+        <View style={{ flexDirection: 'row', marginTop: 10 }}>
+          <TouchableOpacity
+            style={{
+              backgroundColor: COLORS.primary,
+              padding: 10,
+              borderRadius: 10,
+              alignItems: 'center',
+              marginRight: 10,
+            }}
+            onPress={() => handleEditListing(listing)}
+          >
+            <Text style={{ color: COLORS.white, fontSize: 16 }}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              backgroundColor: COLORS.red,
+              padding: 10,
+              borderRadius: 10,
+              alignItems: 'center',
+            }}
+            onPress={() => handleDeleteListing(listing.id)}
+          >
+            <Text style={{ color: COLORS.white, fontSize: 16 }}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return null;
+  };
 
   // Main content when user is authenticated
   return (
@@ -1064,9 +950,7 @@ const Classifieds = () => {
             >
               {selectedListing?.companyName}
             </Text>
-            <Text
-              style={{ fontSize: 16, color: COLORS.gray, marginBottom: 10 }}
-            >
+            <Text style={{ fontSize: 16, color: COLORS.gray, marginBottom: 10 }}>
               {selectedListing?.city}, {selectedListing?.state}
             </Text>
             <Text
@@ -1090,7 +974,7 @@ const Classifieds = () => {
             >
               <Text style={{ color: COLORS.white, fontSize: 16 }}>Apply Now</Text>
             </TouchableOpacity>
-            {renderEditAndDeleteButtons(selectedListing)}
+            {renderEditAndDeleteButtons(selectedListing)} {/* Function Call */}
           </SafeAreaView>
         </View>
       </Modal>
@@ -1107,7 +991,7 @@ const Classifieds = () => {
             <View
               style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
             >
-              {renderEditAndDeleteButtons(selectedListing)}
+              {renderEditAndDeleteButtons(selectedListing)} {/* Function Call */}
 
               {selectedListing?.images && selectedListing.images.length > 0 ? (
                 <View
@@ -1674,6 +1558,7 @@ const Classifieds = () => {
                               marginBottom: 8,
                               color: COLORS.black,
                               fontWeight: 'bold',
+                              textAlign: 'center'
                             }}
                           >
                             Upload Images
@@ -1779,9 +1664,9 @@ const AppNavigator = () => {
           options={{ headerShown: false }} // Hides the header for the Classifieds screen
         />
         <Stack.Screen
-          name="PaymentScreen"
-          component={PaymentScreen}
-          options={{ headerShown: false }} // Hides the header for the PaymentScreen
+          name="CheckoutScreen"
+          component={CheckoutScreen}
+          options={{ headerShown: false }} // Hides the header for the CheckoutScreen
         />
         {/* 
           Removed the SignIn screen from the stack navigator as per your request.
