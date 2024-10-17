@@ -421,7 +421,7 @@ export default function CheckoutScreen() {
           {/* Stripe CardField component */}
           <CardField
             postalCodeEnabled={true}
-            placeholders={{ number: '4242 4242 4242 4242' }} // Stripe test card
+            placeholders={{ number: '**** **** **** ****' }} // Stripe test card
             style={styles.cardField}
             onCardChange={(cardDetails) => console.log('Card details:', cardDetails)}
             editable={!discountApplied || totalAmount > 0} // Disable card input if discount makes it free

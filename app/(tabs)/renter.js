@@ -112,6 +112,9 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
 
+  // New State for All Notifications Modal
+  const [allNotificationsModalVisible, setAllNotificationsModalVisible] = useState(false);
+
   // Define showDatePicker and hideDatePicker within the component
   const showDatePicker = () => {
     setDatePickerVisibility(true);
@@ -591,7 +594,8 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       return;
     }
 
-    let totalCost = parseFloat(currentRentalRequest.totalCost) ||
+    let totalCost =
+      parseFloat(currentRentalRequest.totalCost) ||
       parseFloat(currentRentalRequest.rentalDetails?.totalCost) ||
       parseFloat(calculateRentalCost());
 
@@ -974,29 +978,47 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             Notifications
           </Text>
           {notifications.length > 0 ? (
-            notifications.map((notification) => (
-              <TouchableOpacity
-                key={notification.id} // Ensure notification.id is unique
-                style={{
-                  backgroundColor: "#edf2f7",
-                  padding: 16,
-                  borderRadius: 16,
-                  marginBottom: 16,
-                }}
-                onPress={() => handleNotificationPress(notification)}
-              >
-                <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
-                  {notification.message}
-                </Text>
-                <Text style={{ color: "#4a5568" }}>
-                  {notification.createdAt
-                    ? notification.createdAt.toDate
-                      ? notification.createdAt.toDate().toLocaleString()
-                      : new Date(notification.createdAt).toLocaleString()
-                    : "N/A"}
-                </Text>
-              </TouchableOpacity>
-            ))
+            <>
+              {notifications.slice(0, 3).map((notification) => (
+                <TouchableOpacity
+                  key={notification.id} // Ensure notification.id is unique
+                  style={{
+                    backgroundColor: "#edf2f7",
+                    padding: 16,
+                    borderRadius: 16,
+                    marginBottom: 16,
+                  }}
+                  onPress={() => handleNotificationPress(notification)}
+                >
+                  <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
+                    {notification.message}
+                  </Text>
+                  <Text style={{ color: "#4a5568" }}>
+                    {notification.createdAt
+                      ? notification.createdAt.toDate
+                        ? notification.createdAt.toDate().toLocaleString()
+                        : new Date(notification.createdAt).toLocaleString()
+                      : "N/A"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              {/* "View All" Button */}
+              {notifications.length > 3 && (
+                <TouchableOpacity
+                  onPress={() => setAllNotificationsModalVisible(true)}
+                  style={{
+                    alignItems: "center",
+                    padding: 12,
+                    backgroundColor: "#3182ce",
+                    borderRadius: 8,
+                    marginTop: 8,
+                  }}
+                >
+                  <Text style={{ color: "white", fontWeight: "bold" }}>View All</Text>
+                </TouchableOpacity>
+              )}
+            </>
           ) : (
             <Text style={{ textAlign: "center", color: "#718096" }}>
               No notifications available.
@@ -1352,10 +1374,77 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       </Modal>
       {/* ************* End of Notification Details Modal ************* */}
 
-      {/* ************* Checkout Navigator ************* */}
-      {/* Removed redundant navigators by using only one Stack.Navigator */}
-      {/* No need to include CheckoutScreen inside BookingCalendar's component tree */}
-      {/* Instead, BookingNavigator handles navigation between BookingCalendar and CheckoutScreen */}
+      {/* ************* All Notifications Modal ************* */}
+      <Modal
+        visible={allNotificationsModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAllNotificationsModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.messageModalContainer}>
+              <TouchableOpacity
+                onPress={() => setAllNotificationsModalVisible(false)}
+                style={styles.closeModalButton}
+              >
+                <Ionicons name="close-circle" size={32} color="#2d3748" />
+              </TouchableOpacity>
+
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "bold",
+                  marginBottom: 16,
+                  textAlign: "center",
+                  color: "#2d3748",
+                }}
+              >
+                All Notifications
+              </Text>
+
+              {notifications.length > 0 ? (
+                <ScrollView style={{ flex: 1, marginBottom: 16 }}>
+                  {notifications.map((notification) => (
+                    <TouchableOpacity
+                      key={notification.id}
+                      style={{
+                        backgroundColor: "#edf2f7",
+                        padding: 16,
+                        borderRadius: 16,
+                        marginBottom: 16,
+                      }}
+                      onPress={() => {
+                        handleNotificationPress(notification);
+                        setAllNotificationsModalVisible(false); // Close "All Notifications" modal when a notification is pressed
+                      }}
+                    >
+                      <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
+                        {notification.message}
+                      </Text>
+                      <Text style={{ color: "#4a5568" }}>
+                        {notification.createdAt
+                          ? notification.createdAt.toDate
+                            ? notification.createdAt.toDate().toLocaleString()
+                            : new Date(notification.createdAt).toLocaleString()
+                          : "N/A"}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : (
+                <Text style={{ textAlign: "center", color: "#718096" }}>
+                  No notifications available.
+                </Text>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      {/* ************* End of All Notifications Modal ************* */}
 
       {/* Chat Bubble Button */}
       <TouchableOpacity
@@ -1401,7 +1490,7 @@ const styles = {
   },
   messageModalContainer: {
     width: "90%",
-    height: "80%",
+    height: "80%", // Adjusted height for better visibility
     backgroundColor: "white",
     borderRadius: 24,
     padding: 24,

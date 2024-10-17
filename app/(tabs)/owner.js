@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   TextInput,
@@ -15,6 +15,7 @@ import {
   Platform,
   StyleSheet,
   FlatList,
+  KeyboardAvoidingView, // Imported KeyboardAvoidingView
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { db, storage, auth } from "../../firebaseConfig"; // Ensure correct path
@@ -33,9 +34,9 @@ import {
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
-import { useStripe } from "@stripe/stripe-react-native";
+import { useStripe, CardField } from "@stripe/stripe-react-native"; // Import CardField
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Calendar } from "react-native-calendars";
+import { Picker } from "@react-native-picker/picker";
 
 // Reusable Input Component
 const CustomTextInput = ({
@@ -157,12 +158,10 @@ const OwnerProfile = ({ ownerId }) => {
   const [currentAnnualPdf, setCurrentAnnualPdf] = useState(null);
   const [insurancePdf, setInsurancePdf] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [selectedDates, setSelectedDates] = useState({});
-  const [calendarVisible, setCalendarVisible] = useState(false);
   const [userListings, setUserListings] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
   const [ratings, setRatings] = useState({});
-  const [availableBalance, setAvailableBalance] = useState(5000);
+  const [availableBalance, setAvailableBalance] = useState(0); // Updated initial balance
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
   const [activeRentals, setActiveRentals] = useState([]);
@@ -176,11 +175,131 @@ const OwnerProfile = ({ ownerId }) => {
   const [aircraftModalVisible, setAircraftModalVisible] = useState(false);
   const [selectedAircraft, setSelectedAircraft] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [rentalDate, setRentalDate] = useState(null);
   const [selectedAircraftIds, setSelectedAircraftIds] = useState([]);
 
   const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
   const [selectedListingDetails, setSelectedListingDetails] = useState(null);
+
+  const [depositModalVisible, setDepositModalVisible] = useState(false);
+  const [withdrawalAmount, setWithdrawalAmount] = useState("");
+  const [withdrawalEmail, setWithdrawalEmail] = useState(""); // New state for email
+
+  // Payment Method State
+  const [paymentMethod, setPaymentMethod] = useState("bank"); // 'bank' or 'card'
+  const [bankDetails, setBankDetails] = useState({
+    accountHolderName: "",
+    bankName: "",
+    routingNumber: "",
+    accountNumber: "",
+  });
+  const cardRef = useRef(); // Ref for CardField
+
+  // Function to handle withdrawal
+  const handleWithdraw = async () => {
+    // Validate Withdrawal Amount
+    if (!withdrawalAmount || isNaN(withdrawalAmount) || parseFloat(withdrawalAmount) <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid withdrawal amount.");
+      return;
+    }
+
+    // Validate Email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!withdrawalEmail || !emailRegex.test(withdrawalEmail)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    const amount = parseFloat(withdrawalAmount);
+
+    if (amount > availableBalance) {
+      Alert.alert("Insufficient Funds", "The withdrawal amount exceeds your available balance.");
+      return;
+    }
+
+    // Validate Payment Method
+    if (paymentMethod === "bank") {
+      const { accountHolderName, bankName, routingNumber, accountNumber } = bankDetails;
+      if (!accountHolderName || !bankName || !routingNumber || !accountNumber) {
+        Alert.alert("Incomplete Details", "Please fill in all bank details.");
+        return;
+      }
+    } else if (paymentMethod === "card") {
+      const cardDetails = cardRef.current;
+      if (!cardDetails || !cardDetails.complete) {
+        Alert.alert("Incomplete Details", "Please enter complete card details.");
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      let paymentMethodId = "";
+
+      if (paymentMethod === "bank") {
+        // Create a Stripe payment method for bank account
+        // Note: Stripe requires a separate integration for bank accounts (ACH)
+        // Here, we assume that the backend handles creating the payment method and linking to the user
+        // For simplicity, we'll skip actual Stripe integration in this example
+        // In production, you'd use Stripe's API to create and attach a bank account payment method
+        paymentMethodId = "bank_payment_method_id"; // Replace with actual ID from backend
+      } else if (paymentMethod === "card") {
+        // Create a Stripe payment method for card using the CardField's ref
+        const { error, paymentMethod } = await stripe.createPaymentMethod({
+          type: "Card",
+          card: cardRef.current, // Use the ref instead of cardDetails
+        });
+
+        if (error) {
+          Alert.alert("Card Error", error.message);
+          setLoading(false);
+          return;
+        }
+
+        paymentMethodId = paymentMethod.id;
+      }
+
+      // Call the server's /withdraw-funds endpoint
+      const token = await user.getIdToken(); // Get Firebase ID token for authentication
+
+      const response = await fetch(`${process.env.API_URL}/withdraw-funds`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ownerId: resolvedOwnerId,
+          amount: Math.round(amount * 100), // Convert to cents if required by backend
+          paymentMethodId,
+          email: withdrawalEmail, // Include email in the request
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert(
+          "Success",
+          `You have successfully withdrawn $${amount.toFixed(2)}. An email confirmation has been sent to ${withdrawalEmail}.`
+        );
+        setWithdrawalAmount("");
+        setWithdrawalEmail(""); // Reset email field
+        setDepositModalVisible(false);
+        // The availableBalance will update automatically via Firestore snapshot
+      } else {
+        Alert.alert(
+          "Error",
+          data.error ||
+            "Failed to process withdrawal. An email notification has been sent to inform you of the failure."
+        );
+      }
+    } catch (error) {
+      console.error("Error processing withdrawal:", error);
+      Alert.alert("Error", "There was an error processing your withdrawal.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch stored data on mount
   useEffect(() => {
@@ -308,6 +427,23 @@ const OwnerProfile = ({ ownerId }) => {
       setMessages([]);
     }
   }, [selectedChatThreadId]);
+
+  // Fetch available balance on mount and listen for updates
+  useEffect(() => {
+    if (resolvedOwnerId) {
+      const balanceRef = doc(db, "owners", resolvedOwnerId);
+      const unsubscribe = onSnapshot(balanceRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setAvailableBalance(data.availableBalance || 0);
+        } else {
+          setAvailableBalance(0);
+        }
+      });
+
+      return () => unsubscribe();
+    }
+  }, [resolvedOwnerId]);
 
   // Utility Functions
 
@@ -437,6 +573,7 @@ const OwnerProfile = ({ ownerId }) => {
     } else if (name in profileData) {
       setProfileData((prev) => ({ ...prev, [name]: value }));
     }
+    // Removed the incorrect condition for withdrawalAmount
   };
 
   const pickImage = async () => {
@@ -464,24 +601,6 @@ const OwnerProfile = ({ ownerId }) => {
         mainImage: images.length > 1 ? images[0] : "",
       }));
     }
-  };
-
-  const onDayPress = (day) => {
-    const selected = !selectedDates[day.dateString];
-    setRentalDate(day.dateString);
-    setSelectedDates({
-      [day.dateString]: selected
-        ? { selected: true, marked: true, dotColor: "red" }
-        : undefined,
-    });
-
-    // If a request is selected, handle approval with the selected date
-    if (selectedRequest) {
-      handleApproveRentalRequest(selectedRequest, day.dateString);
-      setSelectedRequest(null); // Reset after approval
-    }
-
-    setCalendarVisible(false);
   };
 
   const uploadFile = async (uri, folder) => {
@@ -525,67 +644,47 @@ const OwnerProfile = ({ ownerId }) => {
 
     setLoading(true);
     try {
-      // Upload images to Firebase Storage and get download URLs
+      // **Step 1: Store the index of the selected main image before uploading**
+      const mainImageIndex = images.indexOf(aircraftDetails.mainImage);
+
+      // **Step 2: Upload images to Firebase Storage and get download URLs**
       const uploadedImages = [];
       for (const image of images) {
         const downloadURL = await uploadFile(image, "aircraftImages");
         uploadedImages.push(downloadURL);
       }
 
-      // Determine the main image
+      // **Step 3: Determine the main image URL based on the original selection**
       let mainImageURL = uploadedImages.length > 0 ? uploadedImages[0] : "";
 
-      if (aircraftDetails.mainImage) {
-        // If a main image is set, find its download URL
-        const mainImageIndex = images.indexOf(aircraftDetails.mainImage);
-        if (mainImageIndex !== -1 && uploadedImages[mainImageIndex]) {
-          mainImageURL = uploadedImages[mainImageIndex];
-        }
+      if (mainImageIndex !== -1 && uploadedImages[mainImageIndex]) {
+        mainImageURL = uploadedImages[mainImageIndex];
       }
 
-      // Update aircraftDetails with uploaded images and mainImage URL
+      // **Step 4: Update aircraftDetails with uploaded images and mainImage URL**
       const updatedAircraftDetails = {
         ...aircraftDetails,
         images: uploadedImages,
         mainImage: mainImageURL,
       };
 
+      // **Step 5: Update state**
+      setImages(uploadedImages);
       setAircraftDetails(updatedAircraftDetails);
       setAircraftSaved(true);
 
-      // Update Firestore
-      let updatedAircrafts = [...allAircrafts];
+      // **Step 6: Prepare additionalAircrafts by removing 'createdAt' to avoid FirebaseError**
+      const sanitizedAdditionalAircrafts = allAircrafts
+        .filter((aircraft) => aircraft.id !== initialAircraftDetails?.id)
+        .map(({ createdAt, ...rest }) => rest); // Remove 'createdAt' if it exists
 
-      // Sanitize aircraftDetails before saving
-      const sanitizedAircraftDetails = sanitizeData(updatedAircraftDetails);
-
-      if (initialAircraftDetails) {
-        // Update existing initial aircraft
-        updatedAircrafts = updatedAircrafts.map((aircraft, index) =>
-          aircraft.id === initialAircraftDetails.id
-            ? { ...sanitizedAircraftDetails, id: aircraft.id }
-            : aircraft
-        );
-      } else {
-        // Add new initial aircraft
-        const newInitialAircraft = {
-          ...sanitizedAircraftDetails,
-          id: `initial_${Date.now()}`,
-        };
-        updatedAircrafts = [newInitialAircraft, ...updatedAircrafts];
-        setInitialAircraftDetails(newInitialAircraft);
-      }
-
-      setAllAircrafts(updatedAircrafts);
-
+      // **Step 7: Update Firestore without 'createdAt' inside arrays**
       await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
         costData,
         aircraftDetails: initialAircraftDetails
-          ? updatedAircrafts.find((a) => a.id === initialAircraftDetails.id)
-          : updatedAircrafts[0],
-        additionalAircrafts: updatedAircrafts.filter(
-          (aircraft) => aircraft.id !== initialAircraftDetails?.id
-        ),
+          ? updatedAircraftDetails
+          : { ...sanitizedAdditionalAircrafts[0], id: `initial_${Date.now()}` },
+        additionalAircrafts: sanitizedAdditionalAircrafts,
       });
 
       Alert.alert("Success", "Your aircraft details have been saved.");
@@ -601,17 +700,9 @@ const OwnerProfile = ({ ownerId }) => {
     setIsEditing(true);
   };
 
-  const onCancelAircraftEdit = () => {
-    if (initialAircraftDetails) {
-      setAircraftDetails(initialAircraftDetails);
-      setImages(initialAircraftDetails.images || []);
-      setAircraftSaved(true);
-      setIsEditing(false);
-      Alert.alert(
-        "Canceled",
-        "Aircraft details reverted to the original state."
-      );
-    }
+  const handleCloseAircraftModal = async () => {
+    await onSaveAircraftDetails();
+    setAircraftModalVisible(false);
   };
 
   const onEditCostData = () => {
@@ -737,10 +828,10 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  // Updated handleApproveRentalRequest to accept rentalDate
-  const handleApproveRentalRequest = async (request, rentalDate) => {
+  // Updated handleApproveRentalRequest to use rentalPeriod from the request
+  const handleApproveRentalRequest = async (request) => {
     try {
-      if (!request.renterId || !request.listingId || !rentalDate) {
+      if (!request.renterId || !request.listingId || !request.rentalPeriod) {
         console.error("Invalid request data: ", request);
         Alert.alert("Error", "Request data is invalid or rental date is missing.");
         return;
@@ -756,7 +847,7 @@ const OwnerProfile = ({ ownerId }) => {
       );
       await updateDoc(notificationRef, {
         status: "approved",
-        rentalDate: rentalDate,
+        rentalDate: request.rentalPeriod, // Use the date from the request
       });
 
       // Notify the renter
@@ -766,7 +857,7 @@ const OwnerProfile = ({ ownerId }) => {
           "Your rental request has been approved. Please complete the payment.",
         listingId: request.listingId,
         ownerId: resolvedOwnerId,
-        rentalDate: rentalDate,
+        rentalDate: request.rentalPeriod,
         createdAt: serverTimestamp(),
       });
 
@@ -802,7 +893,7 @@ const OwnerProfile = ({ ownerId }) => {
 
       Alert.alert(
         "Request Approved",
-        `The rental request for ${rentalDate} has been approved.`
+        `The rental request for ${request.rentalPeriod} has been approved.`
       );
 
       // Optionally, open the message modal for the chat thread
@@ -922,8 +1013,6 @@ const OwnerProfile = ({ ownerId }) => {
         } else {
           setMessages([]);
         }
-      } else {
-        setMessages([]);
       }
     } catch (error) {
       console.error("Error opening message modal:", error);
@@ -998,8 +1087,21 @@ const OwnerProfile = ({ ownerId }) => {
                 {user?.displayName || "User"}
               </Text>
             </View>
+            {/* Removed Funds Button from Header */}
           </View>
         </ImageBackground>
+
+        {/* ************* Funds Button Above Cost of Ownership ************* */}
+        <View style={styles.fundsButtonContainer}>
+          <CustomButton
+            onPress={() => setDepositModalVisible(true)}
+            title={`$${availableBalance.toFixed(2)}`}
+            backgroundColor="#000000" // Changed to black
+            style={styles.fundsButtonStyle}
+            textStyle={styles.fundsButtonTextStyle}
+          />
+        </View>
+        {/* ************* End of Funds Button Placement ************* */}
 
         {/* Cost of Ownership Calculator */}
         <View style={{ padding: 16 }}>
@@ -1158,6 +1260,10 @@ const OwnerProfile = ({ ownerId }) => {
                   keyboardType="numeric"
                 />
               </Section>
+
+              {/* ************* Removed Withdrawal Email and Amount from Cost of Ownership ************* */}
+
+              {/* ************* Removed Withdraw Button from Cost of Ownership ************* */}
 
               <CustomButton onPress={saveCostData} title="Save Cost Data" />
               {loading && (
@@ -1481,6 +1587,8 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </ScrollView>
 
+      {/* ************* Modals Outside ScrollView ************* */}
+
       {/* Rental Request Details Modal */}
       <Modal
         visible={rentalRequestModalVisible}
@@ -1536,9 +1644,8 @@ const OwnerProfile = ({ ownerId }) => {
                   <View style={styles.modalButtonsContainer}>
                     <CustomButton
                       onPress={() => {
-                        setRentalRequestModalVisible(false);
-                        setSelectedRequest(selectedRequest);
-                        setCalendarVisible(true); // Open calendar to select rental date
+                        // Directly approve using the rentalPeriod from the request
+                        handleApproveRentalRequest(selectedRequest);
                       }}
                       title="Approve"
                       backgroundColor="#48bb78"
@@ -1569,29 +1676,6 @@ const OwnerProfile = ({ ownerId }) => {
               <ActivityIndicator size="large" color="#3182ce" />
             )}
           </View>
-        </View>
-      </Modal>
-
-      {/* Rental Request Approval Calendar Modal */}
-      <Modal
-        visible={calendarVisible}
-        animationType="slide"
-        onRequestClose={() => {
-          setCalendarVisible(false);
-          setSelectedRequest(null);
-        }}
-      >
-        <View style={{ flex: 1, padding: 16 }}>
-          <Calendar onDayPress={onDayPress} markedDates={selectedDates} />
-          <CustomButton
-            onPress={() => {
-              setCalendarVisible(false);
-              setSelectedRequest(null);
-            }}
-            title="Cancel"
-            backgroundColor="#e53e3e"
-            style={{ marginTop: 16 }}
-          />
         </View>
       </Modal>
 
@@ -1712,13 +1796,11 @@ const OwnerProfile = ({ ownerId }) => {
             onPress={() => onSubmitMethod({}, false)}
             title="Submit Listing"
             backgroundColor="#3182ce"
-            style={{ marginTop: 16 }}
           />
           <CustomButton
             onPress={() => setFullScreenModalVisible(false)}
             title="Cancel"
             backgroundColor="#e53e3e"
-            style={{ marginTop: 8 }}
           />
         </ScrollView>
       </Modal>
@@ -1887,8 +1969,8 @@ const OwnerProfile = ({ ownerId }) => {
                   style={{ marginBottom: 16 }}
                 />
                 <CustomButton
-                  onPress={onCancelAircraftEdit}
-                  title="Cancel"
+                  onPress={handleCloseAircraftModal}
+                  title="Close"
                   backgroundColor="#e53e3e"
                 />
               </>
@@ -1903,6 +1985,149 @@ const OwnerProfile = ({ ownerId }) => {
           </View>
         </ScrollView>
       </Modal>
+
+      {/* ************* Updated Withdraw Funds Modal ************* */}
+      <Modal
+        visible={depositModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setDepositModalVisible(false)}
+      >
+        {/* Wrapped content with KeyboardAvoidingView */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"} // Adjust behavior based on platform
+          style={styles.modalOverlay} // Ensure overlay covers the screen
+        >
+          <View style={styles.depositModalContainer}>
+            <ModalHeader
+              title="Withdraw Funds"
+              onClose={() => setDepositModalVisible(false)}
+            />
+            <Text style={styles.modalText}>
+              Available Balance: ${availableBalance.toFixed(2)}
+            </Text>
+
+            {/* Payment Method Selection */}
+            <Section title="Payment Method">
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={paymentMethod}
+                  onValueChange={(itemValue, itemIndex) =>
+                    setPaymentMethod(itemValue)
+                  }
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Bank Account" value="bank" />
+                  <Picker.Item label="Debit Card" value="card" />
+                </Picker>
+              </View>
+            </Section>
+
+            {/* Payment Method Details */}
+            {paymentMethod === "bank" && (
+              <Section title="Bank Account Details">
+                <CustomTextInput
+                  placeholder="Account Holder Name"
+                  value={bankDetails.accountHolderName}
+                  onChangeText={(value) =>
+                    setBankDetails((prev) => ({ ...prev, accountHolderName: value }))
+                  }
+                />
+                <CustomTextInput
+                  placeholder="Bank Name"
+                  value={bankDetails.bankName}
+                  onChangeText={(value) =>
+                    setBankDetails((prev) => ({ ...prev, bankName: value }))
+                  }
+                />
+                <CustomTextInput
+                  placeholder="Routing Number"
+                  value={bankDetails.routingNumber}
+                  onChangeText={(value) =>
+                    setBankDetails((prev) => ({ ...prev, routingNumber: value }))
+                  }
+                  keyboardType="numeric"
+                />
+                <CustomTextInput
+                  placeholder="Account Number"
+                  value={bankDetails.accountNumber}
+                  onChangeText={(value) =>
+                    setBankDetails((prev) => ({ ...prev, accountNumber: value }))
+                  }
+                  keyboardType="numeric"
+                />
+              </Section>
+            )}
+
+            {paymentMethod === "card" && (
+              <Section title="Debit Card Details">
+                {/* Using Stripe's CardField with ref for secure card input */}
+                <CardField
+                  ref={cardRef} // Assign the ref here
+                  postalCodeEnabled={false}
+                  placeholder={{
+                    number: "4242 4242 4242 4242",
+                  }}
+                  cardStyle={{
+                    backgroundColor: "#FFFFFF",
+                    textColor: "#000000",
+                  }}
+                  style={{
+                    width: "100%",
+                    height: 50,
+                    marginVertical: 30,
+                  }}
+                  onCardChange={(details) => {
+                    // You can use this to show card details or validation if needed
+                  }}
+                />
+              </Section>
+            )}
+
+            {/* Withdrawal Email Field */}
+            <Section title="Withdrawal Email">
+              <CustomTextInput
+                placeholder="Email Address"
+                value={withdrawalEmail}
+                onChangeText={(value) => setWithdrawalEmail(value)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </Section>
+
+            {/* Withdrawal Amount Field */}
+            <Section title="Withdrawal Amount">
+              <CustomTextInput
+                placeholder="Amount to Withdraw ($)"
+                value={withdrawalAmount}
+                onChangeText={(value) => setWithdrawalAmount(value)}
+                keyboardType="numeric"
+              />
+            </Section>
+
+            <CustomButton
+              onPress={handleWithdraw}
+              title="Withdraw"
+              backgroundColor="#48bb78"
+              style={{ marginTop: 16 }}
+            />
+            <CustomButton
+              onPress={() => setDepositModalVisible(false)}
+              title="Cancel"
+              backgroundColor="#e53e3e"
+              style={{ marginTop: 8 }}
+            />
+            {loading && (
+              <ActivityIndicator
+                size="large"
+                color="#3182ce"
+                style={{ marginTop: 16 }}
+              />
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      {/* ************* End of Updated Withdraw Funds Modal ************* */}
     </View>
   );
 };
@@ -2057,8 +2282,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     position: "relative",
-    // Removed flex: 1 to prevent the modal from being too skinny
-    // Added maxHeight to ensure it doesn't exceed screen height
     maxHeight: "80%",
   },
   messageInputContainer: {
@@ -2158,6 +2381,39 @@ const styles = StyleSheet.create({
     height: 20,
     justifyContent: "center",
     alignItems: "center",
+  },
+  fundsButtonContainer: {
+    alignItems: "center", // Center horizontally
+    marginVertical: 16, // Add some vertical spacing
+  },
+  fundsButtonStyle: {
+    width: 200, // Adjust the width as needed
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  fundsButtonTextStyle: {
+    color: "white",
+    fontWeight: "bold",
+    marginLeft: 8,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  picker: {
+    height: 50,
+    width: "100%",
+  },
+  depositModalContainer: {
+    width: "90%",
+    backgroundColor: "white",
+    borderRadius: 24,
+    padding: 24,
+    position: "relative",
+    maxHeight: "90%",
+    // Removed opacity or semi-transparent background
   },
 });
 
