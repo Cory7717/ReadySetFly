@@ -286,6 +286,7 @@ const Comment = ({
         <View style={styles.replyInputContainer}>
           <TextInput
             placeholder="Write a reply..."
+            placeholderTextColor="#888"            
             value={replyText}
             onChangeText={setReplyText}
             style={styles.replyInput}
@@ -682,6 +683,7 @@ const Post = React.memo(({ post, onViewPost, onProfileImagePress }) => {
           </TouchableOpacity>
           <TextInput
             placeholder="Add a comment..."
+            placeholderTextColor="#888"
             value={commentText}
             onChangeText={setCommentText}
             style={styles.commentInput}
@@ -712,6 +714,7 @@ const Post = React.memo(({ post, onViewPost, onProfileImagePress }) => {
             <View style={styles.editModal}>
               <TextInput
                 style={styles.editInput}
+                placeholderTextColor="#888"
                 value={editText}
                 onChangeText={setEditText}
                 multiline
@@ -1051,6 +1054,7 @@ const CreatePost = () => {
         />
         <TextInput
           placeholder="What's on your mind?"
+          placeholderTextColor="#888"
           value={content}
           onChangeText={setContent}
           multiline
@@ -1393,6 +1397,7 @@ const FullScreenProfileImageModal = ({ visible, onClose, userId }) => {
                 </TouchableOpacity>
                 <TextInput
                   placeholder="Add a comment..."
+                  placeholderTextColor="#888"
                   value={commentText}
                   onChangeText={setCommentText}
                   style={styles.profileCommentInput}
@@ -1708,6 +1713,7 @@ const FullScreenPostModal = ({ onProfileImagePress }) => {
           </TouchableOpacity>
           <TextInput
             placeholder="Add a comment..."
+            placeholderTextColor="#888"
             value={comment}
             onChangeText={setComment}
             style={styles.commentInput}
@@ -2255,6 +2261,7 @@ const styles = StyleSheet.create({
   },
   commentsSection: {
     marginTop: 10,
+    placeholderTextColor:"#888",
   },
   viewMoreComments: {
     color: 'gray',
@@ -2267,6 +2274,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderTopWidth: 1,
     borderColor: '#E5E7EB',
+    placeholderTextColor:"#888",
   },
   commentInput: {
     flex: 1,
@@ -2274,6 +2282,7 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#F3F4F6',
     borderRadius: 20,
+    placeholderTextColor:"#888",
   },
   editModalContainer: {
     flex: 1,
@@ -2296,6 +2305,7 @@ const styles = StyleSheet.create({
     borderColor: 'gray',
     borderWidth: 1,
     borderRadius: 10,
+    placeholderTextColor:"#888",
   },
   modalButtons: {
     flexDirection: 'row',
@@ -2306,10 +2316,12 @@ const styles = StyleSheet.create({
   },
   commentContainer: {
     marginBottom: 10,
+    placeholderTextColor:"#888",
   },
   commentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    placeholderTextColor:"#888",
   },
   commentContent: {
     marginLeft: 10,
@@ -2482,11 +2494,13 @@ const styles = StyleSheet.create({
   fullScreenProfileComments: {
     width: '100%',
     marginTop: 20,
+    placeholderTextColor:"#888",
   },
   profileComment: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+    placeholderTextColor:"#888",
   },
   commentAvatar: {
     width: 40,
@@ -2499,6 +2513,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     flex: 1,
+    placeholderTextColor:"#888",
   },
   profileCommentInput: {
     flex: 1,
@@ -2506,6 +2521,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 20,
     marginRight: 10,
+    placeholderTextColor:"#888",
   },
   fullScreenProfileCommentInput: {
     flexDirection: 'row',
@@ -2513,6 +2529,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderTopWidth: 1,
     borderColor: '#E5E7EB',
+    placeholderTextColor:"#888",
   },
   videoContainer: {
     width: '100%',

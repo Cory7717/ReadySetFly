@@ -173,18 +173,21 @@ const OwnerDashboard = ({ user }) => {
             <Text style={styles.modalTitle}>New Listing</Text>
             <TextInput
               placeholder="Make"
+              placeholderTextColor="#888"
               value={newListing.make}
               onChangeText={(text) => setNewListing({ ...newListing, make: text })}
               style={styles.input}
             />
             <TextInput
               placeholder="Model"
+              placeholderTextColor="#888"
               value={newListing.model}
               onChangeText={(text) => setNewListing({ ...newListing, model: text })}
               style={styles.input}
             />
             <TextInput
               placeholder="Year"
+              placeholderTextColor="#888"
               value={newListing.year}
               onChangeText={(text) => setNewListing({ ...newListing, year: text })}
               keyboardType="numeric"
@@ -192,12 +195,14 @@ const OwnerDashboard = ({ user }) => {
             />
             <TextInput
               placeholder="Location"
+              placeholderTextColor="#888"
               value={newListing.location}
               onChangeText={(text) => setNewListing({ ...newListing, location: text })}
               style={styles.input}
             />
             <TextInput
               placeholder="Rate per Hour"
+              placeholderTextColor="#888"
               value={newListing.ratesPerHour}
               onChangeText={(text) => setNewListing({ ...newListing, ratesPerHour: text })}
               keyboardType="numeric"
@@ -205,6 +210,7 @@ const OwnerDashboard = ({ user }) => {
             />
             <TextInput
               placeholder="Description"
+              placeholderTextColor="#888"
               value={newListing.description}
               onChangeText={(text) => setNewListing({ ...newListing, description: text })}
               multiline

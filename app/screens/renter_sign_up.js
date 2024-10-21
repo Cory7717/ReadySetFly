@@ -47,12 +47,14 @@ export default function RenterSignUp() {
             autoCapitalize="none"
             value={emailAddress}
             placeholder="Email..."
+            placeholderTextColor="#888"
             onChangeText={setEmailAddress}
             style={styles.input}
           />
           <TextInput
             value={password}
             placeholder="Password..."
+            placeholderTextColor="#888"
             secureTextEntry={true}
             onChangeText={setPassword}
             style={styles.input}

@@ -164,6 +164,7 @@ const SignIn = () => {
             style={styles.input}
             keyboardType="email-address"
             editable={!isLockedOut}
+            placeholderTextColor="#888"
           />
           <TextInput
             value={password}
@@ -172,6 +173,7 @@ const SignIn = () => {
             onChangeText={setPassword}
             style={styles.input}
             editable={!isLockedOut}
+            placeholderTextColor="#888"
           />
           <TouchableOpacity
             onPress={onSignInPress}
@@ -220,6 +222,7 @@ const SignIn = () => {
               autoCapitalize="none"
               value={recoveryEmail}
               placeholder="Enter your email"
+              placeholderTextColor="#888"
               onChangeText={setRecoveryEmail}
               style={styles.input}
               keyboardType="email-address"

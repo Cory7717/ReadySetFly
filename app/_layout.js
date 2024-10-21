@@ -105,7 +105,9 @@ const RootLayout = () => {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="screens/renter_sign_in" options={{ headerShown: false }} />
         <Stack.Screen name="search/[query]" options={{ headerShown: false }} />
-        
+        <Stack.Screen name="payment/BankDetailsForm" options={{ headerShown: false }} />
+        <Stack.Screen name="payment/CheckoutScreen" options={{ headerShown: false }} />
+        <Stack.Screen name="payment/ConfirmationScreen" options={{ headerShown: false }} />
         {/* Add other screens as necessary */}
       </Stack>
     </StripeProvider>

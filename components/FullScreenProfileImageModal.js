@@ -349,6 +349,7 @@ const CreatePost = () => {
         />
         <TextInput
           placeholder="What's on your mind?"
+          placeholderTextColor="#888"
           value={content}
           onChangeText={setContent}
           multiline
@@ -667,6 +668,7 @@ const Post = React.memo(({ post: initialPost, onViewPost, onProfileImagePress })
           </TouchableOpacity>
           <TextInput
             placeholder="Add a comment..."
+            placeholderTextColor="#888"
             value={commentText}
             onChangeText={setCommentText}
             style={styles.commentInput}
@@ -686,6 +688,7 @@ const Post = React.memo(({ post: initialPost, onViewPost, onProfileImagePress })
                 style={styles.editInput}
                 value={editText}
                 onChangeText={setEditText}
+                placeholderTextColor="#888"
                 multiline
               />
               <View style={styles.modalButtons}>
@@ -805,6 +808,7 @@ const Comment = ({ comment, onLikeComment, onReplyComment, userId, postId, onPro
         <View style={styles.replyInputContainer}>
           <TextInput
             placeholder="Write a reply..."
+            placeholderTextColor="#888"
             value={replyText}
             onChangeText={setReplyText}
             style={styles.replyInput}

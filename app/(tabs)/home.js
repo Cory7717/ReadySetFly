@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
@@ -13,6 +12,9 @@ import {
   Animated,
   FlatList,
   ScrollView,
+  Switch,
+  StyleSheet,
+  Dimensions,
 } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../../firebaseConfig";
@@ -24,14 +26,16 @@ import {
   where,
   deleteDoc,
   doc,
-  addDoc, // Imported addDoc for Firestore write operations
+  addDoc,
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { Calendar } from "react-native-calendars";
 
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
 const Home = ({ route, navigation }) => {
-  const [user, setUser] = useState(null); // State to store Firebase user
+  const [user, setUser] = useState(null);
   const [listings, setListings] = useState([]);
   const [selectedListing, setSelectedListing] = useState(null);
   const [imageIndex, setImageIndex] = useState(0);
@@ -56,6 +60,13 @@ const Home = ({ route, navigation }) => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [cityState, setCityState] = useState("");
   const [makeModel, setMakeModel] = useState("");
+
+  // New State Variables for Additional Fields
+  const [fullName, setFullName] = useState("");
+  const [cityStateCombined, setCityStateCombined] = useState("");
+  const [hasMedicalCertificate, setHasMedicalCertificate] = useState(false);
+  const [hasRentersInsurance, setHasRentersInsurance] = useState(false);
+  const [flightHours, setFlightHours] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -115,7 +126,7 @@ const Home = ({ route, navigation }) => {
 
         listingsData.forEach((listing) => {
           if (!Array.isArray(listing.images)) {
-            listing.images = [listing.images]; // Convert to array if it's not
+            listing.images = [listing.images];
           }
         });
 
@@ -160,6 +171,38 @@ const Home = ({ route, navigation }) => {
       return;
     }
 
+    // Validation for New Fields
+    if (!fullName.trim()) {
+      Alert.alert("Error", "Please enter your full name.");
+      return;
+    }
+
+    if (!cityStateCombined.trim()) {
+      Alert.alert("Error", "Please enter your current city and state.");
+      return;
+    }
+
+    if (!flightHours || isNaN(flightHours) || Number(flightHours) < 0) {
+      Alert.alert("Error", "Please enter a valid number of flight hours.");
+      return;
+    }
+
+    if (!hasMedicalCertificate) {
+      Alert.alert(
+        "Confirmation Required",
+        "You must confirm that you have a current medical certificate."
+      );
+      return;
+    }
+
+    if (!hasRentersInsurance) {
+      Alert.alert(
+        "Confirmation Required",
+        "You must confirm that you have current renter's insurance."
+      );
+      return;
+    }
+
     const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
     const bookingFee = rentalCost * 0.06;
     const transactionFee = rentalCost * 0.03;
@@ -169,7 +212,7 @@ const Home = ({ route, navigation }) => {
     try {
       const rentalRequestData = {
         renterId: user.uid,
-        renterName: user.displayName || "Anonymous",
+        renterName: fullName,
         ownerId: selectedListing.ownerId,
         airplaneModel: selectedListing.airplaneModel,
         rentalPeriod: rentalDate,
@@ -178,9 +221,13 @@ const Home = ({ route, navigation }) => {
         createdAt: new Date(),
         status: "pending",
         listingId: selectedListing.id,
+        // New Fields
+        currentLocation: cityStateCombined,
+        hasMedicalCertificate: hasMedicalCertificate,
+        hasRentersInsurance: hasRentersInsurance,
+        flightHours: Number(flightHours),
       };
 
-      // Write the rental request to Firestore
       const rentalRequestsRef = collection(
         db,
         "owners",
@@ -285,35 +332,22 @@ const Home = ({ route, navigation }) => {
     };
 
     return (
-      <View style={{ flex: 1, margin: 5 }}>
+      <View style={styles.listingContainer}>
         <TouchableOpacity
           onPress={() => {
             setSelectedListing(item);
             setImageIndex(0);
             setFullScreenModalVisible(true);
+            setFullName(user?.displayName || "");
+            setCityStateCombined("");
+            setHasMedicalCertificate(false);
+            setHasRentersInsurance(false);
+            setFlightHours("");
           }}
-          style={{
-            borderRadius: 10,
-            overflow: "hidden",
-            backgroundColor: "white",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 2,
-            flex: 1,
-          }}
+          style={styles.listingCard}
         >
-          <View style={{ padding: 10, alignItems: "center" }}>
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "bold",
-                color: "#2d3748",
-              }}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.5}
-            >
+          <View style={styles.listingHeader}>
+            <Text style={styles.listingTitle} numberOfLines={1}>
               {abbreviateText(
                 `${item.year} ${item.make} ${item.airplaneModel}`,
                 25
@@ -323,46 +357,19 @@ const Home = ({ route, navigation }) => {
           {item.images && item.images.length > 0 && (
             <ImageBackground
               source={{ uri: item.images[0] }}
-              style={{ height: 150, justifyContent: "space-between" }}
+              style={styles.listingImage}
               imageStyle={{ borderRadius: 10 }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  padding: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    backgroundColor: "#000000a0",
-                    color: "white",
-                    padding: 4,
-                    borderRadius: 5,
-                  }}
-                >
-                  {item.location}
-                </Text>
-                <Text
-                  style={{
-                    backgroundColor: "#000000a0",
-                    color: "white",
-                    padding: 4,
-                    borderRadius: 5,
-                  }}
-                >
+              <View style={styles.listingImageOverlay}>
+                <Text style={styles.listingLocation}>{item.location}</Text>
+                <Text style={styles.listingRate}>
                   ${item.ratesPerHour}/hour
                 </Text>
               </View>
             </ImageBackground>
           )}
-          <View style={{ padding: 10 }}>
-            <Text
-              numberOfLines={2}
-              style={{
-                color: "#4a5568",
-              }}
-            >
+          <View style={styles.listingDescriptionContainer}>
+            <Text numberOfLines={2} style={styles.listingDescription}>
               {item.description}
             </Text>
           </View>
@@ -372,52 +379,29 @@ const Home = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+    <SafeAreaView style={styles.safeArea}>
       <Animated.View
-        style={{
-          height: headerHeight,
-          opacity: headerOpacity,
-          overflow: "hidden",
-        }}
+        style={[
+          styles.header,
+          {
+            height: headerHeight,
+            opacity: headerOpacity,
+          },
+        ]}
       >
         <ImageBackground
           source={wingtipClouds}
-          style={{
-            flex: 1,
-            justifyContent: "flex-start",
-          }}
+          style={styles.headerImage}
           resizeMode="cover"
         >
-          <Animated.View
-            style={{
-              paddingHorizontal: 16,
-              paddingTop: 30, // Ensure sufficient padding from the top
-              paddingBottom: 10, // Reduce padding to keep it close to the top
-              flexDirection: "row",
-              alignItems: "flex-start", // Align items to the start (top left)
-            }}
-          >
-            <View style={{ marginTop: 10 }}>
-              <Animated.Text
-                style={{
-                  fontSize: 24,
-                  color: "white",
-                  fontWeight: "bold",
-                }}
-              >
-                Welcome
-              </Animated.Text>
-              <Animated.Text
-                style={{
-                  fontSize: 28,
-                  color: "white",
-                  fontWeight: "bold",
-                }}
-              >
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.welcomeText}>Welcome</Text>
+              <Text style={styles.userName}>
                 {user?.displayName || "User"}
-              </Animated.Text>
+              </Text>
             </View>
-          </Animated.View>
+          </View>
         </ImageBackground>
       </Animated.View>
 
@@ -426,48 +410,29 @@ const Home = ({ route, navigation }) => {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        columnWrapperStyle={{ justifyContent: "space-between" }}
+        columnWrapperStyle={styles.columnWrapper}
         ListHeaderComponent={
           <>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginBottom: 16,
-                paddingTop: 10, // Added padding to separate from header
-              }}
-            >
-              <Text style={{ fontSize: 18, color: "#4A4A4A" }}>
+            <View style={styles.filterHeader}>
+              <Text style={styles.filterText}>
                 Filter by location or Aircraft Make
               </Text>
               <TouchableOpacity
                 onPress={() => setFilterModalVisible(true)}
-                style={{
-                  backgroundColor: "#E2E2E2",
-                  padding: 8,
-                  borderRadius: 50,
-                }}
+                style={styles.filterButton}
               >
                 <Ionicons name="filter" size={24} color="gray" />
               </TouchableOpacity>
             </View>
 
-            <Text
-              style={{
-                fontSize: 24,
-                fontWeight: "bold",
-                marginBottom: 16,
-                textAlign: "center",
-                color: "#2d3748",
-              }}
-            >
+            <Text style={styles.availableListingsTitle}>
               Available Listings
             </Text>
           </>
         }
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <Text style={{ textAlign: "center", color: "#4a5568" }}>
+          <Text style={styles.emptyListText}>
             No listings available
           </Text>
         }
@@ -480,213 +445,189 @@ const Home = ({ route, navigation }) => {
 
       {showScrollToTop && (
         <TouchableOpacity
-          style={{
-            position: "absolute",
-            right: 20,
-            bottom: 40,
-            backgroundColor: "#1E90FF",
-            padding: 10,
-            borderRadius: 50,
-            elevation: 5,
-          }}
+          style={styles.scrollToTopButton}
           onPress={handleScrollToTop}
         >
           <Ionicons name="arrow-up" size={24} color="white" />
         </TouchableOpacity>
       )}
 
+      {/* Full Screen Modal */}
       <Modal
         animationType="slide"
         transparent={false}
         visible={fullScreenModalVisible}
         onRequestClose={() => setFullScreenModalVisible(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+        <SafeAreaView style={styles.modalSafeArea}>
           {selectedListing && selectedListing.images && (
-            <View style={{ padding: 16, flex: 1 }}>
+            <View style={styles.modalContainer}>
               <TouchableOpacity
                 onPress={() => setFullScreenModalVisible(false)}
+                style={styles.modalCloseButton}
               >
                 <Ionicons name="close" size={30} color="black" />
               </TouchableOpacity>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 16,
-                }}
-              >
-                <TouchableOpacity onPress={handlePreviousImage}>
-                  <Ionicons name="arrow-back" size={30} color="black" />
+              <View style={styles.modalImageContainer}>
+                <TouchableOpacity
+                  onPress={handlePreviousImage}
+                  style={styles.modalArrowButtonLeft}
+                >
+                  <Ionicons name="arrow-back" size={30} color="#1E90FF" />
                 </TouchableOpacity>
                 <Image
                   source={{ uri: selectedListing.images[imageIndex] }}
-                  style={{
-                    width: 300,
-                    height: 200,
-                    alignSelf: "center",
-                    borderRadius: 10,
-                  }}
+                  style={styles.modalImage}
                   resizeMode="cover"
                 />
-                <TouchableOpacity onPress={handleNextImage}>
-                  <Ionicons name="arrow-forward" size={30} color="black" />
+                <TouchableOpacity
+                  onPress={handleNextImage}
+                  style={styles.modalArrowButtonRight}
+                >
+                  <Ionicons name="arrow-forward" size={30} color="#1E90FF" />
                 </TouchableOpacity>
               </View>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <Text
-                  style={{
-                    fontSize: 28,
-                    fontWeight: "bold",
-                    marginBottom: 16,
-                    textAlign: "center",
-                    color: "#2d3748",
-                  }}
-                >
+              <ScrollView contentContainerStyle={styles.modalContent}>
+                <Text style={styles.modalTitle}>
                   {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
                 </Text>
-                <Text
-                  style={{
-                    fontSize: 22,
-                    marginBottom: 16,
-                    textAlign: "center",
-                    color: "#2d3748",
-                  }}
-                >
+                <Text style={styles.modalRate}>
                   ${selectedListing.ratesPerHour} per hour
                 </Text>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    color: "#4a5568",
-                    marginBottom: 16,
-                  }}
-                >
+                <Text style={styles.modalLocation}>
                   Location: {selectedListing.location}
                 </Text>
 
-                <Text
-                  style={{
-                    marginBottom: 16,
-                    textAlign: "center",
-                    color: "#4a5568",
-                  }}
-                >
+                <Text style={styles.modalDescription}>
                   {selectedListing.description}
                 </Text>
 
                 {selectedListing.ownerId === user.uid && (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "center",
-                      marginVertical: 16,
-                    }}
-                  >
+                  <View style={styles.modalOwnerActions}>
                     <TouchableOpacity
                       onPress={() => handleEditListing(selectedListing.id)}
-                      style={{
-                        backgroundColor: "#1E90FF",
-                        padding: 8,
-                        borderRadius: 8,
-                        marginRight: 8,
-                      }}
+                      style={styles.modalEditButton}
                     >
-                      <Text style={{ color: "white" }}>Edit</Text>
+                      <Text style={styles.buttonText}>Edit</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteListing(selectedListing.id)}
-                      style={{
-                        backgroundColor: "#FF6347",
-                        padding: 8,
-                        borderRadius: 8,
-                      }}
+                      style={styles.modalDeleteButton}
                     >
-                      <Text style={{ color: "white" }}>Delete</Text>
+                      <Text style={styles.buttonText}>Delete</Text>
                     </TouchableOpacity>
                   </View>
                 )}
 
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 16,
-                  }}
+                {/* Developer Delete Button */}
+                <TouchableOpacity
+                  onPress={() => handleDeleteListing(selectedListing.id)}
+                  style={styles.modalDeleteButton}
                 >
-                  <Text style={{ fontWeight: "bold", fontSize: 18 }}>
-                    Rental Hours
+                  <Text style={styles.buttonText}>Developer Delete</Text>
+                </TouchableOpacity>
+
+                {/* Full Name Input */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Full Name</Text>
+                  <TextInput
+                    value={fullName}
+                    onChangeText={setFullName}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#888"
+                    style={styles.textInput}
+                  />
+                </View>
+
+                {/* Combined City and State Input */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Current City & State</Text>
+                  <TextInput
+                    value={cityStateCombined}
+                    onChangeText={setCityStateCombined}
+                    placeholder="e.g., New York, NY"
+                    placeholderTextColor="#888"
+                    style={styles.textInput}
+                  />
+                </View>
+
+                {/* Medical Certificate Toggle */}
+                <View style={styles.toggleGroup}>
+                  <Text style={styles.inputLabel}>
+                    Do you have a current medical certificate?
                   </Text>
+                  <Switch
+                    value={hasMedicalCertificate}
+                    onValueChange={setHasMedicalCertificate}
+                  />
+                </View>
+
+                {/* Renters Insurance Toggle */}
+                <View style={styles.toggleGroup}>
+                  <Text style={styles.inputLabel}>
+                    Do you have current renter's insurance?
+                  </Text>
+                  <Switch
+                    value={hasRentersInsurance}
+                    onValueChange={setHasRentersInsurance}
+                  />
+                </View>
+
+                {/* Flight Hours Input */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Flight Hours</Text>
+                  <TextInput
+                    value={flightHours}
+                    onChangeText={setFlightHours}
+                    placeholder="Enter hours"
+                    placeholderTextColor="#888"
+                    keyboardType="numeric"
+                    style={styles.textInputSmall}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Rental Hours</Text>
                   <TextInput
                     value={String(rentalHours)}
+                    placeholderTextColor="#888"
                     onChangeText={(text) => setRentalHours(Number(text))}
                     keyboardType="numeric"
-                    style={{
-                      borderColor: "#CBD5E0",
-                      borderWidth: 1,
-                      padding: 8,
-                      borderRadius: 8,
-                      width: 80,
-                      textAlign: "center",
-                    }}
+                    style={styles.textInputSmall}
                   />
                 </View>
 
                 <TouchableOpacity
                   onPress={() => setCalendarModalVisible(true)}
-                  style={{
-                    backgroundColor: "#1E90FF",
-                    padding: 12,
-                    borderRadius: 8,
-                    marginBottom: 16,
-                  }}
+                  style={styles.calendarButton}
                 >
-                  <Text
-                    style={{
-                      color: "white",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                    }}
-                  >
+                  <Text style={styles.calendarButtonText}>
                     Select Rental Date
                   </Text>
                 </TouchableOpacity>
 
                 {rentalDate && (
-                  <Text style={{ marginBottom: 16, textAlign: "center" }}>
+                  <Text style={styles.selectedDateText}>
                     Selected Rental Date: {rentalDate}
                   </Text>
                 )}
 
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={{ fontWeight: "bold" }}>Total Cost</Text>
+                <View style={styles.totalCostContainer}>
+                  <Text style={styles.totalCostTitle}>Total Cost</Text>
                   <Text>Rental Cost: ${totalCost.rentalCost}</Text>
                   <Text>Booking Fee: ${totalCost.bookingFee}</Text>
                   <Text>Transaction Fee: ${totalCost.transactionFee}</Text>
                   <Text>Sales Tax: ${totalCost.salesTax}</Text>
-                  <Text style={{ fontWeight: "bold" }}>
+                  <Text style={styles.totalCostValue}>
                     Total: ${totalCost.total}
                   </Text>
                 </View>
 
                 <TouchableOpacity
                   onPress={handleSendRentalRequest}
-                  style={{
-                    backgroundColor: "#1E90FF",
-                    padding: 16,
-                    borderRadius: 8,
-                    marginTop: 16,
-                  }}
+                  style={styles.sendRequestButton}
                 >
-                  <Text
-                    style={{
-                      color: "white",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                    }}
-                  >
+                  <Text style={styles.sendRequestButtonText}>
                     Send Rental Request
                   </Text>
                 </TouchableOpacity>
@@ -696,49 +637,42 @@ const Home = ({ route, navigation }) => {
         </SafeAreaView>
       </Modal>
 
+      {/* Calendar Modal */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={calendarModalVisible}
         onRequestClose={() => setCalendarModalVisible(false)}
       >
-        <View style={{ flex: 1, backgroundColor: "white" }}>
-          <Calendar
-            onDayPress={handleDateSelection}
-            markedDates={
-              rentalDate
-                ? {
-                    [rentalDate]: {
-                      selected: true,
-                      marked: true,
-                      dotColor: "red",
-                    },
-                  }
-                : {}
-            }
-          />
-          <TouchableOpacity
-            onPress={() => setCalendarModalVisible(false)}
-            style={{
-              backgroundColor: "#1E90FF",
-              padding: 16,
-              borderRadius: 8,
-              margin: 16,
-            }}
-          >
-            <Text
-              style={{
-                color: "white",
-                textAlign: "center",
-                fontWeight: "bold",
-              }}
+        <View style={styles.calendarModalContainer}>
+          <View style={styles.calendarContent}>
+            <Calendar
+              onDayPress={handleDateSelection}
+              markedDates={
+                rentalDate
+                  ? {
+                      [rentalDate]: {
+                        selected: true,
+                        marked: true,
+                        dotColor: "red",
+                      },
+                    }
+                  : {}
+              }
+            />
+            <TouchableOpacity
+              onPress={() => setCalendarModalVisible(false)}
+              style={styles.closeCalendarButton}
             >
-              Close Calendar
-            </Text>
-          </TouchableOpacity>
+              <Text style={styles.closeCalendarButtonText}>
+                Close Calendar
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
+      {/* Filter Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -746,30 +680,12 @@ const Home = ({ route, navigation }) => {
         onRequestClose={() => setFilterModalVisible(false)}
       >
         <TouchableOpacity
-          style={{
-            flex: 1,
-            justifyContent: "flex-end",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
+          style={styles.filterModalOverlay}
           onPressOut={() => setFilterModalVisible(false)}
         >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              padding: 20,
-              height: "50%",
-            }}
-          >
-            <View
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
-            >
-              <Text
-                style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
-              >
-                Filter Listings
-              </Text>
+          <View style={styles.filterModalContent}>
+            <View style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Filter Listings</Text>
               <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
                 <Ionicons name="close" size={24} color="black" />
               </TouchableOpacity>
@@ -777,71 +693,32 @@ const Home = ({ route, navigation }) => {
 
             <TextInput
               placeholder="Enter City, State"
+              placeholderTextColor="#888"
               value={cityState}
               onChangeText={setCityState}
-              style={{
-                borderColor: "#CBD5E0",
-                borderWidth: 1,
-                padding: 10,
-                borderRadius: 8,
-                marginBottom: 10,
-              }}
+              style={styles.filterTextInput}
             />
-            <Text style={{ textAlign: "center", marginBottom: 10 }}>OR</Text>
+            <Text style={styles.orText}>OR</Text>
             <TextInput
               placeholder="Enter Make and Model"
+              placeholderTextColor="#888"
               value={makeModel}
               onChangeText={setMakeModel}
-              style={{
-                borderColor: "#CBD5E0",
-                borderWidth: 1,
-                padding: 10,
-                borderRadius: 8,
-                marginBottom: 10,
-              }}
+              style={styles.filterTextInput}
             />
-            <View
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
-            >
+            <View style={styles.filterButtonsContainer}>
               <TouchableOpacity
                 onPress={clearFilter}
-                style={{
-                  backgroundColor: "#FF6347",
-                  padding: 10,
-                  borderRadius: 8,
-                  flex: 1,
-                  marginRight: 10,
-                }}
+                style={styles.clearFilterButton}
               >
-                <Text
-                  style={{
-                    color: "white",
-                    textAlign: "center",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Clear Filter
-                </Text>
+                <Text style={styles.filterButtonText}>Clear Filter</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={applyFilter}
-                style={{
-                  backgroundColor: "#1E90FF",
-                  padding: 10,
-                  borderRadius: 8,
-                  flex: 1,
-                }}
+                style={styles.applyFilterButton}
               >
-                <Text
-                  style={{
-                    color: "white",
-                    textAlign: "center",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Apply Filter
-                </Text>
+                <Text style={styles.filterButtonText}>Apply Filter</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -850,5 +727,370 @@ const Home = ({ route, navigation }) => {
     </SafeAreaView>
   );
 };
+
+// **Stylesheet for Clean and Modern Design**
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  header: {
+    overflow: "hidden",
+  },
+  headerImage: {
+    flex: 1,
+    justifyContent: "flex-start",
+  },
+  headerContent: {
+    paddingHorizontal: 16,
+    paddingTop: 30,
+    paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  welcomeText: {
+    fontSize: 24,
+    color: "#FFFFFF",
+    fontWeight: "bold",
+  },
+  userName: {
+    fontSize: 28,
+    color: "#FFFFFF",
+    fontWeight: "bold",
+  },
+  columnWrapper: {
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
+  },
+  filterHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    paddingTop: 10,
+    paddingHorizontal: 10,
+  },
+  filterText: {
+    fontSize: 18,
+    color: "#4A4A4A",
+  },
+  filterButton: {
+    backgroundColor: "#E2E2E2",
+    padding: 8,
+    borderRadius: 50,
+  },
+  availableListingsTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 16,
+    textAlign: "center",
+    color: "#2d3748",
+  },
+  emptyListText: {
+    textAlign: "center",
+    color: "#4a5568",
+    marginTop: 20,
+  },
+  listingContainer: {
+    flex: 1,
+    margin: 5,
+  },
+  listingCard: {
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    flex: 1,
+  },
+  listingHeader: {
+    padding: 10,
+    alignItems: "center",
+  },
+  listingTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#2d3748",
+  },
+  listingImage: {
+    height: 150,
+    justifyContent: "flex-end", // Align overlay to the bottom
+  },
+  listingImageOverlay: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 8,
+    backgroundColor: "rgba(0,0,0,0.3)", // Semi-transparent overlay
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+  listingLocation: {
+    color: "white",
+    padding: 4,
+    borderRadius: 5,
+  },
+  listingRate: {
+    color: "white",
+    padding: 4,
+    borderRadius: 5,
+  },
+  listingDescriptionContainer: {
+    padding: 10,
+  },
+  listingDescription: {
+    color: "#4a5568",
+  },
+  scrollToTopButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 40,
+    backgroundColor: "#1E90FF",
+    padding: 10,
+    borderRadius: 50,
+    elevation: 5,
+  },
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  modalContainer: {
+    padding: 16,
+    flex: 1,
+  },
+  modalCloseButton: {
+    alignSelf: "flex-end",
+  },
+  modalImageContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalArrowButtonLeft: {
+    padding: 10,
+  },
+  modalArrowButtonRight: {
+    padding: 10,
+  },
+  modalImage: {
+    width: SCREEN_WIDTH * 0.7, // 70% of screen width
+    height: SCREEN_WIDTH * 0.45, // Maintain aspect ratio
+    borderRadius: 10,
+  },
+  modalContent: {
+    paddingBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 8,
+    textAlign: "center",
+    color: "#2d3748",
+  },
+  modalRate: {
+    fontSize: 20,
+    marginBottom: 8,
+    textAlign: "center",
+    color: "#2d3748",
+  },
+  modalLocation: {
+    textAlign: "center",
+    color: "#4a5568",
+    marginBottom: 8,
+  },
+  modalDescription: {
+    marginBottom: 16,
+    textAlign: "center",
+    color: "#4a5568",
+  },
+  modalOwnerActions: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginVertical: 16,
+  },
+  modalEditButton: {
+    backgroundColor: "#1E90FF",
+    padding: 10,
+    borderRadius: 8,
+    marginRight: 8,
+    width: 120,
+    alignItems: "center",
+  },
+  modalDeleteButton: {
+    backgroundColor: "#FF6347",
+    padding: 10,
+    borderRadius: 8,
+    width: 120,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+  },
+  inputGroup: {
+    marginBottom: 16,
+    width: "100%", // Ensure inputs take full width
+  },
+  inputLabel: {
+    fontWeight: "bold",
+    fontSize: 16, // Reduced font size for better fit
+    marginBottom: 8,
+  },
+  textInput: {
+    borderColor: "#CBD5E0",
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: 8,
+    width: "100%",
+    textAlign: "center",
+    backgroundColor: "#F7FAFC",
+    placeholderTextColor:"#888",
+  },
+  textInputSmall: {
+    borderColor: "#CBD5E0",
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: 8,
+    width: 100, // Increased width for better input
+    textAlign: "center",
+    backgroundColor: "#F7FAFC",
+  },
+  toggleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    width: "100%", // Ensure toggles take full width
+  },
+  calendarButton: {
+    backgroundColor: "#1E90FF",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    width: "100%",
+  },
+  calendarButtonText: {
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  selectedDateText: {
+    marginBottom: 16,
+    textAlign: "center",
+    fontSize: 16,
+    color: "#2d3748",
+  },
+  totalCostContainer: {
+    marginBottom: 16,
+  },
+  totalCostTitle: {
+    fontWeight: "bold",
+    fontSize: 18,
+    marginBottom: 8,
+  },
+  totalCostValue: {
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  sendRequestButton: {
+    backgroundColor: "#1E90FF",
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 16,
+    width: "100%",
+  },
+  sendRequestButtonText: {
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  calendarModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  calendarContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    width: "90%",
+    alignItems: "center",
+  },
+  closeCalendarButton: {
+    backgroundColor: "#1E90FF",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    width: "100%",
+  },
+  closeCalendarButtonText: {
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  filterModalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  filterModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    height: "50%",
+  },
+  filterModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  filterModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  filterTextInput: {
+    borderColor: "#CBD5E0",
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    backgroundColor: "#F7FAFC",
+    width: "100%",
+  },
+  orText: {
+    textAlign: "center",
+    marginBottom: 10,
+    fontSize: 16,
+    color: "#4A4A4A",
+  },
+  filterButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  clearFilterButton: {
+    backgroundColor: "#FF6347",
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 10,
+    alignItems: "center",
+  },
+  applyFilterButton: {
+    backgroundColor: "#1E90FF",
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    alignItems: "center",
+  },
+  filterButtonText: {
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+});
 
 export default Home;

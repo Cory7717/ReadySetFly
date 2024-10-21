@@ -97,6 +97,7 @@ const OwnerSignup = () => {
           <>
             <TextInput
               placeholder="First Name"
+              placeholderTextColor="#888"
               value={profile.firstName}
               onChangeText={(text) =>
                 setProfile({ ...profile, firstName: text })
@@ -105,6 +106,7 @@ const OwnerSignup = () => {
             />
             <TextInput
               placeholder="Last Name"
+              placeholderTextColor="#888"
               value={profile.lastName}
               onChangeText={(text) => setProfile({ ...profile, lastName: text })}
               style={styles.input}
@@ -122,6 +124,7 @@ const OwnerSignup = () => {
           <>
             <TextInput
               placeholder="Phone Number"
+              placeholderTextColor="#888"
               value={phoneNumber}
               onChangeText={setPhoneNumber}
               style={styles.input}
@@ -140,6 +143,7 @@ const OwnerSignup = () => {
           <>
             <TextInput
               placeholder="Email Address"
+              placeholderTextColor="#888"
               value={emailAddress}
               onChangeText={setEmailAddress}
               style={styles.input}
@@ -157,6 +161,7 @@ const OwnerSignup = () => {
           <>
             <TextInput
               placeholder="Verification Code"
+              placeholderTextColor="#888"
               value={verificationCode}
               onChangeText={setVerificationCode}
               style={styles.input}

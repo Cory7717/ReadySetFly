@@ -92,6 +92,7 @@ const MessagesScreen = () => {
       <View style={styles.inputContainer}>
         <TextInput
           placeholder="Type your message..."
+          placeholderTextColor="#888"
           style={styles.input}
           value={messageText}
           onChangeText={setMessageText}

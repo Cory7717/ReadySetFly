@@ -22,6 +22,7 @@ const Header = () => {
         <Ionicons name="search" size={24} color="gray" />
         <TextInput
           placeholder='Search'
+          placeholderTextColor="#888"
           style={styles.searchInput}
           onChangeText={(value) => console.log(value)}
         />

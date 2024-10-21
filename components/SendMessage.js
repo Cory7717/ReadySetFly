@@ -41,6 +41,7 @@ const SendMessage = ({ userId, contactId }) => {
     <TextInput
       style={tw`flex-1 border rounded p-2`}
       placeholder="Type a message"
+      placeholderTextColor="#888"
       value={text}
       onChangeText={setText}
     />

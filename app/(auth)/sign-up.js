@@ -136,6 +136,7 @@ const SignUp = () => {
         autoCapitalize="none"
         value={emailAddress}
         placeholder="Email"
+        placeholderTextColor="#888"
         onChangeText={setEmailAddress}
         style={{
           borderWidth: 1,
@@ -149,6 +150,7 @@ const SignUp = () => {
         <TextInput
           value={password}
           placeholder="Password"
+          placeholderTextColor="#888"
           secureTextEntry={!passwordVisible}
           onChangeText={setPassword}
           style={{
@@ -174,6 +176,7 @@ const SignUp = () => {
         <TextInput
           value={confirmPassword}
           placeholder="Confirm Password"
+          placeholderTextColor="#888"
           secureTextEntry={!passwordVisible}
           onChangeText={setConfirmPassword}
           style={{
@@ -339,6 +342,7 @@ const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
           </Text>
           <TextInput
             placeholder="First Name"
+            placeholderTextColor="#888"
             value={profileData.firstName}
             onChangeText={(value) => onProfileChange("firstName", value)}
             style={{
@@ -351,6 +355,7 @@ const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
           />
           <TextInput
             placeholder="Last Name"
+            placeholderTextColor="#888"
             value={profileData.lastName}
             onChangeText={(value) => onProfileChange("lastName", value)}
             style={{
@@ -363,6 +368,7 @@ const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
           />
           <TextInput
             placeholder="City and State"
+            placeholderTextColor="#888"
             value={profileData.location}
             onChangeText={(value) => onProfileChange("location", value)}
             style={{

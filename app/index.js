@@ -112,54 +112,63 @@ const App = () => {
 
               <TextInput
                 placeholder="First Name"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.firstName}
                 onChangeText={(text) => setProfileData({ ...profileData, firstName: text })}
               />
               <TextInput
                 placeholder="Last Name"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.lastName}
                 onChangeText={(text) => setProfileData({ ...profileData, lastName: text })}
               />
               <TextInput
                 placeholder="Role (Renter/Owner/Both)"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.role}
                 onChangeText={(text) => setProfileData({ ...profileData, role: text })}
               />
               <TextInput
                 placeholder="City"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.city}
                 onChangeText={(text) => setProfileData({ ...profileData, city: text })}
               />
               <TextInput
                 placeholder="State"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.state}
                 onChangeText={(text) => setProfileData({ ...profileData, state: text })}
               />
               <TextInput
                 placeholder="Type of Aircraft"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.aircraftType}
                 onChangeText={(text) => setProfileData({ ...profileData, aircraftType: text })}
               />
               <TextInput
                 placeholder="Current Medical"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.medicalStatus}
                 onChangeText={(text) => setProfileData({ ...profileData, medicalStatus: text })}
               />
               <TextInput
                 placeholder="Insurance Current (Yes/No)"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.insuranceStatus}
                 onChangeText={(text) => setProfileData({ ...profileData, insuranceStatus: text })}
               />
               <TextInput
                 placeholder="Date of Last Annual"
+                placeholderTextColor="#888"
                 style={styles.input}
                 value={profileData.annualDate}
                 onChangeText={(text) => setProfileData({ ...profileData, annualDate: text })}
@@ -272,6 +281,8 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginBottom: 10,
+    color: '#000', // Ensures text is black and visible
+    fontSize: 16,  // Increases the font size for better readability
   },
   saveButton: {
     backgroundColor: '#28a745',

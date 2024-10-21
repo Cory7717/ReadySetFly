@@ -406,12 +406,14 @@ const RenterDashboard = ({ user }) => {
             {/* Renter Details */}
             <TextInput
               placeholder="Your Name"
+              placeholderTextColor="#888"
               value={renterName}
               onChangeText={setRenterName}
               style={styles.input}
             />
             <TextInput
               placeholder="Your Address"
+              placeholderTextColor="#888"
               value={renterAddress}
               onChangeText={setRenterAddress}
               style={styles.input}
@@ -424,6 +426,7 @@ const RenterDashboard = ({ user }) => {
               onChangeText={(text) => setRentalHours(Number(text))}
               keyboardType="numeric"
               style={styles.input}
+              placeholderTextColor="#888"
             />
 
             {/* Select Rental Date */}
@@ -438,12 +441,14 @@ const RenterDashboard = ({ user }) => {
             {/* Additional Rental Information */}
             <TextInput
               placeholder="Aircraft Type Certified In"
+              placeholderTextColor="#888"
               value={aircraftType}
               onChangeText={setAircraftType}
               style={styles.input}
             />
             <TextInput
               placeholder="Total Flight Hours"
+              placeholderTextColor="#888"
               value={flightHours}
               onChangeText={setFlightHours}
               keyboardType="numeric"
@@ -517,6 +522,7 @@ const RenterDashboard = ({ user }) => {
 
             <TextInput
               placeholder="Enter City, State"
+              placeholderTextColor="#888"
               value={cityState}
               onChangeText={setCityState}
               style={styles.input}
@@ -524,6 +530,7 @@ const RenterDashboard = ({ user }) => {
             <Text style={styles.orText}>OR</Text>
             <TextInput
               placeholder="Enter Make and Model"
+              placeholderTextColor="#888"
               value={makeModel}
               onChangeText={setMakeModel}
               style={styles.input}

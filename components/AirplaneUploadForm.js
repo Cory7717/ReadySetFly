@@ -37,18 +37,21 @@ const AirplaneUploadForm = ({ ownerId }) => {
       <TextInput
         style={styles.input}
         placeholder="Airplane Name"
+        placeholderTextColor="#888"
         value={airplaneName}
         onChangeText={setAirplaneName}
       />
       <TextInput
         style={styles.input}
         placeholder="Airplane Model"
+        placeholderTextColor="#888"
         value={airplaneModel}
         onChangeText={setAirplaneModel}
       />
       <TextInput
         style={styles.input}
         placeholder="Availability"
+        placeholderTextColor="#888"
         value={availability}
         onChangeText={setAvailability}
       />

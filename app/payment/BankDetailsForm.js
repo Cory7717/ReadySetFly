@@ -13,6 +13,7 @@ const BankDetailsForm = ({ ownerId }) => {
   const [accountNumber, setAccountNumber] = useState('');
   const [routingNumber, setRoutingNumber] = useState('');
   const [accountType, setAccountType] = useState('checking'); // 'checking' or 'savings'
+  const [accountHolderType, setAccountHolderType] = useState('individual'); // 'individual' or 'company'
   const [loading, setLoading] = useState(false);
 
   const submitBankDetails = async () => {
@@ -26,14 +27,13 @@ const BankDetailsForm = ({ ownerId }) => {
       // Step 1: Tokenize bank account details using Stripe
       const { token, error } = await createToken({
         type: 'bank_account',
-        bank_account: {
-          country: 'US', // Adjust based on your target country
-          currency: 'usd', // Adjust based on your target currency
-          account_holder_name: accountHolderName,
-          account_holder_type: 'individual', // 'individual' or 'company'
-          routing_number: routingNumber,
-          account_number: accountNumber,
-        },
+        account_holder_name: accountHolderName,
+        account_holder_type: accountHolderType, // 'individual' or 'company'
+        routing_number: routingNumber,
+        account_number: accountNumber,
+        country: 'US', // Adjust based on your target country
+        currency: 'usd', // Adjust based on your target currency
+        account_type: accountType, // 'checking' or 'savings'
       });
 
       if (error) {
@@ -64,6 +64,7 @@ const BankDetailsForm = ({ ownerId }) => {
         body: JSON.stringify({
           ownerId,
           token: token.id, // Send the token ID instead of raw bank details
+          bankName,
         }),
       });
 
@@ -89,18 +90,21 @@ const BankDetailsForm = ({ ownerId }) => {
 
       <TextInput
         placeholder="Bank Name"
+        placeholderTextColor="#888"
         value={bankName}
         onChangeText={setBankName}
         style={styles.input}
       />
       <TextInput
         placeholder="Account Holder Name"
+        placeholderTextColor="#888"
         value={accountHolderName}
         onChangeText={setAccountHolderName}
         style={styles.input}
       />
       <TextInput
         placeholder="Account Number"
+        placeholderTextColor="#888"
         value={accountNumber}
         onChangeText={setAccountNumber}
         keyboardType="numeric"
@@ -108,13 +112,15 @@ const BankDetailsForm = ({ ownerId }) => {
       />
       <TextInput
         placeholder="Routing Number"
+        placeholderTextColor="#888"
         value={routingNumber}
         onChangeText={setRoutingNumber}
         keyboardType="numeric"
         style={styles.input}
       />
+
       <Text style={{ marginTop: 8 }}>Account Type:</Text>
-      <View style={{ flexDirection: 'row', marginBottom: 16 }}>
+      <View style={{ flexDirection: 'row', marginBottom: 16, alignItems: 'center' }}>
         <TouchableOpacity
           onPress={() => setAccountType('checking')}
           style={[
@@ -130,7 +136,27 @@ const BankDetailsForm = ({ ownerId }) => {
             accountType === 'savings' && styles.radioButtonSelected,
           ]}
         />
-        <Text>Saving</Text>
+        <Text>Savings</Text>
+      </View>
+
+      <Text style={{ marginTop: 8 }}>Account Holder Type:</Text>
+      <View style={{ flexDirection: 'row', marginBottom: 16, alignItems: 'center' }}>
+        <TouchableOpacity
+          onPress={() => setAccountHolderType('individual')}
+          style={[
+            styles.radioButton,
+            accountHolderType === 'individual' && styles.radioButtonSelected,
+          ]}
+        />
+        <Text style={{ marginRight: 16 }}>Individual</Text>
+        <TouchableOpacity
+          onPress={() => setAccountHolderType('company')}
+          style={[
+            styles.radioButton,
+            accountHolderType === 'company' && styles.radioButtonSelected,
+          ]}
+        />
+        <Text>Company</Text>
       </View>
 
       <TouchableOpacity onPress={submitBankDetails} style={styles.button}>
@@ -158,6 +184,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
+    marginLeft: 8,
   },
   radioButtonSelected: {
     backgroundColor: '#3182ce',

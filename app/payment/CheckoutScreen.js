@@ -388,6 +388,7 @@ export default function CheckoutScreen() {
               <TextInput
                 style={styles.discountInput}
                 placeholder="Enter Discount Code"
+                placeholderTextColor="#888"
                 value={discountCode}
                 onChangeText={setDiscountCode}
                 autoCapitalize="characters"
@@ -412,6 +413,7 @@ export default function CheckoutScreen() {
           <TextInput
             style={styles.nameInput}
             placeholder="Name on Card"
+            placeholderTextColor="#888"
             value={cardholderName}
             onChangeText={setCardholderName}
             autoCapitalize="words"
@@ -422,6 +424,7 @@ export default function CheckoutScreen() {
           <CardField
             postalCodeEnabled={true}
             placeholders={{ number: '**** **** **** ****' }} // Stripe test card
+            placeholderTextColor="#888"
             style={styles.cardField}
             onCardChange={(cardDetails) => console.log('Card details:', cardDetails)}
             editable={!discountApplied || totalAmount > 0} // Disable card input if discount makes it free

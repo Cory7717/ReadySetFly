@@ -27,6 +27,7 @@ const RenterProfile = () => {
           <TextInput
             style={styles.input}
             placeholder="Name"
+            placeholderTextColor="#888"
             onChangeText={handleChange("name")}
             onBlur={handleBlur("name")}
             value={values.name}
@@ -34,6 +35,7 @@ const RenterProfile = () => {
           <TextInput
             style={styles.input}
             placeholder="Certifications"
+            placeholderTextColor="#888"
             onChangeText={handleChange("certifications")}
             onBlur={handleBlur("certifications")}
             value={values.certifications}
@@ -41,6 +43,7 @@ const RenterProfile = () => {
           <TextInput
             style={styles.input}
             placeholder="Contact"
+            placeholderTextColor="#888"
             onChangeText={handleChange("contact")}
             onBlur={handleBlur("contact")}
             value={values.contact}
@@ -48,6 +51,7 @@ const RenterProfile = () => {
           <TextInput
             style={styles.input}
             placeholder="Address"
+            placeholderTextColor="#888"
             onChangeText={handleChange("address")}
             onBlur={handleBlur("address")}
             value={values.address}

@@ -677,6 +677,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
               </TouchableOpacity>
               <TextInput
                 placeholder="Estimated Hours"
+                placeholderTextColor="#888"
                 keyboardType="numeric"
                 style={{
                   backgroundColor: "white",
@@ -1157,6 +1158,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <TextInput
                   placeholder="Type a message"
+                  placeholderTextColor="#888"
                   style={{
                     flex: 1,
                     borderWidth: 1,

@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { getAuth, onAuthStateChanged } from 'firebase/auth'; // Firebase Auth
 import { createStackNavigator } from '@react-navigation/stack';
-import { NavigationContainer, useNavigation, useRoute } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { db, storage } from '../../firebaseConfig';
 import {
   collection,
@@ -660,10 +660,6 @@ const Classifieds = () => {
         <Text style={{ fontSize: 18, color: COLORS.black, marginBottom: 20, textAlign: 'center' }}>
           You need to be signed in to view classifieds. Please sign in or create an account.
         </Text>
-        {/* 
-          Removed navigation to 'SignIn' screen as per your request.
-          You can implement sign-in prompts or redirects as needed elsewhere in your app.
-        */}
       </SafeAreaView>
     );
   }
@@ -1375,6 +1371,7 @@ const Classifieds = () => {
                         <>
                           <TextInput
                             placeholder="Company Name"
+                            placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('companyName')}
                             onBlur={handleBlur('companyName')}
                             value={values.companyName}
@@ -1388,6 +1385,7 @@ const Classifieds = () => {
                           />
                           <TextInput
                             placeholder="Job Title"
+                            placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('jobTitle')}
                             onBlur={handleBlur('jobTitle')}
                             value={values.jobTitle}
@@ -1401,6 +1399,7 @@ const Classifieds = () => {
                           />
                           <TextInput
                             placeholder="Job Description"
+                            placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('jobDescription')}
                             onBlur={handleBlur('jobDescription')}
                             value={values.jobDescription}
@@ -1420,6 +1419,7 @@ const Classifieds = () => {
                         <>
                           <TextInput
                             placeholder="Flight School Name"
+                            placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('flightSchoolName')}
                             onBlur={handleBlur('flightSchoolName')}
                             value={values.flightSchoolName}
@@ -1433,6 +1433,7 @@ const Classifieds = () => {
                           />
                           <TextInput
                             placeholder="Flight School Details"
+                            placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('flightSchoolDetails')}
                             onBlur={handleBlur('flightSchoolDetails')}
                             value={values.flightSchoolDetails}
@@ -1452,6 +1453,7 @@ const Classifieds = () => {
                         <>
                           <TextInput
                             placeholder="Aircraft Year/Make/Model"
+                            placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('title')}
                             onBlur={handleBlur('title')}
                             value={values.title}
@@ -1465,6 +1467,7 @@ const Classifieds = () => {
                           />
                           <TextInput
                             placeholder="Price"
+                            placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('price')}
                             onBlur={handleBlur('price')}
                             value={values.price}
@@ -1479,6 +1482,7 @@ const Classifieds = () => {
                           />
                           <TextInput
                             placeholder="Description"
+                            placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('description')}
                             onBlur={handleBlur('description')}
                             value={values.description}
@@ -1498,6 +1502,7 @@ const Classifieds = () => {
 
                       <TextInput
                         placeholder="City"
+                        placeholderTextColor={COLORS.gray}
                         onChangeText={handleChange('city')}
                         onBlur={handleBlur('city')}
                         value={values.city}
@@ -1511,6 +1516,7 @@ const Classifieds = () => {
                       />
                       <TextInput
                         placeholder="State"
+                        placeholderTextColor={COLORS.gray}
                         onChangeText={handleChange('state')}
                         onBlur={handleBlur('state')}
                         value={values.state}
@@ -1524,6 +1530,7 @@ const Classifieds = () => {
                       />
                       <TextInput
                         placeholder="Contact Email (Required)"
+                        placeholderTextColor={COLORS.gray}
                         onChangeText={handleChange('email')}
                         onBlur={handleBlur('email')}
                         value={values.email}
@@ -1538,6 +1545,7 @@ const Classifieds = () => {
                       />
                       <TextInput
                         placeholder="Phone Number (Optional)"
+                        placeholderTextColor={COLORS.gray}
                         onChangeText={handleChange('phone')}
                         onBlur={handleBlur('phone')}
                         value={values.phone}
