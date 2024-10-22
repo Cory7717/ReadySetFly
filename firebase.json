@@ -8,7 +8,8 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local"
+        "*.local",
+        ".env"
       ]
     },
     {
@@ -19,7 +20,8 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local"
+        "*.local",
+        ".env"
       ]
     },
     {
@@ -30,7 +32,20 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local"
+        "*.local",
+        ".env"
+      ]
+    },
+    {
+      "source": "rsf_app_backup/backend",
+      "codebase": "backend",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local",
+        ".env"
       ]
     }
   ],

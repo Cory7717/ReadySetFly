@@ -44,7 +44,6 @@ import { useStripe, CardField } from "@stripe/stripe-react-native";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Picker } from "@react-native-picker/picker";
 import BankDetailsForm from "../payment/BankDetailsForm"; // Adjusted path
-// import styles from '../OwnerStyleSheet';
 
 // Define the API URL constant
 const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
@@ -1462,7 +1461,6 @@ const OwnerProfile = ({ ownerId }) => {
               <Section title="Loan Details">
                 <CustomTextInput
                   placeholder="Purchase Price ($)"
-                  placeholderTextColor="#888"
                   value={costData.purchasePrice}
                   onChangeText={(value) =>
                     handleInputChange("purchasePrice", value)
@@ -1471,7 +1469,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Loan Amount ($)"
-                  placeholderTextColor="#888"
                   value={costData.loanAmount}
                   onChangeText={(value) =>
                     handleInputChange("loanAmount", value)
@@ -1480,7 +1477,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Interest Rate (%)"
-                  placeholderTextColor="#888"
                   value={costData.interestRate}
                   onChangeText={(value) =>
                     handleInputChange("interestRate", value)
@@ -1489,14 +1485,12 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Loan Term (years)"
-                  placeholderTextColor="#888"
                   value={costData.loanTerm}
                   onChangeText={(value) => handleInputChange("loanTerm", value)}
                   keyboardType="numeric"
                 />
                 <CustomTextInput
                   placeholder="Depreciation Rate (%)"
-                  placeholderTextColor="#888"
                   value={costData.depreciationRate}
                   onChangeText={(value) =>
                     handleInputChange("depreciationRate", value)
@@ -1505,7 +1499,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Useful Life (years)"
-                  placeholderTextColor="#888"
                   value={costData.usefulLife}
                   onChangeText={(value) =>
                     handleInputChange("usefulLife", value)
@@ -1524,7 +1517,6 @@ const OwnerProfile = ({ ownerId }) => {
               <Section title="Annual Costs">
                 <CustomTextInput
                   placeholder="Estimated Annual Cost ($)"
-                  placeholderTextColor="#888"
                   value={costData.estimatedAnnualCost}
                   onChangeText={(value) =>
                     handleInputChange("estimatedAnnualCost", value)
@@ -1533,7 +1525,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Insurance Cost ($)"
-                  placeholderTextColor="#888"
                   value={costData.insuranceCost}
                   onChangeText={(value) =>
                     handleInputChange("insuranceCost", value)
@@ -1542,7 +1533,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Hangar Cost ($)"
-                  placeholderTextColor="#888"
                   value={costData.hangarCost}
                   onChangeText={(value) =>
                     handleInputChange("hangarCost", value)
@@ -1551,7 +1541,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Annual Registration & Fees ($)"
-                  placeholderTextColor="#888"
                   value={costData.annualRegistrationFees}
                   onChangeText={(value) =>
                     handleInputChange("annualRegistrationFees", value)
@@ -1560,7 +1549,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Maintenance Reserve ($)"
-                  placeholderTextColor="#888"
                   value={costData.maintenanceReserve}
                   onChangeText={(value) =>
                     handleInputChange("maintenanceReserve", value)
@@ -1573,7 +1561,6 @@ const OwnerProfile = ({ ownerId }) => {
               <Section title="Operational Costs">
                 <CustomTextInput
                   placeholder="Fuel Cost Per Hour ($)"
-                  placeholderTextColor="#888"
                   value={costData.fuelCostPerHour}
                   onChangeText={(value) =>
                     handleInputChange("fuelCostPerHour", value)
@@ -1582,7 +1569,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Oil Cost Per Hour ($)"
-                  placeholderTextColor="#888"
                   value={costData.oilCostPerHour}
                   onChangeText={(value) =>
                     handleInputChange("oilCostPerHour", value)
@@ -1591,7 +1577,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Routine Maintenance Per Hour ($)"
-                  placeholderTextColor="#888"
                   value={costData.routineMaintenancePerHour}
                   onChangeText={(value) =>
                     handleInputChange("routineMaintenancePerHour", value)
@@ -1600,7 +1585,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Tires Per Hour ($)"
-                  placeholderTextColor="#888"
                   value={costData.tiresPerHour}
                   onChangeText={(value) =>
                     handleInputChange("tiresPerHour", value)
@@ -1609,7 +1593,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Other Consumables Per Hour ($)"
-                  placeholderTextColor="#888"
                   value={costData.otherConsumablesPerHour}
                   onChangeText={(value) =>
                     handleInputChange("otherConsumablesPerHour", value)
@@ -1618,7 +1601,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <CustomTextInput
                   placeholder="Flight Hours Per Year"
-                  placeholderTextColor="#888"
                   value={costData.flightHoursPerYear}
                   onChangeText={(value) =>
                     handleInputChange("flightHoursPerYear", value)
@@ -1677,6 +1659,7 @@ const OwnerProfile = ({ ownerId }) => {
               data={allAircrafts}
               keyExtractor={(item, index) => `${item.id}_${index}`} // Ensures unique keys by combining ID with index
               nestedScrollEnabled={true}
+              scrollEnabled={false} // Disable scrolling to prevent nesting issues
               renderItem={({ item }) => (
                 <View style={styles.aircraftItemContainer}>
                   {/* Selection Circle */}
@@ -1752,6 +1735,7 @@ const OwnerProfile = ({ ownerId }) => {
               data={userListings}
               keyExtractor={(item, index) => `${item.id}_${index}`} // Ensures unique keys
               nestedScrollEnabled={true}
+              scrollEnabled={false} // Disable scrolling to prevent nesting issues
               renderItem={({ item }) => (
                 <View
                   key={item.id || `listing_${index}`}
@@ -1768,6 +1752,7 @@ const OwnerProfile = ({ ownerId }) => {
                       horizontal
                       keyExtractor={(image, idx) => `${image}_${idx}`} // Ensures unique keys
                       nestedScrollEnabled={true}
+                      scrollEnabled={false} // Disable scrolling to prevent nesting issues
                       renderItem={({ item: image }) => (
                         <Image
                           source={{ uri: image }}
@@ -1842,6 +1827,7 @@ const OwnerProfile = ({ ownerId }) => {
               data={rentalRequests}
               keyExtractor={(item, index) => `${item.id}_${index}`} // Ensures unique keys
               nestedScrollEnabled={true}
+              scrollEnabled={false} // Disable scrolling to prevent nesting issues
               renderItem={({ item }) => (
                 <TouchableOpacity
                   key={item.id || `rentalRequest_${index}`}
@@ -1967,6 +1953,7 @@ const OwnerProfile = ({ ownerId }) => {
               data={rentalHistory}
               keyExtractor={(item, index) => `${item.id}_${index}`} // Ensure unique keys
               nestedScrollEnabled={true}
+              scrollEnabled={false} // Disable scrolling to prevent nesting issues
               renderItem={({ item }) => (
                 <View
                   key={item.id || `order_${index}`} // Ensure that order.id is unique and exists
@@ -2187,10 +2174,11 @@ const OwnerProfile = ({ ownerId }) => {
             <View style={styles.messageInputContainer}>
               <TextInput
                 placeholder="Type your message..."
-                placeholderTextColor="#888"
                 value={messageInput}
                 onChangeText={(text) => setMessageInput(text)}
                 style={styles.messageTextInput}
+                keyboardType="default"
+                autoCapitalize="none"
               />
               <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
                 <Ionicons name="send" size={24} color="white" />
@@ -2215,7 +2203,6 @@ const OwnerProfile = ({ ownerId }) => {
             <CustomTextInput
               key={`${key}_${index}`} // Ensures unique keys by including index
               placeholder={key.replace(/([A-Z])/g, " $1")}
-              placeholderTextColor="#888"
               value={profileData[key]}
               onChangeText={(value) => handleInputChange(key, value)}
             />
@@ -2339,7 +2326,6 @@ const OwnerProfile = ({ ownerId }) => {
           <Section title="General Information">
             <CustomTextInput
               placeholder="Year"
-              placeholderTextColor="#888"
               value={aircraftDetails.year}
               onChangeText={(value) => handleInputChange("year", value)}
               keyboardType="numeric"
@@ -2347,28 +2333,24 @@ const OwnerProfile = ({ ownerId }) => {
             />
             <CustomTextInput
               placeholder="Make"
-              placeholderTextColor="#888"
               value={aircraftDetails.make}
               onChangeText={(value) => handleInputChange("make", value)}
               editable={isEditing}
             />
             <CustomTextInput
               placeholder="Model"
-              placeholderTextColor="#888"
               value={aircraftDetails.model}
               onChangeText={(value) => handleInputChange("model", value)}
               editable={isEditing}
             />
             <CustomTextInput
               placeholder="Engine"
-              placeholderTextColor="#888"
               value={aircraftDetails.engine}
               onChangeText={(value) => handleInputChange("engine", value)}
               editable={isEditing}
             />
             <CustomTextInput
               placeholder="Total Time"
-              placeholderTextColor="#888"
               value={aircraftDetails.totalTime}
               onChangeText={(value) => handleInputChange("totalTime", value)}
               keyboardType="numeric"
@@ -2380,14 +2362,12 @@ const OwnerProfile = ({ ownerId }) => {
           <Section title="Location Information">
             <CustomTextInput
               placeholder="Location"
-              placeholderTextColor="#888"
               value={aircraftDetails.location}
               onChangeText={(value) => handleInputChange("location", value)}
               editable={isEditing}
             />
             <CustomTextInput
               placeholder="Airport Identifier"
-              placeholderTextColor="#888"
               value={aircraftDetails.airportIdentifier}
               onChangeText={(value) =>
                 handleInputChange("airportIdentifier", value)
@@ -2400,7 +2380,6 @@ const OwnerProfile = ({ ownerId }) => {
           <Section title="Cost Information">
             <CustomTextInput
               placeholder="Cost Per Hour ($)"
-              placeholderTextColor="#888"
               value={aircraftDetails.costPerHour}
               onChangeText={(value) => handleInputChange("costPerHour", value)}
               keyboardType="numeric"
@@ -2412,7 +2391,6 @@ const OwnerProfile = ({ ownerId }) => {
           <Section title="Description">
             <CustomTextInput
               placeholder="Description"
-              placeholderTextColor="#888"
               value={aircraftDetails.description}
               onChangeText={(value) => handleInputChange("description", value)}
               style={{ height: 100 }}
@@ -2943,6 +2921,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 16,
+  },
+  deleteButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
   },
 });
 

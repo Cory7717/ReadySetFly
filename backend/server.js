@@ -1,22 +1,26 @@
-require('dotenv').config(); // Load environment variables
+// backend/server.js
+
+const functions = require('firebase-functions');
+require('dotenv').config(); // For local development only
+
 const express = require('express');
 const stripePackage = require('stripe');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const { onRequest } = require("firebase-functions/v2/https");
-const { defineSecret } = require("firebase-functions/params");
 const admin = require('firebase-admin');
 const logger = require("firebase-functions/logger");
+const nodemailer = require('nodemailer');
+const { schedule } = require("firebase-functions/v2/pubsub");
 
-// Define Stripe Secrets as Firebase Secrets
-const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
-const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
-
-// Initialize Firebase Admin SDK with service account
+// Initialize Firebase Admin SDK
 const serviceAccount = require('./serviceAccountKey.json'); // Ensure the path is correct
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
+
+// Initialize Firestore and Storage
+const db = admin.firestore();
+const storage = admin.storage().bucket();
 
 // Initialize Express app
 const app = express();
@@ -28,11 +32,20 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(cors({ origin: allowedOrigins }));
 
 // Body Parser Middleware
-// Note: For webhook endpoint, we need raw body. We'll handle it separately.
 app.use(bodyParser.json());
 
-// Initialize Stripe with the secret key
-const stripe = stripePackage(STRIPE_SECRET_KEY.value());
+// Initialize Stripe with the secret key from Firebase Config
+const stripe = stripePackage(functions.config().stripe.secret);
+
+// Nodemailer Transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    // Access email credentials from Firebase Config or .env (for local dev)
+    user: process.env.EMAIL_USER || functions.config().email.user,
+    pass: process.env.EMAIL_PASS || functions.config().email.pass,
+  },
+});
 
 // =====================
 // Authentication Middleware
@@ -58,12 +71,29 @@ const authenticate = async (req, res, next) => {
 };
 
 // =====================
+// Helper Function: Secure Routes as Admin Only
+// =====================
+const authenticateAdmin = async (req, res, next) => {
+  await authenticate(req, res, () => {});
+
+  const userId = req.user.uid;
+  const adminDoc = await admin.firestore().collection('admins').doc(userId).get();
+
+  if (!adminDoc.exists) {
+    logger.warn(`User ${userId} is not an admin`);
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  next();
+};
+
+// =====================
 // Discount Code Validation Endpoint
 // =====================
 app.post('/validateDiscount', authenticate, async (req, res) => {
   try {
     const { discountCode, amount } = req.body;
-    
+
     // Validate amount
     if (typeof amount !== 'number' || amount < 0) {
       return res.status(400).json({ valid: false, message: 'Invalid amount provided' });
@@ -163,8 +193,8 @@ app.post('/create-connected-account', authenticate, async (req, res) => {
     // Create a link for the owner to provide additional information if necessary
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${process.env.API_URL}/reauth`,
-      return_url: `${process.env.API_URL}/return`,
+      refresh_url: `${functions.config().api.url}/reauth`,
+      return_url: `${functions.config().api.url}/return`,
       type: 'account_onboarding',
     });
 
@@ -187,7 +217,7 @@ app.post('/create-connected-account', authenticate, async (req, res) => {
 // =====================
 app.post('/create-classified-payment-intent', authenticate, async (req, res) => {
   try {
-    const { amount, currency } = req.body;
+    const { amount, currency, listingId } = req.body;
     if (typeof amount !== 'number' || amount <= 0) {
       logger.warn("Invalid amount provided for classified payment intent");
       return res.status(400).json({ error: "Invalid amount. Amount must be a positive number representing cents." });
@@ -200,7 +230,7 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
     }
 
     // Ensure READY_SET_FLY_ACCOUNT is defined
-    if (!process.env.READY_SET_FLY_ACCOUNT) {
+    if (!functions.config().account.ready_set_fly_account) {
       logger.error("READY_SET_FLY_ACCOUNT is not defined in environment variables");
       return res.status(500).json({ error: "Server configuration error" });
     }
@@ -210,12 +240,12 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
       currency: currency || 'usd',
       automatic_payment_methods: { enabled: true },
       transfer_data: {
-        destination: process.env.READY_SET_FLY_ACCOUNT,
+        destination: functions.config().account.ready_set_fly_account,
       },
       metadata: {
         paymentType: 'classified',
         userId: req.user.uid,
-        // Consider adding classifiedId if applicable
+        listingId: listingId || '',
       },
     });
 
@@ -254,13 +284,6 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
     if (!connectedAccountId) {
       logger.warn(`Owner with ID ${ownerId} has not connected a Stripe account`);
       return res.status(400).json({ error: "Owner has not connected a Stripe account" });
-    }
-
-    // Validate rentalId exists
-    const rentalDoc = await admin.firestore().collection('rentals').doc(rentalId).get();
-    if (!rentalDoc.exists) {
-      logger.warn(`Rental with ID ${rentalId} not found`);
-      return res.status(404).json({ error: "Rental not found" });
     }
 
     // Calculate fees and total amount
@@ -411,13 +434,198 @@ app.post('/createListing', authenticate, async (req, res) => {
 });
 
 // =====================
-// Stripe Webhook Endpoint
+// Withdraw Funds Endpoint
+// =====================
+app.post('/withdraw-funds', authenticate, async (req, res) => {
+  try {
+    const { ownerId, amount } = req.body;
+
+    if (!ownerId || !amount) {
+      logger.warn("Missing ownerId or amount for withdrawal");
+      return res.status(400).json({ error: "ownerId and amount are required" });
+    }
+
+    if (typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({ error: "Invalid amount. Must be a positive number." });
+    }
+
+    // Fetch the owner's document
+    const ownerDoc = await admin.firestore().collection('owners').doc(ownerId).get();
+    if (!ownerDoc.exists) {
+      logger.warn(`Owner with ID ${ownerId} not found`);
+      return res.status(404).json({ error: "Owner not found" });
+    }
+
+    const connectedAccountId = ownerDoc.data().stripeAccountId;
+    const availableBalance = ownerDoc.data().availableBalance || 0;
+
+    if (!connectedAccountId) {
+      logger.warn(`Owner with ID ${ownerId} has not connected a Stripe account`);
+      return res.status(400).json({ error: "Owner has not connected a Stripe account" });
+    }
+
+    if (availableBalance < amount) {
+      return res.status(400).json({ error: "Insufficient available balance" });
+    }
+
+    // Create a Payout from the connected account to the owner's bank account
+    const payout = await stripe.payouts.create(
+      {
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: 'usd',
+      },
+      {
+        stripeAccount: connectedAccountId,
+      }
+    );
+
+    // Deduct the amount from the owner's available balance
+    await admin.firestore().collection('owners').doc(ownerId).update({
+      availableBalance: admin.firestore.FieldValue.increment(-amount),
+      lastWithdrawal: admin.firestore.FieldValue.serverTimestamp(),
+      lastPayoutId: payout.id,
+    });
+
+    // Record the payout in owner's transactions
+    await admin.firestore().collection('owners').doc(ownerId).collection('transactions').add({
+      amount: -amount, // Negative to indicate withdrawal
+      description: `Withdrawal of $${amount}`,
+      payoutId: payout.id,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    res.status(200).json({ message: "Withdrawal successful", payout });
+  } catch (error) {
+    logger.error("Error withdrawing funds:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =====================
+// Fetch Firebase User Information Endpoint
+// =====================
+app.get('/firebase-user/:uid', authenticate, async (req, res) => {
+  const { uid } = req.params;
+  
+  // Ensure that users can only fetch their own information
+  if (req.user.uid !== uid) {
+    logger.warn(`User ${req.user.uid} attempted to access user data for ${uid}`);
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  try {
+    const userRecord = await admin.auth().getUser(uid);
+    // Sanitize user data before sending
+    const sanitizedUser = {
+      uid: userRecord.uid,
+      email: userRecord.email,
+      displayName: userRecord.displayName,
+      photoURL: userRecord.photoURL,
+      // Add other non-sensitive fields as needed
+    };
+    res.json({ user: sanitizedUser });
+  } catch (error) {
+    logger.error("Error fetching Firebase user:", error);
+    res.status(500).json({ error: "Failed to fetch Firebase user" });
+  }
+});
+
+// =====================
+// Admin-only: Cleanup Orphaned Rental Requests Endpoint
+// =====================
+app.post('/admin/cleanupOrphanedRentalRequests', authenticateAdmin, async (req, res) => {
+  try {
+    let totalDeletions = 0;
+
+    // Step 1: Fetch all owners
+    const ownersSnapshot = await admin.firestore().collection('owners').get();
+    console.log(`Fetched ${ownersSnapshot.size} owners.`);
+
+    // Iterate through each owner
+    for (const ownerDoc of ownersSnapshot.docs) {
+      const ownerId = ownerDoc.id;
+      console.log(`Processing owner: ${ownerId}`);
+
+      const rentalRequestsRef = admin.firestore().collection('owners').doc(ownerId).collection('rentalRequests');
+      const rentalRequestsSnapshot = await rentalRequestsRef.get();
+      console.log(`Found ${rentalRequestsSnapshot.size} rental requests for owner ${ownerId}.`);
+
+      const rentalBatch = admin.firestore().batch();
+
+      for (const requestDoc of rentalRequestsSnapshot.docs) {
+        const requestData = requestDoc.data();
+        const rentalRequestId = requestDoc.id;
+        const renterId = requestData.renterId;
+        const chatThreadId = requestData.chatThreadId;
+
+        let shouldDelete = false;
+
+        // Check if renterId is missing or invalid
+        if (!renterId) {
+          shouldDelete = true;
+          console.log(`Rental request ${rentalRequestId} for owner ${ownerId} has missing renterId.`);
+        } else {
+          const renterDocRef = admin.firestore().collection('renters').doc(renterId);
+          const renterDoc = await renterDocRef.get();
+
+          if (!renterDoc.exists) {
+            shouldDelete = true;
+            console.log(`Rental request ${rentalRequestId} for owner ${ownerId} references non-existent renterId ${renterId}.`);
+          }
+        }
+
+        if (shouldDelete) {
+          // Delete the rental request
+          rentalBatch.delete(requestDoc.ref);
+          totalDeletions++;
+
+          // Delete associated chat thread if exists
+          if (chatThreadId) {
+            const chatThreadRef = admin.firestore().collection('messages').doc(chatThreadId);
+            rentalBatch.delete(chatThreadRef);
+            console.log(`Deleted associated chat thread ${chatThreadId} for rental request ${rentalRequestId}.`);
+            totalDeletions++;
+          }
+
+          // Delete notifications associated with the rental request
+          if (renterId) {
+            const notificationsRef = admin.firestore().collection('renters').doc(renterId).collection('notifications')
+              .where('rentalRequestId', '==', rentalRequestId);
+            const notificationsSnapshot = await notificationsRef.get();
+
+            notificationsSnapshot.forEach(notificationDoc => {
+              rentalBatch.delete(notificationDoc.ref);
+              console.log(`Deleted notification ${notificationDoc.id} for rental request ${rentalRequestId}.`);
+              totalDeletions++;
+            });
+          }
+        }
+      }
+
+      // Commit the batch if there are deletions
+      if (totalDeletions > 0) {
+        await rentalBatch.commit();
+        console.log(`Committed batch deletions for owner ${ownerId}. Total deletions so far: ${totalDeletions}`);
+      } else {
+        console.log(`No deletions needed for owner ${ownerId}.`);
+      }
+    }
+
+    res.status(200).send(`Cleanup complete. Total deletions: ${totalDeletions}`);
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// =====================
+// Stripe Webhook Endpoint (Express Route)
 // =====================
 app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
   let event;
 
   try {
-    const endpointSecret = STRIPE_WEBHOOK_SECRET.value();
+    const endpointSecret = functions.config().stripe.webhook_secret;
 
     event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], endpointSecret);
   } catch (err) {
@@ -558,106 +766,647 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 });
 
 // =====================
-// Withdraw Funds Endpoint
+// Export Express App as Firebase Function
 // =====================
-app.post('/withdraw-funds', authenticate, async (req, res) => {
-  try {
-    const { ownerId, amount } = req.body;
+exports.api = functions.https.onRequest(app);
 
-    if (!ownerId || !amount) {
-      logger.warn("Missing ownerId or amount for withdrawal");
-      return res.status(400).json({ error: "ownerId and amount are required" });
-    }
+// =====================
+// Firestore Triggers
+// =====================
 
-    if (typeof amount !== 'number' || amount <= 0) {
-      return res.status(400).json({ error: "Invalid amount. Must be a positive number." });
-    }
+/**
+ * Function: onRentalRequestApproved
+ * Trigger: Firestore Document Update
+ */
+exports.onRentalRequestApproved = functions.firestore
+  .document('owners/{ownerId}/rentalRequests/{rentalRequestId}')
+  .onUpdate(async (change, context) => {
+    const after = change.after.data();
+    const before = change.before.data();
+    const { ownerId, rentalRequestId } = context.params;
 
-    // Fetch the owner's document
-    const ownerDoc = await admin.firestore().collection('owners').doc(ownerId).get();
-    if (!ownerDoc.exists) {
-      logger.warn(`Owner with ID ${ownerId} not found`);
-      return res.status(404).json({ error: "Owner not found" });
-    }
+    // Check if the status has changed to 'approved'
+    if (before.status !== 'approved' && after.status === 'approved') {
+      const renterId = after.renterId;
+      const listingId = after.listingId;
+      const rentalDate = after.rentalDate || admin.firestore.FieldValue.serverTimestamp();
 
-    const connectedAccountId = ownerDoc.data().stripeAccountId;
-    const availableBalance = ownerDoc.data().availableBalance || 0;
-
-    if (!connectedAccountId) {
-      logger.warn(`Owner with ID ${ownerId} has not connected a Stripe account`);
-      return res.status(400).json({ error: "Owner has not connected a Stripe account" });
-    }
-
-    if (availableBalance < amount) {
-      return res.status(400).json({ error: "Insufficient available balance" });
-    }
-
-    // Create a Payout from the connected account to the owner's bank account
-    const payout = await stripe.payouts.create(
-      {
-        amount: Math.round(amount * 100), // Convert to cents
-        currency: 'usd',
-      },
-      {
-        stripeAccount: connectedAccountId,
+      if (!renterId || !listingId) {
+        console.error('Missing renterId or listingId in rental request.');
+        return;
       }
-    );
 
-    // Optionally, you can wait for the payout to be paid or handle it asynchronously
+      // Create a chat thread
+      const messagesRef = db.collection('messages');
+      const chatThread = {
+        participants: [ownerId, renterId],
+        messages: [],
+        rentalRequestId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
 
-    // Deduct the amount from the owner's available balance
-    await admin.firestore().collection('owners').doc(ownerId).update({
-      availableBalance: admin.firestore.FieldValue.increment(-amount),
-      lastWithdrawal: admin.firestore.FieldValue.serverTimestamp(),
-      // You can also log the payout details if needed
-      lastPayoutId: payout.id,
-    });
+      const chatDocRef = await messagesRef.add(chatThread);
 
-    // Record the payout in owner's transactions
-    await admin.firestore().collection('owners').doc(ownerId).collection('transactions').add({
-      amount: -amount, // Negative to indicate withdrawal
-      description: `Withdrawal of $${amount}`,
-      payoutId: payout.id,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+      // Update the rental request with chatThreadId
+      await change.after.ref.update({ chatThreadId: chatDocRef.id });
 
-    res.status(200).json({ message: "Withdrawal successful", payout });
-  } catch (error) {
-    logger.error("Error withdrawing funds:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+      // Send notification to renter
+      const renterRef = db.collection('renters').doc(renterId);
+      const renterDoc = await renterRef.get();
 
-// =====================
-// Fetch Firebase User Information
-// =====================
-app.get('/firebase-user/:uid', authenticate, async (req, res) => {
-  const { uid } = req.params;
-  
-  // Ensure that users can only fetch their own information
-  if (req.user.uid !== uid) {
-    logger.warn(`User ${req.user.uid} attempted to access user data for ${uid}`);
-    return res.status(403).json({ error: "Forbidden" });
-  }
+      if (renterDoc.exists) {
+        const renterData = renterDoc.data();
+        const notification = {
+          type: 'rentalApproved',
+          message: `Your rental request for listing ${listingId} has been approved.`,
+          listingId,
+          ownerId,
+          rentalDate,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
 
-  try {
-    const userRecord = await admin.auth().getUser(uid);
-    // Sanitize user data before sending
-    const sanitizedUser = {
-      uid: userRecord.uid,
-      email: userRecord.email,
-      displayName: userRecord.displayName,
-      photoURL: userRecord.photoURL,
-      // Add other non-sensitive fields as needed
+        await renterRef.collection('notifications').add(notification);
+      } else {
+        console.warn(`Renter document does not exist for renterId: ${renterId}`);
+      }
+
+      console.log(`Rental request ${rentalRequestId} approved and chat thread created.`);
+    }
+
+    return null;
+  });
+
+/**
+ * Function: notifyNewMessage
+ * Trigger: Firestore Document Creation
+ */
+exports.notifyNewMessage = functions.firestore
+  .document('messages/{chatThreadId}/messages/{messageId}')
+  .onCreate(async (snap, context) => {
+    const { chatThreadId } = context.params;
+    const messageData = snap.data();
+
+    const { senderId, text, createdAt } = messageData;
+
+    if (!senderId || !text) {
+      console.error('Missing senderId or text in message.');
+      return;
+    }
+
+    // Fetch chat thread to get participants
+    const chatThreadRef = db.collection('messages').doc(chatThreadId);
+    const chatThreadDoc = await chatThreadRef.get();
+
+    if (!chatThreadDoc.exists) {
+      console.error(`Chat thread ${chatThreadId} does not exist.`);
+      return;
+    }
+
+    const chatThread = chatThreadDoc.data();
+    const participants = chatThread.participants;
+
+    // Remove sender from the list to notify the other participant(s)
+    const recipients = participants.filter(id => id !== senderId);
+
+    if (recipients.length === 0) {
+      console.warn('No recipients to notify.');
+      return;
+    }
+
+    // Fetch FCM tokens for recipients
+    const tokens = [];
+
+    for (const recipientId of recipients) {
+      const ownerRef = db.collection('owners').doc(recipientId);
+      const ownerDoc = await ownerRef.get();
+
+      if (ownerDoc.exists) {
+        const ownerData = ownerDoc.data();
+        if (ownerData.fcmToken) {
+          tokens.push(ownerData.fcmToken);
+        }
+      }
+
+      const renterRef = db.collection('renters').doc(recipientId);
+      const renterDoc = await renterRef.get();
+
+      if (renterDoc.exists) {
+        const renterData = renterDoc.data();
+        if (renterData.fcmToken) {
+          tokens.push(renterData.fcmToken);
+        }
+      }
+    }
+
+    if (tokens.length === 0) {
+      console.warn('No FCM tokens found for recipients.');
+      return;
+    }
+
+    // Construct the notification payload
+    const payload = {
+      notification: {
+        title: 'New Message',
+        body: text.length > 50 ? `${text.substring(0, 47)}...` : text,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK', // For React Native apps
+      },
+      data: {
+        chatThreadId,
+        senderId,
+      },
     };
-    res.json({ user: sanitizedUser });
+
+    try {
+      const response = await admin.messaging().sendToDevice(tokens, payload);
+      console.log('Notifications sent successfully:', response);
+    } catch (error) {
+      console.error('Error sending notifications:', error);
+    }
+
+    return null;
+  });
+
+/**
+ * Function: onListingDeleted
+ * Trigger: Firestore Document Deletion
+ */
+exports.onListingDeleted = functions.firestore
+  .document('airplanes/{listingId}')
+  .onDelete(async (snap, context) => {
+    const { listingId } = context.params;
+
+    try {
+      let totalDeletions = 0;
+
+      // Step 1: Delete all rental requests associated with the listing
+      const rentalRequestsRef = db.collectionGroup('rentalRequests').where('listingId', '==', listingId);
+      const rentalRequestsSnapshot = await rentalRequestsRef.get();
+      console.log(`Found ${rentalRequestsSnapshot.size} rental requests for listing ${listingId}.`);
+
+      const rentalBatch = db.batch();
+
+      for (const requestDoc of rentalRequestsSnapshot.docs) {
+        const requestData = requestDoc.data();
+        const renterId = requestData.renterId;
+        const rentalRequestId = requestDoc.id;
+        const chatThreadId = requestData.chatThreadId;
+
+        // Delete rental request
+        rentalBatch.delete(requestDoc.ref);
+        totalDeletions++;
+
+        // Delete associated chat thread if exists
+        if (chatThreadId) {
+          const chatThreadRef = db.collection('messages').doc(chatThreadId);
+          rentalBatch.delete(chatThreadRef);
+          totalDeletions++;
+        }
+
+        // Delete notifications associated with the rental request
+        if (renterId) {
+          const notificationsRef = db.collection('renters').doc(renterId).collection('notifications')
+            .where('rentalRequestId', '==', rentalRequestId);
+          const notificationsSnapshot = await notificationsRef.get();
+
+          notificationsSnapshot.forEach(notificationDoc => {
+            rentalBatch.delete(notificationDoc.ref);
+            console.log(`Deleted notification ${notificationDoc.id} for rental request ${rentalRequestId}.`);
+            totalDeletions++;
+          });
+        }
+      }
+
+      // Commit the batch if there are deletions
+      if (totalDeletions > 0) {
+        await rentalBatch.commit();
+        console.log(`Committed ${totalDeletions} deletions for listing ${listingId}.`);
+      } else {
+        console.log(`No deletions needed for listing ${listingId}.`);
+      }
+
+      // Step 2: Delete images from Firebase Storage
+      const images = snap.data().images || [];
+      const deletePromises = images.map(imageUrl => {
+        // Extract the file path from the URL
+        const filePath = imageUrl.split('/').slice(-2).join('/'); // Adjust based on your storage structure
+        return storage.file(filePath).delete().catch(err => {
+          console.error(`Failed to delete image ${filePath}:`, err);
+        });
+      });
+
+      await Promise.all(deletePromises);
+      console.log(`Deleted ${images.length} images for listing ${listingId}.`);
+    } catch (error) {
+      console.error(`Error deleting associated data for listing ${listingId}:`, error);
+    }
+
+    return null;
+  });
+
+// =====================
+// Scheduled Cleanup Function
+// =====================
+exports.scheduledCleanupOrphanedRentalRequests = schedule('every 24 hours').onRun(async (context) => {
+  try {
+    let totalDeletions = 0;
+
+    // Step 1: Fetch all owners
+    const ownersSnapshot = await db.collection('owners').get();
+    console.log(`Fetched ${ownersSnapshot.size} owners for scheduled cleanup.`);
+
+    for (const ownerDoc of ownersSnapshot.docs) {
+      const ownerId = ownerDoc.id;
+      const rentalRequestsRef = db.collection('owners').doc(ownerId).collection('rentalRequests');
+      const rentalRequestsSnapshot = await rentalRequestsRef.get();
+      console.log(`Owner ${ownerId} has ${rentalRequestsSnapshot.size} rental requests.`);
+
+      const rentalBatch = db.batch();
+
+      for (const requestDoc of rentalRequestsSnapshot.docs) {
+        const requestData = requestDoc.data();
+        const rentalRequestId = requestDoc.id;
+        const renterId = requestData.renterId;
+        const chatThreadId = requestData.chatThreadId;
+
+        let shouldDelete = false;
+
+        if (!renterId) {
+          shouldDelete = true;
+          console.log(`Rental request ${rentalRequestId} for owner ${ownerId} has missing renterId.`);
+        } else {
+          const renterDocRef = db.collection('renters').doc(renterId);
+          const renterDoc = await renterDocRef.get();
+
+          if (!renterDoc.exists) {
+            shouldDelete = true;
+            console.log(`Rental request ${rentalRequestId} for owner ${ownerId} references non-existent renterId ${renterId}.`);
+          }
+        }
+
+        if (shouldDelete) {
+          // Delete the rental request
+          rentalBatch.delete(requestDoc.ref);
+          totalDeletions++;
+
+          // Delete associated chat thread if exists
+          if (chatThreadId) {
+            const chatThreadRef = db.collection('messages').doc(chatThreadId);
+            rentalBatch.delete(chatThreadRef);
+            console.log(`Deleted associated chat thread ${chatThreadId} for rental request ${rentalRequestId}.`);
+            totalDeletions++;
+          }
+
+          // Delete notifications associated with the rental request
+          if (renterId) {
+            const notificationsRef = db.collection('renters').doc(renterId).collection('notifications')
+              .where('rentalRequestId', '==', rentalRequestId);
+            const notificationsSnapshot = await notificationsRef.get();
+
+            notificationsSnapshot.forEach(notificationDoc => {
+              rentalBatch.delete(notificationDoc.ref);
+              console.log(`Deleted notification ${notificationDoc.id} for rental request ${rentalRequestId}.`);
+              totalDeletions++;
+            });
+          }
+        }
+      }
+
+      // Commit the batch if there are deletions
+      if (totalDeletions > 0) {
+        await rentalBatch.commit();
+        console.log(`Committed ${totalDeletions} deletions for owner ${ownerId}.`);
+      } else {
+        console.log(`No orphaned rental requests found for owner ${ownerId}.`);
+      }
+    }
+
+    console.log(`Scheduled cleanup completed. Total deletions: ${totalDeletions}`);
+    return null;
   } catch (error) {
-    logger.error("Error fetching Firebase user:", error);
-    res.status(500).json({ error: "Failed to fetch Firebase user" });
+    console.error('Error during scheduled cleanup:', error);
+    throw new functions.https.HttpsError('internal', 'Scheduled cleanup failed.');
   }
 });
 
 // =====================
-// Start Express Server as Firebase Function
+// Firestore Triggers
 // =====================
-exports.api = onRequest(app);
+
+/**
+ * Function: onRentalRequestApproved
+ * Trigger: Firestore Document Update
+ */
+exports.onRentalRequestApproved = functions.firestore
+  .document('owners/{ownerId}/rentalRequests/{rentalRequestId}')
+  .onUpdate(async (change, context) => {
+    const after = change.after.data();
+    const before = change.before.data();
+    const { ownerId, rentalRequestId } = context.params;
+
+    // Check if the status has changed to 'approved'
+    if (before.status !== 'approved' && after.status === 'approved') {
+      const renterId = after.renterId;
+      const listingId = after.listingId;
+      const rentalDate = after.rentalDate || admin.firestore.FieldValue.serverTimestamp();
+
+      if (!renterId || !listingId) {
+        console.error('Missing renterId or listingId in rental request.');
+        return;
+      }
+
+      // Create a chat thread
+      const messagesRef = db.collection('messages');
+      const chatThread = {
+        participants: [ownerId, renterId],
+        messages: [],
+        rentalRequestId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      const chatDocRef = await messagesRef.add(chatThread);
+
+      // Update the rental request with chatThreadId
+      await change.after.ref.update({ chatThreadId: chatDocRef.id });
+
+      // Send notification to renter
+      const renterRef = db.collection('renters').doc(renterId);
+      const renterDoc = await renterRef.get();
+
+      if (renterDoc.exists) {
+        const renterData = renterDoc.data();
+        const notification = {
+          type: 'rentalApproved',
+          message: `Your rental request for listing ${listingId} has been approved.`,
+          listingId,
+          ownerId,
+          rentalDate,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        await renterRef.collection('notifications').add(notification);
+      } else {
+        console.warn(`Renter document does not exist for renterId: ${renterId}`);
+      }
+
+      console.log(`Rental request ${rentalRequestId} approved and chat thread created.`);
+    }
+
+    return null;
+  });
+
+/**
+ * Function: notifyNewMessage
+ * Trigger: Firestore Document Creation
+ */
+exports.notifyNewMessage = functions.firestore
+  .document('messages/{chatThreadId}/messages/{messageId}')
+  .onCreate(async (snap, context) => {
+    const { chatThreadId } = context.params;
+    const messageData = snap.data();
+
+    const { senderId, text, createdAt } = messageData;
+
+    if (!senderId || !text) {
+      console.error('Missing senderId or text in message.');
+      return;
+    }
+
+    // Fetch chat thread to get participants
+    const chatThreadRef = db.collection('messages').doc(chatThreadId);
+    const chatThreadDoc = await chatThreadRef.get();
+
+    if (!chatThreadDoc.exists) {
+      console.error(`Chat thread ${chatThreadId} does not exist.`);
+      return;
+    }
+
+    const chatThread = chatThreadDoc.data();
+    const participants = chatThread.participants;
+
+    // Remove sender from the list to notify the other participant(s)
+    const recipients = participants.filter(id => id !== senderId);
+
+    if (recipients.length === 0) {
+      console.warn('No recipients to notify.');
+      return;
+    }
+
+    // Fetch FCM tokens for recipients
+    const tokens = [];
+
+    for (const recipientId of recipients) {
+      const ownerRef = db.collection('owners').doc(recipientId);
+      const ownerDoc = await ownerRef.get();
+
+      if (ownerDoc.exists) {
+        const ownerData = ownerDoc.data();
+        if (ownerData.fcmToken) {
+          tokens.push(ownerData.fcmToken);
+        }
+      }
+
+      const renterRef = db.collection('renters').doc(recipientId);
+      const renterDoc = await renterRef.get();
+
+      if (renterDoc.exists) {
+        const renterData = renterDoc.data();
+        if (renterData.fcmToken) {
+          tokens.push(renterData.fcmToken);
+        }
+      }
+    }
+
+    if (tokens.length === 0) {
+      console.warn('No FCM tokens found for recipients.');
+      return;
+    }
+
+    // Construct the notification payload
+    const payload = {
+      notification: {
+        title: 'New Message',
+        body: text.length > 50 ? `${text.substring(0, 47)}...` : text,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK', // For React Native apps
+      },
+      data: {
+        chatThreadId,
+        senderId,
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendToDevice(tokens, payload);
+      console.log('Notifications sent successfully:', response);
+    } catch (error) {
+      console.error('Error sending notifications:', error);
+    }
+
+    return null;
+  });
+
+/**
+ * Function: onListingDeleted
+ * Trigger: Firestore Document Deletion
+ */
+exports.onListingDeleted = functions.firestore
+  .document('airplanes/{listingId}')
+  .onDelete(async (snap, context) => {
+    const { listingId } = context.params;
+
+    try {
+      let totalDeletions = 0;
+
+      // Step 1: Delete all rental requests associated with the listing
+      const rentalRequestsRef = db.collectionGroup('rentalRequests').where('listingId', '==', listingId);
+      const rentalRequestsSnapshot = await rentalRequestsRef.get();
+      console.log(`Found ${rentalRequestsSnapshot.size} rental requests for listing ${listingId}.`);
+
+      const rentalBatch = db.batch();
+
+      for (const requestDoc of rentalRequestsSnapshot.docs) {
+        const requestData = requestDoc.data();
+        const renterId = requestData.renterId;
+        const rentalRequestId = requestDoc.id;
+        const chatThreadId = requestData.chatThreadId;
+
+        // Delete rental request
+        rentalBatch.delete(requestDoc.ref);
+        totalDeletions++;
+
+        // Delete associated chat thread if exists
+        if (chatThreadId) {
+          const chatThreadRef = db.collection('messages').doc(chatThreadId);
+          rentalBatch.delete(chatThreadRef);
+          totalDeletions++;
+        }
+
+        // Delete notifications associated with the rental request
+        if (renterId) {
+          const notificationsRef = db.collection('renters').doc(renterId).collection('notifications')
+            .where('rentalRequestId', '==', rentalRequestId);
+          const notificationsSnapshot = await notificationsRef.get();
+
+          notificationsSnapshot.forEach(notificationDoc => {
+            rentalBatch.delete(notificationDoc.ref);
+            console.log(`Deleted notification ${notificationDoc.id} for rental request ${rentalRequestId}.`);
+            totalDeletions++;
+          });
+        }
+      }
+
+      // Commit the batch if there are deletions
+      if (totalDeletions > 0) {
+        await rentalBatch.commit();
+        console.log(`Committed ${totalDeletions} deletions for listing ${listingId}.`);
+      } else {
+        console.log(`No deletions needed for listing ${listingId}.`);
+      }
+
+      // Step 2: Delete images from Firebase Storage
+      const images = snap.data().images || [];
+      const deletePromises = images.map(imageUrl => {
+        // Extract the file path from the URL
+        const filePath = imageUrl.split('/').slice(-2).join('/'); // Adjust based on your storage structure
+        return storage.file(filePath).delete().catch(err => {
+          console.error(`Failed to delete image ${filePath}:`, err);
+        });
+      });
+
+      await Promise.all(deletePromises);
+      console.log(`Deleted ${images.length} images for listing ${listingId}.`);
+    } catch (error) {
+      console.error(`Error deleting associated data for listing ${listingId}:`, error);
+    }
+
+    return null;
+  });
+
+// =====================
+// Export Express App as Firebase Function
+// =====================
+exports.api = functions.https.onRequest(app);
+
+// =====================
+// Scheduled Cleanup Function
+// =====================
+exports.scheduledCleanupOrphanedRentalRequests = schedule('every 24 hours').onRun(async (context) => {
+  try {
+    let totalDeletions = 0;
+
+    // Step 1: Fetch all owners
+    const ownersSnapshot = await db.collection('owners').get();
+    console.log(`Fetched ${ownersSnapshot.size} owners for scheduled cleanup.`);
+
+    for (const ownerDoc of ownersSnapshot.docs) {
+      const ownerId = ownerDoc.id;
+      const rentalRequestsRef = db.collection('owners').doc(ownerId).collection('rentalRequests');
+      const rentalRequestsSnapshot = await rentalRequestsRef.get();
+      console.log(`Owner ${ownerId} has ${rentalRequestsSnapshot.size} rental requests.`);
+
+      const rentalBatch = db.batch();
+
+      for (const requestDoc of rentalRequestsSnapshot.docs) {
+        const requestData = requestDoc.data();
+        const rentalRequestId = requestDoc.id;
+        const renterId = requestData.renterId;
+        const chatThreadId = requestData.chatThreadId;
+
+        let shouldDelete = false;
+
+        if (!renterId) {
+          shouldDelete = true;
+          console.log(`Rental request ${rentalRequestId} for owner ${ownerId} has missing renterId.`);
+        } else {
+          const renterDocRef = db.collection('renters').doc(renterId);
+          const renterDoc = await renterDocRef.get();
+
+          if (!renterDoc.exists) {
+            shouldDelete = true;
+            console.log(`Rental request ${rentalRequestId} for owner ${ownerId} references non-existent renterId ${renterId}.`);
+          }
+        }
+
+        if (shouldDelete) {
+          // Delete the rental request
+          rentalBatch.delete(requestDoc.ref);
+          totalDeletions++;
+
+          // Delete associated chat thread if exists
+          if (chatThreadId) {
+            const chatThreadRef = db.collection('messages').doc(chatThreadId);
+            rentalBatch.delete(chatThreadRef);
+            console.log(`Deleted associated chat thread ${chatThreadId} for rental request ${rentalRequestId}.`);
+            totalDeletions++;
+          }
+
+          // Delete notifications associated with the rental request
+          if (renterId) {
+            const notificationsRef = db.collection('renters').doc(renterId).collection('notifications')
+              .where('rentalRequestId', '==', rentalRequestId);
+            const notificationsSnapshot = await notificationsRef.get();
+
+            notificationsSnapshot.forEach(notificationDoc => {
+              rentalBatch.delete(notificationDoc.ref);
+              console.log(`Deleted notification ${notificationDoc.id} for rental request ${rentalRequestId}.`);
+              totalDeletions++;
+            });
+          }
+        }
+      }
+
+      // Commit the batch if there are deletions
+      if (totalDeletions > 0) {
+        await rentalBatch.commit();
+        console.log(`Committed ${totalDeletions} deletions for owner ${ownerId}.`);
+      } else {
+        console.log(`No orphaned rental requests found for owner ${ownerId}.`);
+      }
+    }
+
+    console.log(`Scheduled cleanup completed. Total deletions: ${totalDeletions}`);
+    return null;
+  } catch (error) {
+    console.error('Error during scheduled cleanup:', error);
+    throw new functions.https.HttpsError('internal', 'Scheduled cleanup failed.');
+  }
+});

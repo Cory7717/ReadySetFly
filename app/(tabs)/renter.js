@@ -18,6 +18,8 @@ import {
   StatusBar,
   Animated,
   ActivityIndicator,
+  FlatList,
+  StyleSheet,
 } from "react-native";
 import {
   getFirestore,
@@ -32,6 +34,9 @@ import {
   orderBy,
   getDoc,
   serverTimestamp,
+  writeBatch,
+  limit,
+  startAfter,
 } from "firebase/firestore";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -44,7 +49,7 @@ import * as Location from "expo-location";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Octicons from "@expo/vector-icons/Octicons";
-import { useStripe } from "@stripe/stripe-react-native";
+import { useStripe, CardField } from "@stripe/stripe-react-native";
 import { createStackNavigator } from "@react-navigation/stack";
 
 // Import environment variables
@@ -54,6 +59,7 @@ import { API_URL } from "@env"; // Ensure react-native-dotenv is configured
 import CheckoutScreen from "../payment/CheckoutScreen"; // Update with the correct path
 import ConfirmationScreen from "../payment/ConfirmationScreen"; // Ensure correct path
 import MessagesScreen from "../screens/MessagesScreen"; // Ensure correct path
+import BankDetailsForm from "../payment/BankDetailsForm"; // Adjusted path
 
 const Stack = createStackNavigator();
 
@@ -171,20 +177,16 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     }
 
     // Listen to Rental Requests
-    const rentalRequestsRef = collection(
-      db,
-      "renters",
-      renterId,
-      "rentalRequests"
-    );
-    const rentalRequestsQuery = query(
+    const rentalRequestsRef = collection(db, "renters", renterId, "rentalRequests");
+    const rentalRequestsQueryInstance = query(
       rentalRequestsRef,
       where("rentalStatus", "in", ["pending", "approved", "denied"]),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(20) // Initial fetch limit
     );
 
     const unsubscribeRentalRequests = onSnapshot(
-      rentalRequestsQuery,
+      rentalRequestsQueryInstance,
       async (snapshot) => {
         const requests = [];
         for (const docSnap of snapshot.docs) {
@@ -223,19 +225,15 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     );
 
     // Listen to Notifications
-    const notificationsRef = collection(
-      db,
-      "renters",
-      renterId,
-      "notifications"
-    );
-    const notificationsQuery = query(
+    const notificationsRef = collection(db, "renters", renterId, "notifications");
+    const notificationsQueryInstance = query(
       notificationsRef,
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(20) // Initial fetch limit
     );
 
     const unsubscribeNotifications = onSnapshot(
-      notificationsQuery,
+      notificationsQueryInstance,
       (snapshot) => {
         const notifs = [];
         snapshot.docs.forEach((docSnap) => {
@@ -439,7 +437,8 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         rentalsRef,
         where("renterId", "==", resolvedRenterId),
         where("status", "==", "completed"),
-        orderBy("completedAt", "desc")
+        orderBy("completedAt", "desc"),
+        limit(20) // Initial fetch limit
       );
 
       try {
@@ -625,6 +624,155 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     }
   };
   // ************* End of navigateToCheckout Function *************
+
+  // ************* Enhanced Messaging Functions *************
+
+  // Function to open chat thread
+  const openChatThread = async (rentalRequestId) => {
+    const db = getFirestore();
+    try {
+      // Fetch rental request details to get ownerId
+      const rentalRequestRef = doc(db, "renters", renterId, "rentalRequests", rentalRequestId);
+      const rentalRequestSnap = await getDoc(rentalRequestRef);
+      if (!rentalRequestSnap.exists()) {
+        throw new Error("Rental request does not exist.");
+      }
+      const rentalRequest = rentalRequestSnap.data();
+      const ownerId = rentalRequest.ownerId;
+
+      // Check if chat thread exists
+      const chatThreadsRef = collection(db, "messages");
+      const chatQuery = query(
+        chatThreadsRef,
+        where("participants", "array-contains", renterId),
+        where("participants", "array-contains", ownerId)
+      );
+      const chatSnapshot = await getDocs(chatQuery);
+
+      let existingChatThread = null;
+      chatSnapshot.forEach((docSnap) => {
+        const chatData = docSnap.data();
+        if (
+          chatData.participants.includes(renterId) &&
+          chatData.participants.includes(ownerId)
+        ) {
+          existingChatThread = { id: docSnap.id, ...chatData };
+        }
+      });
+
+      let chatThreadId = existingChatThread ? existingChatThread.id : null;
+
+      if (!chatThreadId) {
+        // Create new chat thread
+        const chatThread = {
+          participants: [renterId, ownerId],
+          messages: [],
+          rentalRequestId: rentalRequestId,
+          createdAt: serverTimestamp(),
+        };
+        const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
+        chatThreadId = chatDocRef.id;
+      }
+
+      // Navigate to MessagesScreen with chatThreadId
+      navigation.navigate("Messages", { chatThreadId });
+    } catch (error) {
+      console.error("Error opening chat thread:", error);
+      Alert.alert("Error", "Failed to open chat thread.");
+    }
+  };
+
+  // ************* End of Enhanced Messaging Functions *************
+
+  // ************* Pagination for Notifications *************
+  const [allNotifications, setAllNotifications] = useState([]);
+  const [notificationsLastDoc, setNotificationsLastDoc] = useState(null);
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
+  const NOTIFICATIONS_PAGE_SIZE = 20;
+
+  const fetchMoreNotifications = async () => {
+    if (!hasMoreNotifications) return;
+
+    const db = getFirestore();
+    try {
+      let notificationsQueryInstance = query(
+        collection(db, "renters", renterId, "notifications"),
+        orderBy("createdAt", "desc"),
+        limit(NOTIFICATIONS_PAGE_SIZE)
+      );
+
+      if (notificationsLastDoc) {
+        notificationsQueryInstance = query(
+          collection(db, "renters", renterId, "notifications"),
+          orderBy("createdAt", "desc"),
+          startAfter(notificationsLastDoc),
+          limit(NOTIFICATIONS_PAGE_SIZE)
+        );
+      }
+
+      const snapshot = await getDocs(notificationsQueryInstance);
+
+      if (!snapshot.empty) {
+        const newNotifs = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+        setAllNotifications([...allNotifications, ...newNotifs]);
+
+        const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+        setNotificationsLastDoc(lastVisible);
+
+        if (snapshot.docs.length < NOTIFICATIONS_PAGE_SIZE) {
+          setHasMoreNotifications(false);
+        }
+      } else {
+        setHasMoreNotifications(false);
+      }
+    } catch (error) {
+      console.error("Error fetching more notifications:", error);
+      Alert.alert("Error", "Failed to fetch more notifications.");
+    }
+  };
+
+  useEffect(() => {
+    setAllNotifications(notifications);
+  }, [notifications]);
+
+  // ************* Cleanup Functions *************
+
+  // Function to clean up old notifications (optional)
+  const cleanupOldNotifications = async () => {
+    const db = getFirestore();
+    const notificationsRef = collection(db, "renters", renterId, "notifications");
+    const q = query(
+      notificationsRef,
+      orderBy("createdAt", "desc"),
+      limit(100) // Keep latest 100 notifications
+    );
+
+    try {
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((docSnap, index) => {
+        if (index >= 100) {
+          batch.delete(docSnap.ref);
+        }
+      });
+      await batch.commit();
+      console.log("Old notifications cleaned up.");
+    } catch (error) {
+      console.error("Error cleaning up notifications:", error);
+      Alert.alert("Error", "Failed to clean up notifications.");
+    }
+  };
+
+  // Call cleanup function periodically or based on certain conditions
+  useEffect(() => {
+    // Example: Cleanup after fetching notifications
+    cleanupOldNotifications();
+  }, [allNotifications]);
+
+  // ************* End of Cleanup Functions *************
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
@@ -880,51 +1028,69 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             Manage Your Rentals
           </Text>
           {completedRentals.length > 0 ? (
-            completedRentals.map((rental) => (
-              <View
-                key={rental.id} // Ensure rental.id is unique and exists
-                style={{
-                  backgroundColor: "#edf2f7",
-                  padding: 16,
-                  borderRadius: 16,
-                  marginBottom: 16,
-                }}
-              >
-                <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                  {rental.renterName}
-                </Text>
-                <Text style={{ color: "#4a5568" }}>{rental.rentalPeriod}</Text>
+            <FlatList
+              data={completedRentals}
+              keyExtractor={(item, index) => `${item.id}_${index}`} // Ensure rental.id is unique and exists
+              renderItem={({ item }) => (
                 <View
+                  key={item.id} // Ensure rental.id is unique and exists
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginTop: 8,
+                    backgroundColor: "#edf2f7",
+                    padding: 16,
+                    borderRadius: 16,
+                    marginBottom: 16,
                   }}
                 >
                   <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                    Rate this renter:
+                    {item.renterName}
                   </Text>
-                  <View style={{ flexDirection: "row", marginLeft: 16 }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity
-                        key={`${rental.id}_${star}`} // Unique key by combining rental.id and star
-                        onPress={() => handleRating(rental.id, star)}
-                      >
-                        <FontAwesome
-                          name={
-                            star <= (ratings[rental.id] || 0)
-                              ? "star"
-                              : "star-o"
-                          }
-                          size={24}
-                          color="gold"
-                        />
-                      </TouchableOpacity>
-                    ))}
+                  <Text style={{ color: "#4a5568" }}>{item.rentalPeriod}</Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginTop: 8,
+                    }}
+                  >
+                    <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
+                      Rate this renter:
+                    </Text>
+                    <View style={{ flexDirection: "row", marginLeft: 16 }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <TouchableOpacity
+                          key={`${item.id}_${star}`} // Unique key by combining rental.id and star
+                          onPress={() => handleRating(item.id, star)}
+                        >
+                          <FontAwesome
+                            name={
+                              star <= (ratings[item.id] || 0)
+                                ? "star"
+                                : "star-o"
+                            }
+                            size={24}
+                            color="gold"
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
+                  <TouchableOpacity
+                    onPress={() => openChatThread(item.id)}
+                    style={{
+                      backgroundColor: "#3182ce",
+                      padding: 12,
+                      borderRadius: 8,
+                      alignItems: "center",
+                      marginTop: 16,
+                    }}
+                  >
+                    <Text style={{ color: "white", fontWeight: "bold" }}>
+                      Message Owner
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
-            ))
+              )}
+            />
           ) : (
             <Text style={{ textAlign: "center", color: "#718096" }}>
               No completed rentals available.
@@ -933,81 +1099,59 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         </View>
         {/* ************* End of Completed Rentals Section ************* */}
 
-        {/* ************* Approved Rentals Section ************* */}
+        {/* ************* Approved Rentals Section with Pagination ************* */}
         <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
           <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
             Approved Rentals
           </Text>
           {approvedRentals.length > 0 ? (
-            approvedRentals.map((rental) => (
-              <TouchableOpacity
-                key={rental.id} // Ensure rental.id is unique
-                style={{
-                  backgroundColor: "#edf2f7",
-                  padding: 16,
-                  borderRadius: 16,
-                  marginBottom: 16,
-                }}
-                onPress={() => handleApprovedRentalPress(rental)}
-              >
-                <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
-                  {rental.aircraftModel}
-                </Text>
-                <Text style={{ color: "#4a5568" }}>Renter: {rental.renterName}</Text>
-                <Text style={{ color: "#4a5568" }}>
-                  Rental Period: {rental.rentalPeriod}
-                </Text>
-                <Text style={{ color: "#4a5568" }}>
-                  Total Cost: ${rental.totalCost}
-                </Text>
-                <Text>
-                  Payment Status: {rental.paymentStatus ? rental.paymentStatus : "N/A"}
-                </Text>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={{ textAlign: "center", color: "#718096" }}>
-              No approved rentals at the moment.
-            </Text>
-          )}
-        </View>
-        {/* ************* End of Approved Rentals Section ************* */}
-
-        {/* ************* Notifications Section ************* */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
-            Notifications
-          </Text>
-          {notifications.length > 0 ? (
             <>
-              {notifications.slice(0, 3).map((notification) => (
-                <TouchableOpacity
-                  key={notification.id} // Ensure notification.id is unique
-                  style={{
-                    backgroundColor: "#edf2f7",
-                    padding: 16,
-                    borderRadius: 16,
-                    marginBottom: 16,
-                  }}
-                  onPress={() => handleNotificationPress(notification)}
-                >
-                  <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
-                    {notification.message}
-                  </Text>
-                  <Text style={{ color: "#4a5568" }}>
-                    {notification.createdAt
-                      ? notification.createdAt.toDate
-                        ? notification.createdAt.toDate().toLocaleString()
-                        : new Date(notification.createdAt).toLocaleString()
-                      : "N/A"}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              <FlatList
+                data={approvedRentals}
+                keyExtractor={(item, index) => `${item.id}_${index}`} // Ensure rental.id is unique
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    key={item.id} // Ensure rental.id is unique
+                    style={{
+                      backgroundColor: "#edf2f7",
+                      padding: 16,
+                      borderRadius: 16,
+                      marginBottom: 16,
+                    }}
+                    onPress={() => handleApprovedRentalPress(item)}
+                  >
+                    <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
+                      {item.aircraftModel}
+                    </Text>
+                    <Text style={{ color: "#4a5568" }}>Renter: {item.renterName}</Text>
+                    <Text style={{ color: "#4a5568" }}>
+                      Rental Period: {item.rentalPeriod}
+                    </Text>
+                    <Text style={{ color: "#4a5568" }}>
+                      Total Cost: ${item.totalCost}
+                    </Text>
+                    <Text>
+                      Payment Status: {item.paymentStatus ? item.paymentStatus : "N/A"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                ListFooterComponent={
+                  hasMoreNotifications ? (
+                    <ActivityIndicator size="large" color="#3182ce" style={{ marginVertical: 16 }} />
+                  ) : (
+                    <Text style={{ textAlign: "center", color: "#4a5568", marginVertical: 16 }}>
+                      No more approved rentals to load.
+                    </Text>
+                  )
+                }
+                onEndReached={fetchMoreNotifications}
+                onEndReachedThreshold={0.5}
+              />
 
-              {/* "View All" Button */}
-              {notifications.length > 3 && (
+              {/* Load More Button */}
+              {hasMoreNotifications && (
                 <TouchableOpacity
-                  onPress={() => setAllNotificationsModalVisible(true)}
+                  onPress={fetchMoreNotifications}
                   style={{
                     alignItems: "center",
                     padding: 12,
@@ -1016,14 +1160,82 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                     marginTop: 8,
                   }}
                 >
-                  <Text style={{ color: "white", fontWeight: "bold" }}>View All</Text>
+                  <Text style={{ color: "white", fontWeight: "bold" }}>Load More</Text>
                 </TouchableOpacity>
               )}
             </>
           ) : (
             <Text style={{ textAlign: "center", color: "#718096" }}>
+              No approved rentals at the moment.
+            </Text>
+          )}
+        </View>
+        {/* ************* End of Approved Rentals Section ************* */}
+
+        {/* ************* Notifications Section with Pagination ************* */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
+            Notifications
+          </Text>
+          {allNotifications.length > 0 ? (
+            <FlatList
+              data={allNotifications}
+              keyExtractor={(item, index) => `${item.id}_${index}`} // Ensure unique keys
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={{
+                    backgroundColor: "#edf2f7",
+                    padding: 16,
+                    borderRadius: 16,
+                    marginBottom: 16,
+                  }}
+                  onPress={() => handleNotificationPress(item)}
+                >
+                  <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
+                    {item.message}
+                  </Text>
+                  <Text style={{ color: "#4a5568" }}>
+                    {item.createdAt
+                      ? item.createdAt.toDate
+                        ? item.createdAt.toDate().toLocaleString()
+                        : new Date(item.createdAt).toLocaleString()
+                      : "N/A"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListFooterComponent={
+                hasMoreNotifications ? (
+                  <ActivityIndicator size="large" color="#3182ce" style={{ marginVertical: 16 }} />
+                ) : (
+                  <Text style={{ textAlign: "center", color: "#4a5568", marginVertical: 16 }}>
+                    No more notifications to load.
+                  </Text>
+                )
+              }
+              onEndReached={fetchMoreNotifications}
+              onEndReachedThreshold={0.5}
+            />
+          ) : (
+            <Text style={{ textAlign: "center", color: "#718096" }}>
               No notifications available.
             </Text>
+          )}
+
+          {/* "View All" Button */}
+          {notifications.length > 3 && (
+            <TouchableOpacity
+              onPress={() => setAllNotificationsModalVisible(true)}
+              style={{
+                alignItems: "center",
+                padding: 12,
+                backgroundColor: "#3182ce",
+                borderRadius: 8,
+                marginTop: 8,
+              }}
+            >
+              <Text style={{ color: "white", fontWeight: "bold" }}>View All</Text>
+            </TouchableOpacity>
           )}
         </View>
         {/* ************* End of Notifications Section ************* */}
@@ -1031,76 +1243,23 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
       {/* Profile Information Display */}
       {profileSaved ? (
-        <View
-          style={{
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            backgroundColor: "white",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.22,
-            shadowRadius: 2.22,
-            elevation: 3,
-            borderRadius: 24,
-            marginBottom: 16,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: "bold",
-              color: "#2d3748",
-              marginBottom: 8,
-            }}
-          >
-            Profile Information
-          </Text>
-          <View style={{ flexDirection: "row", marginBottom: 8 }}>
-            <Text style={{ fontWeight: "bold", color: "#2d3748", flex: 1 }}>
-              Name:
-            </Text>
-            <Text style={{ color: "#718096", flex: 2 }}>
-              {profileData.name}
-            </Text>
+        <View style={styles.profileContainer}>
+          <Text style={styles.profileTitle}>Profile Information</Text>
+          <View style={styles.profileRow}>
+            <Text style={styles.profileLabel}>Name:</Text>
+            <Text style={styles.profileValue}>{profileData.name}</Text>
           </View>
           {/* Add other profile fields as needed */}
           {profileData.image && (
             <Image
               source={{ uri: profileData.image }}
-              style={{
-                width: 144,
-                height: 144,
-                borderRadius: 8,
-                marginTop: 8,
-              }}
+              style={styles.profileImage}
             />
           )}
         </View>
       ) : (
-        <View
-          style={{
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            backgroundColor: "white",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.22,
-            shadowRadius: 2.22,
-            elevation: 3,
-            borderRadius: 24,
-            marginBottom: 16,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: "bold",
-              color: "#2d3748",
-              marginBottom: 8,
-            }}
-          >
-            No Profile Information Available
-          </Text>
+        <View style={styles.profileContainer}>
+          <Text style={styles.profileTitle}>No Profile Information Available</Text>
         </View>
       )}
 
@@ -1125,56 +1284,49 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
               </TouchableOpacity>
 
               {messages.length > 0 ? (
-                <ScrollView style={{ flex: 1, marginBottom: 16 }}>
-                  {messages.map((message) => {
-                    // Check if message.id exists; if not, use a fallback
-                    const uniqueKey = message.id
-                      ? `${message.id}_${new Date(message.timestamp?.toDate()).getTime()}`
-                      : `${message.senderId}_${new Date(message.timestamp).getTime()}`;
-
-                    return (
-                      <View key={uniqueKey} style={{ marginBottom: 8 }}>
-                        <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                          {message.senderName}
-                        </Text>
-                        <Text>{message.text}</Text>
-                        <Text style={{ fontSize: 12, color: "#718096" }}>
-                          {message.timestamp
-                            ? message.timestamp.toDate
-                              ? message.timestamp.toDate().toLocaleString()
-                              : new Date(message.timestamp).toLocaleString()
-                            : "N/A"}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
+                <FlatList
+                  data={messages}
+                  keyExtractor={(item, index) =>
+                    `${item.senderId}_${item.timestamp?.seconds}_${item.timestamp?.nanoseconds}_${index}`
+                  } // Ensures unique keys by including index
+                  renderItem={({ item }) => (
+                    <View
+                      style={[
+                        styles.chatBubble,
+                        item.senderId === renterId
+                          ? styles.chatBubbleRight
+                          : styles.chatBubbleLeft,
+                      ]}
+                    >
+                      <Text style={{ fontWeight: "bold" }}>
+                        {item.senderName}:
+                      </Text>
+                      <Text>{item.text}</Text>
+                      <Text style={styles.chatTimestamp}>
+                        {item.timestamp
+                          ? item.timestamp.toDate
+                            ? item.timestamp.toDate().toLocaleString()
+                            : new Date(item.timestamp).toLocaleString()
+                          : "N/A"}
+                      </Text>
+                    </View>
+                  )}
+                />
               ) : (
-                <Text style={{ textAlign: "center", color: "#718096" }}>
-                  No messages yet.
-                </Text>
+                <Text>No messages yet.</Text>
               )}
 
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={styles.messageInputContainer}>
                 <TextInput
-                  placeholder="Type a message"
-                  placeholderTextColor="#888"
-                  style={{
-                    flex: 1,
-                    borderWidth: 1,
-                    borderColor: "#ccc",
-                    borderRadius: 8,
-                    padding: 12,
-                    marginRight: 8,
-                  }}
+                  placeholder="Type your message..."
                   value={messageText}
-                  onChangeText={setMessageText}
+                  onChangeText={(text) => setMessageText(text)}
+                  style={styles.messageTextInput}
+                  keyboardType="default"
+                  autoCapitalize="none"
                 />
-                <TouchableOpacity
-                  onPress={sendMessage}
-                  style={{ padding: 12 }}
-                >
-                  <Ionicons name="send" size={24} color="#3182ce" />
+                <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
+                  <Ionicons name="send" size={24} color="white" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1244,17 +1396,9 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                   {/* Complete Payment Button */}
                   <TouchableOpacity
                     onPress={navigateToCheckout}
-                    style={{
-                      backgroundColor: "#3182ce",
-                      padding: 16,
-                      borderRadius: 8,
-                      alignItems: "center",
-                      marginTop: 16,
-                    }}
+                    style={styles.paymentButton}
                   >
-                    <Text style={{ color: "white", fontWeight: "bold" }}>
-                      Complete Payment
-                    </Text>
+                    <Text style={styles.paymentButtonText}>Complete Payment</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -1334,34 +1478,18 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                   {selectedNotification.type === "rentalApproved" && (
                     <TouchableOpacity
                       onPress={navigateToCheckout}
-                      style={{
-                        backgroundColor: "#3182ce",
-                        padding: 16,
-                        borderRadius: 8,
-                        alignItems: "center",
-                        marginTop: 16,
-                      }}
+                      style={styles.paymentButton}
                     >
-                      <Text style={{ color: "white", fontWeight: "bold" }}>
-                        Process Payment
-                      </Text>
+                      <Text style={styles.paymentButtonText}>Process Payment</Text>
                     </TouchableOpacity>
                   )}
 
                   {selectedNotification.type === "rentalDenied" && (
                     <TouchableOpacity
                       onPress={() => setNotificationModalVisible(false)}
-                      style={{
-                        backgroundColor: "#e53e3e",
-                        padding: 16,
-                        borderRadius: 8,
-                        alignItems: "center",
-                        marginTop: 16,
-                      }}
+                      style={styles.closeButton}
                     >
-                      <Text style={{ color: "white", fontWeight: "bold" }}>
-                        Close
-                      </Text>
+                      <Text style={styles.closeButtonText}>Close</Text>
                     </TouchableOpacity>
                   )}
 
@@ -1408,11 +1536,13 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                 All Notifications
               </Text>
 
-              {notifications.length > 0 ? (
-                <ScrollView style={{ flex: 1, marginBottom: 16 }}>
-                  {notifications.map((notification) => (
+              {allNotifications.length > 0 ? (
+                <FlatList
+                  data={allNotifications}
+                  keyExtractor={(item, index) => `${item.id}_${index}`} // Ensure unique keys
+                  renderItem={({ item }) => (
                     <TouchableOpacity
-                      key={notification.id}
+                      key={item.id}
                       style={{
                         backgroundColor: "#edf2f7",
                         padding: 16,
@@ -1420,23 +1550,34 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                         marginBottom: 16,
                       }}
                       onPress={() => {
-                        handleNotificationPress(notification);
+                        handleNotificationPress(item);
                         setAllNotificationsModalVisible(false); // Close "All Notifications" modal when a notification is pressed
                       }}
                     >
                       <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
-                        {notification.message}
+                        {item.message}
                       </Text>
                       <Text style={{ color: "#4a5568" }}>
-                        {notification.createdAt
-                          ? notification.createdAt.toDate
-                            ? notification.createdAt.toDate().toLocaleString()
-                            : new Date(notification.createdAt).toLocaleString()
+                        {item.createdAt
+                          ? item.createdAt.toDate
+                            ? item.createdAt.toDate().toLocaleString()
+                            : new Date(item.createdAt).toLocaleString()
                           : "N/A"}
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                  )}
+                  ListFooterComponent={
+                    hasMoreNotifications ? (
+                      <ActivityIndicator size="large" color="#3182ce" style={{ marginVertical: 16 }} />
+                    ) : (
+                      <Text style={{ textAlign: "center", color: "#4a5568", marginVertical: 16 }}>
+                        No more notifications to load.
+                      </Text>
+                    )
+                  }
+                  onEndReached={fetchMoreNotifications}
+                  onEndReachedThreshold={0.5}
+                />
               ) : (
                 <Text style={{ textAlign: "center", color: "#718096" }}>
                   No notifications available.
@@ -1450,18 +1591,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
       {/* Chat Bubble Button */}
       <TouchableOpacity
-        style={{
-          position: "absolute",
-          bottom: 20,
-          right: 20,
-          backgroundColor: "#3182ce", // Always active
-          width: 60,
-          height: 60,
-          borderRadius: 30,
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 1,
-        }}
+        style={styles.chatBubbleIcon}
         onPress={toggleMessagesModal} // Directly toggle the modal
       >
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />
@@ -1483,12 +1613,25 @@ const BookingNavigator = () => {
 };
 
 // Styles Object
-const styles = {
+const styles = StyleSheet.create({
+  // Reusable Styles
+  chatBubbleIcon: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: "#3182ce",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center", // Center the modal vertically
+    alignItems: "center", // Center the modal horizontally
   },
   messageModalContainer: {
     width: "90%",
@@ -1512,6 +1655,104 @@ const styles = {
     top: 10,
     right: 10,
   },
-};
+  chatBubble: {
+    padding: 8,
+    borderRadius: 8,
+    marginVertical: 4,
+    maxWidth: "80%",
+  },
+  chatBubbleLeft: {
+    backgroundColor: "#bee3f8",
+    alignSelf: "flex-start",
+  },
+  chatBubbleRight: {
+    backgroundColor: "#e2e8f0",
+    alignSelf: "flex-end",
+  },
+  chatTimestamp: {
+    fontSize: 10,
+    color: "#4a5568",
+    marginTop: 4,
+  },
+  messageInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+    paddingTop: 8,
+  },
+  messageTextInput: {
+    flex: 1,
+    borderColor: "#e2e8f0",
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 8,
+    marginRight: 8,
+  },
+  sendButton: {
+    backgroundColor: "#3182ce",
+    padding: 12,
+    borderRadius: 24,
+  },
+  profileContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "white",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    elevation: 3,
+    borderRadius: 24,
+    marginBottom: 16,
+  },
+  profileTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2d3748",
+    marginBottom: 8,
+  },
+  profileRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  profileLabel: {
+    fontWeight: "bold",
+    color: "#2d3748",
+    flex: 1,
+  },
+  profileValue: {
+    color: "#718096",
+    flex: 2,
+  },
+  profileImage: {
+    width: 144,
+    height: 144,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  paymentButton: {
+    backgroundColor: "#3182ce",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  paymentButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  closeButton: {
+    backgroundColor: "#e53e3e",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  closeButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+});
 
 export default BookingNavigator;

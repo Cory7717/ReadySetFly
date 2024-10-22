@@ -374,17 +374,32 @@ const Classifieds = () => {
             text: 'Delete',
             style: 'destructive',
             onPress: async () => {
-              await deleteDoc(doc(db, 'UserPost', listingId));
-              Alert.alert('Listing Deleted', 'Your listing has been deleted.');
-              setDetailsModalVisible(false);
-              setJobDetailsModalVisible(false);
+              // If server handles deletion, call the server endpoint instead
+              const token = await getFirebaseIdToken();
+              const response = await fetch(`${API_URL}/deleteListing`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ listingId }),
+              });
+
+              if (response.ok) {
+                Alert.alert('Listing Deleted', 'Your listing has been deleted.');
+                setDetailsModalVisible(false);
+                setJobDetailsModalVisible(false);
+              } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to delete listing.');
+              }
             },
           },
         ]
       );
     } catch (error) {
       console.error('Error deleting listing: ', error);
-      Alert.alert('Error', 'Failed to delete the listing.');
+      Alert.alert('Error', error.message || 'Failed to delete the listing.');
     }
   };
 
@@ -396,12 +411,48 @@ const Classifieds = () => {
     }
 
     try {
-      await updateDoc(doc(db, 'UserPost', selectedListing.id), values);
-      Alert.alert('Listing Updated', 'Your listing has been successfully updated.');
-      setEditModalVisible(false);
+      setLoading(true);
+      const token = await getFirebaseIdToken();
+      const formData = new FormData();
+
+      // Append listing details
+      Object.keys(values).forEach((key) => {
+        if (key !== 'images') {
+          formData.append(key, values[key]);
+        }
+      });
+
+      // Append images
+      for (let i = 0; i < images.length; i++) {
+        formData.append('images', {
+          uri: images[i],
+          name: `image_${i}.jpg`,
+          type: 'image/jpeg',
+        });
+      }
+
+      const response = await fetch(`${API_URL}/updateListing/${selectedListing.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        Alert.alert('Listing Updated', 'Your listing has been successfully updated.');
+        setEditModalVisible(false);
+        // Optionally, refresh listings
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update listing.');
+      }
     } catch (error) {
       console.error('Error updating listing:', error);
-      Alert.alert('Error', 'Failed to update the listing.');
+      Alert.alert('Error', error.message || 'Failed to update the listing.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -421,16 +472,35 @@ const Classifieds = () => {
     }
   };
 
-  // Function to create the listing on the backend (if needed)
+  // Function to create the listing on the backend
   const createListing = async () => {
     try {
+      const token = await getFirebaseIdToken();
+      const formData = new FormData();
+
+      // Append listing details
+      Object.keys(listingDetails).forEach((key) => {
+        if (key !== 'images') {
+          formData.append(key, listingDetails[key]);
+        }
+      });
+
+      // Append images
+      for (let i = 0; i < images.length; i++) {
+        formData.append('images', {
+          uri: images[i],
+          name: `image_${i}.jpg`,
+          type: 'image/jpeg',
+        });
+      }
+
       const response = await fetch(`${API_URL}/createListing`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ listingDetails }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -438,7 +508,8 @@ const Classifieds = () => {
         throw new Error(errorData.message || 'Failed to create listing');
       }
 
-      return true;
+      const responseData = await response.json();
+      return responseData.success;
     } catch (error) {
       console.error('Listing creation error:', error);
       Alert.alert('Error', error.message || 'Failed to create listing.');
@@ -478,15 +549,20 @@ const Classifieds = () => {
     setJobDetailsModalVisible(false);
     setEditModalVisible(false);
 
-    // Navigate to CheckoutScreen instead of PaymentScreen
-    navigation.navigate('CheckoutScreen', {
-      paymentType: 'classified', // Specifies the payment type
-      amount: totalWithTaxInCents, // Total cost in cents
-      listingDetails: values,
-      images,
-      selectedCategory,
-      selectedPricing,
-    });
+    // Create listing via server
+    const success = await createListing();
+
+    if (success) {
+      // Navigate to CheckoutScreen if listing creation was successful
+      navigation.navigate('CheckoutScreen', {
+        paymentType: 'classified', // Specifies the payment type
+        amount: totalWithTaxInCents, // Total cost in cents
+        listingDetails: values,
+        images,
+        selectedCategory,
+        selectedPricing,
+      });
+    }
 
     setLoading(false);
   };
@@ -501,46 +577,46 @@ const Classifieds = () => {
   
     try {
       setLoading(true);
-  
-      const uploadedImages = await Promise.all(
-        images.map(async (imageUri) => {
-          try {
-            const response = await fetch(imageUri);
-            const blob = await response.blob();
-            const storageRef = ref(
-              storage,
-              `classifiedImages/${new Date().getTime()}_${user.uid}`
-            );
-            const snapshot = await uploadBytes(storageRef, blob);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            return downloadURL;
-          } catch (error) {
-            console.error('Error uploading image: ', error);
-            return null;
-          }
-        })
-      );
-  
-      const validUploadedImages = uploadedImages.filter((url) => url !== null);
-  
-      const testListing = {
-        ...values,
-        category: selectedCategory,
-        images: validUploadedImages,
-        ownerId: user.uid,
-        userEmail: user.email,
-        createdAt: new Date(),
-        pricingPackage: selectedPricing,
-      };
-  
-      await addDoc(collection(db, 'UserPost'), testListing);
-  
-      Alert.alert('Test Listing Submitted', 'Your test listing has been added successfully.');
-      setModalVisible(false);
-      setLoading(false);
+
+      const token = await getFirebaseIdToken();
+      const formData = new FormData();
+
+      // Append listing details
+      Object.keys(values).forEach((key) => {
+        if (key !== 'images') {
+          formData.append(key, values[key]);
+        }
+      });
+
+      // Append images
+      for (let i = 0; i < images.length; i++) {
+        formData.append('images', {
+          uri: images[i],
+          name: `image_${i}.jpg`,
+          type: 'image/jpeg',
+        });
+      }
+
+      const response = await fetch(`${API_URL}/createListing/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        Alert.alert('Test Listing Submitted', 'Your test listing has been added successfully.');
+        setModalVisible(false);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit test listing.');
+      }
     } catch (error) {
       console.error('Error submitting listing for testing: ', error);
-      Alert.alert('Error', 'Failed to submit the listing for testing.');
+      Alert.alert('Error', error.message || 'Failed to submit the listing for testing.');
+    } finally {
       setLoading(false);
     }
   };
