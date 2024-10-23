@@ -15,6 +15,7 @@ import {
   Switch,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../../firebaseConfig";
@@ -68,12 +69,15 @@ const Home = ({ route, navigation }) => {
   const [hasRentersInsurance, setHasRentersInsurance] = useState(false);
   const [flightHours, setFlightHours] = useState("");
 
+  // Loading Indicator State
+  const [isLoading, setIsLoading] = useState(false);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
       } else {
-        Alert.alert("Error", "User is not authenticated.");
+        Alert.alert("Authentication Error", "User is not authenticated.");
         navigation.replace("SignIn");
       }
     });
@@ -128,6 +132,11 @@ const Home = ({ route, navigation }) => {
           if (!Array.isArray(listing.images)) {
             listing.images = [listing.images];
           }
+          console.log(
+            `Listing ID: ${listing.id}, airplaneModel: ${
+              listing.airplaneModel || "Undefined"
+            }`
+          ); // Logging each listing's airplaneModel
         });
 
         setListings(listingsData);
@@ -139,6 +148,8 @@ const Home = ({ route, navigation }) => {
             "Permission Denied",
             "You do not have permission to access these listings."
           );
+        } else {
+          Alert.alert("Error", "An unexpected error occurred while fetching listings.");
         }
       }
     );
@@ -167,23 +178,23 @@ const Home = ({ route, navigation }) => {
     if (!selectedListing) return;
 
     if (!rentalDate) {
-      Alert.alert("Error", "Please select a rental date.");
+      Alert.alert("Input Required", "Please select a rental date.");
       return;
     }
 
     // Validation for New Fields
     if (!fullName.trim()) {
-      Alert.alert("Error", "Please enter your full name.");
+      Alert.alert("Input Required", "Please enter your full name.");
       return;
     }
 
     if (!cityStateCombined.trim()) {
-      Alert.alert("Error", "Please enter your current city and state.");
+      Alert.alert("Input Required", "Please enter your current city and state.");
       return;
     }
 
     if (!flightHours || isNaN(flightHours) || Number(flightHours) < 0) {
-      Alert.alert("Error", "Please enter a valid number of flight hours.");
+      Alert.alert("Input Required", "Please enter a valid number of flight hours.");
       return;
     }
 
@@ -209,12 +220,23 @@ const Home = ({ route, navigation }) => {
     const salesTax = rentalCost * 0.0825;
     const totalCostValue = rentalCost + bookingFee + transactionFee + salesTax;
 
+    // Declare rentalRequestData outside the try block
+    let rentalRequestData = {};
+
     try {
-      const rentalRequestData = {
+      // Assign 'Unknown Model' if airplaneModel is undefined
+      const airplaneModel = selectedListing.airplaneModel || "Unknown Model";
+      if (airplaneModel === "Unknown Model") {
+        console.warn(
+          `Listing ID: ${selectedListing.id} is missing airplaneModel. Assigning 'Unknown Model'.`
+        );
+      }
+
+      rentalRequestData = {
         renterId: user.uid,
         renterName: fullName,
         ownerId: selectedListing.ownerId,
-        airplaneModel: selectedListing.airplaneModel,
+        airplaneModel: airplaneModel,
         rentalPeriod: rentalDate,
         totalCost: totalCostValue.toFixed(2),
         contact: user.email || "noemail@example.com",
@@ -247,7 +269,7 @@ const Home = ({ route, navigation }) => {
         errorCode: error.code,
         rentalRequestData,
       });
-      Alert.alert("Error", "Failed to send rental request to the owner.");
+      Alert.alert("Error", error.message || "Failed to send rental request to the owner.");
     }
   };
 
@@ -324,18 +346,15 @@ const Home = ({ route, navigation }) => {
   });
 
   const renderItem = ({ item }) => {
-    const abbreviateText = (text, maxLength) => {
-      if (text.length > maxLength) {
-        return `${text.slice(0, maxLength - 3)}...`;
-      }
-      return text;
-    };
+    // Do not exclude listings with undefined airplaneModel
+    const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
 
     return (
       <View style={styles.listingContainer}>
         <TouchableOpacity
           onPress={() => {
             setSelectedListing(item);
+            console.log("Selected Listing:", item); // Logging selected listing
             setImageIndex(0);
             setFullScreenModalVisible(true);
             setFullName(user?.displayName || "");
@@ -348,10 +367,7 @@ const Home = ({ route, navigation }) => {
         >
           <View style={styles.listingHeader}>
             <Text style={styles.listingTitle} numberOfLines={1}>
-              {abbreviateText(
-                `${item.year} ${item.make} ${item.airplaneModel}`,
-                25
-              )}
+              {`${item.year} ${item.make} ${airplaneModelDisplay}`}
             </Text>
           </View>
           {item.images && item.images.length > 0 && (
@@ -489,7 +505,9 @@ const Home = ({ route, navigation }) => {
               </View>
               <ScrollView contentContainerStyle={styles.modalContent}>
                 <Text style={styles.modalTitle}>
-                  {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
+                  {`${selectedListing.year} ${selectedListing.make} ${
+                    selectedListing.airplaneModel || "Unknown Model"
+                  }`}
                 </Text>
                 <Text style={styles.modalRate}>
                   ${selectedListing.ratesPerHour} per hour
@@ -591,7 +609,14 @@ const Home = ({ route, navigation }) => {
                   <TextInput
                     value={String(rentalHours)}
                     placeholderTextColor="#888"
-                    onChangeText={(text) => setRentalHours(Number(text))}
+                    onChangeText={(text) => {
+                      const num = Number(text);
+                      if (!isNaN(num) && num >= 0) {
+                        setRentalHours(num);
+                      } else {
+                        Alert.alert("Invalid Input", "Please enter a valid number of rental hours.");
+                      }
+                    }}
                     keyboardType="numeric"
                     style={styles.textInputSmall}
                   />
@@ -724,6 +749,13 @@ const Home = ({ route, navigation }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Loading Indicator */}
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#1E90FF" />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -945,7 +977,6 @@ const styles = StyleSheet.create({
     width: "100%",
     textAlign: "center",
     backgroundColor: "#F7FAFC",
-    placeholderTextColor:"#888",
   },
   textInputSmall: {
     borderColor: "#CBD5E0",
@@ -1090,6 +1121,16 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textAlign: "center",
     fontWeight: "bold",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

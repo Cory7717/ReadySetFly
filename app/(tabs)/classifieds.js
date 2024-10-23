@@ -42,7 +42,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Formik } from 'formik';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useStripe } from '@stripe/stripe-react-native';
-import { API_URL } from '@env';
+import { API_URL, EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY } from '@env';
 import CheckoutScreen from '../payment/CheckoutScreen'; // Standardized Import
 
 const { width } = Dimensions.get('window');
@@ -82,7 +82,11 @@ const Classifieds = () => {
   const [selectedListing, setSelectedListing] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [location, setLocation] = useState(null);
-  const [pricingModalVisible, setPricingModalVisible] = useState({ Basic: false, Featured: false, Enhanced: false });
+  const [pricingModalVisible, setPricingModalVisible] = useState({
+    Basic: false,
+    Featured: false,
+    Enhanced: false,
+  });
 
   const scaleValue = useRef(new Animated.Value(0)).current;
 
@@ -365,38 +369,34 @@ const Classifieds = () => {
   // Handle deleting a listing
   const handleDeleteListing = async (listingId) => {
     try {
-      Alert.alert(
-        'Confirm Delete',
-        'Are you sure you want to delete this listing?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              // If server handles deletion, call the server endpoint instead
-              const token = await getFirebaseIdToken();
-              const response = await fetch(`${API_URL}/deleteListing`, {
-                method: 'DELETE',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ listingId }),
-              });
+      Alert.alert('Confirm Delete', 'Are you sure you want to delete this listing?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            // If server handles deletion, call the server endpoint instead
+            const token = await getFirebaseIdToken();
+            const response = await fetch(`${API_URL}/deleteListing`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ listingId }),
+            });
 
-              if (response.ok) {
-                Alert.alert('Listing Deleted', 'Your listing has been deleted.');
-                setDetailsModalVisible(false);
-                setJobDetailsModalVisible(false);
-              } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to delete listing.');
-              }
-            },
+            if (response.ok) {
+              Alert.alert('Listing Deleted', 'Your listing has been deleted.');
+              setDetailsModalVisible(false);
+              setJobDetailsModalVisible(false);
+            } else {
+              const errorData = await response.json();
+              throw new Error(errorData.message || 'Failed to delete listing.');
+            }
           },
-        ]
-      );
+        },
+      ]);
     } catch (error) {
       console.error('Error deleting listing: ', error);
       Alert.alert('Error', error.message || 'Failed to delete the listing.');
@@ -523,7 +523,7 @@ const Classifieds = () => {
       const token = await user.getIdToken(true);
       return token;
     } catch (error) {
-      console.error("Error fetching Firebase ID token:", error);
+      console.error('Error fetching Firebase ID token:', error);
       Alert.alert('Authentication Error', 'Failed to authenticate user.');
       return '';
     }
@@ -574,7 +574,7 @@ const Classifieds = () => {
       setLoading(false);
       return;
     }
-  
+
     try {
       setLoading(true);
 
@@ -607,7 +607,10 @@ const Classifieds = () => {
       });
 
       if (response.ok) {
-        Alert.alert('Test Listing Submitted', 'Your test listing has been added successfully.');
+        Alert.alert(
+          'Test Listing Submitted',
+          'Your test listing has been added successfully.'
+        );
         setModalVisible(false);
       } else {
         const errorData = await response.json();
@@ -620,7 +623,7 @@ const Classifieds = () => {
       setLoading(false);
     }
   };
-  
+
   // Reset modals when screen gains focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -637,7 +640,7 @@ const Classifieds = () => {
   // Render category items
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
-      key={item}
+      key={item} // Note: 'key' prop is unnecessary here as FlatList handles keys via keyExtractor
       onPress={() => setSelectedCategory(item)}
       style={{
         padding: 8,
@@ -722,7 +725,14 @@ const Classifieds = () => {
   // If authentication state is loading
   if (loadingAuth) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white }}>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: COLORS.white,
+        }}
+      >
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={{ marginTop: 10, color: COLORS.black }}>Loading...</Text>
       </SafeAreaView>
@@ -732,9 +742,25 @@ const Classifieds = () => {
   // If user is not authenticated
   if (!user) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white, padding: 16 }}>
-        <Text style={{ fontSize: 18, color: COLORS.black, marginBottom: 20, textAlign: 'center' }}>
-          You need to be signed in to view classifieds. Please sign in or create an account.
+      <SafeAreaView
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: COLORS.white,
+          padding: 16,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            color: COLORS.black,
+            marginBottom: 20,
+            textAlign: 'center',
+          }}
+        >
+          You need to be signed in to view classifieds. Please sign in or create an
+          account.
         </Text>
       </SafeAreaView>
     );
@@ -799,10 +825,10 @@ const Classifieds = () => {
               style={{
                 color: COLORS.white,
                 fontWeight: 'bold',
-                fontSize: Animated.add(headerFontSize, 6),
+                fontSize: headerFontSize,
               }}
             >
-              {user?.displayName}
+              {user?.displayName ? user.displayName : 'User'}
             </Animated.Text>
           </Animated.View>
         </ImageBackground>
@@ -811,12 +837,13 @@ const Classifieds = () => {
       <Animated.ScrollView
         contentContainerStyle={{ padding: 16 }}
         scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+        <View
+          style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}
+        >
           <Text style={{ fontSize: 18, color: COLORS.secondary }}>
             Filter by Location or Aircraft Make
           </Text>
@@ -879,7 +906,10 @@ const Classifieds = () => {
               }}
               key={item.id}
             >
-              <TouchableOpacity onPress={() => handleListingPress(item)} style={{ flex: 1 }}>
+              <TouchableOpacity
+                onPress={() => handleListingPress(item)}
+                style={{ flex: 1 }}
+              >
                 <Text
                   style={{
                     fontSize: 18,
@@ -888,7 +918,7 @@ const Classifieds = () => {
                     padding: 10,
                   }}
                 >
-                  {item.title}
+                  {item.title ? item.title : 'No Title'}
                 </Text>
                 {item.category === 'Aviation Jobs' ? (
                   <View
@@ -907,15 +937,16 @@ const Classifieds = () => {
                         marginBottom: 5,
                       }}
                     >
-                      {item.jobTitle}
+                      {item.jobTitle ? item.jobTitle : 'No Job Title'}
                     </Text>
                     <Text
                       style={{ fontSize: 16, color: COLORS.secondary, marginBottom: 5 }}
                     >
-                      {item.companyName}
+                      {item.companyName ? item.companyName : 'No Company Name'}
                     </Text>
                     <Text style={{ fontSize: 14, color: COLORS.gray }}>
-                      {item.city}, {item.state}
+                      {item.city ? item.city : 'No City'},{' '}
+                      {item.state ? item.state : 'No State'}
                     </Text>
                   </View>
                 ) : item.category === 'Flight Schools' ? (
@@ -929,7 +960,9 @@ const Classifieds = () => {
                     <Text
                       style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}
                     >
-                      {item.flightSchoolName}
+                      {item.flightSchoolName
+                        ? item.flightSchoolName
+                        : 'No Flight School Name'}
                     </Text>
                     <Text
                       style={{
@@ -938,10 +971,12 @@ const Classifieds = () => {
                         marginVertical: 5,
                       }}
                     >
-                      {item.flightSchoolDetails}
+                      {item.flightSchoolDetails
+                        ? item.flightSchoolDetails
+                        : 'No Details Provided'}
                     </Text>
                     {item.images && item.images.length > 0 ? (
-                      renderListingImages(item)
+                      <View>{renderListingImages(item)}</View>
                     ) : (
                       <Text
                         style={{
@@ -955,7 +990,7 @@ const Classifieds = () => {
                     )}
                   </View>
                 ) : item.images && item.images.length > 0 ? (
-                  renderListingImages(item)
+                  <View>{renderListingImages(item)}</View>
                 ) : (
                   <Text
                     style={{
@@ -1015,15 +1050,16 @@ const Classifieds = () => {
                 marginBottom: 10,
               }}
             >
-              {selectedListing?.jobTitle}
+              {selectedListing?.jobTitle ? selectedListing.jobTitle : 'No Job Title'}
             </Text>
-            <Text
-              style={{ fontSize: 18, color: COLORS.secondary, marginBottom: 5 }}
-            >
-              {selectedListing?.companyName}
+            <Text style={{ fontSize: 18, color: COLORS.secondary, marginBottom: 5 }}>
+              {selectedListing?.companyName
+                ? selectedListing.companyName
+                : 'No Company Name'}
             </Text>
             <Text style={{ fontSize: 16, color: COLORS.gray, marginBottom: 10 }}>
-              {selectedListing?.city}, {selectedListing?.state}
+              {selectedListing?.city ? selectedListing.city : 'No City'},{' '}
+              {selectedListing?.state ? selectedListing.state : 'No State'}
             </Text>
             <Text
               style={{
@@ -1032,7 +1068,9 @@ const Classifieds = () => {
                 marginBottom: 20,
               }}
             >
-              {selectedListing?.jobDescription}
+              {selectedListing?.jobDescription
+                ? selectedListing.jobDescription
+                : 'No Description Provided'}
             </Text>
             <TouchableOpacity
               style={{
@@ -1046,7 +1084,7 @@ const Classifieds = () => {
             >
               <Text style={{ color: COLORS.white, fontSize: 16 }}>Apply Now</Text>
             </TouchableOpacity>
-            {renderEditAndDeleteButtons(selectedListing)} {/* Function Call */}
+            {renderEditAndDeleteButtons(selectedListing)}
           </SafeAreaView>
         </View>
       </Modal>
@@ -1060,15 +1098,11 @@ const Classifieds = () => {
       >
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)' }}>
           <SafeAreaView style={{ flex: 1 }}>
-            <View
-              style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-            >
-              {renderEditAndDeleteButtons(selectedListing)} {/* Function Call */}
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              {renderEditAndDeleteButtons(selectedListing)}
 
               {selectedListing?.images && selectedListing.images.length > 0 ? (
-                <View
-                  style={{ width: '90%', height: '50%', position: 'relative' }}
-                >
+                <View style={{ width: '90%', height: '50%', position: 'relative' }}>
                   <Image
                     source={{ uri: selectedListing.images[currentImageIndex] }}
                     style={{
@@ -1113,7 +1147,11 @@ const Classifieds = () => {
                   marginTop: 20,
                 }}
               >
-                {selectedListing?.flightSchoolName || selectedListing?.title}
+                {selectedListing?.flightSchoolName
+                  ? selectedListing.flightSchoolName
+                  : selectedListing?.title
+                  ? selectedListing.title
+                  : 'No Title'}
               </Text>
               <Text
                 style={{
@@ -1124,11 +1162,15 @@ const Classifieds = () => {
                   paddingHorizontal: 20,
                 }}
               >
-                {selectedListing?.flightSchoolDetails ||
-                  selectedListing?.description}
+                {selectedListing?.flightSchoolDetails
+                  ? selectedListing.flightSchoolDetails
+                  : selectedListing?.description
+                  ? selectedListing.description
+                  : 'No Description'}
               </Text>
               <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
-                {selectedListing?.city}, {selectedListing?.state}
+                {selectedListing?.city ? selectedListing.city : 'No City'},{' '}
+                {selectedListing?.state ? selectedListing.state : 'No State'}
               </Text>
               <TouchableOpacity
                 style={{
@@ -1362,40 +1404,58 @@ const Classifieds = () => {
                     marginBottom: 8,
                     color: COLORS.black,
                     fontWeight: 'bold',
-                    textAlign: 'center'
+                    textAlign: 'center',
                   }}
                 >
                   Select Pricing Package
                 </Text>
+
+                {/* Redesigned Pricing Package Buttons */}
                 <View
                   style={{
                     flexDirection: 'row',
-                    justifyContent: 'space-around', // Evenly space the buttons
+                    justifyContent: 'space-between',
                     marginBottom: 16,
                   }}
                 >
                   {Object.keys(pricingPackages).map((key) => (
-                    <View key={key} style={{ alignItems: 'center', marginHorizontal: 10 }}>
+                    <View key={key} style={{ flex: 1, alignItems: 'center' }}>
                       <TouchableOpacity
                         onPress={() => setSelectedPricing(key)}
                         style={{
-                          backgroundColor: selectedPricing === key ? COLORS.primary : COLORS.lightGray,
+                          backgroundColor:
+                            selectedPricing === key ? COLORS.primary : COLORS.lightGray,
                           paddingVertical: 12,
-                          paddingHorizontal: 20,
+                          paddingHorizontal: 10,
                           borderRadius: 8,
                           shadowColor: '#000',
                           shadowOffset: { width: 0, height: 2 },
                           shadowOpacity: 0.25,
                           shadowRadius: 3.84,
                           elevation: 5,
-                          width: (width - 160) / 3, // Ensure all buttons have the same width
                           alignItems: 'center',
+                          marginHorizontal: 5,
+                          width: '100%',
                         }}
                       >
-                        <Text style={{ textAlign: 'center', color: selectedPricing === key ? COLORS.white : COLORS.black, fontWeight: 'bold', fontSize: 16 }}>
+                        <Text
+                          style={{
+                            textAlign: 'center',
+                            color: selectedPricing === key ? COLORS.white : COLORS.black,
+                            fontWeight: 'bold',
+                            fontSize: 16,
+                          }}
+                        >
                           {key}
                         </Text>
-                        <Text style={{ textAlign: 'center', color: selectedPricing === key ? COLORS.white : COLORS.black, fontWeight: 'bold', fontSize: 16 }}>
+                        <Text
+                          style={{
+                            textAlign: 'center',
+                            color: selectedPricing === key ? COLORS.white : COLORS.black,
+                            fontWeight: 'bold',
+                            fontSize: 16,
+                          }}
+                        >
                           ${pricingPackages[key]}
                         </Text>
                       </TouchableOpacity>
@@ -1404,10 +1464,13 @@ const Classifieds = () => {
                         style={{
                           position: 'absolute',
                           bottom: -12,
-                          left: (width - 160) / 6 - 12, // Position to the bottom left
                         }}
                       >
-                        <Ionicons name="information-circle-outline" size={24} color={selectedPricing === key ? COLORS.white : COLORS.gray} />
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={24}
+                          color={selectedPricing === key ? COLORS.primary : COLORS.gray}
+                        />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -1425,6 +1488,7 @@ const Classifieds = () => {
                 <Formik
                   initialValues={{
                     title: '',
+                    tailNumber: '',
                     price: '',
                     description: '',
                     city: '',
@@ -1542,6 +1606,20 @@ const Classifieds = () => {
                             }}
                           />
                           <TextInput
+                            placeholder="Aircraft Tail Number"
+                            placeholderTextColor={COLORS.gray}
+                            onChangeText={handleChange('tailNumber')}
+                            onBlur={handleBlur('tailNumber')}
+                            value={values.tailNumber}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
+                          />
+                          <TextInput
                             placeholder="Price"
                             placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('price')}
@@ -1635,14 +1713,16 @@ const Classifieds = () => {
                         }}
                       />
 
-                      {['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale'].includes(selectedCategory) && (
+                      {['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale'].includes(
+                        selectedCategory
+                      ) && (
                         <>
                           <Text
                             style={{
                               marginBottom: 8,
                               color: COLORS.black,
                               fontWeight: 'bold',
-                              textAlign: 'center'
+                              textAlign: 'center',
                             }}
                           >
                             Upload Images
@@ -1652,7 +1732,7 @@ const Classifieds = () => {
                             horizontal
                             renderItem={({ item, index }) => (
                               <Image
-                                key={index}
+                                key={index.toString()}
                                 source={{ uri: item }}
                                 style={{
                                   width: 96,
@@ -1725,9 +1805,7 @@ const Classifieds = () => {
                     backgroundColor: COLORS.lightGray,
                   }}
                 >
-                  <Text style={{ textAlign: 'center', color: COLORS.black }}>
-                    Cancel
-                  </Text>
+                  <Text style={{ textAlign: 'center', color: COLORS.black }}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

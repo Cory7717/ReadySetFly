@@ -1,3 +1,5 @@
+// OwnerProfile.js  
+
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -31,12 +33,13 @@ import {
   getDocs,
   setDoc,
   serverTimestamp,
-  writeBatch, // Added for batch operations
+  writeBatch,
   query,
   where,
   orderBy,
   limit,
   startAfter,
+  deleteField, // Added import for deleteField
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -126,9 +129,8 @@ const OwnerProfile = ({ ownerId }) => {
   });
 
   const [aircraftDetails, setAircraftDetails] = useState({
-    year: "",
-    make: "",
-    model: "",
+    aircraft: "", // Combined Year/Make/Model
+    tailNumber: "", // New field
     engine: "",
     description: "",
     totalTime: "",
@@ -188,7 +190,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [aircraftModalVisible, setAircraftModalVisible] = useState(false);
   const [selectedAircraft, setSelectedAircraft] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [selectedAircraftIds, setSelectedAircraftIds] = useState([]);
+  const [selectedAircraftIds, setSelectedAircraftIds] = useState([]); // NEW: Selected aircraft IDs
 
   const [rentalRequestModalVisible, setRentalRequestModalVisible] = useState(false);
   const [selectedListingDetails, setSelectedListingDetails] = useState(null);
@@ -207,7 +209,7 @@ const OwnerProfile = ({ ownerId }) => {
   });
   const [cardDetails, setCardDetails] = useState({}); // State for CardField details
 
-  // NEW: State for "View More" Active Rentals Modal with Pagination
+  // *** NEW: State for "View More" Active Rentals Modal with Pagination ***
   const [viewMoreModalVisible, setViewMoreModalVisible] = useState(false);
   const [activeRentalsPage, setActiveRentalsPage] = useState([]);
   const [lastActiveRentalDoc, setLastActiveRentalDoc] = useState(null);
@@ -250,6 +252,12 @@ const OwnerProfile = ({ ownerId }) => {
         Alert.alert("Incomplete Details", "Please fill in all bank details.");
         return;
       }
+      // Note: Implement bank account withdrawal functionality here
+      Alert.alert(
+        "Info",
+        "Bank withdrawal functionality is currently under development."
+      );
+      return;
     } else if (paymentMethod === "card") {
       if (!cardDetails || !cardDetails.complete) {
         Alert.alert(
@@ -264,21 +272,14 @@ const OwnerProfile = ({ ownerId }) => {
     try {
       let paymentMethodId = "";
 
-      if (paymentMethod === "bank") {
-        // Create a Stripe payment method for bank account
-        // Note: Stripe requires a separate integration for bank accounts (ACH)
-        // Here, we assume that the backend handles creating the payment method and linking to the user
-        // For simplicity, we'll skip actual Stripe integration in this example
-        // In production, you'd use Stripe's API to create and attach a bank account payment method
-        paymentMethodId = "bank_payment_method_id"; // Replace with actual ID from backend
-        Alert.alert("Info", "Bank withdrawal is not yet implemented.");
-        setLoading(false);
-        return;
-      } else if (paymentMethod === "card") {
-        // Create a Stripe payment method for card using the cardDetails
-        const { error, paymentMethod: pm } = await stripe.createPaymentMethod({
+      if (paymentMethod === "card") {
+        // Create a Stripe payment method using the CardField
+        const { error, paymentMethod } = await stripe.createPaymentMethod({
           type: "Card",
           card: cardDetails,
+          billingDetails: {
+            name: user.displayName || "Owner",
+          },
         });
 
         if (error) {
@@ -287,7 +288,7 @@ const OwnerProfile = ({ ownerId }) => {
           return;
         }
 
-        paymentMethodId = pm.id;
+        paymentMethodId = paymentMethod.id;
       }
 
       // Proceed with withdrawal via backend
@@ -324,7 +325,7 @@ const OwnerProfile = ({ ownerId }) => {
         Alert.alert(
           "Error",
           data.error ||
-            "Failed to process withdrawal. An email notification has been sent to inform you of the failure."
+            "Failed to process withdrawal. Please try again or contact support."
         );
       }
     } catch (error) {
@@ -357,17 +358,15 @@ const OwnerProfile = ({ ownerId }) => {
           }
 
           if (data.aircraftDetails) {
-            // Assign 'id' to aircraftDetails
             const aircraft = { ...data.aircraftDetails, id: resolvedOwnerId };
             setAircraftDetails(aircraft);
             setInitialAircraftDetails(aircraft);
-            setImages(aircraft.images || []); // Initialize images
+            setImages(aircraft.images || []);
             setAircraftSaved(true);
-            setAllAircrafts([aircraft]); // Initialize with initial aircraft
+            setAllAircrafts([aircraft]);
           }
 
           if (data.additionalAircrafts && Array.isArray(data.additionalAircrafts)) {
-            // Assign unique 'id' to each additional aircraft if not present
             const additionalAircraftsWithId = data.additionalAircrafts.map(
               ({ id, ...rest }, index) => ({
                 ...rest,
@@ -375,6 +374,11 @@ const OwnerProfile = ({ ownerId }) => {
               })
             );
             setAllAircrafts((prev) => [...prev, ...additionalAircraftsWithId]);
+          }
+
+          // NEW: Fetch selectedAircraftIds from Firestore
+          if (data.selectedAircraftIds && Array.isArray(data.selectedAircraftIds)) {
+            setSelectedAircraftIds(data.selectedAircraftIds);
           }
         } else {
           console.log("No saved data found for this owner.");
@@ -388,10 +392,30 @@ const OwnerProfile = ({ ownerId }) => {
     fetchOwnerData();
   }, [resolvedOwnerId]);
 
+  // NEW: Persist selectedAircraftIds to Firestore whenever it changes
+  useEffect(() => {
+    const persistSelectedAircraftIds = async () => {
+      try {
+        const docRef = doc(db, "aircraftDetails", resolvedOwnerId);
+        await updateDoc(docRef, {
+          selectedAircraftIds: selectedAircraftIds,
+        });
+      } catch (error) {
+        console.error("Error saving selected aircraft IDs:", error);
+        // Optionally, handle the error (e.g., show an alert)
+      }
+    };
+
+    // Only persist if ownerId is resolved
+    if (resolvedOwnerId) {
+      persistSelectedAircraftIds();
+    }
+  }, [selectedAircraftIds, resolvedOwnerId]);
+
   // Fetch rental requests with renter details and chat thread data
   useEffect(() => {
     if (resolvedOwnerId) {
-      const rentalRequestsQuery = collection(
+      const rentalRequestsQueryInstance = collection(
         db,
         "owners",
         resolvedOwnerId,
@@ -399,7 +423,7 @@ const OwnerProfile = ({ ownerId }) => {
       );
 
       const unsubscribeRentalRequests = onSnapshot(
-        rentalRequestsQuery,
+        rentalRequestsQueryInstance,
         async (snapshot) => {
           const requestsWithNamesAndListings = await Promise.all(
             snapshot.docs.map(async (docSnap, index) => {
@@ -613,11 +637,12 @@ const OwnerProfile = ({ ownerId }) => {
       await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
         costData,
         aircraftDetails: initialAircraftDetails
-          ? { ...initialAircraftDetails, id: initialAircraftDetails.id }
+          ? { ...initialAircraftDetails, id: resolvedOwnerId }
           : { ...aircraftDetails, id: `initial_${Date.now()}` }, // Ensure 'id' is set
         additionalAircrafts: allAircrafts.filter(
           (aircraft) => aircraft.id !== initialAircraftDetails?.id
         ),
+        selectedAircraftIds, // Persist selectedAircraftIds
       });
 
       Alert.alert("Success", `Estimated cost per hour: $${costPerHour}`);
@@ -643,15 +668,20 @@ const OwnerProfile = ({ ownerId }) => {
       Alert.alert("Limit Reached", "You can only upload up to 7 images.");
       return;
     }
+
+    // Disable allowsEditing when allowsMultipleSelection is enabled
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsMultipleSelection: true,
+      allowsEditing: false, // Set to false to fix the warning
       aspect: [4, 3],
       quality: 1,
+      selectionLimit: 7 - images.length, // Allow selecting multiple images up to the limit
     });
 
     if (!result.canceled) {
-      setImages([...images, result.assets[0].uri]);
+      const selectedUris = result.assets.map((asset) => asset.uri);
+      setImages([...images, ...selectedUris]);
     }
   };
 
@@ -702,6 +732,9 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   const onSaveAircraftDetails = async () => {
+    // Debugging: Log current location value
+    console.log("Saving Aircraft Details. Location:", aircraftDetails.location);
+
     if (!aircraftDetails.location || aircraftDetails.location.trim() === "") {
       Alert.alert("Error", "Location is required.");
       return;
@@ -709,50 +742,94 @@ const OwnerProfile = ({ ownerId }) => {
 
     setLoading(true);
     try {
-      // **Step 1: Store the index of the selected main image before uploading**
-      const mainImageIndex = images.indexOf(aircraftDetails.mainImage);
-
-      // **Step 2: Upload images to Firebase Storage and get download URLs**
+      // **Step 1: Upload images to Firebase Storage and get download URLs**
       const uploadedImages = [];
       for (const image of images) {
         const downloadURL = await uploadFile(image, "aircraftImages");
         uploadedImages.push(downloadURL);
       }
 
-      // **Step 3: Determine the main image URL based on the original selection**
+      // **Step 2: Determine the main image URL based on the original selection**
       let mainImageURL = uploadedImages.length > 0 ? uploadedImages[0] : "";
 
-      if (mainImageIndex !== -1 && uploadedImages[mainImageIndex]) {
-        mainImageURL = uploadedImages[mainImageIndex];
+      if (aircraftDetails.mainImage) {
+        const mainImageIndex = images.indexOf(aircraftDetails.mainImage);
+        if (mainImageIndex !== -1 && uploadedImages[mainImageIndex]) {
+          mainImageURL = uploadedImages[mainImageIndex];
+        }
       }
 
-      // **Step 4: Update aircraftDetails with uploaded images and mainImage URL**
+      // **Step 3: Update aircraftDetails with uploaded images and mainImage URL**
       const updatedAircraftDetails = {
         ...aircraftDetails,
         images: uploadedImages,
         mainImage: mainImageURL,
       };
 
-      // **Step 5: Update state**
+      // **Step 4: Update state**
       setImages(uploadedImages);
       setAircraftDetails(updatedAircraftDetails);
       setAircraftSaved(true);
 
-      // **Step 6: Prepare additionalAircrafts by removing 'createdAt' to avoid FirebaseError**
-      const sanitizedAdditionalAircrafts = allAircrafts
-        .filter((aircraft) => aircraft.id !== initialAircraftDetails?.id)
-        .map(({ createdAt, ...rest }) => rest); // Remove 'createdAt' if it exists
+      // **Step 5: Determine if the aircraft is main or additional**
+      const isMainAircraft = updatedAircraftDetails.id === resolvedOwnerId;
 
-      // **Step 7: Update Firestore without 'createdAt' inside arrays**
-      await setDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
-        costData,
-        aircraftDetails: initialAircraftDetails
-          ? updatedAircraftDetails
-          : { ...sanitizedAdditionalAircrafts[0], id: `initial_${Date.now()}` },
-        additionalAircrafts: sanitizedAdditionalAircrafts,
-      });
+      if (isMainAircraft) {
+        // **Step 6: Update Firestore for main aircraft**
+        await updateDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
+          aircraftDetails: updatedAircraftDetails,
+          costData: costData,
+          selectedAircraftIds: selectedAircraftIds, // Persist selectedAircraftIds
+        });
+
+        // **Step 7: Update local state for main aircraft**
+        setInitialAircraftDetails(updatedAircraftDetails);
+        setAllAircrafts((prev) =>
+          prev.map((aircraft) =>
+            aircraft.id === resolvedOwnerId ? updatedAircraftDetails : aircraft
+          )
+        );
+      } else {
+        // **Step 6: Update Firestore for additional aircraft**
+        const additionalAircraftsSnapshot = await getDoc(
+          doc(db, "aircraftDetails", resolvedOwnerId)
+        );
+
+        let additionalAircrafts = [];
+
+        if (additionalAircraftsSnapshot.exists()) {
+          const data = additionalAircraftsSnapshot.data();
+          additionalAircrafts = data.additionalAircrafts || [];
+        }
+
+        // **Find and update the specific additional aircraft**
+        const aircraftIndex = additionalAircrafts.findIndex(
+          (aircraft) => aircraft.id === updatedAircraftDetails.id
+        );
+
+        if (aircraftIndex !== -1) {
+          additionalAircrafts[aircraftIndex] = updatedAircraftDetails;
+        } else {
+          // If it's a new additional aircraft, add it
+          additionalAircrafts.push(updatedAircraftDetails);
+        }
+
+        // **Update Firestore**
+        await updateDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
+          additionalAircrafts: additionalAircrafts,
+          selectedAircraftIds: selectedAircraftIds, // Persist selectedAircraftIds
+        });
+
+        // **Update local state for additional aircraft**
+        setAllAircrafts((prev) =>
+          prev.map((aircraft) =>
+            aircraft.id === updatedAircraftDetails.id ? updatedAircraftDetails : aircraft
+          )
+        );
+      }
 
       Alert.alert("Success", "Your aircraft details have been saved.");
+      setAircraftModalVisible(false); // Close the modal after saving
     } catch (error) {
       console.error("Error saving aircraft details:", error);
       Alert.alert("Error", "Failed to save aircraft details.");
@@ -770,82 +847,84 @@ const OwnerProfile = ({ ownerId }) => {
     setAircraftModalVisible(false);
   };
 
-  const onEditCostData = () => {
-    setCostSaved(false);
-  };
-
-  const onSubmitMethod = async (values, additional = false) => {
-    if (!aircraftDetails.location || aircraftDetails.location.trim() === "") {
-      Alert.alert("Error", "Location is required.");
+  // **Updated onSubmitMethod to accept aircraft data**
+  const onSubmitMethod = async (aircraft, additional = false) => {
+    // Validate necessary fields from the passed aircraft
+    if (!aircraft.location || aircraft.location.trim() === "") {
+      Alert.alert("Error", "Location is required for the selected aircraft.");
       return;
     }
 
-    if (!aircraftDetails.model || aircraftDetails.model.trim() === "") {
-      Alert.alert("Error", "Aircraft model is required.");
+    if (!aircraft.aircraft || aircraft.aircraft.trim() === "") {
+      Alert.alert("Error", "Aircraft name/model is required.");
       return;
     }
 
-    if (!aircraftDetails.costPerHour || isNaN(aircraftDetails.costPerHour)) {
+    if (!aircraft.costPerHour || isNaN(aircraft.costPerHour)) {
       Alert.alert("Error", "Valid cost per hour is required.");
       return;
     }
 
     setLoading(true);
     try {
-      // Upload images to Firebase Storage and get download URLs
+      // **Step 1: Upload Images**
       const uploadedImages = [];
-      for (const image of images) {
+      for (const image of aircraft.images || []) {
         const downloadURL = await uploadFile(image, "aircraftImages");
         uploadedImages.push(downloadURL);
       }
 
-      const annualProofURL = currentAnnualPdf
-        ? await uploadFile(currentAnnualPdf, "documents")
+      // **Step 2: Upload PDFs (if any)**
+      const annualProofURL = aircraft.currentAnnualPdf
+        ? await uploadFile(aircraft.currentAnnualPdf, "documents")
         : "";
-      const insuranceProofURL = insurancePdf
-        ? await uploadFile(insurancePdf, "documents")
+      const insuranceProofURL = aircraft.insurancePdf
+        ? await uploadFile(aircraft.insurancePdf, "documents")
         : "";
 
-      // Determine the main image
+      // **Step 3: Determine Main Image**
       let mainImageURL = uploadedImages.length > 0 ? uploadedImages[0] : "";
-
-      if (aircraftDetails.mainImage) {
-        // If a main image is set, find its download URL
-        const mainImageIndex = images.indexOf(aircraftDetails.mainImage);
+      if (aircraft.mainImage) {
+        const mainImageIndex = aircraft.images.indexOf(aircraft.mainImage);
         if (mainImageIndex !== -1 && uploadedImages[mainImageIndex]) {
           mainImageURL = uploadedImages[mainImageIndex];
         }
       }
 
-      // Prepare new listing data
+      // **Step 4: Prepare New Listing Data**
       const newListing = sanitizeData({
-        year: aircraftDetails.year || "",
-        make: aircraftDetails.make || "",
-        airplaneModel: aircraftDetails.model || "",
-        description: profileData.description || "",
-        location: aircraftDetails.location || "",
-        airportIdentifier: aircraftDetails.airportIdentifier || "",
-        ratesPerHour: aircraftDetails.costPerHour || "0",
+        aircraft: aircraft.aircraft || "",
+        tailNumber: aircraft.tailNumber || "",
+        engine: aircraft.engine || "",
+        description: aircraft.description || "",
+        location: aircraft.location || "",
+        airportIdentifier: aircraft.airportIdentifier || "",
+        ratesPerHour: aircraft.costPerHour || "0",
         minimumHours: profileData.minimumHours || "1",
         images: uploadedImages.length > 0 ? uploadedImages : [],
-        mainImage: mainImageURL, // Set the main image URL
+        mainImage: mainImageURL,
         currentAnnualPdf: annualProofURL || "",
         insurancePdf: insuranceProofURL || "",
         ownerId: resolvedOwnerId,
-        createdAt: serverTimestamp(), // Use serverTimestamp for accurate time
+        createdAt: serverTimestamp(),
         boosted: profileData.boostListing || false,
         boostedListing: profileData.boostListing ? true : false,
       });
 
+      // **Step 5: Add Listing to Firestore**
       const docRef = await addDoc(collection(db, "airplanes"), newListing);
       newListing.id = docRef.id;
 
+      // **Step 6: Update State**
       if (additional) {
-        setAllAircrafts([...allAircrafts, newListing]);
+        setAllAircrafts((prev) => [...prev, newListing]);
       } else {
-        setUserListings([...userListings, newListing]);
-        setAllAircrafts([...allAircrafts, newListing]);
+        setUserListings((prev) => [...prev, newListing]);
+        setAllAircrafts((prev) => [...prev, newListing]);
       }
+
+      console.log("New Listing Data:", newListing);
+      console.log("Listing added with ID:", docRef.id);
 
       Alert.alert("Success", "Your listing has been submitted.");
       setFullScreenModalVisible(false);
@@ -877,6 +956,8 @@ const OwnerProfile = ({ ownerId }) => {
         selectedAircraftIds.includes(aircraft.id)
       );
 
+      console.log("Selected Aircrafts for Listing:", selectedAircrafts);
+
       // List each selected aircraft
       for (const aircraft of selectedAircrafts) {
         await onSubmitMethod(aircraft, true);
@@ -886,7 +967,7 @@ const OwnerProfile = ({ ownerId }) => {
       setSelectedAircraftIds([]);
       Alert.alert("Success", "Selected aircraft have been listed for rent.");
     } catch (error) {
-      console.error("Error listing aircraft: ", error);
+      console.error("Error listing aircraft:", error);
       Alert.alert("Error", "There was an error listing the selected aircraft.");
     } finally {
       setLoading(false);
@@ -965,6 +1046,8 @@ const OwnerProfile = ({ ownerId }) => {
         setChatThreads([...chatThreads, chatThread]);
         chatThreadId = chatDocRef.id;
       }
+
+      console.log("Chat Thread ID:", chatThreadId);
 
       Alert.alert(
         "Request Approved",
@@ -1166,7 +1249,10 @@ const OwnerProfile = ({ ownerId }) => {
 
       if (deletions > 0) {
         await batch.commit();
-        Alert.alert("Cleanup Complete", `${deletions} orphaned rental request(s) have been deleted.`);
+        Alert.alert(
+          "Cleanup Complete",
+          `${deletions} orphaned rental request(s) have been deleted.`
+        );
       } else {
         Alert.alert("Cleanup Complete", "No orphaned rental requests found.");
       }
@@ -1200,8 +1286,8 @@ const OwnerProfile = ({ ownerId }) => {
       snapshot.docs.forEach((docSnap) => {
         const rentalData = docSnap.data();
         const renterId = rentalData.renterId;
-        const rentalRef = docSnap.ref;
-        batch.delete(rentalRef);
+
+        batch.delete(docSnap.ref);
         if (renterId) {
           renterIdsToDelete.add(renterId);
         }
@@ -1225,7 +1311,7 @@ const OwnerProfile = ({ ownerId }) => {
       setActiveRentals([]); // Update state
     } catch (error) {
       console.error("Error deleting all active rentals:", error);
-      Alert.alert("Error", "Failed to delete active rentals. Please try again.");
+      Alert.alert("Error", "Failed to delete active rentals.");
     }
   };
 
@@ -1358,6 +1444,11 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
+  // **NEW: Define the onEditCostData function to handle editing cost data**
+  const onEditCostData = () => {
+    setCostSaved(false);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
       <StatusBar
@@ -1450,7 +1541,7 @@ const OwnerProfile = ({ ownerId }) => {
                 ).toFixed(2)}
               </Text>
               <CustomButton
-                onPress={onEditCostData}
+                onPress={onEditCostData} // Now correctly defined
                 title="Edit Cost Data"
                 style={{ marginTop: 16 }}
               />
@@ -1633,9 +1724,8 @@ const OwnerProfile = ({ ownerId }) => {
               setSelectedAircraft(null);
               setIsEditing(true);
               setAircraftDetails({
-                year: "",
-                make: "",
-                model: "",
+                aircraft: "",
+                tailNumber: "", // New field
                 engine: "",
                 description: "",
                 totalTime: "",
@@ -1653,67 +1743,165 @@ const OwnerProfile = ({ ownerId }) => {
             style={{ marginBottom: 16 }}
           />
 
-          {/* List of All Aircraft with Selection */}
+          {/* Horizontal ScrollView for Aircraft Cards */}
           {allAircrafts.length > 0 ? (
             <FlatList
               data={allAircrafts}
-              keyExtractor={(item, index) => `${item.id}_${index}`} // Ensures unique keys by combining ID with index
-              nestedScrollEnabled={true}
-              scrollEnabled={false} // Disable scrolling to prevent nesting issues
+              keyExtractor={(item, index) => `${item.id}_${index}`} // Ensures unique keys
+              horizontal
+              showsHorizontalScrollIndicator={false}
               renderItem={({ item }) => (
-                <View style={styles.aircraftItemContainer}>
-                  {/* Selection Circle */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedAircraft(item);
+                    setIsEditing(true);
+                    setAircraftDetails(item);
+                    setImages(item.images || []);
+                    setAircraftModalVisible(true);
+                  }}
+                  style={styles.aircraftCard}
+                >
+                  {/* Circle Selection Button */}
                   <TouchableOpacity
                     onPress={() => toggleSelectAircraft(item.id)}
-                    style={styles.selectionCircle}
+                    style={styles.selectionButton}
                   >
                     {selectedAircraftIds.includes(item.id) && (
-                      <View style={styles.selectedCircle} />
+                      <Ionicons name="checkmark" size={20} color="#fff" />
                     )}
                   </TouchableOpacity>
 
-                  {/* Aircraft Details */}
+                  {/* Aircraft Image */}
+                  {item.mainImage ? (
+                    <Image
+                      source={{ uri: item.mainImage }}
+                      style={styles.aircraftCardImage}
+                    />
+                  ) : (
+                    <View style={styles.noImageContainer}>
+                      <Text style={{ color: "#a0aec0" }}>No Image</Text>
+                    </View>
+                  )}
+
+                  {/* Aircraft Info */}
+                  <View style={styles.aircraftCardInfo}>
+                    <Text style={styles.aircraftCardTitle}>
+                      {item.aircraft}
+                    </Text>
+                    <Text>Tail Number: {item.tailNumber}</Text>
+                    <Text>Engine: {item.engine}</Text>
+                    <Text>Total Time: {item.totalTime} hours</Text>
+                    <Text>
+                      Location: {item.location} ({item.airportIdentifier})
+                    </Text>
+                    <Text>Cost Per Hour: ${item.costPerHour}</Text>
+                  </View>
+
+                  {/* Remove Button */}
                   <TouchableOpacity
                     onPress={() => {
-                      setSelectedAircraft(item);
-                      setIsEditing(false);
-                      setAircraftDetails(item);
-                      setImages(item.images || []);
-                      setAircraftModalVisible(true);
-                    }}
-                    style={styles.aircraftDetailsContainer}
-                  >
-                    {/* Main Image */}
-                    {item.mainImage ? (
-                      <Image
-                        source={{ uri: item.mainImage }}
-                        style={styles.aircraftImage}
-                      />
-                    ) : (
-                      <View style={styles.noImageContainer}>
-                        <Text style={{ color: "#a0aec0" }}>No Image</Text>
-                      </View>
-                    )}
+                      Alert.alert(
+                        "Remove Aircraft",
+                        "Are you sure you want to remove this aircraft?",
+                        [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: "Remove",
+                            style: "destructive",
+                            onPress: async () => {
+                              try {
+                                // Remove the condition that prevents deleting the main aircraft
+                                if (item.id === resolvedOwnerId) {
+                                  // Remove the main aircraftDetails field
+                                  await updateDoc(doc(db, "aircraftDetails", resolvedOwnerId), {
+                                    aircraftDetails: deleteField(),
+                                    selectedAircraftIds: selectedAircraftIds.filter(id => id !== item.id), // Remove from selectedAircraftIds if selected
+                                  });
 
-                    {/* Aircraft Info */}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.aircraftTitle}>
-                        {item.year} {item.make} {item.model}
-                      </Text>
-                      <Text>Engine: {item.engine}</Text>
-                      <Text>Total Time: {item.totalTime} hours</Text>
-                      <Text>
-                        Location: {item.location} ({item.airportIdentifier})
-                      </Text>
-                      <Text>Cost Per Hour: ${item.costPerHour}</Text>
-                    </View>
+                                  // Remove from local state
+                                  setUserListings(
+                                    userListings.filter((l) => l.id !== item.id)
+                                  );
+                                  setAllAircrafts(
+                                    allAircrafts.filter((a) => a.id !== item.id)
+                                  );
+                                  setInitialAircraftDetails(null);
+                                  Alert.alert(
+                                    "Removed",
+                                    "The main aircraft has been removed."
+                                  );
+                                } else {
+                                  // Remove from Firestore additionalAircrafts
+                                  const aircraftDetailsRef = doc(db, "aircraftDetails", resolvedOwnerId);
+                                  const aircraftDetailsDoc = await getDoc(aircraftDetailsRef);
+                                  if (aircraftDetailsDoc.exists()) {
+                                    const data = aircraftDetailsDoc.data();
+                                    const updatedAdditionalAircrafts = data.additionalAircrafts.filter(a => a.id !== item.id);
+                                    await updateDoc(aircraftDetailsRef, {
+                                      additionalAircrafts: updatedAdditionalAircrafts,
+                                      selectedAircraftIds: selectedAircraftIds.filter(id => id !== item.id), // Remove from selectedAircraftIds if selected
+                                    });
+                                  }
+
+                                  setUserListings(
+                                    userListings.filter((l) => l.id !== item.id)
+                                  );
+                                  setAllAircrafts(
+                                    allAircrafts.filter((a) => a.id !== item.id)
+                                  );
+                                  Alert.alert(
+                                    "Removed",
+                                    "The aircraft has been removed."
+                                  );
+                                }
+                              } catch (error) {
+                                console.error("Error removing aircraft:", error);
+                                Alert.alert(
+                                  "Error",
+                                  "Failed to remove the aircraft."
+                                );
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                    style={styles.removeAircraftButton}
+                  >
+                    <Ionicons name="close-circle" size={24} color="red" />
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               )}
             />
           ) : (
             <Text>No aircraft added yet.</Text>
           )}
+
+          {/* ************* Big Plus Sign to Add Additional Aircraft ************* */}
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedAircraft(null);
+              setIsEditing(true);
+              setAircraftDetails({
+                aircraft: "",
+                tailNumber: "", // New field
+                engine: "",
+                description: "",
+                totalTime: "",
+                costPerHour: "",
+                location: "",
+                airportIdentifier: "",
+                mainImage: "",
+                images: [],
+              });
+              setImages([]);
+              setAircraftModalVisible(true);
+            }}
+            style={styles.addAircraftButton}
+          >
+            <Ionicons name="add-circle" size={60} color="#3182ce" />
+          </TouchableOpacity>
+          {/* ************* End of Big Plus Sign ************* */}
 
           {/* List Selected Aircraft Button */}
           <CustomButton
@@ -1737,15 +1925,67 @@ const OwnerProfile = ({ ownerId }) => {
               nestedScrollEnabled={true}
               scrollEnabled={false} // Disable scrolling to prevent nesting issues
               renderItem={({ item }) => (
-                <View
-                  key={item.id || `listing_${index}`}
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedAircraft(item);
+                    setIsEditing(true);
+                    setAircraftDetails(item);
+                    setImages(item.images || []);
+                    setAircraftModalVisible(true);
+                  }}
                   style={styles.listingContainer}
                 >
-                  <Text style={{ fontSize: 18, fontWeight: "bold" }}>
-                    {item.airplaneModel}
-                  </Text>
-                  <Text>{item.description}</Text>
-                  <Text>Rate per Hour: ${item.ratesPerHour}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    {/* Pressable Area */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+                        {item.aircraft}
+                      </Text>
+                      <Text>{item.description}</Text>
+                      <Text>Rate per Hour: ${item.ratesPerHour}</Text>
+                    </View>
+                    {/* Remove Button */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        Alert.alert(
+                          "Remove Listing",
+                          "Are you sure you want to remove this listing?",
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                              text: "Remove",
+                              style: "destructive",
+                              onPress: async () => {
+                                try {
+                                  await deleteDoc(doc(db, "airplanes", item.id));
+                                  setUserListings(
+                                    userListings.filter((l) => l.id !== item.id)
+                                  );
+                                  setAllAircrafts(
+                                    allAircrafts.filter((a) => a.id !== item.id)
+                                  );
+                                  setSelectedAircraftIds(selectedAircraftIds.filter(id => id !== item.id)); // Remove from selectedAircraftIds if selected
+                                  Alert.alert(
+                                    "Removed",
+                                    "The listing has been removed."
+                                  );
+                                } catch (error) {
+                                  console.error("Error removing listing:", error);
+                                  Alert.alert(
+                                    "Error",
+                                    "Failed to remove the listing."
+                                  );
+                                }
+                              },
+                            },
+                          ]
+                        );
+                      }}
+                      style={styles.removeAircraftButton}
+                    >
+                      <Ionicons name="close-circle" size={24} color="red" />
+                    </TouchableOpacity>
+                  </View>
                   {item.images.length > 0 && (
                     <FlatList
                       data={item.images}
@@ -1761,60 +2001,12 @@ const OwnerProfile = ({ ownerId }) => {
                       )}
                     />
                   )}
-                  <CustomButton
-                    onPress={() => {
-                      Alert.alert(
-                        "Remove Listing",
-                        "Are you sure you want to remove this listing?",
-                        [
-                          { text: "Cancel", style: "cancel" },
-                          {
-                            text: "Remove",
-                            style: "destructive",
-                            onPress: async () => {
-                              try {
-                                await deleteDoc(doc(db, "airplanes", item.id));
-                                setUserListings(
-                                  userListings.filter((l) => l.id !== item.id)
-                                );
-                                setAllAircrafts(
-                                  allAircrafts.filter((a) => a.id !== item.id)
-                                );
-                                Alert.alert(
-                                  "Removed",
-                                  "The listing has been removed."
-                                );
-                              } catch (error) {
-                                console.error("Error removing listing:", error);
-                                Alert.alert(
-                                  "Error",
-                                  "Failed to remove the listing."
-                                );
-                              }
-                            },
-                          },
-                        ]
-                      );
-                    }}
-                    title="Remove Listing"
-                    backgroundColor="#e53e3e"
-                    style={{ marginTop: 16 }}
-                  />
-                </View>
+                </TouchableOpacity>
               )}
             />
           ) : (
             <Text>No current listings.</Text>
           )}
-        </View>
-
-        {/* Create New Listing Button */}
-        <View style={{ padding: 16 }}>
-          <CustomButton
-            onPress={() => setFullScreenModalVisible(true)}
-            title="Create New Listing"
-            backgroundColor="#3182ce"
-          />
         </View>
 
         {/* ************* New Section: Incoming Rental Requests ************* */}
@@ -1842,11 +2034,11 @@ const OwnerProfile = ({ ownerId }) => {
                   <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                     Renter: {item.renterName}
                   </Text>
-                  {/* Display Year, Make, Model */}
+                  {/* Display Aircraft */}
                   <Text>
                     Listing:{" "}
                     {item.listingDetails
-                      ? `${item.listingDetails.year} ${item.listingDetails.make} ${item.listingDetails.model}`
+                      ? `${item.listingDetails.aircraft}`
                       : "Listing details not available"}
                   </Text>
                   <Text>Total Cost: ${item.totalCost}</Text>
@@ -1880,7 +2072,7 @@ const OwnerProfile = ({ ownerId }) => {
                   >
                     <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                       {item.listingDetails
-                        ? `${item.listingDetails.year} ${item.listingDetails.make} ${item.listingDetails.model}`
+                        ? `${item.listingDetails.aircraft}`
                         : "Listing details not available"}
                     </Text>
                     <Text>Renter: {item.renterName}</Text>
@@ -1888,10 +2080,10 @@ const OwnerProfile = ({ ownerId }) => {
                     <Text>Rental Date: {item.rentalDate || "N/A"}</Text>
                     <Text>Status: {item.status}</Text>
                   </TouchableOpacity>
-                  {/* Delete Button */}
+                  {/* Remove Button */}
                   <TouchableOpacity
                     onPress={() => handleDeleteActiveRental(item.id)}
-                    style={styles.deleteButton}
+                    style={styles.removeAircraftButton}
                   >
                     <Ionicons name="close-circle" size={24} color="red" />
                   </TouchableOpacity>
@@ -1960,7 +2152,7 @@ const OwnerProfile = ({ ownerId }) => {
                   style={styles.rentalHistoryContainer}
                 >
                   <Text style={styles.rentalHistoryTitle}>
-                    {item.airplaneModel}
+                    {item.aircraft}
                   </Text>
                   <Text style={styles.rentalHistoryText}>
                     {item.rentalPeriod}
@@ -2049,7 +2241,7 @@ const OwnerProfile = ({ ownerId }) => {
                   <Text style={styles.modalText}>
                     <Text style={styles.modalLabel}>Listing: </Text>
                     {selectedListingDetails
-                      ? `${selectedListingDetails.year} ${selectedListingDetails.make} ${selectedListingDetails.model}`
+                      ? `${selectedListingDetails.aircraft}`
                       : "Listing details not available"}
                   </Text>
                   <Text style={styles.modalText}>
@@ -2188,67 +2380,6 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* Create New Listing Modal */}
-      <Modal
-        visible={fullScreenModalVisible}
-        animationType="slide"
-        onRequestClose={() => setFullScreenModalVisible(false)}
-      >
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <ModalHeader
-            title="Create New Listing"
-            onClose={() => setFullScreenModalVisible(false)}
-          />
-          {Object.keys(profileData).map((key, index) => (
-            <CustomTextInput
-              key={`${key}_${index}`} // Ensures unique keys by including index
-              placeholder={key.replace(/([A-Z])/g, " $1")}
-              value={profileData[key]}
-              onChangeText={(value) => handleInputChange(key, value)}
-            />
-          ))}
-
-          {/* Upload Images Button */}
-          <CustomButton
-            onPress={pickImage}
-            title="Upload Image"
-            backgroundColor="#3182ce"
-            style={{ marginTop: 16 }}
-          />
-
-          {/* Display Selected Images */}
-          {images.length > 0 && (
-            <FlatList
-              data={images}
-              horizontal
-              keyExtractor={(item, index) => `${item}_${index}`} // Ensures unique keys by combining URI with index
-              renderItem={({ item }) => (
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: item }} style={styles.imagePreview} />
-                  <TouchableOpacity
-                    onPress={() => removeImage(item)}
-                    style={styles.removeImageButton}
-                  >
-                    <Ionicons name="close-circle" size={24} color="red" />
-                  </TouchableOpacity>
-                </View>
-              )}
-            />
-          )}
-
-          <CustomButton
-            onPress={() => onSubmitMethod({}, false)}
-            title="Submit Listing"
-            backgroundColor="#3182ce"
-          />
-          <CustomButton
-            onPress={() => setFullScreenModalVisible(false)}
-            title="Cancel"
-            backgroundColor="#e53e3e"
-          />
-        </ScrollView>
-      </Modal>
-
       {/* ************* New Modal: View More Active Rentals with Pagination ************* */}
       <Modal
         visible={viewMoreModalVisible}
@@ -2283,7 +2414,7 @@ const OwnerProfile = ({ ownerId }) => {
                     {/* Display rental details */}
                     <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                       {item.listingDetails
-                        ? `${item.listingDetails.year} ${item.listingDetails.make} ${item.listingDetails.model}`
+                        ? `${item.listingDetails.aircraft}`
                         : "Listing details not available"}
                     </Text>
                     <Text>Renter: {item.renterName}</Text>
@@ -2325,22 +2456,15 @@ const OwnerProfile = ({ ownerId }) => {
           {/* General Information Section */}
           <Section title="General Information">
             <CustomTextInput
-              placeholder="Year"
-              value={aircraftDetails.year}
-              onChangeText={(value) => handleInputChange("year", value)}
-              keyboardType="numeric"
+              placeholder="Aircraft (Year/Make/Model)"
+              value={aircraftDetails.aircraft}
+              onChangeText={(value) => handleInputChange("aircraft", value)}
               editable={isEditing}
             />
             <CustomTextInput
-              placeholder="Make"
-              value={aircraftDetails.make}
-              onChangeText={(value) => handleInputChange("make", value)}
-              editable={isEditing}
-            />
-            <CustomTextInput
-              placeholder="Model"
-              value={aircraftDetails.model}
-              onChangeText={(value) => handleInputChange("model", value)}
+              placeholder="Tail Number"
+              value={aircraftDetails.tailNumber}
+              onChangeText={(value) => handleInputChange("tailNumber", value)}
               editable={isEditing}
             />
             <CustomTextInput
@@ -2552,7 +2676,7 @@ const OwnerProfile = ({ ownerId }) => {
                       postalCodeEnabled={false}
                       placeholder={{
                         number: "4242 4242 4242 4242",
-                        placeholderTextColor:"#888"
+                        placeholderTextColor: "#888"
                       }}
                       cardStyle={{
                         backgroundColor: "#FFFFFF",
@@ -2629,7 +2753,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#ccc",
     marginBottom: 12,
     paddingVertical: 8,
-    placeholderTextColor:"#888"
+    color: "#000", // Ensure text color is visible
   },
   button: {
     paddingVertical: 12,
@@ -2647,7 +2771,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#edf2f7",
     padding: 16,
     borderRadius: 16,
-    placeholderTextColor:"#888"
   },
   calculatorTitle: {
     fontSize: 18,
@@ -2657,14 +2780,19 @@ const styles = StyleSheet.create({
   calculatorText: {
     fontSize: 16,
     marginBottom: 4,
-    placeholderTextColor:"#888",
   },
-  aircraftItemContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
+  aircraftCard: {
+    width: 250,
+    backgroundColor: "#edf2f7",
+    borderRadius: 16,
+    marginRight: 16,
+    padding: 16,
+    position: "relative",
   },
-  selectionCircle: {
+  selectionButton: {
+    position: "absolute",
+    top: 10,
+    left: 10,
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -2672,40 +2800,36 @@ const styles = StyleSheet.create({
     borderColor: "#3182ce",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    backgroundColor: "transparent",
+    zIndex: 1,
   },
-  selectedCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#3182ce",
+  aircraftCardImage: {
+    width: "100%",
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 8,
   },
-  aircraftDetailsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#edf2f7",
-    padding: 16,
-    borderRadius: 16,
+  aircraftCardInfo: {
     flex: 1,
   },
-  aircraftImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 12,
+  aircraftCardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+  removeAircraftButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
   },
   noImageContainer: {
-    width: 80,
-    height: 80,
+    width: "100%",
+    height: 120,
     borderRadius: 8,
     backgroundColor: "#cbd5e0",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
-  },
-  aircraftTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
+    marginBottom: 8,
   },
   listingContainer: {
     backgroundColor: "#edf2f7",
@@ -2730,6 +2854,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     marginBottom: 16,
+    position: "relative",
   },
   rentalHistoryContainer: {
     backgroundColor: "#edf2f7",
@@ -2793,7 +2918,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 8,
     marginRight: 8,
-    placeholderTextColor:"#888"
+    color: "#000", // Ensure text color is visible
   },
   sendButton: {
     backgroundColor: "#3182ce",
@@ -2858,6 +2983,8 @@ const styles = StyleSheet.create({
   chatBubbleIcon: {
     position: "absolute",
     bottom: 20,
+   
+
     right: 20,
     backgroundColor: "#3182ce",
     width: 60,
@@ -2922,10 +3049,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 16,
   },
-  deleteButton: {
+  // NEW: Selection Button Styles
+  selectionButton: {
     position: "absolute",
-    top: 16,
-    right: 16,
+    top: 10,
+    left: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#3182ce",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+    zIndex: 1,
+  },
+  // NEW: Add Aircraft Button Style
+  addAircraftButton: {
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 16,
   },
 });
 
