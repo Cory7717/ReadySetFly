@@ -117,7 +117,7 @@ const Home = ({ route, navigation }) => {
     }
 
     if (filter.make) {
-      q = query(q, where("airplaneModel", "==", filter.make.toLowerCase()));
+      q = query(q, where("make", "==", filter.make.toLowerCase()));
     }
 
     return onSnapshot(
@@ -133,10 +133,10 @@ const Home = ({ route, navigation }) => {
             listing.images = [listing.images];
           }
           console.log(
-            `Listing ID: ${listing.id}, airplaneModel: ${
+            `Listing ID: ${listing.id}, Year: ${listing.year || "Undefined"}, Make: ${listing.make || "Undefined"}, Model: ${
               listing.airplaneModel || "Undefined"
             }`
-          ); // Logging each listing's airplaneModel
+          ); // Enhanced Logging
         });
 
         setListings(listingsData);
@@ -236,6 +236,7 @@ const Home = ({ route, navigation }) => {
         renterId: user.uid,
         renterName: fullName,
         ownerId: selectedListing.ownerId,
+        make: selectedListing.make || "Unknown Make", // Added 'make' field
         airplaneModel: airplaneModel,
         rentalPeriod: rentalDate,
         totalCost: totalCostValue.toFixed(2),
@@ -367,7 +368,7 @@ const Home = ({ route, navigation }) => {
         >
           <View style={styles.listingHeader}>
             <Text style={styles.listingTitle} numberOfLines={1}>
-              {`${item.year} ${item.make} ${airplaneModelDisplay}`}
+              {`${item.year || ''} ${item.make || 'Unknown Make'} ${airplaneModelDisplay}`}
             </Text>
           </View>
           {item.images && item.images.length > 0 && (
@@ -505,7 +506,7 @@ const Home = ({ route, navigation }) => {
               </View>
               <ScrollView contentContainerStyle={styles.modalContent}>
                 <Text style={styles.modalTitle}>
-                  {`${selectedListing.year} ${selectedListing.make} ${
+                  {`${selectedListing.year || ''} ${selectedListing.make || 'Unknown Make'} ${
                     selectedListing.airplaneModel || "Unknown Model"
                   }`}
                 </Text>

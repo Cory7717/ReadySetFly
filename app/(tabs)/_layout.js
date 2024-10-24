@@ -62,6 +62,27 @@ const TabsLayout = () => {
           },
         }}
       >
+        
+        <Tabs.Screen
+          name="classifieds"
+          options={{
+            title: "Classifieds",
+            headerShown: false,
+            tabBarIcon: ({ color }) => (
+              <FontAwesome6 name="money-bill-1" size={24} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="flights"
+          options={{
+            title: "Social",
+            headerShown: false,
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="people-outline" size={32} color={color} />
+            ),
+          }}
+        />
         <Tabs.Screen
           name="home"
           options={{
@@ -96,26 +117,8 @@ const TabsLayout = () => {
             ),
           }}
         />
-        <Tabs.Screen
-          name="flights"
-          options={{
-            title: "Social",
-            headerShown: false,
-            tabBarIcon: ({ color }) => (
-              <Ionicons name="people-outline" size={32} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="classifieds"
-          options={{
-            title: "Classifieds",
-            headerShown: false,
-            tabBarIcon: ({ color }) => (
-              <FontAwesome6 name="money-bill-1" size={24} color={color} />
-            ),
-          }}
-        />
+        
+        
       </Tabs>
     </>
   );

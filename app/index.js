@@ -4,9 +4,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { Stack } from 'expo-router';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { Picker } from '@react-native-picker/picker'; // Import Picker for dropdowns
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
-import { auth, db } from '../firebaseConfig'; // Add Firestore database
+import { auth, db } from '../firebaseConfig';
 import { doc, setDoc } from 'firebase/firestore';
 import CustomButton from '../components/CustomButton';
 import { images } from '../constants';
@@ -28,8 +29,7 @@ const App = () => {
     firstName: '',
     lastName: '',
     role: '',
-    city: '',
-    state: '',
+    location: '',
     aircraftType: '',
     medicalStatus: '',
     insuranceStatus: '',
@@ -48,17 +48,40 @@ const App = () => {
     if (user) {
       const userDoc = doc(db, 'users', user.uid);
       try {
-        // Save profile data to Firestore
-        await setDoc(userDoc, profileData);
-        
-        // Update user's displayName in Firebase Auth
+        const { role } = profileData;
+        if (!['renter', 'owner', 'both'].includes(role.toLowerCase())) {
+          throw new Error("Invalid role selected. Please choose 'Renter', 'Owner', or 'Both'.");
+        }
+
+        await setDoc(userDoc, {
+          ...profileData,
+          role: role.toLowerCase()
+        });
+
         await updateProfile(user, {
           displayName: `${profileData.firstName} ${profileData.lastName}`
         });
 
-        // Close modal and navigate to the home page
         setModalVisible(false);
-        router.push('/home');
+
+        // Navigate to the correct screen based on the selected role and pass profile data
+        if (role.toLowerCase() === 'owner') {
+          router.push({
+            pathname: '/owner',
+            params: { profileData }
+          });
+        } else if (role.toLowerCase() === 'renter') {
+          router.push({
+            pathname: '/renter',
+            params: { profileData }
+          });
+        } else if (role.toLowerCase() === 'both') {
+          router.push({
+            pathname: '/classifieds',
+            params: { profileData }
+          });
+        }
+
       } catch (error) {
         console.error("Error saving profile data: ", error);
       }
@@ -72,7 +95,7 @@ const App = () => {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.logoContainer}>
           <Image source={images.logo} style={styles.logo} />
         </View>
@@ -106,78 +129,105 @@ const App = () => {
 
         {/* Profile Modal */}
         <Modal visible={isModalVisible} transparent={true} animationType="slide">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Complete Your Profile</Text>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                  <Text style={styles.modalTitle}>Complete Your Profile</Text>
 
-              <TextInput
-                placeholder="First Name"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.firstName}
-                onChangeText={(text) => setProfileData({ ...profileData, firstName: text })}
-              />
-              <TextInput
-                placeholder="Last Name"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.lastName}
-                onChangeText={(text) => setProfileData({ ...profileData, lastName: text })}
-              />
-              <TextInput
-                placeholder="Role (Renter/Owner/Both)"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.role}
-                onChangeText={(text) => setProfileData({ ...profileData, role: text })}
-              />
-              <TextInput
-                placeholder="City"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.city}
-                onChangeText={(text) => setProfileData({ ...profileData, city: text })}
-              />
-              <TextInput
-                placeholder="State"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.state}
-                onChangeText={(text) => setProfileData({ ...profileData, state: text })}
-              />
-              <TextInput
-                placeholder="Type of Aircraft"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.aircraftType}
-                onChangeText={(text) => setProfileData({ ...profileData, aircraftType: text })}
-              />
-              <TextInput
-                placeholder="Current Medical"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.medicalStatus}
-                onChangeText={(text) => setProfileData({ ...profileData, medicalStatus: text })}
-              />
-              <TextInput
-                placeholder="Insurance Current (Yes/No)"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.insuranceStatus}
-                onChangeText={(text) => setProfileData({ ...profileData, insuranceStatus: text })}
-              />
-              <TextInput
-                placeholder="Date of Last Annual"
-                placeholderTextColor="#888"
-                style={styles.input}
-                value={profileData.annualDate}
-                onChangeText={(text) => setProfileData({ ...profileData, annualDate: text })}
-              />
+                  <TextInput
+                    placeholder="First Name"
+                    placeholderTextColor="#888"
+                    style={styles.input}
+                    value={profileData.firstName}
+                    onChangeText={(text) => setProfileData({ ...profileData, firstName: text })}
+                  />
+                  <TextInput
+                    placeholder="Last Name"
+                    placeholderTextColor="#888"
+                    style={styles.input}
+                    value={profileData.lastName}
+                    onChangeText={(text) => setProfileData({ ...profileData, lastName: text })}
+                  />
 
-              <CustomButton title="Save Profile" handlePress={handleSaveProfile} containerStyles={styles.saveButton} />
-              <CustomButton title="Close" handlePress={() => setModalVisible(false)} containerStyles={styles.closeButton} />
+                  {/* Role Picker */}
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={profileData.role}
+                      style={styles.picker}
+                      onValueChange={(itemValue) =>
+                        setProfileData({ ...profileData, role: itemValue })
+                      }>
+                      <Picker.Item label="Select Role" value="" />
+                      <Picker.Item label="Renter" value="renter" />
+                      <Picker.Item label="Owner" value="owner" />
+                      <Picker.Item label="Both" value="both" />
+                    </Picker>
+                  </View>
+
+                  {/* Combined City and State */}
+                  <TextInput
+                    placeholder="City, State"
+                    placeholderTextColor="#888"
+                    style={styles.input}
+                    value={profileData.location}
+                    onChangeText={(text) => setProfileData({ ...profileData, location: text })}
+                  />
+
+                  {/* Year/Make/Model */}
+                  <TextInput
+                    placeholder="Year/Make/Model"
+                    placeholderTextColor="#888"
+                    style={styles.input}
+                    value={profileData.aircraftType}
+                    onChangeText={(text) => setProfileData({ ...profileData, aircraftType: text })}
+                  />
+
+                  {/* Medical Current Picker */}
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={profileData.medicalStatus}
+                      style={styles.picker}
+                      onValueChange={(itemValue) =>
+                        setProfileData({ ...profileData, medicalStatus: itemValue })}
+                      >
+                      <Picker.Item label="Is Medical Current?" value="" />
+                      <Picker.Item label="Yes" value="yes" />
+                      <Picker.Item label="No" value="no" />
+                    </Picker>
+                  </View>
+
+                  {/* Insurance Picker */}
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={profileData.insuranceStatus}
+                      style={styles.picker}
+                      onValueChange={(itemValue) =>
+                        setProfileData({ ...profileData, insuranceStatus: itemValue })}
+                      >
+                      <Picker.Item label="Is Insurance Current?" value="" />
+                      <Picker.Item label="Yes" value="yes" />
+                      <Picker.Item label="No" value="no" />
+                    </Picker>
+                  </View>
+
+                  <TextInput
+                    placeholder="Date of Last Annual"
+                    placeholderTextColor="#888"
+                    style={styles.input}
+                    value={profileData.annualDate}
+                    onChangeText={(text) => setProfileData({ ...profileData, annualDate: text })}
+                  />
+
+                  <CustomButton title="Save Profile" handlePress={handleSaveProfile} containerStyles={styles.saveButton} />
+                  <CustomButton title="Close" handlePress={() => setModalVisible(false)} containerStyles={styles.closeButton} />
+                </ScrollView>
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </ScrollView>
     </SafeAreaProvider>
@@ -267,34 +317,54 @@ const styles = StyleSheet.create({
     width: '90%',
     backgroundColor: 'white',
     padding: 20,
-    borderRadius: 10,
+    borderRadius: 15,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#333',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 10,
-    color: '#000', // Ensures text is black and visible
-    fontSize: 16,  // Increases the font size for better readability
+    borderColor: '#ddd',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    color: '#000',
+    fontSize: 16,
+    backgroundColor: '#f7f7f7',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    marginBottom: 15,
+    backgroundColor: '#f7f7f7',
+  },
+  picker: {
+    height: 50,
+    width: '100%',
   },
   saveButton: {
     backgroundColor: '#28a745',
     paddingVertical: 15,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 10,
   },
   closeButton: {
     backgroundColor: '#dc3545',
     paddingVertical: 15,
-    borderRadius: 8,
-  }
+    borderRadius: 10,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  modalScroll: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
 });
 
 export default App;

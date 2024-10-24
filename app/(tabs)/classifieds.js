@@ -873,7 +873,7 @@ const Classifieds = () => {
             color: COLORS.black,
           }}
         >
-          Aircraft Marketplace
+          Aviation Marketplace
         </Text>
 
         <TouchableOpacity
