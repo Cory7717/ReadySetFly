@@ -28,6 +28,7 @@ import {
   deleteDoc,
   doc,
   addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -108,6 +109,43 @@ const Home = ({ route, navigation }) => {
     }
   }, [route?.params?.newListing, route?.params?.unlistedId]);
 
+  /**
+   * Helper function to parse the combined 'aircraft' field.
+   * Assumes format: "Year Make Model" (e.g., "2020 Cessna 172")
+   * Returns an object with year, make, and airplaneModel.
+   */
+  const parseAircraft = (aircraft) => {
+    if (!aircraft || typeof aircraft !== "string") {
+      return {
+        year: "Unknown Year",
+        make: "Unknown Make",
+        airplaneModel: "Unknown Model",
+      };
+    }
+
+    // Regular expression to match "Year Make Model"
+    const regex = /^(\d{4})\s+(\w+)\s+(.+)$/;
+    const match = aircraft.trim().match(regex);
+
+    if (match) {
+      return {
+        year: match[1],
+        make: match[2],
+        airplaneModel: match[3],
+      };
+    }
+
+    console.warn(`Unable to parse aircraft field: "${aircraft}"`);
+    return {
+      year: "Unknown Year",
+      make: "Unknown Make",
+      airplaneModel: "Unknown Model",
+    };
+  };
+
+  /**
+   * Subscribe to Firestore listings with appropriate filtering and data mapping.
+   */
   const subscribeToListings = () => {
     const listingsRef = collection(db, "airplanes");
     let q = query(listingsRef, orderBy("createdAt", "desc"));
@@ -123,19 +161,44 @@ const Home = ({ route, navigation }) => {
     return onSnapshot(
       q,
       (snapshot) => {
-        const listingsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const listingsData = snapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            let { year, make, airplaneModel } = data;
+
+            // Check if separate fields are missing and attempt to parse from 'aircraft' field
+            if (!year || !make || !airplaneModel) {
+              const parsed = parseAircraft(data.aircraft);
+              if (!year) year = parsed.year;
+              if (!make) make = parsed.make;
+              if (!airplaneModel) airplaneModel = parsed.airplaneModel;
+            }
+
+            return {
+              id: doc.id,
+              year: year || "Unknown Year",
+              make: make || "Unknown Make",
+              airplaneModel: airplaneModel || "Unknown Model",
+              ...data,
+            };
+          })
+          // Filter out listings without a valid ownerId
+          .filter((listing) => {
+            if (!listing.ownerId) {
+              console.warn(
+                `Listing ID: ${listing.id} is missing 'ownerId'. This listing will be excluded.`
+              );
+              return false;
+            }
+            return true;
+          });
 
         listingsData.forEach((listing) => {
           if (!Array.isArray(listing.images)) {
             listing.images = [listing.images];
           }
           console.log(
-            `Listing ID: ${listing.id}, Year: ${listing.year || "Undefined"}, Make: ${listing.make || "Undefined"}, Model: ${
-              listing.airplaneModel || "Undefined"
-            }`
+            `Listing ID: ${listing.id}, Year: ${listing.year}, Make: ${listing.make}, Model: ${listing.airplaneModel}, Owner ID: ${listing.ownerId}`
           ); // Enhanced Logging
         });
 
@@ -155,10 +218,18 @@ const Home = ({ route, navigation }) => {
     );
   };
 
+  /**
+   * Calculate the total cost based on rental hours.
+   */
   const calculateTotalCost = (hours) => {
     if (!selectedListing) return;
 
     const pricePerHour = parseFloat(selectedListing.ratesPerHour);
+    if (isNaN(pricePerHour)) {
+      Alert.alert("Pricing Error", "Invalid rate per hour for the selected listing.");
+      return;
+    }
+
     const rentalCost = pricePerHour * hours;
     const bookingFee = rentalCost * 0.06;
     const transactionFee = rentalCost * 0.03;
@@ -174,8 +245,23 @@ const Home = ({ route, navigation }) => {
     });
   };
 
+  /**
+   * Handle sending a rental request to the owner.
+   */
   const handleSendRentalRequest = async () => {
-    if (!selectedListing) return;
+    if (!selectedListing) {
+      Alert.alert("Selection Error", "No listing selected.");
+      return;
+    }
+
+    if (!selectedListing.ownerId) {
+      Alert.alert(
+        "Listing Error",
+        "The selected listing does not have a valid owner. Please select a different listing."
+      );
+      console.error(`Selected listing ID: ${selectedListing.id} is missing 'ownerId'.`);
+      return;
+    }
 
     if (!rentalDate) {
       Alert.alert("Input Required", "Please select a rental date.");
@@ -215,6 +301,11 @@ const Home = ({ route, navigation }) => {
     }
 
     const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
+    if (isNaN(rentalCost) || rentalCost <= 0) {
+      Alert.alert("Pricing Error", "Invalid rental cost calculated.");
+      return;
+    }
+
     const bookingFee = rentalCost * 0.06;
     const transactionFee = rentalCost * 0.03;
     const salesTax = rentalCost * 0.0825;
@@ -251,12 +342,18 @@ const Home = ({ route, navigation }) => {
         flightHours: Number(flightHours),
       };
 
+      // Ensure that listingId is present
+      if (!rentalRequestData.listingId) {
+        throw new Error("Listing ID is missing in the rental request data.");
+      }
+
       const rentalRequestsRef = collection(
         db,
         "owners",
         selectedListing.ownerId,
         "rentalRequests"
       );
+
       await addDoc(rentalRequestsRef, rentalRequestData);
 
       setFullScreenModalVisible(false);
@@ -264,6 +361,22 @@ const Home = ({ route, navigation }) => {
         "Request Sent",
         "Your rental request has been sent to the owner. You will be notified once the owner reviews the request."
       );
+
+      // Optional: Reset form fields after sending the request
+      setFullName("");
+      setCityStateCombined("");
+      setHasMedicalCertificate(false);
+      setHasRentersInsurance(false);
+      setFlightHours("");
+      setRentalHours(1);
+      setRentalDate(null);
+      setTotalCost({
+        rentalCost: "0.00",
+        bookingFee: "0.00",
+        transactionFee: "0.00",
+        salesTax: "0.00",
+        total: "0.00",
+      });
     } catch (error) {
       console.error("Error sending rental request:", {
         errorMessage: error.message,
@@ -297,6 +410,7 @@ const Home = ({ route, navigation }) => {
       "Edit Listing",
       `This would edit the listing with ID ${listingId}`
     );
+    // Implement navigation or modal for editing the listing
   };
 
   const handleNextImage = () => {
@@ -346,9 +460,15 @@ const Home = ({ route, navigation }) => {
     extrapolate: "clamp",
   });
 
+  /**
+   * Render each listing item.
+   * Utilizes year, make, and airplaneModel fields for display.
+   */
   const renderItem = ({ item }) => {
-    // Do not exclude listings with undefined airplaneModel
-    const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
+    // Ensure correct field access with fallback values
+    const airplaneModelDisplay = item.airplaneModel || item.model || "Unknown Model";
+    const makeDisplay = item.make || item.manufacturer || "Unknown Make";
+    const yearDisplay = item.year || "Unknown Year";
 
     return (
       <View style={styles.listingContainer}>
@@ -368,7 +488,7 @@ const Home = ({ route, navigation }) => {
         >
           <View style={styles.listingHeader}>
             <Text style={styles.listingTitle} numberOfLines={1}>
-              {`${item.year || ''} ${item.make || 'Unknown Make'} ${airplaneModelDisplay}`}
+              {`${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
             </Text>
           </View>
           {item.images && item.images.length > 0 && (
@@ -505,10 +625,10 @@ const Home = ({ route, navigation }) => {
                 </TouchableOpacity>
               </View>
               <ScrollView contentContainerStyle={styles.modalContent}>
-                <Text style={styles.modalTitle}>
-                  {`${selectedListing.year || ''} ${selectedListing.make || 'Unknown Make'} ${
-                    selectedListing.airplaneModel || "Unknown Model"
-                  }`}
+                <Text
+                  style={styles.modalTitle}
+                >
+                  {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
                 </Text>
                 <Text style={styles.modalRate}>
                   ${selectedListing.ratesPerHour} per hour

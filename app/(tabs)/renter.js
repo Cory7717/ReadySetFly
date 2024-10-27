@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+// renter.js
+
+import React, { useState, useEffect } from "react";
 import {
   TextInput,
   Image,
@@ -18,6 +20,7 @@ import {
   FlatList,
   StyleSheet,
 } from "react-native";
+
 import {
   getFirestore,
   collection,
@@ -26,52 +29,69 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  setDoc,
   doc,
   onSnapshot,
   orderBy,
-  getDoc,
   serverTimestamp,
   writeBatch,
   limit,
   startAfter,
-} from "firebase/firestore"; 
+  arrayUnion,
+  getDoc,
+} from "firebase/firestore";
+
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { getAuth } from "firebase/auth";
-import { Ionicons, FontAwesome, Octicons, MaterialCommunityIcons, Fontisto } from "@expo/vector-icons";
-import { NavigationContainer, useNavigation } from "@react-navigation/native";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
-import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
+
+import { getAuth } from "firebase/auth";
+
+import {
+  Ionicons,
+  Octicons,
+  MaterialCommunityIcons,
+  Fontisto,
+} from "@expo/vector-icons";
+
+import { useNavigation } from "@react-navigation/native";
+
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import { Picker } from "@react-native-picker/picker";
 import { useStripe } from "@stripe/stripe-react-native";
-import { createStackNavigator } from "@react-navigation/stack";
 
-// Import environment variables
-import { API_URL } from "@env"; 
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { NavigationContainer } from "@react-navigation/native";
 
-// Import your CheckoutScreen component
-import CheckoutScreen from "../payment/CheckoutScreen"; 
-import ConfirmationScreen from "../payment/ConfirmationScreen"; 
-import MessagesScreen from "../screens/MessagesScreen"; 
+import { API_URL } from "@env";
 
-const Stack = createStackNavigator();
+import CheckoutScreen from "../payment/CheckoutScreen";
+import ConfirmationScreen from "../payment/ConfirmationScreen";
+import MessagesScreen from "../screens/MessagesScreen";
 
-const BookingCalendar = ({ airplaneId, ownerId }) => {
-  const auth = getAuth();
-  const user = auth.currentUser;
+const db = getFirestore();
+const auth = getAuth();
+const user = auth.currentUser;
+
+const Stack = createNativeStackNavigator();
+
+const BookingCalendar = () => {
   const stripe = useStripe();
   const navigation = useNavigation();
 
-  // Modal Visibility States
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] = useState(false);
+  const [
+    rentalCostEstimatorModalVisible,
+    setRentalCostEstimatorModalVisible,
+  ] = useState(false);
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
-  const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
-  const [allNotificationsModalVisible, setAllNotificationsModalVisible] = useState(false);
+  const [
+    allNotificationsModalVisible,
+    setAllNotificationsModalVisible,
+  ] = useState(false);
 
-  // Profile States
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileData, setProfileData] = useState({
     name: "",
@@ -85,14 +105,11 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     image: null,
   });
 
-  // Refresh Control
   const [refreshing, setRefreshing] = useState(false);
 
-  // Consolidated Rentals State
-  const [rentals, setRentals] = useState([]); // Holds both active and completed rentals
+  const [rentals, setRentals] = useState([]);
   const [ratings, setRatings] = useState({});
 
-  // Rental Details States
   const [rentalDate, setRentalDate] = useState("");
   const [rentalHours, setRentalHours] = useState("");
   const [preferredLocation, setPreferredLocation] = useState("");
@@ -101,27 +118,26 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
   const [costPerGallon, setCostPerGallon] = useState("");
   const [numGallons, setNumGallons] = useState("");
 
-  // Notifications
   const [notifications, setNotifications] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
 
-  // Current Rental and Selected Notification
-  const [currentRentalRequest, setCurrentRentalRequest] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
 
-  // Messaging States
+  const [selectedRentalRequest, setSelectedRentalRequest] = useState(null);
+  const [isRentalRequestLoading, setIsRentalRequestLoading] = useState(false);
+
+  const [selectedListing, setSelectedListing] = useState(null);
+  const [totalCost, setTotalCost] = useState(null);
+
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
 
-  // Processed Rentals to Avoid Duplicate Notifications
   const [processedRentals, setProcessedRentals] = useState([]);
 
-  // Rentals Pagination States
   const [rentalsLastDoc, setRentalsLastDoc] = useState(null);
   const [hasMoreRentals, setHasMoreRentals] = useState(true);
   const RENTALS_PAGE_SIZE = 20;
 
-  // Notifications Pagination States
   const [allNotifications, setAllNotifications] = useState([]);
   const [notificationsLastDoc, setNotificationsLastDoc] = useState(null);
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
@@ -129,40 +145,42 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
   const renterId = user?.uid;
 
-  // Date Picker Visibility
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
-  // Map Modal Visibility
   const [isMapModalVisible, setMapModalVisible] = useState(false);
   const [initialLocation, setInitialLocation] = useState(null);
 
-  // State for Current Chat Owner in Messages Modal
   const [currentChatOwnerId, setCurrentChatOwnerId] = useState(null);
 
-  // Fetch and Manage Data
   useEffect(() => {
-    const db = getFirestore();
-
     if (!renterId) {
       console.error("Error: renterId is undefined.");
       Alert.alert("Error", "User is not authenticated.");
       return;
     }
 
-    // References
-    const rentalRequestsRef = collection(db, "renters", renterId, "rentalRequests");
+    const rentalRequestsRef = collection(
+      db,
+      "renters",
+      renterId,
+      "rentalRequests"
+    );
     const ordersRef = collection(db, "orders");
-    const notificationsRef = collection(db, "renters", renterId, "notifications");
+    const notificationsRef = collection(
+      db,
+      "renters",
+      renterId,
+      "notifications"
+    );
 
-    // Queries
-    const rentalRequestsQuery = query(
+    const rentalRequestsQueryInstance = query(
       rentalRequestsRef,
-      where("rentalStatus", "in", ["pending", "approved", "denied", "active"]),
+      where("rentalStatus", "in", ["pending", "approved", "active", "denied"]),
       orderBy("createdAt", "desc"),
       limit(RENTALS_PAGE_SIZE)
     );
 
-    const ordersQuery = query(
+    const ordersQueryInstance = query(
       ordersRef,
       where("renterId", "==", renterId),
       where("status", "==", "completed"),
@@ -177,7 +195,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     );
 
     const unsubscribeRentalRequests = onSnapshot(
-      rentalRequestsQuery,
+      rentalRequestsQueryInstance,
       async (snapshot) => {
         const active = [];
         for (const docSnap of snapshot.docs) {
@@ -203,8 +221,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           });
         }
 
-        // Fetch Completed Rentals
-        const ordersSnapshot = await getDocs(ordersQuery);
+        const ordersSnapshot = await getDocs(ordersQueryInstance);
         const completed = [];
         for (const docSnap of ordersSnapshot.docs) {
           const orderData = docSnap.data();
@@ -229,7 +246,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           });
         }
 
-        // Combine Active and Completed Rentals
         setRentals([...active, ...completed]);
       },
       (error) => {
@@ -252,7 +268,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         setAllNotifications(notifs);
         setNotificationCount(notifs.length);
 
-        // Set the last document for pagination
         const lastVisible = snapshot.docs[snapshot.docs.length - 1];
         setNotificationsLastDoc(lastVisible);
       },
@@ -268,25 +283,53 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     };
   }, [renterId]);
 
-  // Handle Approved Rentals by Creating Notifications
   useEffect(() => {
     const handleApprovedRentals = async () => {
-      const db = getFirestore();
       for (const rental of rentals) {
-        if (rental.rentalStatus === "active" && !processedRentals.includes(rental.id)) {
+        if (
+          (rental.rentalStatus === "active" || rental.rentalStatus === "approved") &&
+          !processedRentals.includes(rental.id)
+        ) {
           const existingNotif = notifications.find(
             (notif) => notif.rentalRequestId === rental.id
           );
           if (!existingNotif) {
             try {
-              await addDoc(collection(db, "renters", renterId, "notifications"), {
-                rentalRequestId: rental.id,
-                message:
-                  "Your rental has been activated! Enjoy your flight.",
-                type: "rentalActivated", // Notification type
-                createdAt: serverTimestamp(),
-              });
-              console.log(`Added rentalActivated notification for rental ID: ${rental.id}`);
+              // Ensure that listingId is fetched from rental request if missing
+              let listingId = rental.listingId;
+              if (!listingId) {
+                const rentalRequestRef = doc(
+                  db,
+                  "renters",
+                  renterId,
+                  "rentalRequests",
+                  rental.id
+                );
+                const rentalRequestSnap = await getDoc(rentalRequestRef);
+                if (rentalRequestSnap.exists()) {
+                  const rentalRequestData = rentalRequestSnap.data();
+                  listingId = rentalRequestData.listingId || null;
+                }
+              }
+
+              await addDoc(
+                collection(db, "renters", renterId, "notifications"),
+                {
+                  rentalRequestId: rental.id,
+                  message:
+                    "Your rental has been approved! Proceed to payment.",
+                  type: "rentalApproved",
+                  listingId: listingId, // Ensure listingId is included
+                  ownerId: rental.ownerId || null,
+                  ownerName: rental.ownerName || "Unknown Owner",
+                  rentalDate: rental.rentalDate || null,
+                  createdAt: serverTimestamp(),
+                  rentalStatus: rental.rentalStatus || "approved",
+                }
+              );
+              console.log(
+                `Added rentalApproved notification for rental ID: ${rental.id}`
+              );
               setProcessedRentals((prev) => [...prev, rental.id]);
             } catch (error) {
               console.error("Error adding notification:", error);
@@ -299,52 +342,130 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     if (rentals.length > 0) {
       handleApprovedRentals();
     }
-  }, [rentals, notifications, renterId, processedRentals]); 
+  }, [rentals, notifications, renterId, processedRentals]);
 
-  // Navigate to Checkout Screen with Rental Request Details
-  const navigateToCheckout = async (rentalRequest) => {
-    if (!rentalRequest) {
+  // Function to create a rental request with listingId
+  const createRentalRequest = async (listingId) => {
+    if (!renterId) {
+      Alert.alert("Error", "User is not authenticated.");
+      return;
+    }
+
+    if (!listingId) {
+      Alert.alert("Error", "Invalid Listing ID.");
+      return;
+    }
+
+    try {
+      const rentalRequestRef = collection(
+        db,
+        "renters",
+        renterId,
+        "rentalRequests"
+      );
+
+      await addDoc(rentalRequestRef, {
+        listingId: listingId,
+        rentalDate: rentalDate || new Date().toLocaleDateString(),
+        rentalHours: rentalHours || "0",
+        rentalStatus: "pending",
+        ownerId: null, // You can set the ownerId if available
+        createdAt: serverTimestamp(),
+      });
+
+      Alert.alert("Success", "Rental request created successfully.");
+    } catch (error) {
+      console.error("Error creating rental request:", error);
+      Alert.alert("Error", "Failed to create rental request.");
+    }
+  };
+
+  const navigateToCheckout = async (rentalRequestId) => {
+    if (!rentalRequestId) {
       Alert.alert("Error", "No rental request selected.");
       return;
     }
 
-    // Calculate Total Cost
-    let totalCost =
-      parseFloat(rentalRequest.totalCost) ||
-      parseFloat(rentalRequest.rentalDetails?.totalCost) ||
-      parseFloat(calculateRentalCost());
+    try {
+      const rentalRequestRef = doc(
+        db,
+        "renters",
+        renterId,
+        "rentalRequests",
+        rentalRequestId
+      );
+      const rentalRequestSnap = await getDoc(rentalRequestRef);
 
-    if (isNaN(totalCost) || totalCost <= 0) {
-      Alert.alert("Invalid Total Cost", "The total cost for this rental is invalid.");
-      return;
-    }
+      if (!rentalRequestSnap.exists()) {
+        Alert.alert("Error", "Rental request not found.");
+        return;
+      }
 
-    const amountInCents = Math.round(totalCost * 100);
+      const rentalRequest = rentalRequestSnap.data();
 
-    console.log(`Creating payment intent for rental ID: ${rentalRequest.id} with amount: ${amountInCents} cents`);
+      console.log("Rental Request Data:", rentalRequest);
 
-    const clientSecret = await createPaymentIntent(amountInCents);
+      if (!rentalRequest.listingId) {
+        Alert.alert("Error", "Listing ID is missing in rental request.");
+        return;
+      }
 
-    if (clientSecret) {
-      console.log("Payment intent created successfully. Navigating to CheckoutScreen.");
-      // Close all modals before navigating
-      setMessagesModalVisible(false);
-      setTransactionModalVisible(false);
-      setNotificationModalVisible(false);
-      setAllNotificationsModalVisible(false);
+      const listingRef = doc(db, "airplanes", rentalRequest.listingId);
+      const listingSnap = await getDoc(listingRef);
 
-      navigation.navigate("CheckoutScreen", {
-        rentalRequestId: rentalRequest.id,
-        amount: totalCost,
-        clientSecret, 
-      });
-    } else {
-      console.log("Failed to create payment intent.");
-      Alert.alert("Payment Error", "Unable to proceed with payment.");
+      if (!listingSnap.exists()) {
+        Alert.alert("Error", "Listing not found.");
+        return;
+      }
+
+      const listingData = listingSnap.data();
+
+      console.log("Listing Data:", listingData);
+
+      const totalCostFromRequest = parseFloat(rentalRequest.totalCost);
+
+      const calculatedTotalCost = totalCostFromRequest.toFixed(2);
+
+      console.log(`Calculated Total Cost: ${calculatedTotalCost}`);
+
+      if (isNaN(calculatedTotalCost) || calculatedTotalCost <= 0) {
+        Alert.alert(
+          "Invalid Total Cost",
+          "The total cost for this rental is invalid."
+        );
+        return;
+      }
+
+      const amountInCents = Math.round(calculatedTotalCost * 100);
+
+      console.log(
+        `Creating payment intent for rental ID: ${rentalRequestSnap.id} with amount: ${amountInCents} cents`
+      );
+
+      const clientSecret = await createPaymentIntent(amountInCents);
+
+      if (clientSecret) {
+        console.log(
+          "Payment intent created successfully. Navigating to CheckoutScreen."
+        );
+        setNotificationModalVisible(false);
+        setAllNotificationsModalVisible(false);
+
+        navigation.navigate("CheckoutScreen", {
+          rentalRequestId: rentalRequestSnap.id,
+          amount: calculatedTotalCost,
+          clientSecret,
+        });
+      } else {
+        console.log("Failed to create payment intent.");
+        Alert.alert("Payment Error", "Unable to proceed with payment.");
+      }
+    } catch (error) {
+      console.error("Error navigating to CheckoutScreen:", error);
+      Alert.alert("Error", "An unexpected error occurred.");
     }
   };
 
-  // Create Payment Intent via Backend
   const createPaymentIntent = async (amount) => {
     if (isNaN(amount) || amount <= 0) {
       Alert.alert("Invalid Amount", "The payment amount is invalid.");
@@ -358,7 +479,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ amount }), 
+        body: JSON.stringify({ amount }),
       });
 
       const data = await response.json();
@@ -369,7 +490,10 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         return data.clientSecret;
       } else {
         console.error("Error creating payment intent:", data);
-        Alert.alert("Payment Error", data.message || "Failed to create payment intent.");
+        Alert.alert(
+          "Payment Error",
+          data.message || "Failed to create payment intent."
+        );
         return null;
       }
     } catch (error) {
@@ -379,15 +503,20 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     }
   };
 
-  // Handle Notification Press
   const handleNotificationPress = async (notification) => {
-    const db = getFirestore();
     try {
       if (!notification) {
         throw new Error("Notification object is undefined.");
       }
 
       if (notification.rentalRequestId) {
+        console.log(
+          "Notification has rentalRequestId:",
+          notification.rentalRequestId
+        );
+
+        setIsRentalRequestLoading(true);
+
         const rentalRequestRef = doc(
           db,
           "renters",
@@ -395,40 +524,71 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           "rentalRequests",
           notification.rentalRequestId
         );
-
         const rentalRequestSnap = await getDoc(rentalRequestRef);
-
+        let rentalRequestData = null;
         if (rentalRequestSnap.exists()) {
-          const rentalRequest = rentalRequestSnap.data();
-
-          setCurrentRentalRequest({ id: rentalRequestSnap.id, ...rentalRequest });
-
-          let ownerName = "Unknown Owner";
-          if (rentalRequest.ownerId) {
-            try {
-              const ownerDocRef = doc(db, "owners", rentalRequest.ownerId);
-              const ownerDoc = await getDoc(ownerDocRef);
-              if (ownerDoc.exists()) {
-                ownerName = ownerDoc.data().fullName || "Unknown Owner";
-              }
-            } catch (error) {
-              console.error("Error fetching owner details:", error);
-            }
-          }
-
-          setSelectedNotification({
-            ...notification,
-            ownerName, 
-          });
-          // Modal will be opened via useEffect
+          rentalRequestData = rentalRequestSnap.data();
+          setSelectedRentalRequest(rentalRequestData);
+          console.log("Fetched Rental Request:", rentalRequestData);
         } else {
-          throw new Error("Rental request not found.");
+          setSelectedRentalRequest(null);
+          console.warn(
+            "Rental request not found for ID:",
+            notification.rentalRequestId
+          );
+          setTotalCost(null);
+          setIsRentalRequestLoading(false);
+          return;
         }
-      } else {
-        // For notifications without rentalRequestId, still set the selectedNotification
+
+        let listingData = null;
+        if (rentalRequestData.listingId) {
+          const listingRef = doc(db, "airplanes", rentalRequestData.listingId);
+          const listingSnap = await getDoc(listingRef);
+          if (listingSnap.exists()) {
+            listingData = listingSnap.data();
+            setSelectedListing(listingData);
+            console.log("Fetched Listing:", listingData);
+          } else {
+            setSelectedListing(null);
+            setTotalCost(null);
+            console.warn(
+              "Listing not found for ID:",
+              rentalRequestData.listingId
+            );
+            setIsRentalRequestLoading(false);
+            return;
+          }
+        } else {
+          setSelectedListing(null);
+          setTotalCost(null);
+          console.warn("Listing ID is missing in the rental request.");
+          setIsRentalRequestLoading(false);
+          return;
+        }
+
+        if (rentalRequestData.totalCost !== undefined) {
+          setTotalCost(rentalRequestData.totalCost);
+        } else {
+          const rentalHours = parseFloat(rentalRequestData.rentalHours) || 0;
+          const costPerHour = parseFloat(listingData.costPerHour) || 0;
+          const calculatedTotalCost = (rentalHours * costPerHour).toFixed(2);
+
+          console.log(`Calculated Total Cost: ${calculatedTotalCost}`);
+
+          setTotalCost(calculatedTotalCost);
+        }
+
         setSelectedNotification(notification);
-        setCurrentRentalRequest(null); // No rental details available
-        // Open the modal regardless of rentalRequestId
+        console.log("Selected Notification:", notification);
+        setNotificationModalVisible(true);
+        setIsRentalRequestLoading(false);
+      } else {
+        setSelectedNotification(notification);
+        setSelectedRentalRequest(null);
+        setSelectedListing(null);
+        setTotalCost(null);
+        setNotificationModalVisible(true);
       }
     } catch (error) {
       console.error("Error handling notification press:", error);
@@ -436,242 +596,15 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     }
   };
 
-  // Handle Rental Press (Active or Completed)
-  const handleRentalPress = (rental) => {
-    if (rental.rentalStatus === "active") {
-      setCurrentRentalRequest(rental);
-      // Removed setTransactionModalVisible(true) from here
-    } else if (rental.rentalStatus === "completed") {
-      // Handle actions for completed rentals, such as viewing details or providing feedback
-      Alert.alert("Completed Rental", "This rental has been completed.");
-      // You can add more functionalities as needed
-    } else {
-      Alert.alert("Rental Status", `This rental is currently ${rental.rentalStatus}.`);
-    }
+  const closeModal = () => {
+    setNotificationModalVisible(false);
+    setSelectedNotification(null);
+    setSelectedRentalRequest(null);
+    setSelectedListing(null);
+    setTotalCost(null);
   };
 
-  // Open Messages Modal with Chat Context
-  const openMessagesModal = () => {
-    setMessagesModalVisible(true);
-  };
-
-  // useEffect to Open Modal Once Selected Notification and Current Rental Request are Set
-  useEffect(() => {
-    if (selectedNotification) {
-      if (selectedNotification.type === "rentalActivated") {
-        if (currentRentalRequest) {
-          setNotificationModalVisible(true);
-        }
-        // Else, wait for currentRentalRequest to be set
-      } else {
-        // For notifications without rentalRequestId or different types
-        setNotificationModalVisible(true);
-      }
-    }
-  }, [selectedNotification, currentRentalRequest]);
-
-  // New useEffect to open Transaction Modal when currentRentalRequest is set
-  useEffect(() => {
-    if (currentRentalRequest) {
-      setTransactionModalVisible(true);
-    }
-  }, [currentRentalRequest]);
-
-  // Fetch More Rentals for Pagination
-  const fetchMoreRentals = async () => {
-    if (!hasMoreRentals) return;
-
-    const db = getFirestore();
-
-    try {
-      const rentalRequestsRef = collection(db, "renters", renterId, "rentalRequests");
-      const ordersRef = collection(db, "orders");
-
-      // Define queries for rentalRequests and orders with pagination
-      let rentalRequestsQueryInstance = query(
-        rentalRequestsRef,
-        where("rentalStatus", "in", ["pending", "approved", "denied", "active"]),
-        orderBy("createdAt", "desc"),
-        startAfter(rentalsLastDoc?.rentalRequestsLastDoc || 0),
-        limit(RENTALS_PAGE_SIZE)
-      );
-
-      let ordersQueryInstance = query(
-        ordersRef,
-        where("renterId", "==", renterId),
-        where("status", "==", "completed"),
-        orderBy("completedAt", "desc"),
-        startAfter(rentalsLastDoc?.ordersLastDoc || 0),
-        limit(RENTALS_PAGE_SIZE)
-      );
-
-      // Fetch rentalRequests
-      const rentalRequestsSnapshot = await getDocs(rentalRequestsQueryInstance);
-      const fetchedActive = [];
-      for (const docSnap of rentalRequestsSnapshot.docs) {
-        const requestData = docSnap.data();
-        let ownerName = "Unknown Owner";
-        if (requestData.ownerId) {
-          try {
-            const ownerDocRef = doc(db, "owners", requestData.ownerId);
-            const ownerDoc = await getDoc(ownerDocRef);
-            if (ownerDoc.exists()) {
-              ownerName = ownerDoc.data().fullName || "Unknown Owner";
-            }
-          } catch (error) {
-            console.error("Error fetching owner details:", error);
-          }
-        }
-
-        fetchedActive.push({
-          id: docSnap.id,
-          rentalStatus: requestData.rentalStatus,
-          ...requestData,
-          ownerName,
-        });
-      }
-
-      // Fetch completed rentals
-      const ordersSnapshot = await getDocs(ordersQueryInstance);
-      const fetchedCompleted = [];
-      for (const docSnap of ordersSnapshot.docs) {
-        const orderData = docSnap.data();
-        let ownerName = "Unknown Owner";
-        if (orderData.ownerId) {
-          try {
-            const ownerDocRef = doc(db, "owners", orderData.ownerId);
-            const ownerDoc = await getDoc(ownerDocRef);
-            if (ownerDoc.exists()) {
-              ownerName = ownerDoc.data().fullName || "Unknown Owner";
-            }
-          } catch (error) {
-            console.error("Error fetching owner details:", error);
-          }
-        }
-
-        fetchedCompleted.push({
-          id: docSnap.id,
-          rentalStatus: "completed",
-          ...orderData,
-          ownerName,
-        });
-      }
-
-      // Update the last document fetched for both rentalRequests and orders
-      const newRentalsLastDoc = {
-        rentalRequestsLastDoc:
-          rentalRequestsSnapshot.docs[rentalRequestsSnapshot.docs.length - 1],
-        ordersLastDoc: ordersSnapshot.docs[ordersSnapshot.docs.length - 1],
-      };
-      setRentalsLastDoc(newRentalsLastDoc);
-
-      // Combine the new rentals with existing ones
-      setRentals((prevRentals) => [
-        ...prevRentals,
-        ...fetchedActive,
-        ...fetchedCompleted,
-      ]);
-
-      // Check if more rentals are available
-      if (
-        rentalRequestsSnapshot.docs.length < RENTALS_PAGE_SIZE &&
-        ordersSnapshot.docs.length < RENTALS_PAGE_SIZE
-      ) {
-        setHasMoreRentals(false);
-      }
-    } catch (error) {
-      console.error("Error fetching more rentals:", error);
-      Alert.alert("Error", "Failed to fetch more rentals.");
-    }
-  };
-
-  // Define fetchMoreNotifications Function
-  const fetchMoreNotifications = async () => {
-    if (!hasMoreNotifications) return;
-
-    const db = getFirestore();
-    const notificationsRef = collection(db, "renters", renterId, "notifications");
-
-    try {
-      const notificationsQueryInstance = query(
-        notificationsRef,
-        orderBy("createdAt", "desc"),
-        startAfter(notificationsLastDoc || 0),
-        limit(NOTIFICATIONS_PAGE_SIZE)
-      );
-
-      const notificationsSnapshot = await getDocs(notificationsQueryInstance);
-      const fetchedNotifications = [];
-
-      notificationsSnapshot.forEach((docSnap) => {
-        fetchedNotifications.push({
-          id: docSnap.id,
-          ...docSnap.data(),
-        });
-      });
-
-      // Update the last document fetched
-      const lastVisible = notificationsSnapshot.docs[notificationsSnapshot.docs.length - 1];
-      setNotificationsLastDoc(lastVisible);
-
-      // Append new notifications to existing ones
-      setAllNotifications((prevNotifications) => [
-        ...prevNotifications,
-        ...fetchedNotifications,
-      ]);
-
-      // Check if more notifications are available
-      if (notificationsSnapshot.docs.length < NOTIFICATIONS_PAGE_SIZE) {
-        setHasMoreNotifications(false);
-      }
-    } catch (error) {
-      console.error("Error fetching more notifications:", error);
-      Alert.alert("Error", "Failed to fetch more notifications.");
-    }
-  };
-
-  // Initialize All Notifications from Notifications State
-  useEffect(() => {
-    setAllNotifications(notifications);
-  }, [notifications]);
-
-  // Cleanup Old Notifications to Maintain Performance
-  const cleanupOldNotifications = async () => {
-    const db = getFirestore();
-    const notificationsRef = collection(db, "renters", renterId, "notifications");
-    const q = query(
-      notificationsRef,
-      orderBy("createdAt", "desc"),
-      limit(100) 
-    );
-
-    try {
-      const snapshot = await getDocs(q);
-      const batch = writeBatch(db);
-      snapshot.docs.forEach((docSnap, index) => {
-        if (index >= 100) {
-          batch.delete(docSnap.ref);
-        }
-      });
-      await batch.commit();
-      console.log("Old notifications cleaned up successfully.");
-    } catch (error) {
-      console.error("Error cleaning up notifications:", error);
-      Alert.alert("Error", "Failed to clean up notifications.");
-    }
-  };
-
-  // Trigger Cleanup Whenever All Notifications Update
-  useEffect(() => {
-    cleanupOldNotifications();
-  }, [allNotifications]);
-
-  // Remove All Notifications Function
   const removeAllNotifications = async () => {
-    const db = getFirestore();
-    const notificationsRef = collection(db, "renters", renterId, "notifications");
-
-    // Confirmation Alert
     Alert.alert(
       "Confirm Deletion",
       "Are you sure you want to remove all notifications?",
@@ -685,9 +618,18 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           style: "destructive",
           onPress: async () => {
             try {
+              const notificationsRef = collection(
+                db,
+                "renters",
+                renterId,
+                "notifications"
+              );
               const snapshot = await getDocs(notificationsRef);
               if (snapshot.empty) {
-                Alert.alert("No Notifications", "There are no notifications to remove.");
+                Alert.alert(
+                  "No Notifications",
+                  "There are no notifications to remove."
+                );
                 return;
               }
 
@@ -712,24 +654,20 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     );
   };
 
-  // Show Date Picker
   const showDatePicker = () => {
     setDatePickerVisibility(true);
   };
 
-  // Hide Date Picker
   const hideDatePicker = () => {
     setDatePickerVisibility(false);
   };
 
-  // Handle Date Selection
   const handleConfirm = (date) => {
     const formattedDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
     setRentalDate(formattedDate);
     hideDatePicker();
   };
 
-  // Send Message Function
   const sendMessage = async () => {
     if (!messageText.trim()) {
       Alert.alert("Validation Error", "Message cannot be empty.");
@@ -741,7 +679,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
       return;
     }
 
-    const db = getFirestore();
     try {
       await addDoc(collection(db, "messages"), {
         senderId: renterId,
@@ -750,24 +687,21 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         text: messageText.trim(),
         timestamp: serverTimestamp(),
         participants: [renterId, currentChatOwnerId],
-        rentalRequestId: currentRentalRequest ? currentRentalRequest.id : null,
+        rentalRequestId: selectedNotification?.rentalRequestId || null,
       });
       setMessageText("");
-      // Optionally, provide feedback or reset states
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message.");
     }
   };
 
-  // Toggle Messages Modal and Close Others
   const toggleMessagesModal = () => {
-    setTransactionModalVisible(false);
     setNotificationModalVisible(false);
+    setAllNotificationsModalVisible(false);
     setMessagesModalVisible(!messagesModalVisible);
   };
 
-  // Profile Image Picker
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
@@ -781,7 +715,6 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     }
   };
 
-  // Document Picker for Profile Documents
   const pickDocument = async (field) => {
     let result = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/*"],
@@ -792,14 +725,12 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     }
   };
 
-  // Handle Profile Submission
   const handleProfileSubmit = (values) => {
     setProfileData(values);
     setProfileSaved(true);
     setProfileModalVisible(false);
   };
 
-  // Navigation Function
   const handleNavigation = (filter) => {
     try {
       navigation.navigate("Home", { filter });
@@ -809,19 +740,18 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     }
   };
 
-  // Calculate Rental Cost
   const calculateRentalCost = () => {
     const hours = parseFloat(rentalHours) || 0;
-    const hourlyCost = parseFloat(costPerHour) || 200; 
+    const hourlyCost = parseFloat(costPerHour) || 200;
     const bookingFee = hourlyCost * hours * 0.06;
     const processingFee = hourlyCost * hours * 0.03;
     const tax = hourlyCost * hours * 0.0825;
-    const totalCost = hourlyCost * hours + bookingFee + processingFee + tax;
+    const totalCost =
+      hourlyCost * hours + bookingFee + processingFee + tax;
 
     return totalCost.toFixed(2);
   };
 
-  // Get Current Location for Map Modal (Optional)
   const getCurrentLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
@@ -838,9 +768,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     });
   };
 
-  // Handle Rating Submission
   const handleRating = async (rentalId, rating) => {
-    const db = getFirestore();
     try {
       const rentalDocRef = doc(db, "orders", rentalId);
       await updateDoc(rentalDocRef, { rating });
@@ -852,15 +780,12 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
     }
   };
 
-  // Fetch Messages When currentChatOwnerId Changes
   useEffect(() => {
     if (currentChatOwnerId) {
-      const db = getFirestore();
       const messagesRef = collection(db, "messages");
       const messagesQueryInstance = query(
         messagesRef,
         where("participants", "array-contains", renterId),
-        where("participants", "array-contains", currentChatOwnerId),
         orderBy("timestamp", "asc")
       );
 
@@ -869,7 +794,13 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         (snapshot) => {
           const fetchedMessages = [];
           snapshot.forEach((docSnap) => {
-            fetchedMessages.push(docSnap.data());
+            const messageData = docSnap.data();
+            if (
+              messageData.participants.includes(renterId) &&
+              messageData.participants.includes(currentChatOwnerId)
+            ) {
+              fetchedMessages.push(messageData);
+            }
           });
           setMessages(fetchedMessages);
         },
@@ -881,11 +812,175 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
       return () => unsubscribe();
     } else {
-      setMessages([]); // Clear messages if no owner is selected
+      setMessages([]);
     }
-  }, [currentChatOwnerId]);
+  }, [currentChatOwnerId, renterId]);
 
-  // Render Component
+  const saveSelectedAircraftIds = async (aircraftId) => {
+    if (!aircraftId) {
+      Alert.alert("Error", "Invalid Aircraft ID.");
+      return;
+    }
+
+    const aircraftRef = doc(db, "aircraftDetails", aircraftId);
+
+    try {
+      const aircraftSnap = await getDoc(aircraftRef);
+
+      if (aircraftSnap.exists()) {
+        await updateDoc(aircraftRef, {
+          selectedBy: arrayUnion(renterId),
+          timestamp: serverTimestamp(),
+        });
+        console.log("Selected aircraft ID updated successfully.");
+        Alert.alert("Success", "Aircraft selected successfully.");
+      } else {
+        await setDoc(
+          aircraftRef,
+          {
+            selectedBy: [renterId],
+            timestamp: serverTimestamp(),
+          },
+          { merge: true }
+        );
+        console.log("Selected aircraft ID document created successfully.");
+        Alert.alert(
+          "Success",
+          "Aircraft selected and document created successfully."
+        );
+      }
+    } catch (error) {
+      console.error("Error saving selected aircraft IDs:", error);
+      Alert.alert("Error", "Failed to save selected aircraft ID.");
+    }
+  };
+
+  const handleRentalPress = (rental) => {
+    Alert.alert(
+      "Rental Pressed",
+      `You pressed on rental: ${rental.aircraftModel || "N/A"}`
+    );
+  };
+
+  const fetchMoreRentals = async () => {
+    if (!hasMoreRentals) return;
+
+    try {
+      let rentalRequestsQueryInstance = query(
+        collection(db, "renters", renterId, "rentalRequests"),
+        where("rentalStatus", "in", ["pending", "approved", "active", "denied"]),
+        orderBy("createdAt", "desc"),
+        startAfter(rentalsLastDoc),
+        limit(RENTALS_PAGE_SIZE)
+      );
+
+      const snapshot = await getDocs(rentalRequestsQueryInstance);
+      if (snapshot.empty) {
+        setHasMoreRentals(false);
+        return;
+      }
+
+      const newRentals = [];
+      for (const docSnap of snapshot.docs) {
+        const requestData = docSnap.data();
+        let ownerName = "Unknown Owner";
+        if (requestData.ownerId) {
+          try {
+            const ownerDocRef = doc(db, "owners", requestData.ownerId);
+            const ownerDoc = await getDoc(ownerDocRef);
+            if (ownerDoc.exists()) {
+              ownerName = ownerDoc.data().fullName || "Unknown Owner";
+            }
+          } catch (error) {
+            console.error("Error fetching owner details:", error);
+          }
+        }
+
+        newRentals.push({
+          id: docSnap.id,
+          rentalStatus: requestData.rentalStatus,
+          ...requestData,
+          ownerName,
+        });
+      }
+
+      const ordersSnapshot = await getDocs(
+        query(
+          collection(db, "orders"),
+          where("renterId", "==", renterId),
+          where("status", "==", "completed"),
+          orderBy("completedAt", "desc"),
+          startAfter(rentalsLastDoc),
+          limit(RENTALS_PAGE_SIZE)
+        )
+      );
+      const completed = [];
+      for (const docSnap of ordersSnapshot.docs) {
+        const orderData = docSnap.data();
+        let ownerName = "Unknown Owner";
+        if (orderData.ownerId) {
+          try {
+            const ownerDocRef = doc(db, "owners", orderData.ownerId);
+            const ownerDoc = await getDoc(ownerDocRef);
+            if (ownerDoc.exists()) {
+              ownerName = ownerDoc.data().fullName || "Unknown Owner";
+            }
+          } catch (error) {
+            console.error("Error fetching owner details:", error);
+          }
+        }
+
+        completed.push({
+          id: docSnap.id,
+          rentalStatus: "completed",
+          ...orderData,
+          ownerName,
+        });
+      }
+
+      setRentals([...rentals, ...newRentals, ...completed]);
+
+      const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+      setRentalsLastDoc(lastVisible);
+    } catch (error) {
+      console.error("Error fetching more rentals:", error);
+      Alert.alert("Error", "Failed to fetch more rentals.");
+    }
+  };
+
+  const fetchMoreNotifications = async () => {
+    if (!hasMoreNotifications || !notificationsLastDoc) return;
+
+    try {
+      const notificationsQueryInstance = query(
+        collection(db, "renters", renterId, "notifications"),
+        orderBy("createdAt", "desc"),
+        startAfter(notificationsLastDoc),
+        limit(NOTIFICATIONS_PAGE_SIZE)
+      );
+
+      const snapshot = await getDocs(notificationsQueryInstance);
+      if (snapshot.empty) {
+        setHasMoreNotifications(false);
+        return;
+      }
+
+      const newNotifications = [];
+      snapshot.docs.forEach((docSnap) => {
+        newNotifications.push({
+          id: docSnap.id,
+          ...docSnap.data(),
+        });
+      });
+
+      setAllNotifications([...allNotifications, ...newNotifications]);
+      setNotificationsLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+    } catch (error) {
+      console.error("Error fetching more notifications:", error);
+      Alert.alert("Error", "Failed to fetch more notifications.");
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
       <SafeAreaView style={{ backgroundColor: "white" }}>
@@ -894,7 +989,10 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
 
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { /* Implement refresh logic if needed */ }} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {}}
+          />
         }
         contentContainerStyle={{ paddingBottom: 16 }}
       >
@@ -903,14 +1001,17 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           source={require("../../Assets/images/wingtip_clouds.jpg")}
           style={{
             height: 200,
-            paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+            paddingTop:
+              Platform.OS === "android" ? StatusBar.currentHeight : 0,
             justifyContent: "center",
             paddingHorizontal: 16,
           }}
           resizeMode="cover"
         >
           <SafeAreaView style={{ flex: 1 }}>
-            <Text style={{ fontSize: 20, fontWeight: "bold", color: "white" }}>
+            <Text
+              style={{ fontSize: 20, fontWeight: "bold", color: "white" }}
+            >
               Good afternoon, {user?.displayName || "User"}
             </Text>
             <View
@@ -950,7 +1051,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                   flex: 1,
                   opacity: 0.9,
                 }}
-                onChangeText={setRentalHours}
+                onChangeText={(text) => setRentalHours(text.replace(/[^0-9.]/g, ""))}
                 value={rentalHours}
               />
             </View>
@@ -971,6 +1072,26 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             >
               <Text style={{ textAlign: "center" }}>
                 {preferredLocation || "Preferred City/Airport"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Sample Button to Save Selected Aircraft ID */}
+            {/* Replace this with your actual implementation */}
+            <TouchableOpacity
+              onPress={() => {
+                saveSelectedAircraftIds("1Dj9eQwMcRWWXqtcGHNKEctgjW62");
+                createRentalRequest("1Dj9eQwMcRWWXqtcGHNKEctgjW62"); // Create rental request with listingId
+              }}
+              style={{
+                backgroundColor: "#48bb78",
+                padding: 12,
+                borderRadius: 8,
+                marginTop: 16,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "white", fontWeight: "bold" }}>
+                Select This Aircraft
               </Text>
             </TouchableOpacity>
           </SafeAreaView>
@@ -1147,11 +1268,13 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           {rentals.length > 0 ? (
             <>
               <FlatList
-                data={rentals}
-                keyExtractor={(item, index) => `${item.id}_${index}`} 
+                data={rentals.filter(
+                  (rental) => rental.rentalStatus === "active"
+                )}
+                keyExtractor={(item, index) => `${item.id}_${index}`}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    key={item.id} 
+                    key={item.id}
                     style={{
                       backgroundColor: "#edf2f7",
                       padding: 16,
@@ -1160,36 +1283,57 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                     }}
                     onPress={() => handleRentalPress(item)}
                   >
-                    <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
-                      {item.aircraftModel}
+                    <Text
+                      style={{
+                        fontWeight: "bold",
+                        color: "#2d3748",
+                        fontSize: 16,
+                      }}
+                    >
+                      {item.aircraftModel || "N/A"}
                     </Text>
-                    <Text style={{ color: "#4a5568" }}>Renter: {item.renterName}</Text>
                     <Text style={{ color: "#4a5568" }}>
-                      Rental Period: {item.rentalPeriod}
+                      Owner: {item.ownerName || "N/A"}
                     </Text>
                     <Text style={{ color: "#4a5568" }}>
-                      Total Cost: ${item.totalCost}
+                      Rental Period: {item.rentalDate || "N/A"}
+                    </Text>
+                    <Text style={{ color: "#4a5568" }}>
+                      Total Cost: ${item.totalCost || "N/A"}
                     </Text>
                     <Text>
-                      Payment Status: {item.paymentStatus ? item.paymentStatus : "N/A"}
+                      Payment Status:{" "}
+                      {item.paymentStatus ? item.paymentStatus : "N/A"}
                     </Text>
                     <Text>
-                      Status: {item.rentalStatus.charAt(0).toUpperCase() + item.rentalStatus.slice(1)}
+                      Status:{" "}
+                      {item.rentalStatus.charAt(0).toUpperCase() +
+                        item.rentalStatus.slice(1)}
                     </Text>
                   </TouchableOpacity>
                 )}
                 ListFooterComponent={
                   hasMoreRentals ? (
-                    <ActivityIndicator size="large" color="#3182ce" style={{ marginVertical: 16 }} />
+                    <ActivityIndicator
+                      size="large"
+                      color="#3182ce"
+                      style={{ marginVertical: 16 }}
+                    />
                   ) : (
-                    <Text style={{ textAlign: "center", color: "#4a5568", marginVertical: 16 }}>
+                    <Text
+                      style={{
+                        textAlign: "center",
+                        color: "#4a5568",
+                        marginVertical: 16,
+                      }}
+                    >
                       No more rentals to load.
                     </Text>
                   )
                 }
                 onEndReached={fetchMoreRentals}
                 onEndReachedThreshold={0.5}
-                scrollEnabled={false} // Disable scrolling for nested FlatList
+                scrollEnabled={false}
               />
 
               {hasMoreRentals && (
@@ -1203,7 +1347,9 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                     marginTop: 8,
                   }}
                 >
-                  <Text style={{ color: "white", fontWeight: "bold" }}>Load More</Text>
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    Load More
+                  </Text>
                 </TouchableOpacity>
               )}
             </>
@@ -1222,7 +1368,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           {allNotifications.length > 0 ? (
             <FlatList
               data={allNotifications}
-              keyExtractor={(item, index) => `${item.id}_${index}`} 
+              keyExtractor={(item, index) => `${item.id}_${index}`}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   key={item.id}
@@ -1234,7 +1380,13 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                   }}
                   onPress={() => handleNotificationPress(item)}
                 >
-                  <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
+                  <Text
+                    style={{
+                      fontWeight: "bold",
+                      color: "#2d3748",
+                      fontSize: 16,
+                    }}
+                  >
                     {item.message}
                   </Text>
                   <Text style={{ color: "#4a5568" }}>
@@ -1248,16 +1400,26 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
               )}
               ListFooterComponent={
                 hasMoreNotifications ? (
-                  <ActivityIndicator size="large" color="#3182ce" style={{ marginVertical: 16 }} />
+                  <ActivityIndicator
+                    size="large"
+                    color="#3182ce"
+                    style={{ marginVertical: 16 }}
+                  />
                 ) : (
-                  <Text style={{ textAlign: "center", color: "#4a5568", marginVertical: 16 }}>
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      color: "#4a5568",
+                      marginVertical: 16,
+                    }}
+                  >
                     No more notifications to load.
                   </Text>
                 )
               }
               onEndReached={fetchMoreNotifications}
               onEndReachedThreshold={0.5}
-              scrollEnabled={false} // Disable scrolling for nested FlatList
+              scrollEnabled={false}
             />
           ) : (
             <Text style={{ textAlign: "center", color: "#718096" }}>
@@ -1272,17 +1434,19 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
               style={{
                 alignItems: "center",
                 padding: 12,
-                backgroundColor: "#e53e3e", // Red color to indicate deletion
+                backgroundColor: "#e53e3e",
                 borderRadius: 8,
                 marginTop: 8,
               }}
             >
-              <Text style={{ color: "white", fontWeight: "bold" }}>Remove All</Text>
+              <Text style={{ color: "white", fontWeight: "bold" }}>
+                Remove All
+              </Text>
             </TouchableOpacity>
           )}
 
           {/* "View All" Button */}
-          {notifications.length > 3 && (
+          {allNotifications.length > 3 && (
             <TouchableOpacity
               onPress={() => setAllNotificationsModalVisible(true)}
               style={{
@@ -1293,7 +1457,9 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                 marginTop: 8,
               }}
             >
-              <Text style={{ color: "white", fontWeight: "bold" }}>View All</Text>
+              <Text style={{ color: "white", fontWeight: "bold" }}>
+                View All
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1308,15 +1474,14 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
             <Text style={styles.profileValue}>{profileData.name}</Text>
           </View>
           {profileData.image && (
-            <Image
-              source={{ uri: profileData.image }}
-              style={styles.profileImage}
-            />
+            <Image source={{ uri: profileData.image }} style={styles.profileImage} />
           )}
         </View>
       ) : (
         <View style={styles.profileContainer}>
-          <Text style={styles.profileTitle}>No Profile Information Available</Text>
+          <Text style={styles.profileTitle}>
+            No Profile Information Available
+          </Text>
         </View>
       )}
 
@@ -1340,12 +1505,24 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                 <Ionicons name="close-circle" size={32} color="#2d3748" />
               </TouchableOpacity>
 
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "bold",
+                  marginBottom: 16,
+                  textAlign: "center",
+                  color: "#2d3748",
+                }}
+              >
+                Messages
+              </Text>
+
               {messages.length > 0 ? (
                 <FlatList
                   data={messages}
                   keyExtractor={(item, index) =>
                     `${item.senderId}_${item.timestamp?.seconds}_${item.timestamp?.nanoseconds}_${index}`
-                  } 
+                  }
                   renderItem={({ item }) => (
                     <View
                       style={[
@@ -1368,7 +1545,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                       </Text>
                     </View>
                   )}
-                  scrollEnabled={false} // Disable scrolling for nested FlatList
+                  scrollEnabled={false}
                 />
               ) : (
                 <Text>No messages yet.</Text>
@@ -1392,114 +1569,12 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Transaction Modal */}
-      <Modal
-        visible={transactionModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setTransactionModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.transactionModalContainer}>
-              <TouchableOpacity
-                onPress={() => setTransactionModalVisible(false)}
-                style={styles.closeModalButton}
-              >
-                <Ionicons name="close-circle" size={32} color="#2d3748" />
-              </TouchableOpacity>
-
-              {currentRentalRequest ? (
-                <ScrollView contentContainerStyle={{ padding: 16 }}>
-                  <Text
-                    style={{
-                      fontSize: 20,
-                      fontWeight: "bold",
-                      marginBottom: 16,
-                      textAlign: "center",
-                      color: "#2d3748",
-                    }}
-                  >
-                    Transaction Details
-                  </Text>
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                      Aircraft Model:
-                    </Text>
-                    <Text style={{ color: "#4a5568" }}>
-                      {currentRentalRequest.aircraftModel}
-                    </Text>
-                  </View>
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                      Rental Period:
-                    </Text>
-                    <Text style={{ color: "#4a5568" }}>
-                      {currentRentalRequest.rentalPeriod}
-                    </Text>
-                  </View>
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                      Pricing Details:
-                    </Text>
-                    <Text style={{ color: "#4a5568" }}>
-                      Cost per Hour: ${currentRentalRequest.costPerHour || costPerHour}
-                    </Text>
-                    <Text style={{ color: "#4a5568" }}>
-                      Number of Hours: {currentRentalRequest.rentalHours || rentalHours}
-                    </Text>
-                    <Text style={{ color: "#4a5568" }}>
-                      Total Cost: ${currentRentalRequest.totalCost || calculateRentalCost()}
-                    </Text>
-                  </View>
-
-                  {/* Proceed to Pay Button (Only Visible When rentalRequest Exists) */}
-                  {currentRentalRequest && (
-                    <TouchableOpacity
-                      onPress={() => navigateToCheckout(currentRentalRequest)} 
-                      style={styles.paymentButton}
-                    >
-                      <Text style={styles.paymentButtonText}>Proceed to Pay</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Message Owner Button */}
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (currentRentalRequest?.ownerId) {
-                        setCurrentChatOwnerId(currentRentalRequest.ownerId);
-                        setMessagesModalVisible(true);
-                      } else {
-                        Alert.alert("Error", "No owner available to message.");
-                      }
-                    }}
-                    style={styles.messageOwnerButton}
-                  >
-                    <Text style={styles.messageOwnerButtonText}>Message Owner</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              ) : (
-                <Text style={{ textAlign: "center", color: "#718096" }}>
-                  No rental request available for payment.
-                </Text>
-              )}
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
       {/* Notification Modal */}
       <Modal
         visible={notificationModalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => {
-          setNotificationModalVisible(false);
-          setSelectedNotification(null); // Reset selectedNotification when modal is closed
-        }}
+        onRequestClose={closeModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1508,10 +1583,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
           <View style={styles.modalOverlay}>
             <View style={styles.notificationModalContainer}>
               <TouchableOpacity
-                onPress={() => {
-                  setNotificationModalVisible(false);
-                  setSelectedNotification(null); // Reset selectedNotification when modal is closed
-                }}
+                onPress={closeModal}
                 style={styles.closeModalButton}
               >
                 <Ionicons name="close-circle" size={32} color="#2d3748" />
@@ -1553,52 +1625,43 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                     <Text style={{ color: "#4a5568" }}>
                       {selectedNotification.createdAt
                         ? selectedNotification.createdAt.toDate
-                          ? selectedNotification.createdAt.toDate().toLocaleString()
+                          ? selectedNotification.createdAt
+                              .toDate()
+                              .toLocaleString()
                           : new Date(selectedNotification.createdAt).toLocaleString()
                         : "N/A"}
                     </Text>
                   </View>
 
-                  {/* Additional Rental Details if Available */}
-                  {selectedNotification.rentalRequestId && currentRentalRequest && (
-                    <>
-                      <View style={{ marginBottom: 16 }}>
-                        <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                          Aircraft Model:
-                        </Text>
-                        <Text style={{ color: "#4a5568" }}>
-                          {currentRentalRequest.aircraftModel}
-                        </Text>
-                      </View>
-                      <View style={{ marginBottom: 16 }}>
-                        <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                          Rental Period:
-                        </Text>
-                        <Text style={{ color: "#4a5568" }}>
-                          {currentRentalRequest.rentalPeriod}
-                        </Text>
-                      </View>
-                      <View style={{ marginBottom: 16 }}>
-                        <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                          Pricing Details:
-                        </Text>
-                        <Text style={{ color: "#4a5568" }}>
-                          Cost per Hour: ${currentRentalRequest.costPerHour || costPerHour}
-                        </Text>
-                        <Text style={{ color: "#4a5568" }}>
-                          Number of Hours: {currentRentalRequest.rentalHours || rentalHours}
-                        </Text>
-                        <Text style={{ color: "#4a5568" }}>
-                          Total Cost: ${currentRentalRequest.totalCost || calculateRentalCost()}
-                        </Text>
-                      </View>
-                    </>
+                  {/* Rental Details */}
+                  {selectedRentalRequest && selectedListing && (
+                    <View style={{ marginBottom: 16 }}>
+                      <Text
+                        style={{
+                          fontWeight: "bold",
+                          color: "#2d3748",
+                        }}
+                      >
+                        Rental Details:
+                      </Text>
+                      <Text style={{ color: "#4a5568" }}>
+                        Aircraft Model: {selectedListing.aircraft || "N/A"}
+                      </Text>
+                      <Text style={{ color: "#4a5568" }}>
+                        Rental Period: {selectedRentalRequest.rentalDate || "N/A"}
+                      </Text>
+                      <Text style={{ color: "#4a5568" }}>
+                        Total Cost: ${totalCost !== null ? totalCost : "N/A"}
+                      </Text>
+                    </View>
                   )}
 
-                  {/* Proceed to Pay Button (Only Visible When rentalRequest Exists) */}
-                  {currentRentalRequest && (
+                  {/* Proceed to Pay Button */}
+                  {selectedNotification.rentalStatus !== "denied" && totalCost && (
                     <TouchableOpacity
-                      onPress={() => navigateToCheckout(currentRentalRequest)} 
+                      onPress={() =>
+                        navigateToCheckout(selectedNotification.rentalRequestId)
+                      }
                       style={styles.paymentButton}
                     >
                       <Text style={styles.paymentButtonText}>Proceed to Pay</Text>
@@ -1606,31 +1669,30 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                   )}
 
                   {/* Message Owner Button */}
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (currentRentalRequest?.ownerId) {
-                        setCurrentChatOwnerId(currentRentalRequest.ownerId);
+                  {selectedNotification.ownerId && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setCurrentChatOwnerId(selectedNotification.ownerId);
                         setMessagesModalVisible(true);
-                      } else {
-                        Alert.alert("Error", "No owner available to message.");
-                      }
-                    }}
-                    style={styles.messageOwnerButton}
-                  >
-                    <Text style={styles.messageOwnerButtonText}>Message Owner</Text>
-                  </TouchableOpacity>
+                      }}
+                      style={styles.messageOwnerButton}
+                    >
+                      <Text style={styles.messageOwnerButtonText}>
+                        Message Owner
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
-                  {/* Close Button for All Notifications */}
+                  {/* Close Button */}
                   <TouchableOpacity
-                    onPress={() => {
-                      setNotificationModalVisible(false);
-                      setSelectedNotification(null); // Reset selectedNotification when modal is closed
-                    }}
+                    onPress={closeModal}
                     style={styles.closeButton}
                   >
                     <Text style={styles.closeButtonText}>Close</Text>
                   </TouchableOpacity>
                 </ScrollView>
+              ) : isRentalRequestLoading ? (
+                <ActivityIndicator size="large" color="#3182ce" />
               ) : (
                 <ActivityIndicator size="large" color="#3182ce" />
               )}
@@ -1674,7 +1736,7 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
               {allNotifications.length > 0 ? (
                 <FlatList
                   data={allNotifications}
-                  keyExtractor={(item, index) => `${item.id}_${index}`} 
+                  keyExtractor={(item, index) => `${item.id}_${index}`}
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       key={item.id}
@@ -1686,10 +1748,16 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                       }}
                       onPress={() => {
                         handleNotificationPress(item);
-                        setAllNotificationsModalVisible(false); 
+                        setAllNotificationsModalVisible(false);
                       }}
                     >
-                      <Text style={{ fontWeight: "bold", color: "#2d3748", fontSize: 16 }}>
+                      <Text
+                        style={{
+                          fontWeight: "bold",
+                          color: "#2d3748",
+                          fontSize: 16,
+                        }}
+                      >
                         {item.message}
                       </Text>
                       <Text style={{ color: "#4a5568" }}>
@@ -1703,16 +1771,26 @@ const BookingCalendar = ({ airplaneId, ownerId }) => {
                   )}
                   ListFooterComponent={
                     hasMoreNotifications ? (
-                      <ActivityIndicator size="large" color="#3182ce" style={{ marginVertical: 16 }} />
+                      <ActivityIndicator
+                        size="large"
+                        color="#3182ce"
+                        style={{ marginVertical: 16 }}
+                      />
                     ) : (
-                      <Text style={{ textAlign: "center", color: "#4a5568", marginVertical: 16 }}>
+                      <Text
+                        style={{
+                          textAlign: "center",
+                          color: "#4a5568",
+                          marginVertical: 16,
+                        }}
+                      >
                         No more notifications to load.
                       </Text>
                     )
                   }
                   onEndReached={fetchMoreNotifications}
                   onEndReachedThreshold={0.5}
-                  scrollEnabled={false} // Disable scrolling for nested FlatList
+                  scrollEnabled={false}
                 />
               ) : (
                 <Text style={{ textAlign: "center", color: "#718096" }}>
@@ -1741,7 +1819,10 @@ const BookingNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="BookingCalendar" component={BookingCalendar} />
         <Stack.Screen name="CheckoutScreen" component={CheckoutScreen} />
-        <Stack.Screen name="ConfirmationScreen" component={ConfirmationScreen} />
+        <Stack.Screen
+          name="ConfirmationScreen"
+          component={ConfirmationScreen}
+        />
         <Stack.Screen name="Messages" component={MessagesScreen} />
       </Stack.Navigator>
     </NavigationContainer>
@@ -1774,15 +1855,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     position: "relative",
-  },
-  transactionModalContainer: {
-    width: "90%",
-    backgroundColor: "white",
-    borderRadius: 24,
-    padding: 24,
-    position: "relative",
-    maxHeight: "80%",
-    flex: 1,
   },
   notificationModalContainer: {
     width: "100%",
@@ -1895,8 +1967,8 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
   },
-  messageOwnerButton: { // New Style for "Message Owner" Button
-    backgroundColor: "#38a169", // Green color to indicate action
+  messageOwnerButton: {
+    backgroundColor: "#38a169",
     padding: 16,
     borderRadius: 8,
     alignItems: "center",

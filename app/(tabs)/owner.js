@@ -30,7 +30,6 @@ import {
   deleteDoc,
   doc,
   getDoc,
-  getDocs,
   setDoc,
   serverTimestamp,
   writeBatch,
@@ -39,7 +38,7 @@ import {
   orderBy,
   limit,
   startAfter,
-  deleteField, // Added import for deleteField
+  getDocs,
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -218,6 +217,9 @@ const OwnerProfile = ({ ownerId }) => {
   const [hasMoreActiveRentals, setHasMoreActiveRentals] = useState(true);
   const ACTIVE_RENTALS_PAGE_SIZE = 10; // Number of rentals to fetch per page
 
+  // *** NEW: State for Cleanup Loading ***
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+
   // Function to handle withdrawal
   const handleWithdraw = async () => {
     // Validate Withdrawal Amount
@@ -277,13 +279,14 @@ const OwnerProfile = ({ ownerId }) => {
 
       if (paymentMethod === "card") {
         // Create a Stripe payment method using the CardField
-        const { error, paymentMethod } = await stripe.createPaymentMethod({
-          type: "Card",
-          card: cardDetails,
-          billingDetails: {
-            name: user.displayName || "Owner",
-          },
-        });
+        const { error, paymentMethod: stripePaymentMethod } =
+          await stripe.createPaymentMethod({
+            type: "Card",
+            card: cardDetails,
+            billingDetails: {
+              name: user.displayName || "Owner",
+            },
+          });
 
         if (error) {
           Alert.alert("Card Error", error.message);
@@ -291,7 +294,7 @@ const OwnerProfile = ({ ownerId }) => {
           return;
         }
 
-        paymentMethodId = paymentMethod.id;
+        paymentMethodId = stripePaymentMethod.id;
       }
 
       // Proceed with withdrawal via backend
@@ -421,7 +424,7 @@ const OwnerProfile = ({ ownerId }) => {
     }
   }, [selectedAircraftIds, resolvedOwnerId]);
 
-  // Fetch rental requests with renter details and chat thread data
+  // *** UPDATED: Fetch rental requests with correct field mapping ***
   useEffect(() => {
     if (resolvedOwnerId) {
       const rentalRequestsQueryInstance = collection(
@@ -438,48 +441,21 @@ const OwnerProfile = ({ ownerId }) => {
             snapshot.docs.map(async (docSnap, index) => {
               const requestData = docSnap.data();
 
-              // *** UPDATED: Added comprehensive logging ***
               console.log(`Processing Rental Request ID: ${docSnap.id}`);
               console.log(`Request Data:`, requestData);
 
-              let renterName = "Anonymous";
-              let renterCityState = "N/A";
-              let flightHours = "N/A";
-              let currentMedical = "N/A";
-              let currentRentersInsurance = "N/A";
+              // *** UPDATED: Extract fields directly from rental request data ***
+              let renterName = requestData.renterName || "Anonymous";
+              let renterCityState = requestData.currentLocation || "N/A";
+              let flightHours =
+                requestData.flightHours != null ? requestData.flightHours : "N/A";
+              let currentMedical = requestData.hasMedicalCertificate
+                ? "Yes"
+                : "No";
+              let currentRentersInsurance = requestData.hasRentersInsurance
+                ? "Yes"
+                : "No";
 
-              if (!requestData.renterId) {
-                console.warn(
-                  `Rental Request ID: ${docSnap.id} is missing renterId.`
-                );
-              }
-
-              if (requestData.renterId) {
-                try {
-                  const renterDocRef = doc(db, "renters", requestData.renterId);
-                  const renterDoc = await getDoc(renterDocRef);
-                  if (renterDoc.exists()) {
-                    const renterData = renterDoc.data();
-                    renterName = renterData.fullName || "Anonymous";
-                    renterCityState =
-                      renterData.city && renterData.state
-                        ? `${renterData.city}, ${renterData.state}`
-                        : "N/A";
-                    flightHours = renterData.flightHours || "N/A";
-                    currentMedical = renterData.currentMedical || "N/A";
-                    currentRentersInsurance =
-                      renterData.currentRentersInsurance || "N/A";
-                  } else {
-                    console.warn(
-                      `Renter document does not exist for renterId: ${requestData.renterId}`
-                    );
-                  }
-                } catch (error) {
-                  console.error("Error fetching renter's details:", error);
-                }
-              }
-
-              // *** UPDATED: Log listingId before fetching ***
               console.log(
                 `Fetching Listing Details for listingId: ${requestData.listingId}`
               );
@@ -515,58 +491,25 @@ const OwnerProfile = ({ ownerId }) => {
             })
           );
 
-          // Separate rental requests into pending and approved (active) rentals
+          // Separate rental requests into pending and active (status: "active")
           const pendingRequests = requestsWithNamesAndListings.filter(
             (req) => req.status === "pending"
           );
-          const approvedRentals = requestsWithNamesAndListings.filter(
-            (req) => req.status === "approved"
+          const activeRentals = requestsWithNamesAndListings.filter(
+            (req) => req.status === "active"
           );
 
           setRentalRequests(pendingRequests);
-          setActiveRentals(approvedRentals); // Set Active Rentals
+          setActiveRentals(activeRentals); // Set Active Rentals
 
           console.log(`Pending Requests: ${pendingRequests.length}`);
-          console.log(`Approved Rentals: ${approvedRentals.length}`);
+          console.log(`Active Rentals: ${activeRentals.length}`);
         }
       );
 
       return () => {
         unsubscribeRentalRequests();
       };
-    }
-  }, [resolvedOwnerId]);
-
-  // Subscribe to messages in a chat thread
-  useEffect(() => {
-    if (selectedChatThreadId) {
-      const chatDocRef = doc(db, "messages", selectedChatThreadId);
-      const unsubscribe = onSnapshot(chatDocRef, (docSnapshot) => {
-        if (docSnapshot.exists()) {
-          const chatData = docSnapshot.data();
-          setMessages(chatData.messages || []);
-        }
-      });
-      return () => unsubscribe();
-    } else {
-      setMessages([]);
-    }
-  }, [selectedChatThreadId]);
-
-  // Fetch available balance on mount and listen for updates
-  useEffect(() => {
-    if (resolvedOwnerId) {
-      const balanceRef = doc(db, "owners", resolvedOwnerId);
-      const unsubscribe = onSnapshot(balanceRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setAvailableBalance(data.availableBalance || 0);
-        } else {
-          setAvailableBalance(0);
-        }
-      });
-
-      return () => unsubscribe();
     }
   }, [resolvedOwnerId]);
 
@@ -896,7 +839,10 @@ const OwnerProfile = ({ ownerId }) => {
   const onSubmitMethod = async (aircraft, additional = false) => {
     // Validate necessary fields from the passed aircraft
     if (!aircraft.location || aircraft.location.trim() === "") {
-      Alert.alert("Error", "Location is required for the selected aircraft.");
+      Alert.alert(
+        "Error",
+        "Location is required for the selected aircraft."
+      );
       return;
     }
 
@@ -1019,10 +965,10 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  // **UPDATED: handleApproveRentalRequest with comprehensive logging and error handling**
+  // *** UPDATED: handleApproveRentalRequest with comprehensive logging and error handling ***
   const handleApproveRentalRequest = async (request) => {
     try {
-      if (!request.renterId || !request.listingId || !request.rentalPeriod) {
+      if (!request.listingId || !request.rentalPeriod) {
         console.error("Invalid request data: ", request);
         Alert.alert(
           "Error",
@@ -1031,34 +977,72 @@ const OwnerProfile = ({ ownerId }) => {
         return;
       }
 
-      // Update the rental request status
-      const rentalRequestRef = doc(
+      const renterId = request.renterId;
+      if (!renterId) {
+        console.error("Rental Request is missing renterId: ", request);
+        Alert.alert("Error", "Rental request is missing renter ID.");
+        return;
+      }
+
+      const ownerName = user.displayName || "Unknown Owner";
+
+      // Start a batch write to ensure atomicity
+      const batch = writeBatch(db);
+
+      // Update the rental request status to 'active' in owner's collection
+      const ownerRentalRef = doc(
         db,
         "owners",
         resolvedOwnerId,
         "rentalRequests",
         request.id
       );
-      await updateDoc(rentalRequestRef, {
-        status: "approved",
+      batch.update(ownerRentalRef, {
+        status: "active",
         rentalDate: request.rentalPeriod, // Use the date from the request
       });
 
-      // Notify the renter
-      await addDoc(
-        collection(db, "renters", request.renterId, "notifications"),
-        {
-          type: "rentalApproved",
-          message:
-            "Your rental request has been approved. Please complete the payment.",
-          listingId: request.listingId,
-          ownerId: resolvedOwnerId,
-          rentalDate: request.rentalPeriod,
-          createdAt: serverTimestamp(),
-        }
+      // *** UPDATED: Use setDoc with merge: true to ensure the document is created if it doesn't exist ***
+      // Update the rental request status to 'active' in renter's collection
+      const renterRentalRef = doc(
+        db,
+        "renters",
+        renterId,
+        "rentalRequests",
+        request.id
       );
+      batch.set(renterRentalRef, {
+        status: "active",
+        rentalDate: request.rentalPeriod,
+      }, { merge: true });
 
-      // **Modified Query: Use only one array-contains filter**
+      // Notify the renter with rentalRequestId *** UPDATED ***
+      const notificationRef = collection(
+        db,
+        "renters",
+        renterId,
+        "notifications"
+      );
+      const notificationData = {
+        type: "rentalApproved",
+        message:
+          "Your rental request has been approved. Please complete the payment.",
+        rentalRequestId: request.id, // Include rentalRequestId
+        listingId: request.listingId,
+        ownerId: resolvedOwnerId,
+        ownerName: ownerName, // Include owner name
+        rentalDate: request.rentalPeriod,
+        createdAt: serverTimestamp(),
+      };
+      const notificationDoc = doc(notificationRef); // Auto-generated ID
+      batch.set(notificationDoc, notificationData);
+
+      // Commit the batch
+      await batch.commit();
+
+      console.log("Batch commit successful for approving rental request.");
+
+      // Handle Chat Threads
       const chatThreadsQuery = query(
         collection(db, "messages"),
         where("participants", "array-contains", resolvedOwnerId)
@@ -1071,7 +1055,7 @@ const OwnerProfile = ({ ownerId }) => {
         const chatData = docSnap.data();
         if (
           chatData.participants.includes(resolvedOwnerId) &&
-          chatData.participants.includes(request.renterId)
+          chatData.participants.includes(renterId)
         ) {
           existingChatThread = { id: docSnap.id, ...chatData };
         }
@@ -1081,9 +1065,9 @@ const OwnerProfile = ({ ownerId }) => {
 
       if (!chatThreadId) {
         const chatThread = {
-          participants: [resolvedOwnerId, request.renterId],
+          participants: [resolvedOwnerId, renterId],
           messages: [],
-          rentalRequestId: request.id,
+          rentalRequestId: request.id, // Link chat thread to rentalRequestId *** UPDATED ***
           createdAt: serverTimestamp(),
         };
         const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
@@ -1115,31 +1099,68 @@ const OwnerProfile = ({ ownerId }) => {
         return;
       }
 
-      if (!request.renterId || !request.listingId) {
-        console.error("Invalid request data: ", request);
-        Alert.alert("Error", "Request data is invalid.");
+      const renterId = request.renterId;
+      if (!renterId) {
+        console.error("Rental Request is missing renterId: ", request);
+        Alert.alert("Error", "Rental request is missing renter ID.");
         return;
       }
 
-      const rentalRequestRef = doc(
+      if (!request.listingId) {
+        console.error("Rental Request is missing listingId: ", request);
+        Alert.alert("Error", "Rental request is missing listing ID.");
+        return;
+      }
+
+      // Start a batch write to ensure atomicity
+      const batch = writeBatch(db);
+
+      // Update the rental request status to 'denied' in owner's collection
+      const ownerRentalRef = doc(
         db,
         "owners",
         resolvedOwnerId,
         "rentalRequests",
         request.id
       );
-      await updateDoc(rentalRequestRef, { status: "denied" });
+      batch.update(ownerRentalRef, {
+        status: "denied",
+      });
 
-      await addDoc(
-        collection(db, "renters", request.renterId, "notifications"),
-        {
-          type: "rentalDenied",
-          message: "Your rental request has been denied by the owner.",
-          listingId: request.listingId,
-          ownerId: resolvedOwnerId,
-          createdAt: serverTimestamp(),
-        }
+      // Update the rental request status to 'denied' in renter's collection
+      const renterRentalRef = doc(
+        db,
+        "renters",
+        renterId,
+        "rentalRequests",
+        request.id
       );
+      batch.update(renterRentalRef, {
+        status: "denied",
+      });
+
+      // Notify the renter with rentalRequestId *** UPDATED ***
+      const notificationRef = collection(
+        db,
+        "renters",
+        renterId,
+        "notifications"
+      );
+      const notificationData = {
+        type: "rentalDenied",
+        message: "Your rental request has been denied by the owner.",
+        rentalRequestId: request.id, // Include rentalRequestId
+        listingId: request.listingId,
+        ownerId: resolvedOwnerId,
+        createdAt: serverTimestamp(),
+      };
+      const notificationDoc = doc(notificationRef); // Auto-generated ID
+      batch.set(notificationDoc, notificationData);
+
+      // Commit the batch
+      await batch.commit();
+
+      console.log("Batch commit successful for denying rental request.");
 
       Alert.alert("Request Denied", "The rental request has been denied.");
       setRentalRequestModalVisible(false);
@@ -1151,6 +1172,11 @@ const OwnerProfile = ({ ownerId }) => {
 
   const fetchListingDetails = async (listingId) => {
     try {
+      if (!listingId) {
+        console.warn(`Missing listingId.`);
+        return null;
+      }
+
       const listingDocRef = doc(db, "airplanes", listingId);
       const listingDoc = await getDoc(listingDocRef);
       if (listingDoc.exists()) {
@@ -1259,6 +1285,7 @@ const OwnerProfile = ({ ownerId }) => {
 
   // Function to clean up orphaned rental requests
   const cleanupOrphanedRentalRequests = async () => {
+    const BATCH_SIZE = 500;
     try {
       const rentalRequestsRef = collection(
         db,
@@ -1273,10 +1300,11 @@ const OwnerProfile = ({ ownerId }) => {
         return;
       }
 
-      const batch = writeBatch(db);
+      let batch = writeBatch(db);
       let deletions = 0;
 
-      for (const docSnap of snapshot.docs) {
+      for (let i = 0; i < snapshot.docs.length; i++) {
+        const docSnap = snapshot.docs[i];
         const requestData = docSnap.data();
         const renterId = requestData.renterId;
 
@@ -1284,21 +1312,30 @@ const OwnerProfile = ({ ownerId }) => {
           // If renterId is missing, delete the rental request
           batch.delete(docSnap.ref);
           deletions += 1;
-          continue;
+        } else {
+          const renterDocRef = doc(db, "renters", renterId);
+          const renterDocSnap = await getDoc(renterDocRef);
+          if (!renterDocSnap.exists()) {
+            // If renter document does not exist, delete the rental request
+            batch.delete(docSnap.ref);
+            deletions += 1;
+          }
         }
 
-        const renterDocRef = doc(db, "renters", renterId);
-        const renterDocSnap = await getDoc(renterDocRef);
-
-        if (!renterDocSnap.exists()) {
-          // If renter document does not exist, delete the rental request
-          batch.delete(docSnap.ref);
-          deletions += 1;
+        // Commit the batch every BATCH_SIZE deletions
+        if (deletions % BATCH_SIZE === 0 && deletions > 0) {
+          await batch.commit();
+          console.log(`${deletions} rental requests deleted so far...`);
+          batch = writeBatch(db); // Reset the batch
         }
       }
 
-      if (deletions > 0) {
+      // Commit any remaining deletions
+      if (deletions % BATCH_SIZE !== 0) {
         await batch.commit();
+      }
+
+      if (deletions > 0) {
         Alert.alert(
           "Cleanup Complete",
           `${deletions} orphaned rental request(s) have been deleted.`
@@ -1312,189 +1349,82 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  // Function to delete all active rentals
-  const deleteAllActiveRentals = async () => {
+  // Function to clean up orphaned listings
+  const cleanupOrphanedListings = async () => {
+    const BATCH_SIZE = 500;
     try {
-      const rentalRequestsRef = collection(
-        db,
-        "owners",
-        resolvedOwnerId,
-        "rentalRequests"
-      );
-      const activeRentalsQuery = query(
-        rentalRequestsRef,
-        where("status", "==", "approved"),
-        orderBy("createdAt", "desc"),
-        limit(500) // Firestore batch limit
-      );
-
-      const snapshot = await getDocs(activeRentalsQuery);
+      const listingsRef = collection(db, "newListing");
+      const snapshot = await getDocs(listingsRef);
 
       if (snapshot.empty) {
-        Alert.alert("Delete All", "No active rentals found to delete.");
+        Alert.alert("Cleanup", "No listings found to clean up.");
         return;
       }
 
-      const batch = writeBatch(db);
-      const renterIdsToDelete = new Set();
+      let batch = writeBatch(db);
+      let deletions = 0;
 
-      snapshot.docs.forEach((docSnap) => {
-        const rentalData = docSnap.data();
-        const renterId = rentalData.renterId;
+      for (let i = 0; i < snapshot.docs.length; i++) {
+        const docSnap = snapshot.docs[i];
+        const listingData = docSnap.data();
+        const renterId = listingData.renterId;
 
-        batch.delete(docSnap.ref);
         if (renterId) {
-          renterIdsToDelete.add(renterId);
-        }
-      });
-
-      // Fetch renter documents to delete
-      const renterPromises = Array.from(renterIdsToDelete).map(
-        async (renterId) => {
-          const renterRef = doc(db, "renters", renterId);
-          const renterDoc = await getDoc(renterRef);
-          if (renterDoc.exists()) {
-            batch.delete(renterRef);
-          } else {
-            console.warn(
-              `Renter document does not exist for renterId: ${renterId}`
-            );
+          const renterDocRef = doc(db, "renters", renterId);
+          const renterDocSnap = await getDoc(renterDocRef);
+          if (!renterDocSnap.exists()) {
+            // If renter document does not exist, delete the listing
+            batch.delete(docSnap.ref);
+            deletions += 1;
           }
+        } else {
+          // If renterId is missing, delete the listing
+          batch.delete(docSnap.ref);
+          deletions += 1;
         }
-      );
 
-      await Promise.all(renterPromises);
-
-      await batch.commit();
-      Alert.alert(
-        "Delete All Complete",
-        "All active rentals have been deleted."
-      );
-      setActiveRentals([]); // Update state
-    } catch (error) {
-      console.error("Error deleting all active rentals:", error);
-      Alert.alert("Error", "Failed to delete active rentals.");
-    }
-  };
-
-  // Function to fetch active rentals with pagination
-  const fetchActiveRentals = async () => {
-    if (!hasMoreActiveRentals) return;
-
-    try {
-      let activeRentalsQueryInstance = query(
-        collection(db, "owners", resolvedOwnerId, "rentalRequests"),
-        where("status", "==", "approved"),
-        orderBy("createdAt", "desc"),
-        limit(ACTIVE_RENTALS_PAGE_SIZE)
-      );
-
-      if (lastActiveRentalDoc) {
-        activeRentalsQueryInstance = query(
-          collection(db, "owners", resolvedOwnerId, "rentalRequests"),
-          where("status", "==", "approved"),
-          orderBy("createdAt", "desc"),
-          startAfter(lastActiveRentalDoc),
-          limit(ACTIVE_RENTALS_PAGE_SIZE)
-        );
+        // Commit the batch every BATCH_SIZE deletions
+        if (deletions % BATCH_SIZE === 0 && deletions > 0) {
+          await batch.commit();
+          console.log(`${deletions} listings deleted so far...`);
+          batch = writeBatch(db); // Reset the batch
+        }
       }
 
-      const snapshot = await getDocs(activeRentalsQueryInstance);
+      // Commit any remaining deletions
+      if (deletions % BATCH_SIZE !== 0) {
+        await batch.commit();
+      }
 
-      if (!snapshot.empty) {
-        const rentalsData = await Promise.all(
-          snapshot.docs.map(async (docSnap) => {
-            const rentalData = docSnap.data();
-            let renterName = "Anonymous";
-            let renterCityState = "N/A";
-            let flightHours = "N/A";
-            let currentMedical = "N/A";
-            let currentRentersInsurance = "N/A";
-
-            if (rentalData.renterId) {
-              try {
-                const renterDocRef = doc(db, "renters", rentalData.renterId);
-                const renterDoc = await getDoc(renterDocRef);
-                if (renterDoc.exists()) {
-                  const renterData = renterDoc.data();
-                  renterName = renterData.fullName || "Anonymous";
-                  renterCityState =
-                    renterData.city && renterData.state
-                      ? `${renterData.city}, ${renterData.state}`
-                      : "N/A";
-                  flightHours = renterData.flightHours || "N/A";
-                  currentMedical = renterData.currentMedical || "N/A";
-                  currentRentersInsurance =
-                    renterData.currentRentersInsurance || "N/A";
-                } else {
-                  console.warn(
-                    `Renter document does not exist for renterId: ${rentalData.renterId}`
-                  );
-                }
-              } catch (error) {
-                console.error("Error fetching renter's details:", error);
-              }
-            }
-
-            const listingDetails = rentalData.listingId
-              ? await fetchListingDetails(rentalData.listingId)
-              : null;
-
-            if (!listingDetails) {
-              console.warn(
-                `Listing details not found for listingId: ${rentalData.listingId}`
-              );
-            } else {
-              console.log(`Fetched Listing Details:`, listingDetails);
-            }
-
-            return {
-              id: docSnap.id,
-              ...rentalData,
-              renterName,
-              renterCityState,
-              flightHours,
-              currentMedical,
-              currentRentersInsurance,
-              listingDetails,
-            };
-          })
+      if (deletions > 0) {
+        Alert.alert(
+          "Cleanup Complete",
+          `${deletions} orphaned listing(s) have been deleted.`
         );
-
-        setActiveRentalsPage((prevPage) => [...prevPage, ...rentalsData]);
-
-        const lastVisible = snapshot.docs[snapshot.docs.length - 1];
-        setLastActiveRentalDoc(lastVisible);
-
-        if (snapshot.docs.length < ACTIVE_RENTALS_PAGE_SIZE) {
-          setHasMoreActiveRentals(false);
-        }
       } else {
-        setHasMoreActiveRentals(false);
+        Alert.alert("Cleanup Complete", "No orphaned listings found.");
       }
     } catch (error) {
-      console.error("Error fetching active rentals:", error);
-      Alert.alert("Error", "Failed to fetch active rentals. Please try again.");
+      console.error("Error cleaning up listings:", error);
+      Alert.alert("Error", "Failed to clean up listings.");
     }
   };
 
-  // Function to handle infinite scrolling in "View More" Modal
-  const handleLoadMoreActiveRentals = () => {
-    if (hasMoreActiveRentals && !loading) {
-      fetchActiveRentals();
+  // General cleanup function
+  const performCleanup = async () => {
+    setCleanupLoading(true);
+    try {
+      await cleanupOrphanedRentalRequests();
+      await cleanupOrphanedListings();
+      // Add more cleanup functions here if needed
+      Alert.alert("Cleanup Success", "All cleanup operations completed.");
+    } catch (error) {
+      console.error("Error performing cleanup:", error);
+      Alert.alert("Error", "An error occurred during cleanup.");
+    } finally {
+      setCleanupLoading(false);
     }
   };
-
-  // Initialize active rentals page when modal is opened
-  useEffect(() => {
-    if (viewMoreModalVisible) {
-      // Reset pagination
-      setActiveRentalsPage([]);
-      setLastActiveRentalDoc(null);
-      setHasMoreActiveRentals(true);
-      fetchActiveRentals();
-    }
-  }, [viewMoreModalVisible]);
 
   // Function to handle deleting an active rental
   const handleDeleteActiveRental = async (rentalId) => {
@@ -1508,6 +1438,13 @@ const OwnerProfile = ({ ownerId }) => {
         rentalId
       );
       await deleteDoc(rentalRequestRef);
+
+      // Also delete from renter's rentalRequests
+      const renterId = activeRentals.find((rental) => rental.id === rentalId)?.renterId;
+      if (renterId) {
+        const renterRentalRef = doc(db, "renters", renterId, "rentalRequests", rentalId);
+        await deleteDoc(renterRentalRef);
+      }
 
       // Remove the rental from the activeRentals state
       setActiveRentals(
@@ -1534,6 +1471,111 @@ const OwnerProfile = ({ ownerId }) => {
   // *** NEW: Define the onEditCostData function to handle editing cost data ***
   const onEditCostData = () => {
     setCostSaved(false);
+  };
+
+  // *** NEW: Fetch the first page of active rentals when 'View More' modal is opened ***
+  useEffect(() => {
+    if (viewMoreModalVisible) {
+      fetchFirstPageActiveRentals();
+    } else {
+      // Reset pagination when modal is closed
+      setActiveRentalsPage([]);
+      setLastActiveRentalDoc(null);
+      setHasMoreActiveRentals(true);
+    }
+  }, [viewMoreModalVisible]);
+
+  // *** NEW: Function to fetch the first page of active rentals ***
+  const fetchFirstPageActiveRentals = async () => {
+    setLoading(true);
+    try {
+      const rentalsRef = collection(
+        db,
+        "owners",
+        resolvedOwnerId,
+        "rentalRequests"
+      );
+      const q = query(
+        rentalsRef,
+        where("status", "==", "active"),
+        orderBy("createdAt", "desc"),
+        limit(ACTIVE_RENTALS_PAGE_SIZE)
+      );
+
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        setLastActiveRentalDoc(lastDoc);
+
+        const newRentals = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        setActiveRentalsPage(newRentals);
+
+        if (snapshot.docs.length < ACTIVE_RENTALS_PAGE_SIZE) {
+          setHasMoreActiveRentals(false);
+        } else {
+          setHasMoreActiveRentals(true);
+        }
+      } else {
+        setHasMoreActiveRentals(false);
+      }
+    } catch (error) {
+      console.error("Error fetching active rentals:", error);
+      Alert.alert("Error", "Failed to fetch active rentals.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // *** NEW: Function to handle loading more active rentals ***
+  const handleLoadMoreActiveRentals = async () => {
+    if (!hasMoreActiveRentals || loading) return;
+
+    setLoading(true);
+    try {
+      const rentalsRef = collection(
+        db,
+        "owners",
+        resolvedOwnerId,
+        "rentalRequests"
+      );
+      const q = query(
+        rentalsRef,
+        where("status", "==", "active"),
+        orderBy("createdAt", "desc"),
+        startAfter(lastActiveRentalDoc),
+        limit(ACTIVE_RENTALS_PAGE_SIZE)
+      );
+
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        setLastActiveRentalDoc(lastDoc);
+
+        const newRentals = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        setActiveRentalsPage((prev) => [...prev, ...newRentals]);
+
+        if (snapshot.docs.length < ACTIVE_RENTALS_PAGE_SIZE) {
+          setHasMoreActiveRentals(false);
+        }
+      } else {
+        setHasMoreActiveRentals(false);
+      }
+    } catch (error) {
+      console.error("Error loading more active rentals:", error);
+      Alert.alert("Error", "Failed to load more active rentals.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1664,7 +1706,9 @@ const OwnerProfile = ({ ownerId }) => {
                 <CustomTextInput
                   placeholder="Loan Term (years)"
                   value={costData.loanTerm}
-                  onChangeText={(value) => handleInputChange("loanTerm", value)}
+                  onChangeText={(value) =>
+                    handleInputChange("loanTerm", value)
+                  }
                   keyboardType="numeric"
                 />
                 <CustomTextInput
@@ -1798,6 +1842,7 @@ const OwnerProfile = ({ ownerId }) => {
             </View>
           )}
         </View>
+        {/* ************* End of Cost of Ownership Calculator ************* */}
 
         {/* ************* Updated Section: Your Aircraft ************* */}
         <View style={{ padding: 16 }}>
@@ -1903,6 +1948,22 @@ const OwnerProfile = ({ ownerId }) => {
                             onPress: async () => {
                               try {
                                 // Removal logic...
+                                // Example: Remove from Firestore
+                                await deleteDoc(
+                                  doc(db, "aircraftDetails", item.id)
+                                );
+                                setAllAircrafts(
+                                  allAircrafts.filter((a) => a.id !== item.id)
+                                );
+                                setSelectedAircraftIds(
+                                  selectedAircraftIds.filter(
+                                    (id) => id !== item.id
+                                  )
+                                ); // Remove from selectedAircraftIds if selected
+                                Alert.alert(
+                                  "Removed",
+                                  "The aircraft has been removed."
+                                );
                               } catch (error) {
                                 console.error(
                                   "Error removing aircraft:",
@@ -1964,6 +2025,43 @@ const OwnerProfile = ({ ownerId }) => {
           />
         </View>
         {/* ************* End of Updated Section: Your Aircraft ************* */}
+
+        {/* ************* Admin Tools Section ************* */}
+        {/* Show only for admin users */}
+        {user?.email === "admin@example.com" && ( // Replace with your admin condition
+          <View style={{ padding: 16 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+              Admin Tools
+            </Text>
+            <CustomButton
+              onPress={() => {
+                Alert.alert(
+                  "Confirm Cleanup",
+                  "Are you sure you want to perform cleanup? This will delete orphaned rental requests and listings.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Yes, Clean Up",
+                      style: "destructive",
+                      onPress: performCleanup,
+                    },
+                  ]
+                );
+              }}
+              title="Perform Cleanup"
+              backgroundColor="#e53e3e" // Red color for destructive action
+              style={{ marginBottom: 16 }}
+            />
+            {cleanupLoading && (
+              <ActivityIndicator
+                size="large"
+                color="#e53e3e"
+                style={{ marginTop: 8 }}
+              />
+            )}
+          </View>
+        )}
+        {/* ************* End of Admin Tools Section ************* */}
 
         {/* Current Listings */}
         <View style={{ padding: 16 }}>
@@ -2134,6 +2232,7 @@ const OwnerProfile = ({ ownerId }) => {
                       setRentalRequestModalVisible(true); // Reuse the same modal for Active Rentals
                     }}
                   >
+                    {/* Display rental details */}
                     <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                       {item.listingDetails
                         ? `${item.listingDetails.aircraft}`
@@ -2175,7 +2274,26 @@ const OwnerProfile = ({ ownerId }) => {
                       {
                         text: "Yes, Delete All",
                         style: "destructive",
-                        onPress: deleteAllActiveRentals,
+                        onPress: async () => {
+                          try {
+                            for (const rental of activeRentals) {
+                              await handleDeleteActiveRental(rental.id);
+                            }
+                            Alert.alert(
+                              "Deleted",
+                              "All active rentals have been deleted."
+                            );
+                          } catch (error) {
+                            console.error(
+                              "Error deleting all active rentals:",
+                              error
+                            );
+                            Alert.alert(
+                              "Error",
+                              "Failed to delete all active rentals."
+                            );
+                          }
+                        },
                       },
                     ]
                   )
@@ -2190,77 +2308,6 @@ const OwnerProfile = ({ ownerId }) => {
           )}
         </View>
         {/* ************* End of Active Rentals ************* */}
-
-        {/* Rental History */}
-        <View style={{ padding: 16 }}>
-          <Text
-            style={{
-              fontSize: 24,
-              fontWeight: "bold",
-              marginBottom: 16,
-              color: "#2d3748",
-              textAlign: "center",
-            }}
-          >
-            Rental History
-          </Text>
-          {rentalHistory.length > 0 ? (
-            <FlatList
-              data={rentalHistory}
-              keyExtractor={(item, index) => `${item.id}_${index}`} // Ensure unique keys
-              nestedScrollEnabled={true}
-              scrollEnabled={false} // Disable scrolling to prevent nesting issues
-              renderItem={({ item }) => (
-                <View
-                  key={item.id || `order_${index}`} // Ensure that order.id is unique and exists
-                  style={styles.rentalHistoryContainer}
-                >
-                  <Text style={styles.rentalHistoryTitle}>{item.aircraft}</Text>
-                  <Text style={styles.rentalHistoryText}>
-                    {item.rentalPeriod}
-                  </Text>
-                  <Text style={styles.rentalHistoryText}>
-                    {item.renterName}
-                  </Text>
-                  <View style={styles.ratingContainer}>
-                    <Text style={{ color: "#2d3748" }}>Rate this renter:</Text>
-                    <View style={{ flexDirection: "row" }}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <TouchableOpacity
-                          key={`${item.id}_${star}`} // Ensure unique key
-                          onPress={() => handleRating(item.id, star)}
-                        >
-                          <FontAwesome
-                            name={
-                              star <= (ratings[item.id] || 0)
-                                ? "star"
-                                : "star-o"
-                            }
-                            size={24}
-                            color="gold"
-                          />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                  <CustomButton
-                    onPress={() => {
-                      setSelectedRequest(item);
-                      openMessageModal(item.chatThreadId);
-                    }}
-                    title="Message Renter"
-                    backgroundColor="#3182ce"
-                    style={{ marginTop: 16 }}
-                  />
-                </View>
-              )}
-            />
-          ) : (
-            <Text style={{ color: "#4a5568", textAlign: "center" }}>
-              No rental history.
-            </Text>
-          )}
-        </View>
       </ScrollView>
 
       {/* ************* Modals Outside ScrollView ************* */}
@@ -2359,7 +2406,7 @@ const OwnerProfile = ({ ownerId }) => {
                   </View>
                 )}
 
-                {selectedRequest.status === "approved" && (
+                {selectedRequest.status === "active" && (
                   <CustomButton
                     onPress={() => {
                       // Implement any actions for active rentals if needed
@@ -2714,6 +2761,7 @@ const OwnerProfile = ({ ownerId }) => {
               <ScrollView
                 contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
                 keyboardShouldPersistTaps="handled"
+                showsHorizontalScrollIndicator="false"
               >
                 <ModalHeader
                   title="Withdraw Funds"
