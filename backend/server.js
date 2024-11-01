@@ -47,6 +47,10 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Constants for Fee Calculations
+const bookingFeeRate = 0.06; // 6%
+const taxRate = 0.0825; // 8.25%
+
 // =====================
 // Authentication Middleware
 // =====================
@@ -69,6 +73,30 @@ const authenticate = async (req, res, next) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
 };
+
+// Stripe Payment Intent Creation Endpoint (General)
+app.post('/create-payment-intent', async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    if (typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({ error: "Invalid amount. Amount must be a positive number representing cents." });
+    }
+
+    // Create the PaymentIntent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: 'usd',
+      automatic_payment_methods: { enabled: true },
+    });
+
+    res.status(200).json({ clientSecret: paymentIntent.client_secret });
+  } catch (error) {
+    console.error("Error creating payment intent:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // =====================
 // Helper Function: Secure Routes as Admin Only
@@ -218,6 +246,7 @@ app.post('/create-connected-account', authenticate, async (req, res) => {
 app.post('/create-classified-payment-intent', authenticate, async (req, res) => {
   try {
     const { amount, currency, listingId } = req.body;
+
     if (typeof amount !== 'number' || amount <= 0) {
       logger.warn("Invalid amount provided for classified payment intent");
       return res.status(400).json({ error: "Invalid amount. Amount must be a positive number representing cents." });
@@ -229,23 +258,22 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
       return res.status(400).json({ error: "Unsupported currency" });
     }
 
-    // Ensure READY_SET_FLY_ACCOUNT is defined
-    if (!functions.config().account.ready_set_fly_account) {
-      logger.error("READY_SET_FLY_ACCOUNT is not defined in environment variables");
-      return res.status(500).json({ error: "Server configuration error" });
-    }
+    // Calculate tax
+    const tax = Math.round(amount * taxRate); // Tax on amount
 
+    const totalAmount = amount + tax;
+
+    // Create the PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount,
+      amount: totalAmount,
       currency: currency || 'usd',
       automatic_payment_methods: { enabled: true },
-      transfer_data: {
-        destination: functions.config().account.ready_set_fly_account,
-      },
       metadata: {
         paymentType: 'classified',
         userId: req.user.uid,
         listingId: listingId || '',
+        amount: (amount / 100).toFixed(2),
+        tax: (tax / 100).toFixed(2),
       },
     });
 
@@ -287,22 +315,14 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
     }
 
     // Calculate fees and total amount
-    const perHourCents = Math.round(perHour * 100); // Convert to cents if perHour is in dollars
-    const bookingFee = Math.round(perHourCents * 0.06); // 6%
-    const processingFee = Math.round(perHourCents * 0.03); // 3%
-    const tax = Math.round((perHourCents + bookingFee) * 0.0825); // 8.25% on (perHour + bookingFee)
-    const totalAmount = perHourCents + bookingFee + processingFee + tax; // Total in cents
+    const perHourCents = Math.round(perHour * 100); // Convert to cents
+    const bookingFee = Math.round(perHourCents * bookingFeeRate); // Booking fee
+    const tax = Math.round((perHourCents + bookingFee) * taxRate); // Tax on (perHourCents + bookingFee)
+    const totalAmount = perHourCents + bookingFee + tax; // Total amount in cents
 
-    // Calculate the transfer amount to the owner (94% of perHour)
-    const transferAmount = Math.round(perHourCents * 0.94); // 94% in cents
+    const applicationFeeAmount = bookingFee + tax; // Platform collects booking fee and tax
 
-    // Validate connectedAccountId format
-    const stripeAccountIdRegex = /^acct_[A-Za-z0-9]+$/;
-    if (!stripeAccountIdRegex.test(connectedAccountId)) {
-      logger.warn(`Invalid Stripe account ID format for owner ${ownerId}`);
-      return res.status(400).json({ error: "Invalid Stripe account ID" });
-    }
-
+    // Create the PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: 'usd',
@@ -312,15 +332,13 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
         userId: req.user.uid,
         ownerId: ownerId,
         rentalId: rentalId,
-        perHour: perHour.toString(),
-        bookingFee: bookingFee.toString(),
-        processingFee: processingFee.toString(),
-        tax: tax.toString(),
+        perHour: (perHourCents / 100).toFixed(2),
+        bookingFee: (bookingFee / 100).toFixed(2),
+        tax: (tax / 100).toFixed(2),
       },
-      application_fee_amount: Math.round(totalAmount * 0.06), // 6% fee
+      application_fee_amount: applicationFeeAmount,
       transfer_data: {
         destination: connectedAccountId,
-        amount: transferAmount,
       },
     });
 
@@ -367,9 +385,6 @@ app.post('/attach-bank-account', authenticate, async (req, res) => {
     const bankAccount = await stripe.accounts.createExternalAccount(connectedAccountId, {
       external_account: token,
     });
-
-    // Optionally, you can initiate verification if required
-    // For example, sending micro-deposits and verifying them
 
     // Update Firestore with the attached bank account details
     await admin.firestore().collection('owners').doc(ownerId).update({
@@ -656,7 +671,7 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 
             // Record the transaction under the owner
             await admin.firestore().collection('owners').doc(ownerId).collection('transactions').add({
-              amount: perHour * 0.94, // 94% of perHour
+              amount: perHour, // Amount in dollars
               description: `Payment for rental ${rentalId}`,
               transferId: paymentIntent.transfer_data.destination_payment,
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -665,7 +680,7 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
             // Update the owner's available balance
             const ownerRef = admin.firestore().collection('owners').doc(ownerId);
             await ownerRef.update({
-              availableBalance: admin.firestore.FieldValue.increment(perHour * 0.94),
+              availableBalance: admin.firestore.FieldValue.increment(perHour),
             });
 
             // Update the rental status to 'paid'
@@ -677,7 +692,7 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 
             logger.info(`Rental ${rentalId} marked as paid and owner ${ownerId} notified.`);
           } else if (paymentType === 'classified') {
-            const listingId = paymentIntent.metadata.listingId; // Assuming you pass listingId instead of rentalId for classifieds
+            const listingId = paymentIntent.metadata.listingId;
 
             if (!listingId) {
               logger.warn("Missing listingId in classified payment intent metadata");
@@ -692,23 +707,6 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
             });
 
             logger.info(`Classified listing ${listingId} marked as paid.`);
-          } else if (paymentType === 'deposit') {
-            const ownerId = paymentIntent.metadata.ownerId;
-            const depositId = paymentIntent.metadata.depositId; // Assuming you pass a depositId
-
-            if (!ownerId || !depositId) {
-              logger.warn("Missing ownerId or depositId in deposit payment intent metadata");
-              break;
-            }
-
-            // Update the owner's deposits
-            await admin.firestore().collection('owners').doc(ownerId).collection('deposits').doc(depositId).update({
-              status: 'completed',
-              paymentIntentId: paymentIntent.id,
-              completedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-            logger.info(`Deposit ${depositId} for owner ${ownerId} marked as completed.`);
           }
         } catch (error) {
           logger.error("Error processing payment_intent.succeeded webhook:", error);
@@ -724,7 +722,6 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
         const userId = paymentIntent.metadata.userId;
 
         // Optional: Handle failed payments, notify users, etc.
-        // For example, update listing or rental status to 'payment_failed'
         try {
           if (paymentType === 'rental') {
             const rentalId = paymentIntent.metadata.rentalId;

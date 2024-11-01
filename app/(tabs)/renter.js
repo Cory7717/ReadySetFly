@@ -18,7 +18,7 @@ import {
   StatusBar,
   ActivityIndicator,
   FlatList,
-  StyleSheet,
+  StyleSheet
 } from "react-native";
 
 import {
@@ -45,7 +45,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import * as Location from "expo-location";
 
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 import {
   Ionicons,
@@ -63,7 +63,11 @@ import { useStripe } from "@stripe/stripe-react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { NavigationContainer } from "@react-navigation/native";
 
-import { API_URL } from "@env";
+// Removed import of API_URL from "@env"
+// import { API_URL } from "@env";
+
+// Added API_URL directly (Replace with your actual API URL)
+const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api"; // Replace with your actual API URL
 
 import CheckoutScreen from "../payment/CheckoutScreen";
 import ConfirmationScreen from "../payment/ConfirmationScreen";
@@ -71,7 +75,6 @@ import MessagesScreen from "../screens/MessagesScreen";
 
 const db = getFirestore();
 const auth = getAuth();
-const user = auth.currentUser;
 
 const Stack = createNativeStackNavigator();
 
@@ -79,18 +82,16 @@ const BookingCalendar = () => {
   const stripe = useStripe();
   const navigation = useNavigation();
 
+  // State Variables
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [
-    rentalCostEstimatorModalVisible,
-    setRentalCostEstimatorModalVisible,
-  ] = useState(false);
+  const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] =
+    useState(false);
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
-  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
-  const [
-    allNotificationsModalVisible,
-    setAllNotificationsModalVisible,
-  ] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] =
+    useState(false);
+  const [allNotificationsModalVisible, setAllNotificationsModalVisible] =
+    useState(false);
 
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -122,12 +123,13 @@ const BookingCalendar = () => {
   const [notificationCount, setNotificationCount] = useState(0);
 
   const [selectedNotification, setSelectedNotification] = useState(null);
-
   const [selectedRentalRequest, setSelectedRentalRequest] = useState(null);
   const [isRentalRequestLoading, setIsRentalRequestLoading] = useState(false);
 
   const [selectedListing, setSelectedListing] = useState(null);
-  const [totalCost, setTotalCost] = useState(null);
+  const [selectedListingId, setSelectedListingId] = useState(null); // Updated: Dynamic Listing ID
+  const [selectedListingName, setSelectedListingName] = useState(null); // Optional: Display Aircraft Name
+  const [totalCost, setTotalCost] = useState(null); // Updated: State for Total Cost
 
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
@@ -143,7 +145,8 @@ const BookingCalendar = () => {
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const NOTIFICATIONS_PAGE_SIZE = 20;
 
-  const renterId = user?.uid;
+  const [isAuthChecked, setIsAuthChecked] = useState(false); // New: Track auth status
+  const [renter, setRenter] = useState(null); // Updated: Manage authenticated user
 
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
@@ -152,10 +155,31 @@ const BookingCalendar = () => {
 
   const [currentChatOwnerId, setCurrentChatOwnerId] = useState(null);
 
+  // Fetch authenticated renter details
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setRenter(user);
+      } else {
+        setRenter(null);
+        // Optionally navigate to login screen here
+      }
+      setIsAuthChecked(true); // Auth state has been determined
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  const renterId = renter?.uid;
+
+  // Fetch Rentals and Notifications
+  useEffect(() => {
+    if (!isAuthChecked) return; // Wait until auth is checked
+
     if (!renterId) {
       console.error("Error: renterId is undefined.");
-      Alert.alert("Error", "User is not authenticated.");
+      Alert.alert("Authentication Error", "User is not authenticated.");
+      // Optionally, navigate to login screen here
       return;
     }
 
@@ -194,6 +218,7 @@ const BookingCalendar = () => {
       limit(NOTIFICATIONS_PAGE_SIZE)
     );
 
+    // Real-time listener for Rental Requests and Orders
     const unsubscribeRentalRequests = onSnapshot(
       rentalRequestsQueryInstance,
       async (snapshot) => {
@@ -201,16 +226,35 @@ const BookingCalendar = () => {
         for (const docSnap of snapshot.docs) {
           const requestData = docSnap.data();
           let ownerName = "Unknown Owner";
+
+          // Ensure ownerId exists
           if (requestData.ownerId) {
             try {
               const ownerDocRef = doc(db, "owners", requestData.ownerId);
               const ownerDoc = await getDoc(ownerDocRef);
               if (ownerDoc.exists()) {
                 ownerName = ownerDoc.data().fullName || "Unknown Owner";
+              } else {
+                console.warn(
+                  `Owner document not found for ownerId: ${requestData.ownerId}`
+                );
               }
             } catch (error) {
               console.error("Error fetching owner details:", error);
             }
+          } else {
+            console.warn(
+              `Rental Request ID: ${docSnap.id} is missing 'ownerId'. This request will be excluded.`
+            );
+            continue; // Skip rental requests without ownerId
+          }
+
+          // Ensure listingId exists
+          if (!requestData.listingId) {
+            console.warn(
+              `Rental Request ID: ${docSnap.id} is missing 'listingId'. This request will be excluded.`
+            );
+            continue; // Skip rental requests without listingId
           }
 
           active.push({
@@ -221,21 +265,41 @@ const BookingCalendar = () => {
           });
         }
 
+        // Fetch completed rentals from Orders
         const ordersSnapshot = await getDocs(ordersQueryInstance);
         const completed = [];
         for (const docSnap of ordersSnapshot.docs) {
           const orderData = docSnap.data();
           let ownerName = "Unknown Owner";
+
+          // Ensure ownerId exists
           if (orderData.ownerId) {
             try {
               const ownerDocRef = doc(db, "owners", orderData.ownerId);
-              const ownerDoc = await getDoc(ownerDocRef);
-              if (ownerDoc.exists()) {
-                ownerName = ownerDoc.data().fullName || "Unknown Owner";
+              const ownerDocSnap = await getDoc(ownerDocRef);
+              if (ownerDocSnap.exists()) {
+                ownerName = ownerDocSnap.data().fullName || "Unknown Owner";
+              } else {
+                console.warn(
+                  `Owner document not found for ownerId: ${orderData.ownerId}`
+                );
               }
             } catch (error) {
               console.error("Error fetching owner details:", error);
             }
+          } else {
+            console.warn(
+              `Order ID: ${docSnap.id} is missing 'ownerId'. This order will be excluded.`
+            );
+            continue; // Skip orders without ownerId
+          }
+
+          // Ensure listingId exists
+          if (!orderData.listingId) {
+            console.warn(
+              `Order ID: ${docSnap.id} is missing 'listingId'. This order will be excluded.`
+            );
+            continue; // Skip orders without listingId
           }
 
           completed.push({
@@ -247,6 +311,10 @@ const BookingCalendar = () => {
         }
 
         setRentals([...active, ...completed]);
+
+        // Update last document for pagination
+        const lastActiveDoc = snapshot.docs[snapshot.docs.length - 1];
+        setRentalsLastDoc(lastActiveDoc);
       },
       (error) => {
         console.error("Error fetching rentals:", error);
@@ -254,6 +322,7 @@ const BookingCalendar = () => {
       }
     );
 
+    // Real-time listener for Notifications
     const unsubscribeNotifications = onSnapshot(
       notificationsQueryInstance,
       (snapshot) => {
@@ -281,13 +350,15 @@ const BookingCalendar = () => {
       unsubscribeRentalRequests();
       unsubscribeNotifications();
     };
-  }, [renterId]);
+  }, [renterId, isAuthChecked]);
 
+  // Handle Approved Rentals: Create Notifications
   useEffect(() => {
     const handleApprovedRentals = async () => {
       for (const rental of rentals) {
         if (
-          (rental.rentalStatus === "active" || rental.rentalStatus === "approved") &&
+          (rental.rentalStatus === "active" ||
+            rental.rentalStatus === "approved") &&
           !processedRentals.includes(rental.id)
         ) {
           const existingNotif = notifications.find(
@@ -295,9 +366,10 @@ const BookingCalendar = () => {
           );
           if (!existingNotif) {
             try {
-              // Ensure that listingId is fetched from rental request if missing
-              let listingId = rental.listingId;
-              if (!listingId) {
+              // Ensure that listingId and ownerId are fetched correctly
+              let { listingId, ownerId, rentalDate, totalCost } = rental;
+
+              if (!listingId || !ownerId) {
                 const rentalRequestRef = doc(
                   db,
                   "renters",
@@ -308,23 +380,53 @@ const BookingCalendar = () => {
                 const rentalRequestSnap = await getDoc(rentalRequestRef);
                 if (rentalRequestSnap.exists()) {
                   const rentalRequestData = rentalRequestSnap.data();
-                  listingId = rentalRequestData.listingId || null;
+                  listingId = rentalRequestData.listingId || listingId;
+                  ownerId = rentalRequestData.ownerId || ownerId;
+                  rentalDate = rentalRequestData.rentalDate || rentalDate;
+                  totalCost = rentalRequestData.totalCost || totalCost;
                 }
+              }
+
+              if (!listingId || !ownerId) {
+                console.warn(
+                  `Missing listingId or ownerId for rental ID: ${rental.id}. Notification not created.`
+                );
+                continue; // Skip if essential fields are missing
+              }
+
+              // Fetch owner name
+              let ownerName = "Unknown Owner";
+              try {
+                const ownerDocRef = doc(db, "owners", ownerId);
+                const ownerDocSnap = await getDoc(ownerDocRef);
+                if (ownerDocSnap.exists()) {
+                  ownerName = ownerDocSnap.data().fullName || "Unknown Owner";
+                }
+              } catch (error) {
+                console.error("Error fetching owner details:", error);
+              }
+
+              // Optional: Ensure totalCost is set correctly
+              if (totalCost === undefined || totalCost === null) {
+                console.warn(
+                  `Total cost is missing for rental ID: ${rental.id}. Setting to 0.`
+                );
+                totalCost = 0;
               }
 
               await addDoc(
                 collection(db, "renters", renterId, "notifications"),
                 {
                   rentalRequestId: rental.id,
-                  message:
-                    "Your rental has been approved! Proceed to payment.",
+                  message: "Your rental has been approved! Proceed to payment.",
                   type: "rentalApproved",
                   listingId: listingId, // Ensure listingId is included
-                  ownerId: rental.ownerId || null,
-                  ownerName: rental.ownerName || "Unknown Owner",
-                  rentalDate: rental.rentalDate || null,
+                  ownerId: ownerId,
+                  ownerName: ownerName,
+                  rentalDate: rentalDate || null,
                   createdAt: serverTimestamp(),
                   rentalStatus: rental.rentalStatus || "approved",
+                  totalCost: totalCost, // Include totalCost in the notification
                 }
               );
               console.log(
@@ -344,35 +446,85 @@ const BookingCalendar = () => {
     }
   }, [rentals, notifications, renterId, processedRentals]);
 
-  // Function to create a rental request with listingId
-  const createRentalRequest = async (listingId) => {
-    if (!renterId) {
-      Alert.alert("Error", "User is not authenticated.");
+  // Updated: New createRentalRequest Function
+  const createRentalRequest = async (listingId, renterId, otherData) => {
+    if (!listingId) {
+      console.error("Cannot create rental request without listingId.");
+      Alert.alert(
+        "Error",
+        "Listing ID is required to create a rental request."
+      );
       return;
     }
 
-    if (!listingId) {
-      Alert.alert("Error", "Invalid Listing ID.");
+    if (!renterId) {
+      console.error("Cannot create rental request without renterId.");
+      Alert.alert("Error", "Renter ID is required to create a rental request.");
       return;
     }
 
     try {
-      const rentalRequestRef = collection(
+      const listingRef = doc(db, "airplanes", listingId);
+      const listingSnap = await getDoc(listingRef);
+
+      if (!listingSnap.exists()) {
+        Alert.alert("Error", "Listing not found.");
+        return;
+      }
+
+      const listingData = listingSnap.data();
+      const ownerId = listingData.ownerId;
+
+      if (!ownerId) {
+        Alert.alert("Error", "Listing does not have an associated owner.");
+        console.warn(`Listing ID: ${listingId} is missing 'ownerId'.`);
+        return;
+      }
+
+      const rentalRequest = {
+        listingId: listingId, // Ensure this is set
+        renterId: renterId,
+        rentalStatus: "pending",
+        rentalDate: otherData.rentalDate || "", // e.g., "3 hours"
+        createdAt: serverTimestamp(),
+        totalCost: 0, // Initially set to 0, to be updated by the rental flow
+        rentalDate: otherData.rentalDate || "", // e.g., "10/29/2024"
+        senderId: renterId, // Assuming sender is the renter
+        senderName: otherData.senderName || renter.displayName || "User Name",
+        contact:
+          otherData.contact ||
+          profileData.contact ||
+          "User email and phone number",
+        airplaneModel:
+          otherData.airplaneModel || selectedListingName || "Aircraft Model",
+      };
+
+      // Add to owner's rentalRequests and get rentalRequestId
+      const ownerRentalRequestRef = collection(
+        db,
+        "owners",
+        ownerId,
+        "rentalRequests"
+      );
+      const ownerRentalRequestDoc = await addDoc(
+        ownerRentalRequestRef,
+        rentalRequest
+      );
+      const rentalRequestId = ownerRentalRequestDoc.id;
+
+      // Add to renter's rentalRequests with the same rentalRequestId
+      const renterRentalRequestRef = doc(
         db,
         "renters",
         renterId,
-        "rentalRequests"
+        "rentalRequests",
+        rentalRequestId
       );
+      await setDoc(renterRentalRequestRef, rentalRequest);
 
-      await addDoc(rentalRequestRef, {
-        listingId: listingId,
-        rentalDate: rentalDate || new Date().toLocaleDateString(),
-        rentalHours: rentalHours || "0",
-        rentalStatus: "pending",
-        ownerId: null, // You can set the ownerId if available
-        createdAt: serverTimestamp(),
-      });
-
+      console.log(
+        `Created rental request ${rentalRequestId} for listing ${listingId}`
+      );
       Alert.alert("Success", "Rental request created successfully.");
     } catch (error) {
       console.error("Error creating rental request:", error);
@@ -380,6 +532,7 @@ const BookingCalendar = () => {
     }
   };
 
+  // Navigate to CheckoutScreen with Payment Intent
   const navigateToCheckout = async (rentalRequestId) => {
     if (!rentalRequestId) {
       Alert.alert("Error", "No rental request selected.");
@@ -407,6 +560,9 @@ const BookingCalendar = () => {
 
       if (!rentalRequest.listingId) {
         Alert.alert("Error", "Listing ID is missing in rental request.");
+        console.warn(
+          `Rental Request ID: ${rentalRequestId} is missing 'listingId'.`
+        );
         return;
       }
 
@@ -422,9 +578,17 @@ const BookingCalendar = () => {
 
       console.log("Listing Data:", listingData);
 
-      const totalCostFromRequest = parseFloat(rentalRequest.totalCost);
+      // **Updated:** Use `rentalRequest.totalCost` directly with proper parsing
+      const totalCostNumber = parseFloat(rentalRequest.totalCost);
+      if (!isNaN(totalCostNumber) && totalCostNumber > 0) {
+        setTotalCost(totalCostNumber.toFixed(2));
+      } else {
+        setTotalCost("N/A");
+      }
 
-      const calculatedTotalCost = totalCostFromRequest.toFixed(2);
+      const calculatedTotalCost = !isNaN(totalCostNumber)
+        ? totalCostNumber.toFixed(2)
+        : 0.0;
 
       console.log(`Calculated Total Cost: ${calculatedTotalCost}`);
 
@@ -453,7 +617,7 @@ const BookingCalendar = () => {
 
         navigation.navigate("CheckoutScreen", {
           rentalRequestId: rentalRequestSnap.id,
-          amount: calculatedTotalCost,
+          amount: calculatedTotalCost, // Pass the calculated total cost
           clientSecret,
         });
       } else {
@@ -466,6 +630,7 @@ const BookingCalendar = () => {
     }
   };
 
+  // Create Payment Intent via Backend
   const createPaymentIntent = async (amount) => {
     if (isNaN(amount) || amount <= 0) {
       Alert.alert("Invalid Amount", "The payment amount is invalid.");
@@ -474,6 +639,8 @@ const BookingCalendar = () => {
 
     try {
       console.log(`Creating payment intent for amount: ${amount} cents`);
+      console.log(`API_URL is: ${API_URL}`);
+
       const response = await fetch(`${API_URL}/create-payment-intent`, {
         method: "POST",
         headers: {
@@ -482,18 +649,16 @@ const BookingCalendar = () => {
         body: JSON.stringify({ amount }),
       });
 
-      const data = await response.json();
+      const text = await response.text();
 
-      console.log("Payment Intent Response:", data);
+      console.log("Payment Intent Response:", text);
 
       if (response.ok) {
+        const data = JSON.parse(text);
         return data.clientSecret;
       } else {
-        console.error("Error creating payment intent:", data);
-        Alert.alert(
-          "Payment Error",
-          data.message || "Failed to create payment intent."
-        );
+        console.error("Error creating payment intent:", text);
+        Alert.alert("Payment Error", "Failed to create payment intent.");
         return null;
       }
     } catch (error) {
@@ -503,6 +668,9 @@ const BookingCalendar = () => {
     }
   };
 
+  // ... Rest of your functions remain unchanged ...
+
+  // Handle Notification Press
   const handleNotificationPress = async (notification) => {
     try {
       if (!notification) {
@@ -524,6 +692,48 @@ const BookingCalendar = () => {
           "rentalRequests",
           notification.rentalRequestId
         );
+
+        // Set up a listener for the rental request document to keep totalCost updated
+        const unsubscribeRentalRequest = onSnapshot(
+          rentalRequestRef,
+          async (rentalRequestSnap) => {
+            if (rentalRequestSnap.exists()) {
+              const rentalRequestData = rentalRequestSnap.data();
+              setSelectedRentalRequest(rentalRequestData);
+
+              const totalCostNumber = parseFloat(rentalRequestData.totalCost);
+              if (!isNaN(totalCostNumber) && totalCostNumber > 0) {
+                setTotalCost(totalCostNumber.toFixed(2));
+              } else {
+                setTotalCost("N/A");
+              }
+
+              // Update rentals state if needed
+              setRentals((prevRentals) =>
+                prevRentals.map((rental) =>
+                  rental.id === rentalRequestSnap.id
+                    ? { ...rental, ...rentalRequestData }
+                    : rental
+                )
+              );
+            } else {
+              setSelectedRentalRequest(null);
+              setTotalCost(null);
+              console.warn(
+                "Rental request not found for ID:",
+                notification.rentalRequestId
+              );
+            }
+
+            setIsRentalRequestLoading(false);
+          },
+          (error) => {
+            console.error("Error listening to rental request:", error);
+            setIsRentalRequestLoading(false);
+          }
+        );
+
+        // Fetch listing data
         const rentalRequestSnap = await getDoc(rentalRequestRef);
         let rentalRequestData = null;
         if (rentalRequestSnap.exists()) {
@@ -567,18 +777,6 @@ const BookingCalendar = () => {
           return;
         }
 
-        if (rentalRequestData.totalCost !== undefined) {
-          setTotalCost(rentalRequestData.totalCost);
-        } else {
-          const rentalHours = parseFloat(rentalRequestData.rentalHours) || 0;
-          const costPerHour = parseFloat(listingData.costPerHour) || 0;
-          const calculatedTotalCost = (rentalHours * costPerHour).toFixed(2);
-
-          console.log(`Calculated Total Cost: ${calculatedTotalCost}`);
-
-          setTotalCost(calculatedTotalCost);
-        }
-
         setSelectedNotification(notification);
         console.log("Selected Notification:", notification);
         setNotificationModalVisible(true);
@@ -596,6 +794,7 @@ const BookingCalendar = () => {
     }
   };
 
+  // Close Notification Modal
   const closeModal = () => {
     setNotificationModalVisible(false);
     setSelectedNotification(null);
@@ -604,6 +803,7 @@ const BookingCalendar = () => {
     setTotalCost(null);
   };
 
+  // Remove All Notifications
   const removeAllNotifications = async () => {
     Alert.alert(
       "Confirm Deletion",
@@ -654,6 +854,7 @@ const BookingCalendar = () => {
     );
   };
 
+  // Date Picker Functions
   const showDatePicker = () => {
     setDatePickerVisibility(true);
   };
@@ -663,11 +864,14 @@ const BookingCalendar = () => {
   };
 
   const handleConfirm = (date) => {
-    const formattedDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+    const formattedDate = `${
+      date.getMonth() + 1
+    }/${date.getDate()}/${date.getFullYear()}`;
     setRentalDate(formattedDate);
     hideDatePicker();
   };
 
+  // Send Message Function
   const sendMessage = async () => {
     if (!messageText.trim()) {
       Alert.alert("Validation Error", "Message cannot be empty.");
@@ -680,14 +884,19 @@ const BookingCalendar = () => {
     }
 
     try {
+      // Fetch listingId from the selected notification or rental request
+      let listingId = selectedNotification?.listingId || null;
+      let rentalRequestId = selectedNotification?.rentalRequestId || null;
+
       await addDoc(collection(db, "messages"), {
         senderId: renterId,
-        senderName: user.displayName || "User",
+        senderName: renter.displayName || "User",
         receiverId: currentChatOwnerId,
         text: messageText.trim(),
         timestamp: serverTimestamp(),
         participants: [renterId, currentChatOwnerId],
-        rentalRequestId: selectedNotification?.rentalRequestId || null,
+        rentalRequestId: rentalRequestId,
+        listingId: listingId, // Explicitly include listingId
       });
       setMessageText("");
     } catch (error) {
@@ -696,12 +905,14 @@ const BookingCalendar = () => {
     }
   };
 
+  // Toggle Messages Modal
   const toggleMessagesModal = () => {
     setNotificationModalVisible(false);
     setAllNotificationsModalVisible(false);
     setMessagesModalVisible(!messagesModalVisible);
   };
 
+  // Image Picker
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
@@ -715,6 +926,7 @@ const BookingCalendar = () => {
     }
   };
 
+  // Document Picker
   const pickDocument = async (field) => {
     let result = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/*"],
@@ -725,12 +937,14 @@ const BookingCalendar = () => {
     }
   };
 
+  // Handle Profile Submit
   const handleProfileSubmit = (values) => {
     setProfileData(values);
     setProfileSaved(true);
     setProfileModalVisible(false);
   };
 
+  // Handle Navigation to Home with Filters
   const handleNavigation = (filter) => {
     try {
       navigation.navigate("Home", { filter });
@@ -740,22 +954,26 @@ const BookingCalendar = () => {
     }
   };
 
+  // Calculate Rental Cost
   const calculateRentalCost = () => {
     const hours = parseFloat(rentalHours) || 0;
     const hourlyCost = parseFloat(costPerHour) || 200;
     const bookingFee = hourlyCost * hours * 0.06;
     const processingFee = hourlyCost * hours * 0.03;
     const tax = hourlyCost * hours * 0.0825;
-    const totalCost =
-      hourlyCost * hours + bookingFee + processingFee + tax;
+    const totalCost = hourlyCost * hours + bookingFee + processingFee + tax;
 
     return totalCost.toFixed(2);
   };
 
+  // Get Current Location
   const getCurrentLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission to access location was denied");
+      Alert.alert(
+        "Permission Denied",
+        "Permission to access location was denied."
+      );
       return;
     }
 
@@ -768,6 +986,7 @@ const BookingCalendar = () => {
     });
   };
 
+  // Handle Rating Submission
   const handleRating = async (rentalId, rating) => {
     try {
       const rentalDocRef = doc(db, "orders", rentalId);
@@ -780,6 +999,7 @@ const BookingCalendar = () => {
     }
   };
 
+  // Listen for Messages between Renter and Owner
   useEffect(() => {
     if (currentChatOwnerId) {
       const messagesRef = collection(db, "messages");
@@ -816,6 +1036,7 @@ const BookingCalendar = () => {
     }
   }, [currentChatOwnerId, renterId]);
 
+  // Save Selected Aircraft IDs
   const saveSelectedAircraftIds = async (aircraftId) => {
     if (!aircraftId) {
       Alert.alert("Error", "Invalid Aircraft ID.");
@@ -855,6 +1076,7 @@ const BookingCalendar = () => {
     }
   };
 
+  // Handle Rental Press (Optional: Expand Functionality)
   const handleRentalPress = (rental) => {
     Alert.alert(
       "Rental Pressed",
@@ -862,13 +1084,19 @@ const BookingCalendar = () => {
     );
   };
 
+  // Fetch More Rentals for Pagination
   const fetchMoreRentals = async () => {
     if (!hasMoreRentals) return;
 
     try {
       let rentalRequestsQueryInstance = query(
         collection(db, "renters", renterId, "rentalRequests"),
-        where("rentalStatus", "in", ["pending", "approved", "active", "denied"]),
+        where("rentalStatus", "in", [
+          "pending",
+          "approved",
+          "active",
+          "denied",
+        ]),
         orderBy("createdAt", "desc"),
         startAfter(rentalsLastDoc),
         limit(RENTALS_PAGE_SIZE)
@@ -884,16 +1112,35 @@ const BookingCalendar = () => {
       for (const docSnap of snapshot.docs) {
         const requestData = docSnap.data();
         let ownerName = "Unknown Owner";
+
+        // Ensure ownerId exists
         if (requestData.ownerId) {
           try {
             const ownerDocRef = doc(db, "owners", requestData.ownerId);
             const ownerDoc = await getDoc(ownerDocRef);
             if (ownerDoc.exists()) {
               ownerName = ownerDoc.data().fullName || "Unknown Owner";
+            } else {
+              console.warn(
+                `Owner document not found for ownerId: ${requestData.ownerId}`
+              );
             }
           } catch (error) {
             console.error("Error fetching owner details:", error);
           }
+        } else {
+          console.warn(
+            `Rental Request ID: ${docSnap.id} is missing 'ownerId'. This request will be excluded.`
+          );
+          continue; // Skip rental requests without ownerId
+        }
+
+        // Ensure listingId exists
+        if (!requestData.listingId) {
+          console.warn(
+            `Rental Request ID: ${docSnap.id} is missing 'listingId'. This request will be excluded.`
+          );
+          continue; // Skip rental requests without listingId
         }
 
         newRentals.push({
@@ -904,6 +1151,7 @@ const BookingCalendar = () => {
         });
       }
 
+      // Fetch completed rentals from Orders
       const ordersSnapshot = await getDocs(
         query(
           collection(db, "orders"),
@@ -918,16 +1166,35 @@ const BookingCalendar = () => {
       for (const docSnap of ordersSnapshot.docs) {
         const orderData = docSnap.data();
         let ownerName = "Unknown Owner";
+
+        // Ensure ownerId exists
         if (orderData.ownerId) {
           try {
             const ownerDocRef = doc(db, "owners", orderData.ownerId);
-            const ownerDoc = await getDoc(ownerDocRef);
-            if (ownerDoc.exists()) {
-              ownerName = ownerDoc.data().fullName || "Unknown Owner";
+            const ownerDocSnap = await getDoc(ownerDocRef);
+            if (ownerDocSnap.exists()) {
+              ownerName = ownerDocSnap.data().fullName || "Unknown Owner";
+            } else {
+              console.warn(
+                `Owner document not found for ownerId: ${orderData.ownerId}`
+              );
             }
           } catch (error) {
             console.error("Error fetching owner details:", error);
           }
+        } else {
+          console.warn(
+            `Order ID: ${docSnap.id} is missing 'ownerId'. This order will be excluded.`
+          );
+          continue; // Skip orders without ownerId
+        }
+
+        // Ensure listingId exists
+        if (!orderData.listingId) {
+          console.warn(
+            `Order ID: ${docSnap.id} is missing 'listingId'. This order will be excluded.`
+          );
+          continue; // Skip orders without listingId
         }
 
         completed.push({
@@ -948,6 +1215,7 @@ const BookingCalendar = () => {
     }
   };
 
+  // Fetch More Notifications for Pagination
   const fetchMoreNotifications = async () => {
     if (!hasMoreNotifications || !notificationsLastDoc) return;
 
@@ -987,290 +1255,485 @@ const BookingCalendar = () => {
         <StatusBar hidden={true} />
       </SafeAreaView>
 
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {}}
-          />
-        }
-        contentContainerStyle={{ paddingBottom: 16 }}
-      >
-        {/* Header with Image Background */}
-        <ImageBackground
-          source={require("../../Assets/images/wingtip_clouds.jpg")}
-          style={{
-            height: 200,
-            paddingTop:
-              Platform.OS === "android" ? StatusBar.currentHeight : 0,
-            justifyContent: "center",
-            paddingHorizontal: 16,
-          }}
-          resizeMode="cover"
+      {/* Display Loading Indicator While Auth State is Being Determined */}
+      {!isAuthChecked ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3182ce" />
+        </View>
+      ) : renterId ? (
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {}} // Implement pull-to-refresh if needed
+            />
+          }
+          contentContainerStyle={{ paddingBottom: 16 }}
         >
-          <SafeAreaView style={{ flex: 1 }}>
-            <Text
-              style={{ fontSize: 20, fontWeight: "bold", color: "white" }}
-            >
-              Good afternoon, {user?.displayName || "User"}
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginTop: 16,
-              }}
-            >
-              {/* Select Date */}
+          {/* Header with Image Background */}
+          <ImageBackground
+            source={require("../../Assets/images/wingtip_clouds.jpg")}
+            style={{
+              height: 200,
+              paddingTop:
+                Platform.OS === "android" ? StatusBar.currentHeight : 0,
+              justifyContent: "center",
+              paddingHorizontal: 16,
+            }}
+            resizeMode="cover"
+          >
+            <SafeAreaView style={{ flex: 1 }}>
+              <Text
+                style={{ fontSize: 20, fontWeight: "bold", color: "white" }}
+              >
+                Good afternoon, {renter?.displayName || "User"}
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginTop: 16,
+                }}
+              >
+                {/* Select Date */}
+                <TouchableOpacity
+                  onPress={showDatePicker}
+                  style={{
+                    backgroundColor: "white",
+                    borderRadius: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    flex: 1,
+                    marginRight: 8,
+                    opacity: 0.9,
+                    justifyContent: "center",
+                  }}
+                  accessibilityLabel="Select rental date"
+                  accessibilityRole="button"
+                >
+                  <Text>{rentalDate || "Select Date"}</Text>
+                </TouchableOpacity>
+
+                {/* Estimated Hours */}
+                <TextInput
+                  placeholder="Estimated Hours"
+                  placeholderTextColor="#888"
+                  keyboardType="numeric"
+                  style={{
+                    backgroundColor: "white",
+                    borderRadius: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    flex: 1,
+                    opacity: 0.9,
+                  }}
+                  onChangeText={(text) =>
+                    setRentalHours(text.replace(/[^0-9.]/g, ""))
+                  }
+                  value={rentalHours}
+                  accessibilityLabel="Enter estimated rental hours"
+                />
+              </View>
+
+              {/* Preferred Location */}
               <TouchableOpacity
-                onPress={showDatePicker}
+                onPress={() => setMapModalVisible(true)}
                 style={{
                   backgroundColor: "white",
                   borderRadius: 8,
                   paddingHorizontal: 16,
                   paddingVertical: 12,
-                  flex: 1,
-                  marginRight: 8,
+                  marginTop: 16,
                   opacity: 0.9,
                   justifyContent: "center",
                 }}
+                accessibilityLabel="Select preferred rental location"
+                accessibilityRole="button"
               >
-                <Text>{rentalDate || "Select Date"}</Text>
+                <Text style={{ textAlign: "center" }}>
+                  {preferredLocation || "Preferred City/Airport"}
+                </Text>
               </TouchableOpacity>
 
-              {/* Estimated Hours */}
-              <TextInput
-                placeholder="Estimated Hours"
-                placeholderTextColor="#888"
-                keyboardType="numeric"
-                style={{
-                  backgroundColor: "white",
-                  borderRadius: 8,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  flex: 1,
-                  opacity: 0.9,
+              {/* Button to Create Rental Request */}
+              <TouchableOpacity
+                onPress={() => {
+                  if (selectedListingId) {
+                    // Ensure a listing is selected
+                    saveSelectedAircraftIds(selectedListingId);
+                    // Prepare otherData
+                    const otherData = {
+                      rentalDate: `${rentalHours} hours`,
+                      senderName: renter.displayName || "User Name",
+                      contact:
+                        profileData.contact || "User email and phone number",
+                      airplaneModel: selectedListingName || "Aircraft Model",
+                      rentalDate: rentalDate || new Date().toLocaleDateString(),
+                    };
+                    createRentalRequest(selectedListingId, renterId, otherData); // Create rental request with dynamic listingId and otherData
+                  } else {
+                    Alert.alert(
+                      "Select an Aircraft",
+                      "Please select an aircraft first."
+                    );
+                  }
                 }}
-                onChangeText={(text) => setRentalHours(text.replace(/[^0-9.]/g, ""))}
-                value={rentalHours}
+                style={{
+                  backgroundColor: "#48bb78",
+                  padding: 12,
+                  borderRadius: 8,
+                  marginTop: 16,
+                  alignItems: "center",
+                  opacity: selectedListingId ? 1 : 0.5, // Optional: Visual feedback
+                }}
+                disabled={!selectedListingId} // Disable button if no listing is selected
+                accessibilityLabel="Create rental request"
+                accessibilityRole="button"
+              >
+                <Text style={{ color: "white", fontWeight: "bold" }}>
+                  Create Rental Request
+                </Text>
+              </TouchableOpacity>
+
+              {/* Display Selected Aircraft (Optional) */}
+              {selectedListingName && (
+                <Text
+                  style={{ marginTop: 8, color: "white", textAlign: "center" }}
+                >
+                  Selected Aircraft: {selectedListingName}
+                </Text>
+              )}
+            </SafeAreaView>
+          </ImageBackground>
+
+          {/* Date Picker Modal */}
+          <DateTimePickerModal
+            isVisible={isDatePickerVisible}
+            mode="date"
+            onConfirm={handleConfirm}
+            onCancel={hideDatePicker}
+          />
+
+          {/* Navigation Buttons */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              padding: 16,
+            }}
+          >
+            <TouchableOpacity
+              style={{ alignItems: "center" }}
+              onPress={() => handleNavigation("all")}
+              accessibilityLabel="View all aircraft"
+              accessibilityRole="button"
+            >
+              <Octicons name="paper-airplane" size={32} color="#3182ce" />
+              <Text>All Aircraft</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ alignItems: "center" }}
+              onPress={() => handleNavigation("jets")}
+              accessibilityLabel="View jets"
+              accessibilityRole="button"
+            >
+              <Ionicons name="airplane-outline" size={32} color="#3182ce" />
+              <Text>Jets</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ alignItems: "center" }}
+              onPress={() => handleNavigation("pistons")}
+              accessibilityLabel="View piston aircraft"
+              accessibilityRole="button"
+            >
+              <MaterialCommunityIcons
+                name="engine-outline"
+                size={32}
+                color="#3182ce"
               />
-            </View>
-
-            {/* Preferred Location */}
-            <TouchableOpacity
-              onPress={() => setMapModalVisible(true)}
-              style={{
-                backgroundColor: "white",
-                borderRadius: 8,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                marginTop: 16,
-                opacity: 0.9,
-                textAlign: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ textAlign: "center" }}>
-                {preferredLocation || "Preferred City/Airport"}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Sample Button to Save Selected Aircraft ID */}
-            {/* Replace this with your actual implementation */}
-            <TouchableOpacity
-              onPress={() => {
-                saveSelectedAircraftIds("1Dj9eQwMcRWWXqtcGHNKEctgjW62");
-                createRentalRequest("1Dj9eQwMcRWWXqtcGHNKEctgjW62"); // Create rental request with listingId
-              }}
-              style={{
-                backgroundColor: "#48bb78",
-                padding: 12,
-                borderRadius: 8,
-                marginTop: 16,
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold" }}>
-                Select This Aircraft
-              </Text>
-            </TouchableOpacity>
-          </SafeAreaView>
-        </ImageBackground>
-
-        {/* Date Picker Modal */}
-        <DateTimePickerModal
-          isVisible={isDatePickerVisible}
-          mode="date"
-          onConfirm={handleConfirm}
-          onCancel={hideDatePicker}
-        />
-
-        {/* Navigation Buttons */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            padding: 16,
-          }}
-        >
-          <TouchableOpacity
-            style={{ alignItems: "center" }}
-            onPress={() => handleNavigation("all")}
-          >
-            <Octicons name="paper-airplane" size={32} color="#3182ce" />
-            <Text>All Aircraft</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ alignItems: "center" }}
-            onPress={() => handleNavigation("jets")}
-          >
-            <Ionicons name="airplane-outline" size={32} color="#3182ce" />
-            <Text>Jets</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ alignItems: "center" }}
-            onPress={() => handleNavigation("pistons")}
-          >
-            <MaterialCommunityIcons
-              name="engine-outline"
-              size={32}
-              color="#3182ce"
-            />
-            <Text>Pistons</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ alignItems: "center" }}
-            onPress={() => handleNavigation("helicopters")}
-          >
-            <Fontisto name="helicopter" size={32} color="#3182ce" />
-            <Text>Helicopters</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Recent Searches */}
-        <View style={{ paddingHorizontal: 16 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
-            Recent Searches
-          </Text>
-          <View
-            style={{ flexDirection: "row", justifyContent: "space-between" }}
-          >
-            <View
-              style={{
-                backgroundColor: "#edf2f7",
-                padding: 12,
-                borderRadius: 8,
-                flex: 1,
-                marginRight: 8,
-              }}
-            >
-              <Text>Van Nuys Airport</Text>
-              <Text style={{ color: "#a0aec0" }}>
-                3 guests · 9/10/23-9/17/23
-              </Text>
-            </View>
-            <View
-              style={{
-                backgroundColor: "#edf2f7",
-                padding: 12,
-                borderRadius: 8,
-                flex: 1,
-              }}
-            >
-              <Text>Santa Monica Airport</Text>
-              <Text style={{ color: "#a0aec0" }}>
-                2 guests · 9/18/23-9/25/23
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Aircraft Types */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
-            Aircraft Types
-          </Text>
-          <View
-            style={{ flexDirection: "row", justifyContent: "space-between" }}
-          >
-            <TouchableOpacity
-              style={{ flex: 1, marginRight: 8 }}
-              onPress={() => handleNavigation("single-piston")}
-            >
-              <Text style={{ marginTop: 8, fontWeight: "bold" }}>
-                Single Engine Piston
-              </Text>
+              <Text>Pistons</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={{ flex: 1 }}
-              onPress={() => handleNavigation("twin-piston")}
+              style={{ alignItems: "center" }}
+              onPress={() => handleNavigation("helicopters")}
+              accessibilityLabel="View helicopters"
+              accessibilityRole="button"
             >
-              <Text style={{ marginTop: 8, fontWeight: "bold" }}>
-                Twin Engine Piston
-              </Text>
+              <Fontisto name="helicopter" size={32} color="#3182ce" />
+              <Text>Helicopters</Text>
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Recommended for You */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
-            Recommended for you
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <TouchableOpacity
-              style={{ marginRight: 16 }}
-              onPress={() => handleNavigation("cessna-172")}
+          {/* Recent Searches */}
+          <View style={{ paddingHorizontal: 16 }}>
+            <Text
+              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
             >
-              <Image
-                source={require("../../Assets/images/recommended1.jpg")}
-                style={{ width: 200, height: 120, borderRadius: 8 }}
-                resizeMode="cover"
-              />
-              <Text style={{ marginTop: 8, fontWeight: "bold" }}>
-                Cessna 172
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ marginRight: 16 }}
-              onPress={() => handleNavigation("beechcraft-baron")}
+              Recent Searches
+            </Text>
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
             >
-              <Image
-                source={require("../../Assets/images/recommended2.jpg")}
-                style={{ width: 200, height: 120, borderRadius: 8 }}
-                resizeMode="cover"
-              />
-              <Text style={{ marginTop: 8, fontWeight: "bold" }}>
-                Beechcraft Baron
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ marginRight: 16 }}
-              onPress={() => handleNavigation("cirrus-sr22")}
-            >
-              <Image
-                source={require("../../Assets/images/recommended3.jpg")}
-                style={{ width: 200, height: 120, borderRadius: 8 }}
-                resizeMode="cover"
-              />
-              <Text style={{ marginTop: 8, fontWeight: "bold" }}>
-                Cirrus SR22
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+              <View
+                style={{
+                  backgroundColor: "#edf2f7",
+                  padding: 12,
+                  borderRadius: 8,
+                  flex: 1,
+                  marginRight: 8,
+                }}
+              >
+                <Text>Van Nuys Airport</Text>
+                <Text style={{ color: "#a0aec0" }}>
+                  3 guests · 9/10/23-9/17/23
+                </Text>
+              </View>
+              <View
+                style={{
+                  backgroundColor: "#edf2f7",
+                  padding: 12,
+                  borderRadius: 8,
+                  flex: 1,
+                }}
+              >
+                <Text>Santa Monica Airport</Text>
+                <Text style={{ color: "#a0aec0" }}>
+                  2 guests · 9/18/23-9/25/23
+                </Text>
+              </View>
+            </View>
+          </View>
 
-        {/* Active Rentals */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
-            Active Rentals
-          </Text>
-          {rentals.length > 0 ? (
-            <>
-              <FlatList
-                data={rentals.filter(
-                  (rental) => rental.rentalStatus === "active"
+          {/* Aircraft Types */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+            <Text
+              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
+            >
+              Aircraft Types
+            </Text>
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <TouchableOpacity
+                style={{ flex: 1, marginRight: 8 }}
+                onPress={() => handleNavigation("single-piston")}
+                accessibilityLabel="View single engine piston aircraft"
+                accessibilityRole="button"
+              >
+                <Text style={{ marginTop: 8, fontWeight: "bold" }}>
+                  Single Engine Piston
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                onPress={() => handleNavigation("twin-piston")}
+                accessibilityLabel="View twin engine piston aircraft"
+                accessibilityRole="button"
+              >
+                <Text style={{ marginTop: 8, fontWeight: "bold" }}>
+                  Twin Engine Piston
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Recommended for You */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+            <Text
+              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
+            >
+              Recommended for you
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {/* Cessna 172 */}
+              <TouchableOpacity
+                style={{ marginRight: 16 }}
+                onPress={() => {
+                  setSelectedListingId("cessna-172-id"); // Set dynamic Listing ID
+                  setSelectedListingName("Cessna 172"); // Optional: Set aircraft name
+                  handleNavigation("cessna-172");
+                }}
+                accessibilityLabel="Select Cessna 172"
+                accessibilityRole="button"
+              >
+                <Image
+                  source={require("../../Assets/images/recommended1.jpg")}
+                  style={{ width: 200, height: 120, borderRadius: 8 }}
+                  resizeMode="cover"
+                />
+                <Text style={{ marginTop: 8, fontWeight: "bold" }}>
+                  Cessna 172
+                </Text>
+              </TouchableOpacity>
+
+              {/* Beechcraft Baron */}
+              <TouchableOpacity
+                style={{ marginRight: 16 }}
+                onPress={() => {
+                  setSelectedListingId("beechcraft-baron-id"); // Set dynamic Listing ID
+                  setSelectedListingName("Beechcraft Baron"); // Optional: Set aircraft name
+                  handleNavigation("beechcraft-baron");
+                }}
+                accessibilityLabel="Select Beechcraft Baron"
+                accessibilityRole="button"
+              >
+                <Image
+                  source={require("../../Assets/images/recommended2.jpg")}
+                  style={{ width: 200, height: 120, borderRadius: 8 }}
+                  resizeMode="cover"
+                />
+                <Text style={{ marginTop: 8, fontWeight: "bold" }}>
+                  Beechcraft Baron
+                </Text>
+              </TouchableOpacity>
+
+              {/* Cirrus SR22 */}
+              <TouchableOpacity
+                style={{ marginRight: 16 }}
+                onPress={() => {
+                  setSelectedListingId("cirrus-sr22-id"); // Set dynamic Listing ID
+                  setSelectedListingName("Cirrus SR22"); // Optional: Set aircraft name
+                  handleNavigation("cirrus-sr22");
+                }}
+                accessibilityLabel="Select Cirrus SR22"
+                accessibilityRole="button"
+              >
+                <Image
+                  source={require("../../Assets/images/recommended3.jpg")}
+                  style={{ width: 200, height: 120, borderRadius: 8 }}
+                  resizeMode="cover"
+                />
+                <Text style={{ marginTop: 8, fontWeight: "bold" }}>
+                  Cirrus SR22
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+
+          {/* Active Rentals */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+            <Text
+              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
+            >
+              Active Rentals
+            </Text>
+            {rentals.length > 0 ? (
+              <>
+                <FlatList
+                  data={rentals.filter(
+                    (rental) => rental.rentalStatus === "active"
+                  )}
+                  keyExtractor={(item, index) => `${item.id}_${index}`}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={{
+                        backgroundColor: "#edf2f7",
+                        padding: 16,
+                        borderRadius: 16,
+                        marginBottom: 16,
+                      }}
+                      onPress={() => handleRentalPress(item)}
+                      accessibilityLabel={`View details for active rental of ${
+                        item.aircraftModel || "N/A"
+                      }`}
+                      accessibilityRole="button"
+                    >
+                      <Text
+                        style={{
+                          fontWeight: "bold",
+                          color: "#2d3748",
+                          fontSize: 16,
+                        }}
+                      >
+                        {item.aircraftModel || "N/A"}
+                      </Text>
+                      <Text style={{ color: "#4a5568" }}>
+                        Owner: {item.ownerName || "N/A"}
+                      </Text>
+                      <Text style={{ color: "#4a5568" }}>
+                        Rental Period:{" "}
+                        {item.rentalDate ||
+                          selectedRentalRequest?.rentalDate ||
+                          "N/A"}
+                      </Text>
+                      <Text style={{ color: "#4a5568" }}>
+                        Total Cost: $
+                        {item.totalCost !== undefined && item.totalCost !== null
+                          ? parseFloat(item.totalCost).toFixed(2)
+                          : "N/A"}
+                      </Text>
+                      <Text>
+                        Payment Status:{" "}
+                        {item.paymentStatus ? item.paymentStatus : "N/A"}
+                      </Text>
+                      <Text>
+                        Status:{" "}
+                        {item.rentalStatus.charAt(0).toUpperCase() +
+                          item.rentalStatus.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  ListFooterComponent={
+                    hasMoreRentals ? (
+                      <ActivityIndicator
+                        size="large"
+                        color="#3182ce"
+                        style={{ marginVertical: 16 }}
+                      />
+                    ) : (
+                      <Text
+                        style={{
+                          textAlign: "center",
+                          color: "#4a5568",
+                          marginVertical: 16,
+                        }}
+                      >
+                        No more rentals to load.
+                      </Text>
+                    )
+                  }
+                  onEndReached={fetchMoreRentals}
+                  onEndReachedThreshold={0.5}
+                  scrollEnabled={false}
+                />
+
+                {hasMoreRentals && (
+                  <TouchableOpacity
+                    onPress={fetchMoreRentals}
+                    style={{
+                      alignItems: "center",
+                      padding: 12,
+                      backgroundColor: "#3182ce",
+                      borderRadius: 8,
+                      marginTop: 8,
+                    }}
+                    accessibilityLabel="Load more rentals"
+                    accessibilityRole="button"
+                  >
+                    <Text style={{ color: "white", fontWeight: "bold" }}>
+                      Load More
+                    </Text>
+                  </TouchableOpacity>
                 )}
+              </>
+            ) : (
+              <Text style={{ textAlign: "center", color: "#718096" }}>
+                No active rentals at the moment.
+              </Text>
+            )}
+          </View>
+
+          {/* Notifications */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+            <Text
+              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}
+            >
+              Notifications
+            </Text>
+            {allNotifications.length > 0 ? (
+              <FlatList
+                data={allNotifications}
                 keyExtractor={(item, index) => `${item.id}_${index}`}
                 renderItem={({ item }) => (
                   <TouchableOpacity
@@ -1281,7 +1744,9 @@ const BookingCalendar = () => {
                       borderRadius: 16,
                       marginBottom: 16,
                     }}
-                    onPress={() => handleRentalPress(item)}
+                    onPress={() => handleNotificationPress(item)}
+                    accessibilityLabel={`View details for notification: ${item.message}`}
+                    accessibilityRole="button"
                   >
                     <Text
                       style={{
@@ -1290,30 +1755,19 @@ const BookingCalendar = () => {
                         fontSize: 16,
                       }}
                     >
-                      {item.aircraftModel || "N/A"}
+                      {item.message}
                     </Text>
                     <Text style={{ color: "#4a5568" }}>
-                      Owner: {item.ownerName || "N/A"}
-                    </Text>
-                    <Text style={{ color: "#4a5568" }}>
-                      Rental Period: {item.rentalDate || "N/A"}
-                    </Text>
-                    <Text style={{ color: "#4a5568" }}>
-                      Total Cost: ${item.totalCost || "N/A"}
-                    </Text>
-                    <Text>
-                      Payment Status:{" "}
-                      {item.paymentStatus ? item.paymentStatus : "N/A"}
-                    </Text>
-                    <Text>
-                      Status:{" "}
-                      {item.rentalStatus.charAt(0).toUpperCase() +
-                        item.rentalStatus.slice(1)}
+                      {item.createdAt
+                        ? item.createdAt.toDate
+                          ? item.createdAt.toDate().toLocaleString()
+                          : new Date(item.createdAt).toLocaleString()
+                        : "N/A"}
                     </Text>
                   </TouchableOpacity>
                 )}
                 ListFooterComponent={
-                  hasMoreRentals ? (
+                  hasMoreNotifications ? (
                     <ActivityIndicator
                       size="large"
                       color="#3182ce"
@@ -1327,146 +1781,88 @@ const BookingCalendar = () => {
                         marginVertical: 16,
                       }}
                     >
-                      No more rentals to load.
+                      No more notifications to load.
                     </Text>
                   )
                 }
-                onEndReached={fetchMoreRentals}
+                onEndReached={fetchMoreNotifications}
                 onEndReachedThreshold={0.5}
                 scrollEnabled={false}
               />
+            ) : (
+              <Text style={{ textAlign: "center", color: "#718096" }}>
+                No notifications available.
+              </Text>
+            )}
 
-              {hasMoreRentals && (
-                <TouchableOpacity
-                  onPress={fetchMoreRentals}
-                  style={{
-                    alignItems: "center",
-                    padding: 12,
-                    backgroundColor: "#3182ce",
-                    borderRadius: 8,
-                    marginTop: 8,
-                  }}
-                >
-                  <Text style={{ color: "white", fontWeight: "bold" }}>
-                    Load More
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </>
-          ) : (
-            <Text style={{ textAlign: "center", color: "#718096" }}>
-              No active rentals at the moment.
-            </Text>
-          )}
-        </View>
+            {/* "Remove All" Button */}
+            {allNotifications.length > 0 && (
+              <TouchableOpacity
+                onPress={removeAllNotifications}
+                style={{
+                  alignItems: "center",
+                  padding: 12,
+                  backgroundColor: "#e53e3e",
+                  borderRadius: 8,
+                  marginTop: 8,
+                }}
+                accessibilityLabel="Remove all notifications"
+                accessibilityRole="button"
+              >
+                <Text style={{ color: "white", fontWeight: "bold" }}>
+                  Remove All
+                </Text>
+              </TouchableOpacity>
+            )}
 
-        {/* Notifications */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
-          <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
-            Notifications
+            {/* "View All" Button */}
+            {allNotifications.length > 3 && (
+              <TouchableOpacity
+                onPress={() => setAllNotificationsModalVisible(true)}
+                style={{
+                  alignItems: "center",
+                  padding: 12,
+                  backgroundColor: "#3182ce",
+                  borderRadius: 8,
+                  marginTop: 8,
+                }}
+                accessibilityLabel="View all notifications"
+                accessibilityRole="button"
+              >
+                <Text style={{ color: "white", fontWeight: "bold" }}>
+                  View All
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+      ) : (
+        // If user is not authenticated, display a message or navigate to login
+        <View style={styles.notAuthenticatedContainer}>
+          <Text style={{ fontSize: 18, color: "#2d3748", textAlign: "center" }}>
+            You are not authenticated. Please log in to continue.
           </Text>
-          {allNotifications.length > 0 ? (
-            <FlatList
-              data={allNotifications}
-              keyExtractor={(item, index) => `${item.id}_${index}`}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={{
-                    backgroundColor: "#edf2f7",
-                    padding: 16,
-                    borderRadius: 16,
-                    marginBottom: 16,
-                  }}
-                  onPress={() => handleNotificationPress(item)}
-                >
-                  <Text
-                    style={{
-                      fontWeight: "bold",
-                      color: "#2d3748",
-                      fontSize: 16,
-                    }}
-                  >
-                    {item.message}
-                  </Text>
-                  <Text style={{ color: "#4a5568" }}>
-                    {item.createdAt
-                      ? item.createdAt.toDate
-                        ? item.createdAt.toDate().toLocaleString()
-                        : new Date(item.createdAt).toLocaleString()
-                      : "N/A"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              ListFooterComponent={
-                hasMoreNotifications ? (
-                  <ActivityIndicator
-                    size="large"
-                    color="#3182ce"
-                    style={{ marginVertical: 16 }}
-                  />
-                ) : (
-                  <Text
-                    style={{
-                      textAlign: "center",
-                      color: "#4a5568",
-                      marginVertical: 16,
-                    }}
-                  >
-                    No more notifications to load.
-                  </Text>
-                )
-              }
-              onEndReached={fetchMoreNotifications}
-              onEndReachedThreshold={0.5}
-              scrollEnabled={false}
-            />
-          ) : (
-            <Text style={{ textAlign: "center", color: "#718096" }}>
-              No notifications available.
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Login")} // Ensure you have a Login screen in your navigator
+            style={{
+              backgroundColor: "#3182ce",
+              padding: 12,
+              borderRadius: 8,
+              marginTop: 16,
+              alignItems: "center",
+            }}
+            accessibilityLabel="Navigate to login screen"
+            accessibilityRole="button"
+          >
+            <Text style={{ color: "white", fontWeight: "bold" }}>
+              Go to Login
             </Text>
-          )}
-
-          {/* "Remove All" Button */}
-          {allNotifications.length > 0 && (
-            <TouchableOpacity
-              onPress={removeAllNotifications}
-              style={{
-                alignItems: "center",
-                padding: 12,
-                backgroundColor: "#e53e3e",
-                borderRadius: 8,
-                marginTop: 8,
-              }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold" }}>
-                Remove All
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* "View All" Button */}
-          {allNotifications.length > 3 && (
-            <TouchableOpacity
-              onPress={() => setAllNotificationsModalVisible(true)}
-              style={{
-                alignItems: "center",
-                padding: 12,
-                backgroundColor: "#3182ce",
-                borderRadius: 8,
-                marginTop: 8,
-              }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold" }}>
-                View All
-              </Text>
-            </TouchableOpacity>
-          )}
+          </TouchableOpacity>
         </View>
-      </ScrollView>
+      )}
 
       {/* Profile Information */}
-      {profileSaved ? (
+      {profileSaved && renterId && (
         <View style={styles.profileContainer}>
           <Text style={styles.profileTitle}>Profile Information</Text>
           <View style={styles.profileRow}>
@@ -1474,14 +1870,11 @@ const BookingCalendar = () => {
             <Text style={styles.profileValue}>{profileData.name}</Text>
           </View>
           {profileData.image && (
-            <Image source={{ uri: profileData.image }} style={styles.profileImage} />
+            <Image
+              source={{ uri: profileData.image }}
+              style={styles.profileImage}
+            />
           )}
-        </View>
-      ) : (
-        <View style={styles.profileContainer}>
-          <Text style={styles.profileTitle}>
-            No Profile Information Available
-          </Text>
         </View>
       )}
 
@@ -1501,6 +1894,8 @@ const BookingCalendar = () => {
               <TouchableOpacity
                 onPress={() => setMessagesModalVisible(false)}
                 style={styles.closeModalButton}
+                accessibilityLabel="Close messages"
+                accessibilityRole="button"
               >
                 <Ionicons name="close-circle" size={32} color="#2d3748" />
               </TouchableOpacity>
@@ -1559,8 +1954,14 @@ const BookingCalendar = () => {
                   style={styles.messageTextInput}
                   keyboardType="default"
                   autoCapitalize="none"
+                  accessibilityLabel="Type a message"
                 />
-                <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
+                <TouchableOpacity
+                  onPress={sendMessage}
+                  style={styles.sendButton}
+                  accessibilityLabel="Send message"
+                  accessibilityRole="button"
+                >
                   <Ionicons name="send" size={24} color="white" />
                 </TouchableOpacity>
               </View>
@@ -1573,130 +1974,147 @@ const BookingCalendar = () => {
       <Modal
         visible={notificationModalVisible}
         animationType="slide"
-        transparent={true}
+        transparent={false} // Changed from true to false
+        presentationStyle="fullScreen" // Added for full screen
         onRequestClose={closeModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.notificationModalContainer}>
-              <TouchableOpacity
-                onPress={closeModal}
-                style={styles.closeModalButton}
-              >
-                <Ionicons name="close-circle" size={32} color="#2d3748" />
-              </TouchableOpacity>
+          <View style={styles.notificationModalContainer}>
+            <TouchableOpacity
+              onPress={closeModal}
+              style={styles.closeModalButton}
+              accessibilityLabel="Close notification"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle" size={32} color="#2d3748" />
+            </TouchableOpacity>
 
-              {selectedNotification ? (
-                <ScrollView contentContainerStyle={{ padding: 16 }}>
-                  <Text
-                    style={{
-                      fontSize: 24,
-                      fontWeight: "bold",
-                      marginBottom: 16,
-                      textAlign: "center",
-                      color: "#2d3748",
-                    }}
-                  >
-                    Notification Details
+            {selectedNotification ? (
+              <ScrollView contentContainerStyle={{ padding: 16 }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: "bold",
+                    marginBottom: 16,
+                    textAlign: "center",
+                    color: "#2d3748",
+                  }}
+                >
+                  Notification Details
+                </Text>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
+                    Message:
                   </Text>
+                  <Text style={{ color: "#4a5568" }}>
+                    {selectedNotification.message}
+                  </Text>
+                </View>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
+                    From:
+                  </Text>
+                  <Text style={{ color: "#4a5568" }}>
+                    {selectedNotification.ownerName || "Unknown Owner"}
+                  </Text>
+                </View>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
+                    Date:
+                  </Text>
+                  <Text style={{ color: "#4a5568" }}>
+                    {selectedNotification.createdAt
+                      ? selectedNotification.createdAt.toDate
+                        ? selectedNotification.createdAt
+                            .toDate()
+                            .toLocaleString()
+                        : new Date(
+                            selectedNotification.createdAt
+                          ).toLocaleString()
+                      : "N/A"}
+                  </Text>
+                </View>
+
+                {/* Rental Details */}
+                {selectedRentalRequest && selectedListing && (
                   <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                      Message:
+                    <Text
+                      style={{
+                        fontWeight: "bold",
+                        color: "#2d3748",
+                      }}
+                    >
+                      Rental Details:
                     </Text>
                     <Text style={{ color: "#4a5568" }}>
-                      {selectedNotification.message}
-                    </Text>
-                  </View>
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                      From:
+                      Aircraft Model: {selectedListing.aircraft || "N/A"}
                     </Text>
                     <Text style={{ color: "#4a5568" }}>
-                      {selectedNotification.ownerName || "Unknown Owner"}
-                    </Text>
-                  </View>
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontWeight: "bold", color: "#2d3748" }}>
-                      Date:
+                      Rental Period: {selectedRentalRequest.rentalDate || "N/A"}
                     </Text>
                     <Text style={{ color: "#4a5568" }}>
-                      {selectedNotification.createdAt
-                        ? selectedNotification.createdAt.toDate
-                          ? selectedNotification.createdAt
-                              .toDate()
-                              .toLocaleString()
-                          : new Date(selectedNotification.createdAt).toLocaleString()
+                      Total Cost: $
+                      {selectedRentalRequest.totalCost !== undefined &&
+                      selectedRentalRequest.totalCost !== null
+                        ? parseFloat(selectedRentalRequest.totalCost).toFixed(2)
                         : "N/A"}
                     </Text>
                   </View>
+                )}
 
-                  {/* Rental Details */}
-                  {selectedRentalRequest && selectedListing && (
-                    <View style={{ marginBottom: 16 }}>
-                      <Text
-                        style={{
-                          fontWeight: "bold",
-                          color: "#2d3748",
-                        }}
-                      >
-                        Rental Details:
-                      </Text>
-                      <Text style={{ color: "#4a5568" }}>
-                        Aircraft Model: {selectedListing.aircraft || "N/A"}
-                      </Text>
-                      <Text style={{ color: "#4a5568" }}>
-                        Rental Period: {selectedRentalRequest.rentalDate || "N/A"}
-                      </Text>
-                      <Text style={{ color: "#4a5568" }}>
-                        Total Cost: ${totalCost !== null ? totalCost : "N/A"}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Proceed to Pay Button */}
-                  {selectedNotification.rentalStatus !== "denied" && totalCost && (
+                {/* Proceed to Pay Button */}
+                {selectedRentalRequest &&
+                  selectedRentalRequest.totalCost &&
+                  parseFloat(selectedRentalRequest.totalCost) > 0 && (
                     <TouchableOpacity
                       onPress={() =>
                         navigateToCheckout(selectedNotification.rentalRequestId)
                       }
                       style={styles.paymentButton}
+                      accessibilityLabel="Proceed to payment"
+                      accessibilityRole="button"
                     >
-                      <Text style={styles.paymentButtonText}>Proceed to Pay</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Message Owner Button */}
-                  {selectedNotification.ownerId && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setCurrentChatOwnerId(selectedNotification.ownerId);
-                        setMessagesModalVisible(true);
-                      }}
-                      style={styles.messageOwnerButton}
-                    >
-                      <Text style={styles.messageOwnerButtonText}>
-                        Message Owner
+                      <Text style={styles.paymentButtonText}>
+                        Proceed to Pay
                       </Text>
                     </TouchableOpacity>
                   )}
 
-                  {/* Close Button */}
+                {/* Message Owner Button */}
+                {selectedNotification.ownerId && (
                   <TouchableOpacity
-                    onPress={closeModal}
-                    style={styles.closeButton}
+                    onPress={() => {
+                      setCurrentChatOwnerId(selectedNotification.ownerId);
+                      setMessagesModalVisible(true);
+                    }}
+                    style={styles.messageOwnerButton}
+                    accessibilityLabel="Message Owner"
+                    accessibilityRole="button"
                   >
-                    <Text style={styles.closeButtonText}>Close</Text>
+                    <Text style={styles.messageOwnerButtonText}>
+                      Message Owner
+                    </Text>
                   </TouchableOpacity>
-                </ScrollView>
-              ) : isRentalRequestLoading ? (
-                <ActivityIndicator size="large" color="#3182ce" />
-              ) : (
-                <ActivityIndicator size="large" color="#3182ce" />
-              )}
-            </View>
+                )}
+
+                {/* Close Button */}
+                <TouchableOpacity
+                  onPress={closeModal}
+                  style={styles.closeButton}
+                  accessibilityLabel="Close notification modal"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : isRentalRequestLoading ? (
+              <ActivityIndicator size="large" color="#3182ce" />
+            ) : (
+              <ActivityIndicator size="large" color="#3182ce" />
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1717,6 +2135,8 @@ const BookingCalendar = () => {
               <TouchableOpacity
                 onPress={() => setAllNotificationsModalVisible(false)}
                 style={styles.closeModalButton}
+                accessibilityLabel="Close all notifications"
+                accessibilityRole="button"
               >
                 <Ionicons name="close-circle" size={32} color="#2d3748" />
               </TouchableOpacity>
@@ -1750,6 +2170,8 @@ const BookingCalendar = () => {
                         handleNotificationPress(item);
                         setAllNotificationsModalVisible(false);
                       }}
+                      accessibilityLabel={`View details for notification: ${item.message}`}
+                      accessibilityRole="button"
                     >
                       <Text
                         style={{
@@ -1806,6 +2228,8 @@ const BookingCalendar = () => {
       <TouchableOpacity
         style={styles.chatBubbleIcon}
         onPress={toggleMessagesModal}
+        accessibilityLabel="Open messages"
+        accessibilityRole="button"
       >
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />
       </TouchableOpacity>
@@ -1813,6 +2237,7 @@ const BookingCalendar = () => {
   );
 };
 
+// Navigation Container
 const BookingNavigator = () => {
   return (
     <NavigationContainer independent={true}>
@@ -1824,11 +2249,42 @@ const BookingNavigator = () => {
           component={ConfirmationScreen}
         />
         <Stack.Screen name="Messages" component={MessagesScreen} />
+        {/* Ensure you have a Login screen in your navigator */}
+        <Stack.Screen name="Login" component={LoginScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
 
+// Placeholder LoginScreen Component
+const LoginScreen = () => {
+  const navigation = useNavigation();
+
+  // Implement your login logic here
+  return (
+    <View style={styles.loginContainer}>
+      <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 24 }}>
+        Login Screen
+      </Text>
+      {/* Add your login form here */}
+      <TouchableOpacity
+        onPress={() => navigation.navigate("BookingCalendar")}
+        style={{
+          backgroundColor: "#3182ce",
+          padding: 12,
+          borderRadius: 8,
+          alignItems: "center",
+        }}
+        accessibilityLabel="Navigate to booking calendar after login"
+        accessibilityRole="button"
+      >
+        <Text style={{ color: "white", fontWeight: "bold" }}>Login</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+// Stylesheet for Clean and Modern Design
 const styles = StyleSheet.create({
   chatBubbleIcon: {
     position: "absolute",
@@ -1857,10 +2313,8 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   notificationModalContainer: {
-    width: "100%",
-    height: "100%",
+    flex: 1, // Changed from width and height to flex: 1 for full screen
     backgroundColor: "white",
-    borderRadius: 0,
     padding: 24,
     position: "relative",
   },
@@ -1902,6 +2356,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 8,
     marginRight: 8,
+    color: "#000",
   },
   sendButton: {
     backgroundColor: "#3182ce",
@@ -1919,6 +2374,7 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderRadius: 24,
     marginBottom: 16,
+    marginHorizontal: 16,
   },
   profileTitle: {
     fontSize: 20,
@@ -1944,6 +2400,7 @@ const styles = StyleSheet.create({
     height: 144,
     borderRadius: 8,
     marginTop: 8,
+    alignSelf: "center",
   },
   paymentButton: {
     backgroundColor: "#3182ce",
@@ -1977,6 +2434,24 @@ const styles = StyleSheet.create({
   messageOwnerButtonText: {
     color: "white",
     fontWeight: "bold",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  notAuthenticatedContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "white",
   },
 });
 

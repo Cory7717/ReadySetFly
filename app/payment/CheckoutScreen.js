@@ -124,7 +124,16 @@ export default function CheckoutScreen() {
         body: JSON.stringify({ discountCode: code }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        const text = await response.text();
+        console.error('Response is not JSON:', text);
+        setErrorMessage('Failed to apply discount. Please try again.');
+        setLoading(false);
+        return;
+      }
 
       if (response.ok && data.valid) {
         setDiscountApplied(true);
@@ -196,54 +205,43 @@ export default function CheckoutScreen() {
 
       let clientSecret = '';
 
-      if (paymentType === 'rental') {
-        // For Rentals, call /create-rental-payment-intent
-        const response = await fetch(`${API_URL}/create-rental-payment-intent`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
-          },
-          body: JSON.stringify({ 
-            perHour: initialPerHour, 
-            ownerId: ownerId,
-            rentalRequestId: rentalRequestId, // Pass rentalRequestId
-          }),
-        });
+      const endpoint =
+        paymentType === 'rental'
+          ? '/create-rental-payment-intent'
+          : '/create-classified-payment-intent';
 
-        const { clientSecret: rentalClientSecret, error } = await response.json();
+      const body =
+        paymentType === 'rental'
+          ? { perHour: initialPerHour, ownerId, rentalRequestId }
+          : { amount: initialAmount, currency: 'usd' };
 
-        if (error) {
-          Alert.alert('Error', error);
-          setLoading(false);
-          return;
-        }
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
+        },
+        body: JSON.stringify(body),
+      });
 
-        clientSecret = rentalClientSecret;
-      } else if (paymentType === 'classified') {
-        // For Classifieds, call /create-classified-payment-intent
-        const response = await fetch(`${API_URL}/create-classified-payment-intent`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
-          },
-          body: JSON.stringify({ 
-            amount: initialAmount, // Amount in cents
-            currency: 'usd', // Default to USD or pass as needed
-          }),
-        });
-
-        const { clientSecret: classifiedClientSecret, error } = await response.json();
-
-        if (error) {
-          Alert.alert('Error', error);
-          setLoading(false);
-          return;
-        }
-
-        clientSecret = classifiedClientSecret;
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        const text = await response.text();
+        console.error('Response is not JSON:', text);
+        Alert.alert('Error', 'Failed to create payment intent.');
+        setLoading(false);
+        return;
       }
+
+      if (!response.ok) {
+        Alert.alert('Error', data.error || 'Failed to create payment intent.');
+        setLoading(false);
+        return;
+      }
+
+      clientSecret = data.clientSecret;
 
       if (!clientSecret) {
         Alert.alert('Error', 'Payment details are missing.');
@@ -259,7 +257,7 @@ export default function CheckoutScreen() {
 
       if (error) {
         Alert.alert('Payment failed', error.message);
-      } else if (paymentIntent.status === 'Succeeded') {
+      } else if (paymentIntent && paymentIntent.status === 'Succeeded') {
         // After successful payment, create the listing
         const listingCreated = await createListing();
         if (listingCreated) {
@@ -297,7 +295,7 @@ export default function CheckoutScreen() {
       const token = await user.getIdToken(true);
       return token;
     } catch (error) {
-      console.error("Error fetching Firebase ID token:", error);
+      console.error('Error fetching Firebase ID token:', error);
       Alert.alert('Authentication Error', 'Failed to authenticate user.');
       return '';
     }
@@ -310,14 +308,24 @@ export default function CheckoutScreen() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
+          Authorization: `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
         },
         body: JSON.stringify({ listingDetails }),
       });
 
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        const text = await response.text();
+        console.error('Response is not JSON:', text);
+        Alert.alert('Error', 'Failed to create listing.');
+        return false;
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create listing');
+        Alert.alert('Error', data.message || 'Failed to create listing.');
+        return false;
       }
 
       return true;
@@ -372,7 +380,7 @@ export default function CheckoutScreen() {
               <Text style={styles.detail}>Tax (8.25%): ${((initialPerHour + initialPerHour * 0.06) * 0.0825).toFixed(2)}</Text>
               <Text style={styles.amount}>
                 Total Amount: $
-                {((initialPerHour + initialPerHour * 0.06 + initialPerHour * 0.03 + (initialPerHour + initialPerHour * 0.06) * 0.0825) / 100).toFixed(2)}
+                {((initialPerHour + initialPerHour * 0.06 + initialPerHour * 0.03 + (initialPerHour + initialPerHour * 0.06) * 0.0825)).toFixed(2)}
               </Text>
             </View>
           ) : (

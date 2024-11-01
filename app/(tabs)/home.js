@@ -29,16 +29,22 @@ import {
   doc,
   addDoc,
   serverTimestamp,
+  getDocs,
+  limit,
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { Calendar } from "react-native-calendars";
+// **Added Imports for Notifications**
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const Home = ({ route, navigation }) => {
   const [user, setUser] = useState(null);
   const [listings, setListings] = useState([]);
+  const [recommendedListings, setRecommendedListings] = useState([]);
   const [selectedListing, setSelectedListing] = useState(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
@@ -73,8 +79,15 @@ const Home = ({ route, navigation }) => {
   // Loading Indicator State
   const [isLoading, setIsLoading] = useState(false);
 
+  // State for Recommended Listings Loading
+  const [isRecommendedLoading, setIsRecommendedLoading] = useState(false);
+
+  // **Notification Listener Reference**
+  const notificationListener = useRef();
+  const responseListener = useRef();
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
       } else {
@@ -82,7 +95,7 @@ const Home = ({ route, navigation }) => {
         navigation.replace("SignIn");
       }
     });
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
   }, []);
 
   useEffect(() => {
@@ -179,27 +192,30 @@ const Home = ({ route, navigation }) => {
               year: year || "Unknown Year",
               make: make || "Unknown Make",
               airplaneModel: airplaneModel || "Unknown Model",
-              ...data,
+              ownerId: data.ownerId || null,
+              ratesPerHour: data.ratesPerHour || "0.00",
+              location: data.location || "Unknown Location",
+              description: data.description || "No description available.",
+              images: data.images || [],
+              createdAt: data.createdAt || serverTimestamp(),
             };
           })
           // Filter out listings without a valid ownerId
           .filter((listing) => {
             if (!listing.ownerId) {
-              console.warn(
-                `Listing ID: ${listing.id} is missing 'ownerId'. This listing will be excluded.`
-              );
               return false;
             }
             return true;
           });
 
+        // Log detailed information about each listing
         listingsData.forEach((listing) => {
           if (!Array.isArray(listing.images)) {
             listing.images = [listing.images];
           }
           console.log(
             `Listing ID: ${listing.id}, Year: ${listing.year}, Make: ${listing.make}, Model: ${listing.airplaneModel}, Owner ID: ${listing.ownerId}`
-          ); // Enhanced Logging
+          );
         });
 
         setListings(listingsData);
@@ -217,6 +233,67 @@ const Home = ({ route, navigation }) => {
       }
     );
   };
+
+  /**
+   * Fetch Recommended Listings from Firestore
+   */
+  const fetchRecommendedListings = async () => {
+    setIsRecommendedLoading(true);
+    try {
+      const recommendedRef = collection(db, "airplanes");
+      const recommendedQuery = query(
+        recommendedRef,
+        where("isRecommended", "==", true),
+        limit(10)
+      );
+      const snapshot = await getDocs(recommendedQuery);
+      const recommendedData = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        let { year, make, airplaneModel } = data;
+
+        // Parse aircraft field if necessary
+        if (!year || !make || !airplaneModel) {
+          const parsed = parseAircraft(data.aircraft);
+          if (!year) year = parsed.year;
+          if (!make) make = parsed.make;
+          if (!airplaneModel) airplaneModel = parsed.airplaneModel;
+        }
+
+        return {
+          id: doc.id,
+          year: year || "Unknown Year",
+          make: make || "Unknown Make",
+          airplaneModel: airplaneModel || "Unknown Model",
+          ownerId: data.ownerId || null,
+          ratesPerHour: data.ratesPerHour || "0.00",
+          location: data.location || "Unknown Location",
+          description: data.description || "No description available.",
+          images: data.images || [],
+          createdAt: data.createdAt || serverTimestamp(),
+        };
+      });
+
+      // Filter out listings without a valid ownerId
+      const validRecommended = recommendedData.filter((listing) => {
+        if (!listing.ownerId) {
+          return false;
+        }
+        return true;
+      });
+
+      setRecommendedListings(validRecommended);
+      console.log(`Fetched ${validRecommended.length} recommended listings.`);
+    } catch (error) {
+      console.error("Error fetching recommended listings: ", error);
+      Alert.alert("Error", "Failed to fetch recommended listings.");
+    } finally {
+      setIsRecommendedLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecommendedListings();
+  }, [filter]);
 
   /**
    * Calculate the total cost based on rental hours.
@@ -249,8 +326,17 @@ const Home = ({ route, navigation }) => {
    * Handle sending a rental request to the owner.
    */
   const handleSendRentalRequest = async () => {
+    console.log("Attempting to send rental request.");
+    console.log("Selected Listing:", selectedListing);
+    console.log("Selected Listing ID:", selectedListing?.id);
+
     if (!selectedListing) {
       Alert.alert("Selection Error", "No listing selected.");
+      return;
+    }
+
+    if (!selectedListing.id) {
+      Alert.alert("Error", "Listing ID is missing. Please select a valid listing.");
       return;
     }
 
@@ -306,12 +392,10 @@ const Home = ({ route, navigation }) => {
       return;
     }
 
-    const bookingFee = rentalCost * 0.06;
-    const transactionFee = rentalCost * 0.03;
-    const salesTax = rentalCost * 0.0825;
-    const totalCostValue = rentalCost + bookingFee + transactionFee + salesTax;
+    // Calculate owner's payout (rental cost minus 6% commission)
+    const ownerPayout = rentalCost * 0.94;
 
-    // Declare rentalRequestData outside the try block
+    // Declare rentalRequestData
     let rentalRequestData = {};
 
     try {
@@ -327,20 +411,24 @@ const Home = ({ route, navigation }) => {
         renterId: user.uid,
         renterName: fullName,
         ownerId: selectedListing.ownerId,
-        make: selectedListing.make || "Unknown Make", // Added 'make' field
+        make: selectedListing.make || "Unknown Make",
         airplaneModel: airplaneModel,
-        rentalPeriod: rentalDate,
-        totalCost: totalCostValue.toFixed(2),
+        rentalDate: rentalDate,
+        rentalHours: rentalHours,
+        rentalCost: rentalCost.toFixed(2),
+        ownerPayout: ownerPayout.toFixed(2),
         contact: user.email || "noemail@example.com",
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
         status: "pending",
         listingId: selectedListing.id,
-        // New Fields
         currentLocation: cityStateCombined,
         hasMedicalCertificate: hasMedicalCertificate,
         hasRentersInsurance: hasRentersInsurance,
         flightHours: Number(flightHours),
       };
+
+      // Log the rentalRequestData before sending
+      console.log("Rental Request Data:", rentalRequestData);
 
       // Ensure that listingId is present
       if (!rentalRequestData.listingId) {
@@ -474,8 +562,15 @@ const Home = ({ route, navigation }) => {
       <View style={styles.listingContainer}>
         <TouchableOpacity
           onPress={() => {
+            if (!item.ownerId) {
+              Alert.alert(
+                "Listing Unavailable",
+                "This listing does not have a valid owner and cannot be rented."
+              );
+              return;
+            }
             setSelectedListing(item);
-            console.log("Selected Listing:", item); // Logging selected listing
+            console.log("Selected Listing:", item);
             setImageIndex(0);
             setFullScreenModalVisible(true);
             setFullName(user?.displayName || "");
@@ -485,13 +580,15 @@ const Home = ({ route, navigation }) => {
             setFlightHours("");
           }}
           style={styles.listingCard}
+          accessibilityLabel={`Select listing: ${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
+          accessibilityRole="button"
         >
           <View style={styles.listingHeader}>
             <Text style={styles.listingTitle} numberOfLines={1}>
               {`${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
             </Text>
           </View>
-          {item.images && item.images.length > 0 && (
+          {item.images && item.images.length > 0 ? (
             <ImageBackground
               source={{ uri: item.images[0] }}
               style={styles.listingImage}
@@ -504,6 +601,11 @@ const Home = ({ route, navigation }) => {
                 </Text>
               </View>
             </ImageBackground>
+          ) : (
+            <View style={[styles.listingImage, { justifyContent: "center", alignItems: "center" }]}>
+              <Ionicons name="image" size={50} color="#A0AEC0" />
+              <Text style={{ color: "#A0AEC0" }}>No Image Available</Text>
+            </View>
           )}
           <View style={styles.listingDescriptionContainer}>
             <Text numberOfLines={2} style={styles.listingDescription}>
@@ -514,6 +616,72 @@ const Home = ({ route, navigation }) => {
       </View>
     );
   };
+
+  /**
+   * Handle incoming notifications and set selectedListing accordingly.
+   */
+  useEffect(() => {
+    // **Register for Push Notifications**
+    const registerForPushNotificationsAsync = async () => {
+      if (Device.isDevice) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== 'granted') {
+          Alert.alert('Permission required', 'Failed to get push token for notifications!');
+          return;
+        }
+      } else {
+        Alert.alert('Error', 'Must use physical device for Push Notifications');
+      }
+    };
+
+    registerForPushNotificationsAsync();
+
+    // **Listener for Notification Responses**
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      console.log("Notification Data:", data);
+
+      if (data && data.listingId) {
+        // Find the listing by ID from 'listings' or 'recommendedListings'
+        const listing = listings.find(item => item.id === data.listingId) ||
+                        recommendedListings.find(item => item.id === data.listingId);
+        
+        if (listing) {
+          if (!listing.ownerId) {
+            Alert.alert("Error", "The listing associated with this notification does not have a valid owner.");
+            console.warn(`Listing with ID ${data.listingId} is missing 'ownerId'.`);
+            return;
+          }
+          setSelectedListing(listing);
+          console.log("Listing set from notification:", listing);
+          setImageIndex(0);
+          setFullScreenModalVisible(true);
+          setFullName(user?.displayName || "");
+          setCityStateCombined("");
+          setHasMedicalCertificate(false);
+          setHasRentersInsurance(false);
+          setFlightHours("");
+        } else {
+          console.warn(`Listing with ID ${data.listingId} not found.`);
+          Alert.alert("Error", "Listing not found.");
+        }
+      } else {
+        console.warn("Notification does not contain listingId.");
+        Alert.alert("Error", "Invalid notification data.");
+      }
+    });
+
+    return () => {
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, [listings, recommendedListings, user]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -542,6 +710,74 @@ const Home = ({ route, navigation }) => {
         </ImageBackground>
       </Animated.View>
 
+      {/* Recommended for You Section */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
+          Recommended for you
+        </Text>
+        {isRecommendedLoading ? (
+          <ActivityIndicator size="large" color="#1E90FF" />
+        ) : recommendedListings.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {recommendedListings.map((listing) => (
+              <TouchableOpacity
+                key={listing.id}
+                style={{ marginRight: 16 }}
+                onPress={() => {
+                  if (!listing.ownerId) {
+                    Alert.alert(
+                      "Listing Unavailable",
+                      "This recommended listing does not have a valid owner and cannot be rented."
+                    );
+                    return;
+                  }
+                  setSelectedListing(listing);
+                  console.log("Selected Recommended Listing:", listing);
+                  setImageIndex(0);
+                  setFullScreenModalVisible(true);
+                  setFullName(user?.displayName || "");
+                  setCityStateCombined("");
+                  setHasMedicalCertificate(false);
+                  setHasRentersInsurance(false);
+                  setFlightHours("");
+                }}
+                accessibilityLabel={`Select recommended aircraft: ${listing.year} ${listing.make} ${listing.airplaneModel}`}
+                accessibilityRole="button"
+              >
+                {listing.images && listing.images.length > 0 ? (
+                  <Image
+                    source={{ uri: listing.images[0] }}
+                    style={{ width: 200, height: 120, borderRadius: 8 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 200,
+                      height: 120,
+                      borderRadius: 8,
+                      backgroundColor: "#A0AEC0",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Ionicons name="image" size={50} color="#FFFFFF" />
+                    <Text style={{ color: "#FFFFFF" }}>No Image</Text>
+                  </View>
+                )}
+                <Text style={{ marginTop: 8, fontWeight: "bold" }}>
+                  {`${listing.year} ${listing.make} ${listing.airplaneModel}`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : (
+          <Text style={{ textAlign: "center", color: "#718096" }}>
+            No recommended listings available.
+          </Text>
+        )}
+      </View>
+
       <FlatList
         data={listings}
         renderItem={renderItem}
@@ -557,6 +793,8 @@ const Home = ({ route, navigation }) => {
               <TouchableOpacity
                 onPress={() => setFilterModalVisible(true)}
                 style={styles.filterButton}
+                accessibilityLabel="Open filter options"
+                accessibilityRole="button"
               >
                 <Ionicons name="filter" size={24} color="gray" />
               </TouchableOpacity>
@@ -584,6 +822,8 @@ const Home = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.scrollToTopButton}
           onPress={handleScrollToTop}
+          accessibilityLabel="Scroll to top"
+          accessibilityRole="button"
         >
           <Ionicons name="arrow-up" size={24} color="white" />
         </TouchableOpacity>
@@ -602,6 +842,8 @@ const Home = ({ route, navigation }) => {
               <TouchableOpacity
                 onPress={() => setFullScreenModalVisible(false)}
                 style={styles.modalCloseButton}
+                accessibilityLabel="Close modal"
+                accessibilityRole="button"
               >
                 <Ionicons name="close" size={30} color="black" />
               </TouchableOpacity>
@@ -609,17 +851,33 @@ const Home = ({ route, navigation }) => {
                 <TouchableOpacity
                   onPress={handlePreviousImage}
                   style={styles.modalArrowButtonLeft}
+                  accessibilityLabel="Previous image"
+                  accessibilityRole="button"
                 >
                   <Ionicons name="arrow-back" size={30} color="#1E90FF" />
                 </TouchableOpacity>
-                <Image
-                  source={{ uri: selectedListing.images[imageIndex] }}
-                  style={styles.modalImage}
-                  resizeMode="cover"
-                />
+                {selectedListing.images.length > 0 ? (
+                  <Image
+                    source={{ uri: selectedListing.images[imageIndex] }}
+                    style={styles.modalImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.modalImage,
+                      { justifyContent: "center", alignItems: "center" },
+                    ]}
+                  >
+                    <Ionicons name="image" size={50} color="#A0AEC0" />
+                    <Text style={{ color: "#A0AEC0" }}>No Image Available</Text>
+                  </View>
+                )}
                 <TouchableOpacity
                   onPress={handleNextImage}
                   style={styles.modalArrowButtonRight}
+                  accessibilityLabel="Next image"
+                  accessibilityRole="button"
                 >
                   <Ionicons name="arrow-forward" size={30} color="#1E90FF" />
                 </TouchableOpacity>
@@ -627,17 +885,18 @@ const Home = ({ route, navigation }) => {
               <ScrollView contentContainerStyle={styles.modalContent}>
                 <Text
                   style={styles.modalTitle}
+                  accessibilityLabel="Listing title"
                 >
                   {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
                 </Text>
-                <Text style={styles.modalRate}>
+                <Text style={styles.modalRate} accessibilityLabel="Rate per hour">
                   ${selectedListing.ratesPerHour} per hour
                 </Text>
-                <Text style={styles.modalLocation}>
+                <Text style={styles.modalLocation} accessibilityLabel="Location">
                   Location: {selectedListing.location}
                 </Text>
 
-                <Text style={styles.modalDescription}>
+                <Text style={styles.modalDescription} accessibilityLabel="Description">
                   {selectedListing.description}
                 </Text>
 
@@ -646,12 +905,16 @@ const Home = ({ route, navigation }) => {
                     <TouchableOpacity
                       onPress={() => handleEditListing(selectedListing.id)}
                       style={styles.modalEditButton}
+                      accessibilityLabel="Edit listing"
+                      accessibilityRole="button"
                     >
                       <Text style={styles.buttonText}>Edit</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteListing(selectedListing.id)}
                       style={styles.modalDeleteButton}
+                      accessibilityLabel="Delete listing"
+                      accessibilityRole="button"
                     >
                       <Text style={styles.buttonText}>Delete</Text>
                     </TouchableOpacity>
@@ -662,6 +925,8 @@ const Home = ({ route, navigation }) => {
                 <TouchableOpacity
                   onPress={() => handleDeleteListing(selectedListing.id)}
                   style={styles.modalDeleteButton}
+                  accessibilityLabel="Developer delete listing"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.buttonText}>Developer Delete</Text>
                 </TouchableOpacity>
@@ -675,6 +940,7 @@ const Home = ({ route, navigation }) => {
                     placeholder="Enter your full name"
                     placeholderTextColor="#888"
                     style={styles.textInput}
+                    accessibilityLabel="Full name input"
                   />
                 </View>
 
@@ -687,6 +953,7 @@ const Home = ({ route, navigation }) => {
                     placeholder="e.g., New York, NY"
                     placeholderTextColor="#888"
                     style={styles.textInput}
+                    accessibilityLabel="Current city and state input"
                   />
                 </View>
 
@@ -698,6 +965,7 @@ const Home = ({ route, navigation }) => {
                   <Switch
                     value={hasMedicalCertificate}
                     onValueChange={setHasMedicalCertificate}
+                    accessibilityLabel="Medical certificate toggle"
                   />
                 </View>
 
@@ -709,6 +977,7 @@ const Home = ({ route, navigation }) => {
                   <Switch
                     value={hasRentersInsurance}
                     onValueChange={setHasRentersInsurance}
+                    accessibilityLabel="Renters insurance toggle"
                   />
                 </View>
 
@@ -722,6 +991,7 @@ const Home = ({ route, navigation }) => {
                     placeholderTextColor="#888"
                     keyboardType="numeric"
                     style={styles.textInputSmall}
+                    accessibilityLabel="Flight hours input"
                   />
                 </View>
 
@@ -740,12 +1010,15 @@ const Home = ({ route, navigation }) => {
                     }}
                     keyboardType="numeric"
                     style={styles.textInputSmall}
+                    accessibilityLabel="Rental hours input"
                   />
                 </View>
 
                 <TouchableOpacity
                   onPress={() => setCalendarModalVisible(true)}
                   style={styles.calendarButton}
+                  accessibilityLabel="Select rental date"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.calendarButtonText}>
                     Select Rental Date
@@ -753,7 +1026,7 @@ const Home = ({ route, navigation }) => {
                 </TouchableOpacity>
 
                 {rentalDate && (
-                  <Text style={styles.selectedDateText}>
+                  <Text style={styles.selectedDateText} accessibilityLabel="Selected rental date">
                     Selected Rental Date: {rentalDate}
                   </Text>
                 )}
@@ -772,6 +1045,8 @@ const Home = ({ route, navigation }) => {
                 <TouchableOpacity
                   onPress={handleSendRentalRequest}
                   style={styles.sendRequestButton}
+                  accessibilityLabel="Send rental request"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.sendRequestButtonText}>
                     Send Rental Request
@@ -809,6 +1084,8 @@ const Home = ({ route, navigation }) => {
             <TouchableOpacity
               onPress={() => setCalendarModalVisible(false)}
               style={styles.closeCalendarButton}
+              accessibilityLabel="Close calendar"
+              accessibilityRole="button"
             >
               <Text style={styles.closeCalendarButtonText}>
                 Close Calendar
@@ -828,6 +1105,8 @@ const Home = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.filterModalOverlay}
           onPressOut={() => setFilterModalVisible(false)}
+          accessibilityLabel="Close filter modal"
+          accessibilityRole="button"
         >
           <View style={styles.filterModalContent}>
             <View style={styles.filterModalHeader}>
@@ -843,6 +1122,7 @@ const Home = ({ route, navigation }) => {
               value={cityState}
               onChangeText={setCityState}
               style={styles.filterTextInput}
+              accessibilityLabel="Filter by city and state"
             />
             <Text style={styles.orText}>OR</Text>
             <TextInput
@@ -851,11 +1131,14 @@ const Home = ({ route, navigation }) => {
               value={makeModel}
               onChangeText={setMakeModel}
               style={styles.filterTextInput}
+              accessibilityLabel="Filter by make and model"
             />
             <View style={styles.filterButtonsContainer}>
               <TouchableOpacity
                 onPress={clearFilter}
                 style={styles.clearFilterButton}
+                accessibilityLabel="Clear filters"
+                accessibilityRole="button"
               >
                 <Text style={styles.filterButtonText}>Clear Filter</Text>
               </TouchableOpacity>
@@ -863,6 +1146,8 @@ const Home = ({ route, navigation }) => {
               <TouchableOpacity
                 onPress={applyFilter}
                 style={styles.applyFilterButton}
+                accessibilityLabel="Apply filters"
+                accessibilityRole="button"
               >
                 <Text style={styles.filterButtonText}>Apply Filter</Text>
               </TouchableOpacity>
