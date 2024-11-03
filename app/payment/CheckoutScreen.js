@@ -244,6 +244,7 @@ export default function CheckoutScreen() {
       clientSecret = data.clientSecret;
 
       if (!clientSecret) {
+        console.error("Error: Client secret is missing in the payment response.");
         Alert.alert('Error', 'Payment details are missing.');
         setLoading(false);
         return;
@@ -435,6 +436,7 @@ export default function CheckoutScreen() {
             placeholderTextColor="#888"
             style={styles.cardField}
             onCardChange={(cardDetails) => console.log('Card details:', cardDetails)}
+            onFocus={() => console.log('CardField focused')}
             editable={!discountApplied || totalAmount > 0} // Disable card input if discount makes it free
           />
 

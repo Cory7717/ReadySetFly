@@ -1,7 +1,7 @@
 {
   "functions": [
     {
-      "source": "functions",
+      "source": "backend",
       "codebase": "default",
       "ignore": [
         "node_modules",
@@ -27,18 +27,6 @@
     {
       "source": "production",
       "codebase": "production",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local",
-        ".env"
-      ]
-    },
-    {
-      "source": "rsf_app_backup/backend",
-      "codebase": "backend",
       "ignore": [
         "node_modules",
         ".git",
@@ -102,9 +90,6 @@
       "enabled": true
     },
     "singleProjectMode": true
-  },
-  "remoteconfig": {
-    "template": "remoteconfig.template.json"
   },
   "extensions": {},
   "database": {

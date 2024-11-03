@@ -18,7 +18,7 @@ import {
   StatusBar,
   ActivityIndicator,
   FlatList,
-  StyleSheet
+  StyleSheet,
 } from "react-native";
 
 import {
@@ -63,11 +63,9 @@ import { useStripe } from "@stripe/stripe-react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { NavigationContainer } from "@react-navigation/native";
 
-// Removed import of API_URL from "@env"
-// import { API_URL } from "@env";
-
-// Added API_URL directly (Replace with your actual API URL)
-const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api"; // Replace with your actual API URL
+const API_URL =
+  "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
+// Ensure this is the correct base URL for your Cloud Functions
 
 import CheckoutScreen from "../payment/CheckoutScreen";
 import ConfirmationScreen from "../payment/ConfirmationScreen";
@@ -127,9 +125,9 @@ const BookingCalendar = () => {
   const [isRentalRequestLoading, setIsRentalRequestLoading] = useState(false);
 
   const [selectedListing, setSelectedListing] = useState(null);
-  const [selectedListingId, setSelectedListingId] = useState(null); // Updated: Dynamic Listing ID
-  const [selectedListingName, setSelectedListingName] = useState(null); // Optional: Display Aircraft Name
-  const [totalCost, setTotalCost] = useState(null); // Updated: State for Total Cost
+  const [selectedListingId, setSelectedListingId] = useState(null); // Dynamic Listing ID
+  const [selectedListingName, setSelectedListingName] = useState(null); // Display Aircraft Name
+  const [totalCost, setTotalCost] = useState(null); // State for Total Cost
 
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
@@ -145,8 +143,8 @@ const BookingCalendar = () => {
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const NOTIFICATIONS_PAGE_SIZE = 20;
 
-  const [isAuthChecked, setIsAuthChecked] = useState(false); // New: Track auth status
-  const [renter, setRenter] = useState(null); // Updated: Manage authenticated user
+  const [isAuthChecked, setIsAuthChecked] = useState(false); // Track auth status
+  const [renter, setRenter] = useState(null); // Manage authenticated user
 
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
@@ -481,15 +479,27 @@ const BookingCalendar = () => {
         return;
       }
 
+      // Parse costPerHour as a float and validate
+      const parsedCostPerHour = parseFloat(listingData.ratesPerHour);
+      if (isNaN(parsedCostPerHour) || parsedCostPerHour <= 0) {
+        Alert.alert(
+          "Invalid Rate",
+          "The listing has an invalid rate per hour. Please contact support."
+        );
+        console.error(
+          `Invalid ratesPerHour for listing ID: ${listingId}. Received: ${listingData.ratesPerHour}`
+        );
+        return;
+      }
+
       const rentalRequest = {
-        listingId: listingId, // Ensure this is set
+        listingId: listingId,
         renterId: renterId,
         rentalStatus: "pending",
-        rentalDate: otherData.rentalDate || "", // e.g., "3 hours"
+        rentalDate: otherData.rentalDate || "",
         createdAt: serverTimestamp(),
-        totalCost: 0, // Initially set to 0, to be updated by the rental flow
-        rentalDate: otherData.rentalDate || "", // e.g., "10/29/2024"
-        senderId: renterId, // Assuming sender is the renter
+        totalCost: 0,
+        senderId: renterId,
         senderName: otherData.senderName || renter.displayName || "User Name",
         contact:
           otherData.contact ||
@@ -497,30 +507,27 @@ const BookingCalendar = () => {
           "User email and phone number",
         airplaneModel:
           otherData.airplaneModel || selectedListingName || "Aircraft Model",
+        rentalHours: parseFloat(otherData.rentalHours) || 1,
+        costPerHour: parsedCostPerHour, // Ensure it's a number
+        ownerId: ownerId,
+        rentalRequestId: "", // Initialize to empty
       };
 
-      // Add to owner's rentalRequests and get rentalRequestId
-      const ownerRentalRequestRef = collection(
-        db,
-        "owners",
-        ownerId,
-        "rentalRequests"
-      );
-      const ownerRentalRequestDoc = await addDoc(
-        ownerRentalRequestRef,
-        rentalRequest
-      );
-      const rentalRequestId = ownerRentalRequestDoc.id;
-
-      // Add to renter's rentalRequests with the same rentalRequestId
-      const renterRentalRequestRef = doc(
+      // Add to renter's rentalRequests and get rentalRequestId
+      const renterRentalRequestRef = collection(
         db,
         "renters",
         renterId,
-        "rentalRequests",
-        rentalRequestId
+        "rentalRequests"
       );
-      await setDoc(renterRentalRequestRef, rentalRequest);
+      const renterRentalRequestDoc = await addDoc(
+        renterRentalRequestRef,
+        rentalRequest
+      );
+      const rentalRequestId = renterRentalRequestDoc.id;
+
+      // Update the renterRentalRequestDoc with rentalRequestId
+      await updateDoc(renterRentalRequestDoc, { rentalRequestId });
 
       console.log(
         `Created rental request ${rentalRequestId} for listing ${listingId}`
@@ -530,6 +537,47 @@ const BookingCalendar = () => {
       console.error("Error creating rental request:", error);
       Alert.alert("Error", "Failed to create rental request.");
     }
+  };
+
+  // Compute Total Cost Function
+  const computeTotalCost = (rentalHours, costPerHour) => {
+    const hours = parseFloat(rentalHours);
+    const hourlyCost = parseFloat(costPerHour);
+
+    console.log(
+      "computeTotalCost - rentalHours:",
+      rentalHours,
+      "hours:",
+      hours
+    );
+    console.log(
+      "computeTotalCost - costPerHour:",
+      costPerHour,
+      "hourlyCost:",
+      hourlyCost
+    );
+
+    if (isNaN(hours) || hours <= 0 || isNaN(hourlyCost) || hourlyCost <= 0) {
+      console.warn("Invalid rentalHours or costPerHour:", {
+        rentalHours,
+        costPerHour,
+      });
+      return null;
+    }
+
+    const rentalCost = hours * hourlyCost;
+    const bookingFee = rentalCost * 0.06; // 6% booking fee
+    const tax = rentalCost * 0.0825; // 8.25% state tax
+    const processingFee = rentalCost * 0.03; // 3% CC processing fee
+    const totalAmount = rentalCost + bookingFee + tax + processingFee;
+
+    return {
+      rentalCost: rentalCost.toFixed(2),
+      bookingFee: bookingFee.toFixed(2),
+      tax: tax.toFixed(2),
+      processingFee: processingFee.toFixed(2),
+      total: totalAmount.toFixed(2),
+    };
   };
 
   // Navigate to CheckoutScreen with Payment Intent
@@ -578,35 +626,46 @@ const BookingCalendar = () => {
 
       console.log("Listing Data:", listingData);
 
-      // **Updated:** Use `rentalRequest.totalCost` directly with proper parsing
-      const totalCostNumber = parseFloat(rentalRequest.totalCost);
-      if (!isNaN(totalCostNumber) && totalCostNumber > 0) {
-        setTotalCost(totalCostNumber.toFixed(2));
+      // Use `computeTotalCost` to calculate detailed total cost
+      const computedTotalCost = computeTotalCost(
+        rentalRequest.rentalHours || 1,
+        listingData.ratesPerHour || "0.00"
+      );
+
+      if (computedTotalCost) {
+        setTotalCost(computedTotalCost);
       } else {
-        setTotalCost("N/A");
+        setTotalCost({
+          rentalCost: "N/A",
+          bookingFee: "N/A",
+          tax: "N/A",
+          processingFee: "N/A",
+          total: "N/A",
+        });
       }
 
-      const calculatedTotalCost = !isNaN(totalCostNumber)
-        ? totalCostNumber.toFixed(2)
-        : 0.0;
-
-      console.log(`Calculated Total Cost: ${calculatedTotalCost}`);
-
-      if (isNaN(calculatedTotalCost) || calculatedTotalCost <= 0) {
-        Alert.alert(
-          "Invalid Total Cost",
-          "The total cost for this rental is invalid."
-        );
-        return;
-      }
-
-      const amountInCents = Math.round(calculatedTotalCost * 100);
+      const amountInCents = computedTotalCost
+        ? Math.round(parseFloat(computedTotalCost.total) * 100)
+        : 0;
 
       console.log(
         `Creating payment intent for rental ID: ${rentalRequestSnap.id} with amount: ${amountInCents} cents`
       );
 
-      const clientSecret = await createPaymentIntent(amountInCents);
+      // Confirm that ownerId exists
+      if (!rentalRequest.ownerId) {
+        console.error("Owner ID is missing in rental request.");
+        Alert.alert("Error", "Owner information is missing.");
+        return;
+      }
+
+      // Pass amount, rentalRequestId, ownerId, and renterId
+      const clientSecret = await createPaymentIntent(
+        amountInCents,
+        rentalRequestSnap.id,
+        rentalRequest.ownerId, // Pass ownerId
+        renterId // Pass renterId
+      );
 
       if (clientSecret) {
         console.log(
@@ -617,7 +676,7 @@ const BookingCalendar = () => {
 
         navigation.navigate("CheckoutScreen", {
           rentalRequestId: rentalRequestSnap.id,
-          amount: calculatedTotalCost, // Pass the calculated total cost
+          amount: computedTotalCost.total, // Pass the calculated total cost
           clientSecret,
         });
       } else {
@@ -631,22 +690,46 @@ const BookingCalendar = () => {
   };
 
   // Create Payment Intent via Backend
-  const createPaymentIntent = async (amount) => {
+  const createPaymentIntent = async (
+    amount,
+    rentalRequestId,
+    ownerId,
+    renterId
+  ) => {
     if (isNaN(amount) || amount <= 0) {
       Alert.alert("Invalid Amount", "The payment amount is invalid.");
       return null;
     }
 
+    if (!rentalRequestId) {
+      Alert.alert("Invalid Rental Request", "Rental Request ID is missing.");
+      return null;
+    }
+
+    if (!ownerId) {
+      Alert.alert("Invalid Owner", "Owner ID is missing.");
+      return null;
+    }
+
+    if (!renterId) {
+      Alert.alert("Invalid Renter", "Renter ID is missing.");
+      return null;
+    }
+
     try {
       console.log(`Creating payment intent for amount: ${amount} cents`);
+      console.log(`Rental Request ID: ${rentalRequestId}`);
+      console.log(`Owner ID: ${ownerId}`);
+      console.log(`Renter ID: ${renterId}`);
       console.log(`API_URL is: ${API_URL}`);
 
-      const response = await fetch(`${API_URL}/create-payment-intent`, {
+      const response = await fetch(`${API_URL}/create-rental-payment-intent`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${await auth.currentUser.getIdToken()}`,
         },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, rentalRequestId, ownerId, renterId }), // Include renterId
       });
 
       const text = await response.text();
@@ -655,7 +738,13 @@ const BookingCalendar = () => {
 
       if (response.ok) {
         const data = JSON.parse(text);
-        return data.clientSecret;
+        if (data.clientSecret) {
+          return data.clientSecret;
+        } else {
+          console.error("clientSecret not found in response:", data);
+          Alert.alert("Payment Error", "Invalid response from payment server.");
+          return null;
+        }
       } else {
         console.error("Error creating payment intent:", text);
         Alert.alert("Payment Error", "Failed to create payment intent.");
@@ -668,9 +757,7 @@ const BookingCalendar = () => {
     }
   };
 
-  // ... Rest of your functions remain unchanged ...
-
-  // Handle Notification Press
+  // Simplified handleNotificationPress Function
   const handleNotificationPress = async (notification) => {
     try {
       if (!notification) {
@@ -678,10 +765,7 @@ const BookingCalendar = () => {
       }
 
       if (notification.rentalRequestId) {
-        console.log(
-          "Notification has rentalRequestId:",
-          notification.rentalRequestId
-        );
+        console.log("Notification has rentalRequestId:", notification.rentalRequestId);
 
         setIsRentalRequestLoading(true);
 
@@ -693,88 +777,52 @@ const BookingCalendar = () => {
           notification.rentalRequestId
         );
 
-        // Set up a listener for the rental request document to keep totalCost updated
-        const unsubscribeRentalRequest = onSnapshot(
-          rentalRequestRef,
-          async (rentalRequestSnap) => {
-            if (rentalRequestSnap.exists()) {
-              const rentalRequestData = rentalRequestSnap.data();
-              setSelectedRentalRequest(rentalRequestData);
-
-              const totalCostNumber = parseFloat(rentalRequestData.totalCost);
-              if (!isNaN(totalCostNumber) && totalCostNumber > 0) {
-                setTotalCost(totalCostNumber.toFixed(2));
-              } else {
-                setTotalCost("N/A");
-              }
-
-              // Update rentals state if needed
-              setRentals((prevRentals) =>
-                prevRentals.map((rental) =>
-                  rental.id === rentalRequestSnap.id
-                    ? { ...rental, ...rentalRequestData }
-                    : rental
-                )
-              );
-            } else {
-              setSelectedRentalRequest(null);
-              setTotalCost(null);
-              console.warn(
-                "Rental request not found for ID:",
-                notification.rentalRequestId
-              );
-            }
-
-            setIsRentalRequestLoading(false);
-          },
-          (error) => {
-            console.error("Error listening to rental request:", error);
-            setIsRentalRequestLoading(false);
-          }
-        );
-
-        // Fetch listing data
+        // Fetch rental request data using getDoc
         const rentalRequestSnap = await getDoc(rentalRequestRef);
-        let rentalRequestData = null;
-        if (rentalRequestSnap.exists()) {
-          rentalRequestData = rentalRequestSnap.data();
-          setSelectedRentalRequest(rentalRequestData);
-          console.log("Fetched Rental Request:", rentalRequestData);
-        } else {
+        if (!rentalRequestSnap.exists()) {
           setSelectedRentalRequest(null);
-          console.warn(
-            "Rental request not found for ID:",
-            notification.rentalRequestId
-          );
+          setSelectedListing(null);
           setTotalCost(null);
+          Alert.alert("Error", "Rental request not found.");
           setIsRentalRequestLoading(false);
           return;
         }
 
-        let listingData = null;
-        if (rentalRequestData.listingId) {
-          const listingRef = doc(db, "airplanes", rentalRequestData.listingId);
-          const listingSnap = await getDoc(listingRef);
-          if (listingSnap.exists()) {
-            listingData = listingSnap.data();
-            setSelectedListing(listingData);
-            console.log("Fetched Listing:", listingData);
-          } else {
-            setSelectedListing(null);
-            setTotalCost(null);
-            console.warn(
-              "Listing not found for ID:",
-              rentalRequestData.listingId
-            );
-            setIsRentalRequestLoading(false);
-            return;
-          }
-        } else {
+        const rentalRequestData = rentalRequestSnap.data();
+        setSelectedRentalRequest(rentalRequestData);
+        console.log("Rental Request Data:", rentalRequestData);
+
+        // Fetch listing data
+        const listingRef = doc(db, "airplanes", rentalRequestData.listingId);
+        const listingSnap = await getDoc(listingRef);
+        if (!listingSnap.exists()) {
           setSelectedListing(null);
           setTotalCost(null);
-          console.warn("Listing ID is missing in the rental request.");
+          Alert.alert("Error", "Listing not found.");
           setIsRentalRequestLoading(false);
           return;
+        }
+
+        const listingData = listingSnap.data();
+        setSelectedListing(listingData);
+        console.log("Listing Data:", listingData);
+
+        // Compute total cost
+        const computedTotalCost = computeTotalCost(
+          rentalRequestData.rentalHours || 1,
+          listingData.ratesPerHour || 0
+        );
+
+        if (computedTotalCost) {
+          setTotalCost(computedTotalCost);
+        } else {
+          setTotalCost({
+            rentalCost: "N/A",
+            bookingFee: "N/A",
+            tax: "N/A",
+            processingFee: "N/A",
+            total: "N/A",
+          });
         }
 
         setSelectedNotification(notification);
@@ -791,6 +839,7 @@ const BookingCalendar = () => {
     } catch (error) {
       console.error("Error handling notification press:", error);
       Alert.alert("Error", error.message);
+      setIsRentalRequestLoading(false);
     }
   };
 
@@ -952,18 +1001,6 @@ const BookingCalendar = () => {
       console.error("Navigation error:", error);
       Alert.alert("Error", "Failed to navigate to the home screen.");
     }
-  };
-
-  // Calculate Rental Cost
-  const calculateRentalCost = () => {
-    const hours = parseFloat(rentalHours) || 0;
-    const hourlyCost = parseFloat(costPerHour) || 200;
-    const bookingFee = hourlyCost * hours * 0.06;
-    const processingFee = hourlyCost * hours * 0.03;
-    const tax = hourlyCost * hours * 0.0825;
-    const totalCost = hourlyCost * hours + bookingFee + processingFee + tax;
-
-    return totalCost.toFixed(2);
   };
 
   // Get Current Location
@@ -1327,9 +1364,10 @@ const BookingCalendar = () => {
                     flex: 1,
                     opacity: 0.9,
                   }}
-                  onChangeText={(text) =>
-                    setRentalHours(text.replace(/[^0-9.]/g, ""))
-                  }
+                  onChangeText={(text) => {
+                    const sanitizedText = text.replace(/[^0-9.]/g, "");
+                    setRentalHours(sanitizedText);
+                  }}
                   value={rentalHours}
                   accessibilityLabel="Enter estimated rental hours"
                 />
@@ -1358,17 +1396,30 @@ const BookingCalendar = () => {
               {/* Button to Create Rental Request */}
               <TouchableOpacity
                 onPress={() => {
+                  // Validate rentalHours before proceeding
+                  if (
+                    !rentalHours ||
+                    isNaN(rentalHours) ||
+                    parseFloat(rentalHours) <= 0
+                  ) {
+                    Alert.alert(
+                      "Invalid Rental Hours",
+                      "Please enter a valid number of rental hours."
+                    );
+                    return;
+                  }
+
                   if (selectedListingId) {
                     // Ensure a listing is selected
                     saveSelectedAircraftIds(selectedListingId);
                     // Prepare otherData
                     const otherData = {
-                      rentalDate: `${rentalHours} hours`,
+                      rentalDate: rentalDate || new Date().toLocaleDateString(),
                       senderName: renter.displayName || "User Name",
                       contact:
                         profileData.contact || "User email and phone number",
                       airplaneModel: selectedListingName || "Aircraft Model",
-                      rentalDate: rentalDate || new Date().toLocaleDateString(),
+                      rentalHours: parseFloat(rentalHours) || 1, // Ensure it's a number
                     };
                     createRentalRequest(selectedListingId, renterId, otherData); // Create rental request with dynamic listingId and otherData
                   } else {
@@ -1398,7 +1449,11 @@ const BookingCalendar = () => {
               {/* Display Selected Aircraft (Optional) */}
               {selectedListingName && (
                 <Text
-                  style={{ marginTop: 8, color: "white", textAlign: "center" }}
+                  style={{
+                    marginTop: 8,
+                    color: "white",
+                    textAlign: "center",
+                  }}
                 >
                   Selected Aircraft: {selectedListingName}
                 </Text>
@@ -2056,12 +2111,32 @@ const BookingCalendar = () => {
                       Rental Period: {selectedRentalRequest.rentalDate || "N/A"}
                     </Text>
                     <Text style={{ color: "#4a5568" }}>
-                      Total Cost: $
-                      {selectedRentalRequest.totalCost !== undefined &&
-                      selectedRentalRequest.totalCost !== null
-                        ? parseFloat(selectedRentalRequest.totalCost).toFixed(2)
-                        : "N/A"}
+                      Estimated Hours:{" "}
+                      {selectedRentalRequest.rentalHours || "N/A"}
                     </Text>
+                    {/* Detailed Total Cost Components */}
+                    {totalCost ? (
+                      <>
+                        <Text style={{ color: "#4a5568" }}>
+                          Rental Cost (${selectedListing.ratesPerHour}/hr): $
+                          {totalCost.rentalCost}
+                        </Text>
+                        <Text style={{ color: "#4a5568" }}>
+                          Booking Fee (6%): ${totalCost.bookingFee}
+                        </Text>
+                        <Text style={{ color: "#4a5568" }}>
+                          Tax (8.25%): ${totalCost.tax}
+                        </Text>
+                        <Text style={{ color: "#4a5568" }}>
+                          Processing Fee (3%): ${totalCost.processingFee}
+                        </Text>
+                        <Text style={{ fontWeight: "bold", color: "#4a5568" }}>
+                          Total: ${totalCost.total}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={{ color: "#4a5568" }}>Total Cost: N/A</Text>
+                    )}
                   </View>
                 )}
 
@@ -2284,157 +2359,8 @@ const LoginScreen = () => {
   );
 };
 
-// Stylesheet for Clean and Modern Design
+// Stylesheet
 const styles = StyleSheet.create({
-  chatBubbleIcon: {
-    position: "absolute",
-    bottom: 20,
-    right: 20,
-    backgroundColor: "#3182ce",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  messageModalContainer: {
-    width: "90%",
-    height: "80%",
-    backgroundColor: "white",
-    borderRadius: 24,
-    padding: 24,
-    position: "relative",
-  },
-  notificationModalContainer: {
-    flex: 1, // Changed from width and height to flex: 1 for full screen
-    backgroundColor: "white",
-    padding: 24,
-    position: "relative",
-  },
-  closeModalButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-  },
-  chatBubble: {
-    padding: 8,
-    borderRadius: 8,
-    marginVertical: 4,
-    maxWidth: "80%",
-  },
-  chatBubbleLeft: {
-    backgroundColor: "#bee3f8",
-    alignSelf: "flex-start",
-  },
-  chatBubbleRight: {
-    backgroundColor: "#e2e8f0",
-    alignSelf: "flex-end",
-  },
-  chatTimestamp: {
-    fontSize: 10,
-    color: "#4a5568",
-    marginTop: 4,
-  },
-  messageInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-    paddingTop: 8,
-  },
-  messageTextInput: {
-    flex: 1,
-    borderColor: "#e2e8f0",
-    borderWidth: 1,
-    borderRadius: 24,
-    padding: 8,
-    marginRight: 8,
-    color: "#000",
-  },
-  sendButton: {
-    backgroundColor: "#3182ce",
-    padding: 12,
-    borderRadius: 24,
-  },
-  profileContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "white",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
-    elevation: 3,
-    borderRadius: 24,
-    marginBottom: 16,
-    marginHorizontal: 16,
-  },
-  profileTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2d3748",
-    marginBottom: 8,
-  },
-  profileRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  profileLabel: {
-    fontWeight: "bold",
-    color: "#2d3748",
-    flex: 1,
-  },
-  profileValue: {
-    color: "#718096",
-    flex: 2,
-  },
-  profileImage: {
-    width: 144,
-    height: 144,
-    borderRadius: 8,
-    marginTop: 8,
-    alignSelf: "center",
-  },
-  paymentButton: {
-    backgroundColor: "#3182ce",
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  paymentButtonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  closeButton: {
-    backgroundColor: "#e53e3e",
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  closeButtonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  messageOwnerButton: {
-    backgroundColor: "#38a169",
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  messageOwnerButtonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -2446,12 +2372,148 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
   },
+  profileContainer: {
+    padding: 16,
+    backgroundColor: "#f7fafc",
+  },
+  profileTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+    textAlign: "center",
+    color: "#2d3748",
+  },
+  profileRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  profileLabel: {
+    fontWeight: "bold",
+    color: "#2d3748",
+    flex: 1,
+  },
+  profileValue: {
+    color: "#4a5568",
+    flex: 2,
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignSelf: "center",
+    marginTop: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  messageModalContainer: {
+    width: "90%",
+    height: "80%",
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 16,
+  },
+  notificationModalContainer: {
+    flex: 1,
+    backgroundColor: "white",
+    paddingTop: 16,
+  },
+  closeModalButton: {
+    alignSelf: "flex-end",
+  },
+  chatBubble: {
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+    maxWidth: "80%",
+  },
+  chatBubbleLeft: {
+    backgroundColor: "#edf2f7",
+    alignSelf: "flex-start",
+  },
+  chatBubbleRight: {
+    backgroundColor: "#3182ce",
+    alignSelf: "flex-end",
+  },
+  chatTimestamp: {
+    fontSize: 10,
+    color: "#a0aec0",
+    marginTop: 4,
+  },
+  messageInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 16,
+  },
+  messageTextInput: {
+    flex: 1,
+    borderColor: "#cbd5e0",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  sendButton: {
+    backgroundColor: "#3182ce",
+    padding: 10,
+    borderRadius: 8,
+  },
+  messageOwnerButton: {
+    backgroundColor: "#3182ce",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  messageOwnerButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  closeButton: {
+    backgroundColor: "#e2e8f0",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  closeButtonText: {
+    color: "#2d3748",
+    fontWeight: "bold",
+  },
+  paymentButton: {
+    backgroundColor: "#48bb78",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  paymentButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  chatBubbleIcon: {
+    position: "absolute",
+    bottom: 32,
+    right: 32,
+    backgroundColor: "#3182ce",
+    borderRadius: 32,
+    padding: 8,
+    elevation: 5, // For Android shadow
+    shadowColor: "#000", // For iOS shadow
+    shadowOffset: { width: 0, height: 2 }, // For iOS shadow
+    shadowOpacity: 0.3, // For iOS shadow
+    shadowRadius: 3, // For iOS shadow
+  },
   loginContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
-    backgroundColor: "white",
   },
 });
 
