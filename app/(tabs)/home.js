@@ -1,3 +1,5 @@
+// home.js
+
 import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
@@ -16,6 +18,7 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../../firebaseConfig";
@@ -31,13 +34,16 @@ import {
   serverTimestamp,
   getDocs,
   limit,
+  setDoc,
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
 import { Calendar } from "react-native-calendars";
-// **Added Imports for Notifications**
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
+import { Picker } from "@react-native-picker/picker"; // Ensure Picker is imported
+import { CardField } from "@stripe/stripe-react-native"; // Ensure Stripe is set up
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -82,9 +88,143 @@ const Home = ({ route, navigation }) => {
   // State for Recommended Listings Loading
   const [isRecommendedLoading, setIsRecommendedLoading] = useState(false);
 
-  // **Notification Listener Reference**
+  // **Notification Listener References**
   const notificationListener = useRef();
   const responseListener = useRef();
+
+  /**
+   * **New Functionality: Register for Push Notifications and Update Firestore**
+   *
+   * This function handles:
+   * 1. Registering the device for push notifications.
+   * 2. Retrieving the Expo Push Notification Token (FCM Token).
+   * 3. Saving/updating the token in Firebase Firestore under the renter's document.
+   */
+  useEffect(() => {
+    const registerForPushNotificationsAsync = async () => {
+      let token;
+      if (Device.isDevice) {
+        const { status: existingStatus } =
+          await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== "granted") {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== "granted") {
+          Alert.alert(
+            "Permission required",
+            "Failed to get push token for notifications!"
+          );
+          return;
+        }
+        token = (await Notifications.getExpoPushTokenAsync()).data;
+        console.log("Expo Push Token:", token);
+      } else {
+        Alert.alert(
+          "Error",
+          "Must use a physical device for Push Notifications"
+        );
+      }
+
+      if (token && user) {
+        try {
+          // Adjust the Firestore path as per your data structure
+          const renterRef = doc(db, "users", user.uid, "renters", user.uid);
+          await setDoc(renterRef, { fcmToken: token }, { merge: true });
+          console.log("FCM Token saved to Firestore");
+        } catch (error) {
+          console.error("Error saving FCM token to Firestore:", error);
+        }
+      }
+
+      // For Android, set notification channel
+      if (Platform.OS === "android") {
+        Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7C",
+        });
+      }
+    };
+
+    if (user) {
+      registerForPushNotificationsAsync();
+    }
+  }, [user]);
+
+  /**
+   * **Handle Incoming Notifications and Responses**
+   *
+   * This effect sets up listeners for incoming notifications and user interactions with notifications.
+   */
+  useEffect(() => {
+    if (!user) return;
+
+    // Listener for incoming notifications
+    notificationListener.current =
+      Notifications.addNotificationReceivedListener((notification) => {
+        console.log("Notification Received:", notification);
+        // You can handle the notification here if needed
+      });
+
+    // Listener for user interacting with a notification
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log("Notification Response:", response);
+        const data = response.notification.request.content.data;
+        console.log("Notification Data:", data);
+
+        if (data && data.listingId) {
+          // Find the listing by ID from 'listings' or 'recommendedListings'
+          const listing =
+            listings.find((item) => item.id === data.listingId) ||
+            recommendedListings.find((item) => item.id === data.listingId);
+
+          if (listing) {
+            if (!listing.ownerId) {
+              Alert.alert(
+                "Error",
+                "The listing associated with this notification does not have a valid owner."
+              );
+              console.warn(
+                `Listing with ID ${data.listingId} is missing 'ownerId'.`
+              );
+              return;
+            }
+            setSelectedListing(listing);
+            console.log("Listing set from notification:", listing);
+            setImageIndex(0);
+            setFullScreenModalVisible(true);
+            setFullName(user?.displayName || "");
+            setCityStateCombined("");
+            setHasMedicalCertificate(false);
+            setHasRentersInsurance(false);
+            setFlightHours("");
+          } else {
+            console.warn(`Listing with ID ${data.listingId} not found.`);
+            Alert.alert("Error", "Listing not found.");
+          }
+        } else {
+          console.warn("Notification does not contain listingId.");
+          Alert.alert("Error", "Invalid notification data.");
+        }
+      });
+
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(
+          notificationListener.current
+        );
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(
+          responseListener.current
+        );
+      }
+    };
+  }, [listings, recommendedListings, user]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -112,7 +252,10 @@ const Home = ({ route, navigation }) => {
 
   useEffect(() => {
     if (route?.params?.newListing) {
-      setListings((prevListings) => [route.params.newListing, ...prevListings]);
+      setListings((prevListings) => [
+        route.params.newListing,
+        ...prevListings,
+      ]);
     }
 
     if (route?.params?.unlistedId) {
@@ -123,12 +266,12 @@ const Home = ({ route, navigation }) => {
   }, [route?.params?.newListing, route?.params?.unlistedId]);
 
   /**
-   * Helper function to parse the combined 'aircraft' field.
-   * Assumes format: "Year Make Model" (e.g., "2020 Cessna 172")
+   * Helper function to parse the combined 'aircraftModel' field.
+   * Supports formats like "Year Make Model" and "Year/Make/Model".
    * Returns an object with year, make, and airplaneModel.
    */
-  const parseAircraft = (aircraft) => {
-    if (!aircraft || typeof aircraft !== "string") {
+  const parseAircraft = (aircraftModel) => {
+    if (!aircraftModel || typeof aircraftModel !== "string") {
       return {
         year: "Unknown Year",
         make: "Unknown Make",
@@ -136,9 +279,12 @@ const Home = ({ route, navigation }) => {
       };
     }
 
+    // Replace slashes with spaces to standardize the format
+    const normalizedModel = aircraftModel.replace(/\//g, " ");
+
     // Regular expression to match "Year Make Model"
     const regex = /^(\d{4})\s+(\w+)\s+(.+)$/;
-    const match = aircraft.trim().match(regex);
+    const match = normalizedModel.trim().match(regex);
 
     if (match) {
       return {
@@ -148,7 +294,7 @@ const Home = ({ route, navigation }) => {
       };
     }
 
-    console.warn(`Unable to parse aircraft field: "${aircraft}"`);
+    console.warn(`Unable to parse aircraftModel field: "${aircraftModel}"`);
     return {
       year: "Unknown Year",
       make: "Unknown Make",
@@ -177,15 +323,8 @@ const Home = ({ route, navigation }) => {
         const listingsData = snapshot.docs
           .map((doc) => {
             const data = doc.data();
-            let { year, make, airplaneModel } = data;
-
-            // Check if separate fields are missing and attempt to parse from 'aircraft' field
-            if (!year || !make || !airplaneModel) {
-              const parsed = parseAircraft(data.aircraft);
-              if (!year) year = parsed.year;
-              if (!make) make = parsed.make;
-              if (!airplaneModel) airplaneModel = parsed.airplaneModel;
-            }
+            const parsedAircraft = parseAircraft(data.aircraftModel);
+            const { year, make, airplaneModel } = parsedAircraft;
 
             return {
               id: doc.id,
@@ -193,26 +332,18 @@ const Home = ({ route, navigation }) => {
               make: make || "Unknown Make",
               airplaneModel: airplaneModel || "Unknown Model",
               ownerId: data.ownerId || null,
-              ratesPerHour: data.ratesPerHour || "0.00",
+              costPerHour: data.costPerHour || "0.00",
               location: data.location || "Unknown Location",
               description: data.description || "No description available.",
-              images: data.images || [],
+              images: Array.isArray(data.images) ? data.images : [data.images],
               createdAt: data.createdAt || serverTimestamp(),
             };
           })
           // Filter out listings without a valid ownerId
-          .filter((listing) => {
-            if (!listing.ownerId) {
-              return false;
-            }
-            return true;
-          });
+          .filter((listing) => listing.ownerId);
 
         // Log detailed information about each listing
         listingsData.forEach((listing) => {
-          if (!Array.isArray(listing.images)) {
-            listing.images = [listing.images];
-          }
           console.log(
             `Listing ID: ${listing.id}, Year: ${listing.year}, Make: ${listing.make}, Model: ${listing.airplaneModel}, Owner ID: ${listing.ownerId}`
           );
@@ -228,7 +359,10 @@ const Home = ({ route, navigation }) => {
             "You do not have permission to access these listings."
           );
         } else {
-          Alert.alert("Error", "An unexpected error occurred while fetching listings.");
+          Alert.alert(
+            "Error",
+            "An unexpected error occurred while fetching listings."
+          );
         }
       }
     );
@@ -249,15 +383,8 @@ const Home = ({ route, navigation }) => {
       const snapshot = await getDocs(recommendedQuery);
       const recommendedData = snapshot.docs.map((doc) => {
         const data = doc.data();
-        let { year, make, airplaneModel } = data;
-
-        // Parse aircraft field if necessary
-        if (!year || !make || !airplaneModel) {
-          const parsed = parseAircraft(data.aircraft);
-          if (!year) year = parsed.year;
-          if (!make) make = parsed.make;
-          if (!airplaneModel) airplaneModel = parsed.airplaneModel;
-        }
+        const parsedAircraft = parseAircraft(data.aircraftModel);
+        const { year, make, airplaneModel } = parsedAircraft;
 
         return {
           id: doc.id,
@@ -265,22 +392,16 @@ const Home = ({ route, navigation }) => {
           make: make || "Unknown Make",
           airplaneModel: airplaneModel || "Unknown Model",
           ownerId: data.ownerId || null,
-          ratesPerHour: data.ratesPerHour || "0.00",
+          costPerHour: data.costPerHour || "0.00",
           location: data.location || "Unknown Location",
           description: data.description || "No description available.",
-          images: data.images || [],
+          images: Array.isArray(data.images) ? data.images : [data.images],
           createdAt: data.createdAt || serverTimestamp(),
         };
       });
 
       // Filter out listings without a valid ownerId
-      const validRecommended = recommendedData.filter((listing) => {
-        if (!listing.ownerId) {
-          return false;
-        }
-        return true;
-      });
-
+      const validRecommended = recommendedData.filter((listing) => listing.ownerId);
       setRecommendedListings(validRecommended);
       console.log(`Fetched ${validRecommended.length} recommended listings.`);
     } catch (error) {
@@ -301,9 +422,12 @@ const Home = ({ route, navigation }) => {
   const calculateTotalCost = (hours) => {
     if (!selectedListing) return;
 
-    const pricePerHour = parseFloat(selectedListing.ratesPerHour);
+    const pricePerHour = parseFloat(selectedListing.costPerHour);
     if (isNaN(pricePerHour)) {
-      Alert.alert("Pricing Error", "Invalid rate per hour for the selected listing.");
+      Alert.alert(
+        "Pricing Error",
+        "Invalid rate per hour for the selected listing."
+      );
       return;
     }
 
@@ -323,7 +447,9 @@ const Home = ({ route, navigation }) => {
   };
 
   /**
-   * Handle sending a rental request to the owner.
+   * **Updated Function: Handle Sending a Rental Request to the Owner**
+   *
+   * This function now adds rental requests directly to the centralized 'rentalRequests' collection.
    */
   const handleSendRentalRequest = async () => {
     console.log("Attempting to send rental request.");
@@ -336,7 +462,10 @@ const Home = ({ route, navigation }) => {
     }
 
     if (!selectedListing.id) {
-      Alert.alert("Error", "Listing ID is missing. Please select a valid listing.");
+      Alert.alert(
+        "Error",
+        "Listing ID is missing. Please select a valid listing."
+      );
       return;
     }
 
@@ -345,7 +474,9 @@ const Home = ({ route, navigation }) => {
         "Listing Error",
         "The selected listing does not have a valid owner. Please select a different listing."
       );
-      console.error(`Selected listing ID: ${selectedListing.id} is missing 'ownerId'.`);
+      console.error(
+        `Selected listing ID: ${selectedListing.id} is missing 'ownerId'.`
+      );
       return;
     }
 
@@ -366,7 +497,10 @@ const Home = ({ route, navigation }) => {
     }
 
     if (!flightHours || isNaN(flightHours) || Number(flightHours) < 0) {
-      Alert.alert("Input Required", "Please enter a valid number of flight hours.");
+      Alert.alert(
+        "Input Required",
+        "Please enter a valid number of flight hours."
+      );
       return;
     }
 
@@ -386,7 +520,7 @@ const Home = ({ route, navigation }) => {
       return;
     }
 
-    const rentalCost = parseFloat(selectedListing.ratesPerHour) * rentalHours;
+    const rentalCost = parseFloat(selectedListing.costPerHour) * rentalHours;
     if (isNaN(rentalCost) || rentalCost <= 0) {
       Alert.alert("Pricing Error", "Invalid rental cost calculated.");
       return;
@@ -400,7 +534,8 @@ const Home = ({ route, navigation }) => {
 
     try {
       // Assign 'Unknown Model' if airplaneModel is undefined
-      const airplaneModel = selectedListing.airplaneModel || "Unknown Model";
+      const airplaneModel =
+        selectedListing.airplaneModel || "Unknown Model";
       if (airplaneModel === "Unknown Model") {
         console.warn(
           `Listing ID: ${selectedListing.id} is missing airplaneModel. Assigning 'Unknown Model'.`
@@ -409,18 +544,16 @@ const Home = ({ route, navigation }) => {
 
       rentalRequestData = {
         renterId: user.uid,
-        renterName: fullName,
+        renterName: fullName, // Correctly set renterName
         ownerId: selectedListing.ownerId,
-        make: selectedListing.make || "Unknown Make",
-        airplaneModel: airplaneModel,
-        rentalDate: rentalDate,
-        rentalHours: rentalHours,
-        rentalCost: rentalCost.toFixed(2),
-        ownerPayout: ownerPayout.toFixed(2),
-        contact: user.email || "noemail@example.com",
-        createdAt: serverTimestamp(),
-        status: "pending",
         listingId: selectedListing.id,
+        rentalHours: rentalHours,
+        baseCost: rentalCost.toFixed(2),
+        commission: (rentalCost * 0.06).toFixed(2),
+        totalCost: (rentalCost - rentalCost * 0.06).toFixed(2),
+        rentalDate: rentalDate,
+        status: "pending",
+        createdAt: serverTimestamp(),
         currentLocation: cityStateCombined,
         hasMedicalCertificate: hasMedicalCertificate,
         hasRentersInsurance: hasRentersInsurance,
@@ -435,22 +568,24 @@ const Home = ({ route, navigation }) => {
         throw new Error("Listing ID is missing in the rental request data.");
       }
 
-      const rentalRequestsRef = collection(
-        db,
-        "owners",
-        selectedListing.ownerId,
-        "rentalRequests"
+      // **New: Add to Centralized 'rentalRequests' Collection**
+      const rentalRequestsRef = collection(db, "rentalRequests");
+      const rentalRequestDoc = await addDoc(rentalRequestsRef, rentalRequestData);
+      const rentalRequestId = rentalRequestDoc.id;
+
+      // Optionally, update the document with its own ID
+      await setDoc(rentalRequestDoc, { id: rentalRequestId }, { merge: true });
+
+      console.log(
+        `Created rental request ${rentalRequestId} for listing ${selectedListing.id} with ownerId ${selectedListing.ownerId}`
       );
-
-      await addDoc(rentalRequestsRef, rentalRequestData);
-
-      setFullScreenModalVisible(false);
       Alert.alert(
-        "Request Sent",
-        "Your rental request has been sent to the owner. You will be notified once the owner reviews the request."
+        "Success",
+        "Rental request created successfully. You will be notified once the owner reviews your request."
       );
 
-      // Optional: Reset form fields after sending the request
+      // Close the modal and reset form fields
+      setFullScreenModalVisible(false);
       setFullName("");
       setCityStateCombined("");
       setHasMedicalCertificate(false);
@@ -471,7 +606,10 @@ const Home = ({ route, navigation }) => {
         errorCode: error.code,
         rentalRequestData,
       });
-      Alert.alert("Error", error.message || "Failed to send rental request to the owner.");
+      Alert.alert(
+        "Error",
+        error.message || "Failed to send rental request to the owner."
+      );
     }
   };
 
@@ -494,10 +632,7 @@ const Home = ({ route, navigation }) => {
   };
 
   const handleEditListing = async (listingId) => {
-    Alert.alert(
-      "Edit Listing",
-      `This would edit the listing with ID ${listingId}`
-    );
+    Alert.alert("Edit Listing", `This would edit the listing with ID ${listingId}`);
     // Implement navigation or modal for editing the listing
   };
 
@@ -554,8 +689,8 @@ const Home = ({ route, navigation }) => {
    */
   const renderItem = ({ item }) => {
     // Ensure correct field access with fallback values
-    const airplaneModelDisplay = item.airplaneModel || item.model || "Unknown Model";
-    const makeDisplay = item.make || item.manufacturer || "Unknown Make";
+    const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
+    const makeDisplay = item.make || "Unknown Make";
     const yearDisplay = item.year || "Unknown Year";
 
     return (
@@ -597,12 +732,17 @@ const Home = ({ route, navigation }) => {
               <View style={styles.listingImageOverlay}>
                 <Text style={styles.listingLocation}>{item.location}</Text>
                 <Text style={styles.listingRate}>
-                  ${item.ratesPerHour}/hour
+                  ${parseFloat(item.costPerHour).toFixed(2)}/hour
                 </Text>
               </View>
             </ImageBackground>
           ) : (
-            <View style={[styles.listingImage, { justifyContent: "center", alignItems: "center" }]}>
+            <View
+              style={[
+                styles.listingImage,
+                { justifyContent: "center", alignItems: "center" },
+              ]}
+            >
               <Ionicons name="image" size={50} color="#A0AEC0" />
               <Text style={{ color: "#A0AEC0" }}>No Image Available</Text>
             </View>
@@ -618,70 +758,14 @@ const Home = ({ route, navigation }) => {
   };
 
   /**
-   * Handle incoming notifications and set selectedListing accordingly.
+   * **New Functionality: Handle Rental Requests from Centralized Collection**
+   *
+   * This function can be used to fetch and display rental requests if needed.
+   * Currently, 'home.js' primarily handles sending rental requests.
+   * Ensure that any rental request handling aligns with the centralized structure.
    */
-  useEffect(() => {
-    // **Register for Push Notifications**
-    const registerForPushNotificationsAsync = async () => {
-      if (Device.isDevice) {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-        if (finalStatus !== 'granted') {
-          Alert.alert('Permission required', 'Failed to get push token for notifications!');
-          return;
-        }
-      } else {
-        Alert.alert('Error', 'Must use physical device for Push Notifications');
-      }
-    };
 
-    registerForPushNotificationsAsync();
-
-    // **Listener for Notification Responses**
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data;
-      console.log("Notification Data:", data);
-
-      if (data && data.listingId) {
-        // Find the listing by ID from 'listings' or 'recommendedListings'
-        const listing = listings.find(item => item.id === data.listingId) ||
-                        recommendedListings.find(item => item.id === data.listingId);
-        
-        if (listing) {
-          if (!listing.ownerId) {
-            Alert.alert("Error", "The listing associated with this notification does not have a valid owner.");
-            console.warn(`Listing with ID ${data.listingId} is missing 'ownerId'.`);
-            return;
-          }
-          setSelectedListing(listing);
-          console.log("Listing set from notification:", listing);
-          setImageIndex(0);
-          setFullScreenModalVisible(true);
-          setFullName(user?.displayName || "");
-          setCityStateCombined("");
-          setHasMedicalCertificate(false);
-          setHasRentersInsurance(false);
-          setFlightHours("");
-        } else {
-          console.warn(`Listing with ID ${data.listingId} not found.`);
-          Alert.alert("Error", "Listing not found.");
-        }
-      } else {
-        console.warn("Notification does not contain listingId.");
-        Alert.alert("Error", "Invalid notification data.");
-      }
-    });
-
-    return () => {
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
-      }
-    };
-  }, [listings, recommendedListings, user]);
+  // ... (Other existing functions)
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -807,9 +891,7 @@ const Home = ({ route, navigation }) => {
         }
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <Text style={styles.emptyListText}>
-            No listings available
-          </Text>
+          <Text style={styles.emptyListText}>No listings available</Text>
         }
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -889,17 +971,24 @@ const Home = ({ route, navigation }) => {
                 >
                   {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
                 </Text>
-                <Text style={styles.modalRate} accessibilityLabel="Rate per hour">
-                  ${selectedListing.ratesPerHour} per hour
+                <Text
+                  style={styles.modalRate}
+                  accessibilityLabel="Rate per hour"
+                >
+                  ${parseFloat(selectedListing.costPerHour).toFixed(2)} per hour
                 </Text>
                 <Text style={styles.modalLocation} accessibilityLabel="Location">
                   Location: {selectedListing.location}
                 </Text>
 
-                <Text style={styles.modalDescription} accessibilityLabel="Description">
+                <Text
+                  style={styles.modalDescription}
+                  accessibilityLabel="Description"
+                >
                   {selectedListing.description}
                 </Text>
 
+                {/* Display Owner ID Check */}
                 {selectedListing.ownerId === user.uid && (
                   <View style={styles.modalOwnerActions}>
                     <TouchableOpacity
@@ -1005,7 +1094,10 @@ const Home = ({ route, navigation }) => {
                       if (!isNaN(num) && num >= 0) {
                         setRentalHours(num);
                       } else {
-                        Alert.alert("Invalid Input", "Please enter a valid number of rental hours.");
+                        Alert.alert(
+                          "Invalid Input",
+                          "Please enter a valid number of rental hours."
+                        );
                       }
                     }}
                     keyboardType="numeric"
@@ -1026,7 +1118,10 @@ const Home = ({ route, navigation }) => {
                 </TouchableOpacity>
 
                 {rentalDate && (
-                  <Text style={styles.selectedDateText} accessibilityLabel="Selected rental date">
+                  <Text
+                    style={styles.selectedDateText}
+                    accessibilityLabel="Selected rental date"
+                  >
                     Selected Rental Date: {rentalDate}
                   </Text>
                 )}
@@ -1166,126 +1261,121 @@ const Home = ({ route, navigation }) => {
   );
 };
 
-// **Stylesheet for Clean and Modern Design**
+// Styles
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F7FAFC",
   },
   header: {
-    overflow: "hidden",
+    position: "absolute",
+    top: 0,
+    width: "100%",
+    zIndex: 1,
   },
   headerImage: {
     flex: 1,
-    justifyContent: "flex-start",
+    justifyContent: "center",
+    paddingHorizontal: 16,
   },
   headerContent: {
-    paddingHorizontal: 16,
-    paddingTop: 30,
-    paddingBottom: 10,
-    flexDirection: "row",
-    alignItems: "flex-start",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    padding: 16,
+    borderRadius: 8,
   },
   welcomeText: {
-    fontSize: 24,
+    fontSize: 16,
     color: "#FFFFFF",
-    fontWeight: "bold",
   },
   userName: {
-    fontSize: 28,
+    fontSize: 24,
+    fontWeight: "bold",
     color: "#FFFFFF",
+  },
+  recommendedListingsContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+  },
+  listingContainer: {
+    flex: 1,
+    margin: 8,
+    maxWidth: (SCREEN_WIDTH - 48) / 2, // Adjusted for padding and margins
+  },
+  listingCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    overflow: "hidden",
+    elevation: 3, // For Android shadow
+    shadowColor: "#000", // For iOS shadow
+    shadowOffset: { width: 0, height: 2 }, // For iOS shadow
+    shadowOpacity: 0.1, // For iOS shadow
+    shadowRadius: 4, // For iOS shadow
+  },
+  listingHeader: {
+    padding: 8,
+  },
+  listingTitle: {
+    fontSize: 16,
     fontWeight: "bold",
   },
-  columnWrapper: {
-    justifyContent: "space-between",
-    paddingHorizontal: 10,
+  listingImage: {
+    width: "100%",
+    height: 120,
+    justifyContent: "flex-end",
+  },
+  listingImageOverlay: {
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 4,
+  },
+  listingLocation: {
+    color: "#FFFFFF",
+    fontSize: 12,
+  },
+  listingRate: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  listingDescriptionContainer: {
+    padding: 8,
+  },
+  listingDescription: {
+    fontSize: 14,
+    color: "#4A5568",
   },
   filterHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
-    paddingTop: 10,
-    paddingHorizontal: 10,
+    alignItems: "center",
+    marginBottom: 8,
   },
   filterText: {
-    fontSize: 18,
-    color: "#4A4A4A",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   filterButton: {
-    backgroundColor: "#E2E2E2",
     padding: 8,
-    borderRadius: 50,
   },
   availableListingsTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "bold",
     marginBottom: 16,
-    textAlign: "center",
-    color: "#2d3748",
   },
   emptyListText: {
     textAlign: "center",
-    color: "#4a5568",
-    marginTop: 20,
-  },
-  listingContainer: {
-    flex: 1,
-    margin: 5,
-  },
-  listingCard: {
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    flex: 1,
-  },
-  listingHeader: {
-    padding: 10,
-    alignItems: "center",
-  },
-  listingTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#2d3748",
-  },
-  listingImage: {
-    height: 150,
-    justifyContent: "flex-end", // Align overlay to the bottom
-  },
-  listingImageOverlay: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 8,
-    backgroundColor: "rgba(0,0,0,0.3)", // Semi-transparent overlay
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-  },
-  listingLocation: {
-    color: "white",
-    padding: 4,
-    borderRadius: 5,
-  },
-  listingRate: {
-    color: "white",
-    padding: 4,
-    borderRadius: 5,
-  },
-  listingDescriptionContainer: {
-    padding: 10,
-  },
-  listingDescription: {
-    color: "#4a5568",
+    color: "#718096",
+    marginTop: 16,
   },
   scrollToTopButton: {
     position: "absolute",
-    right: 20,
-    bottom: 40,
+    bottom: 32,
+    right: 32,
     backgroundColor: "#1E90FF",
-    padding: 10,
-    borderRadius: 50,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 5,
   },
   modalSafeArea: {
@@ -1293,73 +1383,69 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   modalContainer: {
-    padding: 16,
     flex: 1,
+    padding: 16,
   },
   modalCloseButton: {
     alignSelf: "flex-end",
   },
   modalImageContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
   },
-  modalArrowButtonLeft: {
-    padding: 10,
-  },
-  modalArrowButtonRight: {
-    padding: 10,
-  },
   modalImage: {
-    width: SCREEN_WIDTH * 0.7, // 70% of screen width
-    height: SCREEN_WIDTH * 0.45, // Maintain aspect ratio
+    width: SCREEN_WIDTH - 64,
+    height: 200,
     borderRadius: 10,
   },
+  modalArrowButtonLeft: {
+    marginRight: 8,
+  },
+  modalArrowButtonRight: {
+    marginLeft: 8,
+  },
   modalContent: {
-    paddingBottom: 20,
+    paddingVertical: 16,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
     marginBottom: 8,
-    textAlign: "center",
-    color: "#2d3748",
   },
   modalRate: {
-    fontSize: 20,
+    fontSize: 18,
+    color: "#1E90FF",
     marginBottom: 8,
-    textAlign: "center",
-    color: "#2d3748",
   },
   modalLocation: {
-    textAlign: "center",
-    color: "#4a5568",
+    fontSize: 16,
     marginBottom: 8,
   },
   modalDescription: {
+    fontSize: 16,
+    color: "#4A5568",
     marginBottom: 16,
-    textAlign: "center",
-    color: "#4a5568",
   },
   modalOwnerActions: {
     flexDirection: "row",
-    justifyContent: "center",
-    marginVertical: 16,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
   modalEditButton: {
-    backgroundColor: "#1E90FF",
-    padding: 10,
+    backgroundColor: "#48BB78",
+    padding: 12,
     borderRadius: 8,
+    flex: 1,
     marginRight: 8,
-    width: 120,
     alignItems: "center",
   },
   modalDeleteButton: {
-    backgroundColor: "#FF6347",
-    padding: 10,
+    backgroundColor: "#E53E3E",
+    padding: 12,
     borderRadius: 8,
-    width: 120,
+    flex: 1,
+    marginLeft: 8,
     alignItems: "center",
   },
   buttonText: {
@@ -1368,78 +1454,79 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 16,
-    width: "100%", // Ensure inputs take full width
   },
   inputLabel: {
-    fontWeight: "bold",
-    fontSize: 16, // Reduced font size for better fit
-    marginBottom: 8,
+    fontSize: 16,
+    marginBottom: 4,
   },
   textInput: {
-    borderColor: "#CBD5E0",
     borderWidth: 1,
-    padding: 12,
+    borderColor: "#A0AEC0",
     borderRadius: 8,
-    width: "100%",
-    textAlign: "center",
-    backgroundColor: "#F7FAFC",
+    padding: 12,
+    fontSize: 16,
+    color: "#2D3748",
   },
   textInputSmall: {
-    borderColor: "#CBD5E0",
     borderWidth: 1,
-    padding: 12,
+    borderColor: "#A0AEC0",
     borderRadius: 8,
-    width: 100, // Increased width for better input
-    textAlign: "center",
-    backgroundColor: "#F7FAFC",
+    padding: 12,
+    fontSize: 16,
+    color: "#2D3748",
+    width: "100%",
   },
   toggleGroup: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
-    width: "100%", // Ensure toggles take full width
   },
   calendarButton: {
     backgroundColor: "#1E90FF",
     padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
-    width: "100%",
+    alignItems: "center",
+    marginBottom: 8,
   },
   calendarButtonText: {
     color: "#FFFFFF",
-    textAlign: "center",
+    fontSize: 16,
     fontWeight: "bold",
   },
   selectedDateText: {
-    marginBottom: 16,
-    textAlign: "center",
     fontSize: 16,
-    color: "#2d3748",
+    textAlign: "center",
+    marginBottom: 16,
+    color: "#4A5568",
   },
   totalCostContainer: {
+    backgroundColor: "#EDF2F7",
+    padding: 16,
+    borderRadius: 8,
     marginBottom: 16,
   },
   totalCostTitle: {
-    fontWeight: "bold",
     fontSize: 18,
+    fontWeight: "bold",
     marginBottom: 8,
   },
   totalCostValue: {
+    fontSize: 20,
     fontWeight: "bold",
-    fontSize: 16,
+    marginTop: 8,
+    color: "#2F855A",
   },
   sendRequestButton: {
-    backgroundColor: "#1E90FF",
+    backgroundColor: "#3182CE",
     padding: 16,
     borderRadius: 8,
-    marginTop: 16,
-    width: "100%",
+    alignItems: "center",
+    marginBottom: 16,
   },
   sendRequestButtonText: {
     color: "#FFFFFF",
-    textAlign: "center",
+    fontSize: 18,
     fontWeight: "bold",
   },
   calendarModalContainer: {
@@ -1449,84 +1536,80 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   calendarContent: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 20,
     width: "90%",
-    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    padding: 16,
   },
   closeCalendarButton: {
-    backgroundColor: "#1E90FF",
-    padding: 12,
-    borderRadius: 8,
     marginTop: 16,
-    width: "100%",
+    alignItems: "center",
   },
   closeCalendarButtonText: {
-    color: "#FFFFFF",
-    textAlign: "center",
+    color: "#1E90FF",
+    fontSize: 16,
     fontWeight: "bold",
   },
   filterModalOverlay: {
     flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   filterModalContent: {
+    width: "90%",
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    height: "50%",
+    borderRadius: 8,
+    padding: 16,
   },
   filterModalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 10,
+    alignItems: "center",
+    marginBottom: 16,
   },
   filterModalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 10,
   },
   filterTextInput: {
-    borderColor: "#CBD5E0",
     borderWidth: 1,
-    padding: 10,
+    borderColor: "#A0AEC0",
     borderRadius: 8,
-    marginBottom: 10,
-    backgroundColor: "#F7FAFC",
-    width: "100%",
+    padding: 12,
+    fontSize: 16,
+    color: "#2D3748",
+    marginBottom: 16,
   },
   orText: {
     textAlign: "center",
-    marginBottom: 10,
-    fontSize: 16,
-    color: "#4A4A4A",
+    marginVertical: 8,
+    color: "#718096",
   },
   filterButtonsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
   clearFilterButton: {
-    backgroundColor: "#FF6347",
-    padding: 10,
+    backgroundColor: "#E53E3E",
+    padding: 12,
     borderRadius: 8,
     flex: 1,
-    marginRight: 10,
+    marginRight: 8,
     alignItems: "center",
   },
   applyFilterButton: {
     backgroundColor: "#1E90FF",
-    padding: 10,
+    padding: 12,
     borderRadius: 8,
     flex: 1,
+    marginLeft: 8,
     alignItems: "center",
   },
   filterButtonText: {
     color: "#FFFFFF",
-    textAlign: "center",
     fontWeight: "bold",
+    fontSize: 16,
   },
   loadingOverlay: {
     position: "absolute",
