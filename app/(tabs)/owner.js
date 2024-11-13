@@ -18,8 +18,9 @@ import {
   FlatList,
   KeyboardAvoidingView,
   StyleSheet,
+  Linking,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { db, storage, auth } from "../../firebaseConfig";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -92,11 +93,12 @@ const CustomButton = ({
   backgroundColor = "#3182ce",
   style,
   textStyle,
+  accessibilityLabel,
 }) => (
   <TouchableOpacity
     onPress={onPress}
     style={[styles.button, { backgroundColor }, style]}
-    accessibilityLabel={title}
+    accessibilityLabel={accessibilityLabel || title}
     accessibilityRole="button"
   >
     <Text style={[styles.buttonText, textStyle]}>{title}</Text>
@@ -138,9 +140,10 @@ const OwnerProfile = ({ ownerId }) => {
 
   // State Definitions
   const [profileData, setProfileData] = useState({
-    fullName: "",
+    fullName: user?.displayName || "",
     contact: "",
     address: "",
+    email: user?.email || "", // Include email from Firebase Auth
     // Add more owner-specific fields as needed
   });
 
@@ -237,6 +240,14 @@ const OwnerProfile = ({ ownerId }) => {
   // State for Cleanup Loading
   const [cleanupLoading, setCleanupLoading] = useState(false);
 
+  // State for Stripe Account
+  const [stripeAccountId, setStripeAccountId] = useState(null);
+  const [isStripeConnected, setIsStripeConnected] = useState(false);
+
+  // New state for Connect Stripe Modal
+  const [connectStripeModalVisible, setConnectStripeModalVisible] =
+    useState(false);
+
   /**
    * Helper function to automatically send state data to Firestore.
    * Ensures that every update is correctly persisted.
@@ -282,7 +293,13 @@ const OwnerProfile = ({ ownerId }) => {
 
     try {
       // Fetch Owner Profile Data from 'users/{uid}/owners/{ownerId}'
-      const profileDocRef = doc(db, "users", resolvedOwnerId, "owners", resolvedOwnerId);
+      const profileDocRef = doc(
+        db,
+        "users",
+        resolvedOwnerId,
+        "owners",
+        resolvedOwnerId
+      );
       const profileDocSnap = await getDoc(profileDocRef);
 
       if (profileDocSnap.exists()) {
@@ -291,10 +308,20 @@ const OwnerProfile = ({ ownerId }) => {
           fullName: profile.fullName || "",
           contact: profile.contact || "",
           address: profile.address || "",
+          email: profile.email || user.email || "", // Include email from Firestore or Firebase Auth
           // Add more fields as necessary
         });
+        setStripeAccountId(profile.stripeAccountId || null); // Set Stripe Account ID
+        setIsStripeConnected(!!profile.stripeAccountId); // Update connection status
       } else {
         console.log("No owner profile data found.");
+        setIsStripeConnected(false); // Owner not connected
+        // Initialize profileData with user's email
+        setProfileData((prev) => ({
+          ...prev,
+          email: user.email || "",
+          fullName: user.displayName || "",
+        }));
       }
 
       // Fetch Aircrafts from 'airplanes' collection where ownerId == resolvedOwnerId
@@ -312,14 +339,16 @@ const OwnerProfile = ({ ownerId }) => {
       console.error("Error fetching owner data:", error);
       Alert.alert("Error", "Failed to fetch saved data.");
     }
-  }, [resolvedOwnerId]);
+  }, [resolvedOwnerId, user]);
 
   /**
    * UseEffect to fetch owner data on component mount and when resolvedOwnerId changes.
    */
-  useEffect(() => {
-    fetchOwnerData();
-  }, [fetchOwnerData]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchOwnerData();
+    }, [fetchOwnerData])
+  );
 
   /**
    * UseEffect to watch and auto-save changes in profileData, aircraftDetails, costData
@@ -341,6 +370,69 @@ const OwnerProfile = ({ ownerId }) => {
       autoSaveDataToFirestore("costData", costData);
     }
   }, [costData, resolvedOwnerId]);
+
+  /**
+   * Function to handle connecting Stripe account.
+   */
+  const handleConnectStripe = async () => {
+    // Ensure that both email and fullName are present before proceeding
+    if (!profileData.email || !profileData.fullName) {
+      Alert.alert(
+        "Incomplete Profile",
+        "Please provide your full name and email address."
+      );
+      setConnectStripeModalVisible(true); // Open the modal to collect data
+      return;
+    }
+
+    try {
+      const token = await user.getIdToken(); // Get Firebase ID token for authentication
+
+      const response = await fetch(`${API_URL}/create-connected-account`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ownerId: resolvedOwnerId, // Ensure ownerId is included
+          email: profileData.email,
+          fullName: profileData.fullName,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const { accountLinkUrl } = data;
+        // Open the account link in a web browser
+        Linking.openURL(accountLinkUrl);
+      } else {
+        Alert.alert(
+          "Error",
+          data.error || "Failed to connect Stripe account. Please try again."
+        );
+      }
+    } catch (error) {
+      console.error("Error connecting Stripe account:", error);
+      Alert.alert("Error", "There was an error connecting your Stripe account.");
+    }
+  };
+
+  /**
+   * Function to handle submission of data from the Connect Stripe Modal.
+   */
+  const handleConnectStripeSubmit = async () => {
+    if (!profileData.email || !profileData.fullName) {
+      Alert.alert(
+        "Incomplete Information",
+        "Please provide both your full name and email address."
+      );
+      return;
+    }
+    setConnectStripeModalVisible(false);
+    await handleConnectStripe();
+  };
 
   /**
    * Function to handle withdrawal.
@@ -547,27 +639,14 @@ const OwnerProfile = ({ ownerId }) => {
 
               // Fetch renter's name and location
               if (renterId) {
-                // **Ensure the correct Firestore path is used**
-                // If renters are stored directly under 'users/{renterId}', adjust the path accordingly
+                // Ensure the correct Firestore path is used
                 const renterDocRef = doc(db, "users", renterId, "renters", renterId);
                 const renterDocSnap = await getDoc(renterDocRef);
                 if (renterDocSnap.exists()) {
                   const renterData = renterDocSnap.data();
                   console.log("Renter Data:", renterData); // Debugging line
-                  renterName = renterData.fullName || "Anonymous"; // **Updated field name**
+                  renterName = renterData.fullName || "Anonymous";
                   renterCityState = renterData.currentLocation || "N/A";
-                } else {
-                  // **Alternative Path or Handle Missing Document**
-                  // If renters are stored directly under 'users/{renterId}', uncomment the following:
-                  /*
-                  const alternativeRenterDocRef = doc(db, "users", renterId);
-                  const alternativeRenterDocSnap = await getDoc(alternativeRenterDocRef);
-                  if (alternativeRenterDocSnap.exists()) {
-                    const renterData = alternativeRenterDocSnap.data();
-                    renterName = renterData.fullName || "Anonymous";
-                    renterCityState = renterData.currentLocation || "N/A";
-                  }
-                  */
                 }
               }
 
@@ -741,7 +820,7 @@ const OwnerProfile = ({ ownerId }) => {
       // Notify the renter with rentalRequestId
       const notificationRef = collection(
         db,
-        "renters", // **Updated Path**
+        "renters",
         renterId,
         "notifications"
       );
@@ -846,7 +925,7 @@ const OwnerProfile = ({ ownerId }) => {
       // Notify the renter with rentalRequestId
       const notificationRef = collection(
         db,
-        "renters", // **Updated Path**
+        "renters",
         renterId,
         "notifications"
       );
@@ -1219,8 +1298,8 @@ const OwnerProfile = ({ ownerId }) => {
 
       // Total Fixed Costs per Year
       const totalFixedCosts =
-        parseFloat(costData.mortgageExpense) * 12 +
-        parseFloat(costData.depreciationExpense) +
+        parseFloat(mortgageExpense) * 12 +
+        parseFloat(depreciationExpense) +
         parseFloat(costData.insuranceCost) +
         parseFloat(costData.hangarCost) +
         parseFloat(costData.maintenanceReserve) +
@@ -1286,8 +1365,11 @@ const OwnerProfile = ({ ownerId }) => {
       setCostData((prev) => ({ ...prev, [name]: value }));
     } else if (name in profileData) {
       setProfileData((prev) => ({ ...prev, [name]: value }));
+    } else if (name === "withdrawalAmount") {
+      setWithdrawalAmount(value);
+    } else if (name === "withdrawalEmail") {
+      setWithdrawalEmail(value);
     }
-    // Removed the incorrect condition for withdrawalAmount
   };
 
   /**
@@ -1304,7 +1386,7 @@ const OwnerProfile = ({ ownerId }) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      allowsEditing: false, // Set to false to fix the warning
+      allowsEditing: false,
       aspect: [4, 3],
       quality: 1,
       selectionLimit: 7 - images.length, // Allow selecting multiple images up to the limit
@@ -1396,11 +1478,7 @@ const OwnerProfile = ({ ownerId }) => {
       setAircraftDetails(updatedAircraftDetails);
       setAircraftSaved(true);
 
-      // **Step 5: Determine if the aircraft is main or additional**
-      // Since we're using the 'airplanes' collection, every aircraft is listed here
-      // No distinction between main and additional aircraft
-
-      // **Step 6: Update Firestore using setDoc**
+      // **Step 5: Update Firestore using setDoc**
       const airplanesRef = collection(db, "airplanes");
       if (selectedAircraft) {
         // Editing an existing aircraft
@@ -1526,7 +1604,7 @@ const OwnerProfile = ({ ownerId }) => {
         mainImage: mainImageURL,
         currentAnnualPdf: annualProofURL || "",
         insurancePdf: insuranceProofURL || "",
-        ownerId: resolvedOwnerId, // Ensure ownerId is included
+        ownerId: resolvedOwnerId, // **Ensure ownerId is included**
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -1662,9 +1740,7 @@ const OwnerProfile = ({ ownerId }) => {
               <Text style={{ fontSize: 14, color: "white", marginTop: 1 }}>
                 Good Morning
               </Text>
-              <Text
-                style={{ fontSize: 18, fontWeight: "bold", color: "white" }}
-              >
+              <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
                 {user?.displayName || "User"}
               </Text>
             </View>
@@ -1672,7 +1748,7 @@ const OwnerProfile = ({ ownerId }) => {
           </View>
         </ImageBackground>
 
-        {/* ************* Funds Button Above Cost of Ownership ************* */}
+        {/* Funds Button Above Cost of Ownership */}
         <View style={styles.fundsButtonContainer}>
           <CustomButton
             onPress={() => setDepositModalVisible(true)}
@@ -1682,7 +1758,7 @@ const OwnerProfile = ({ ownerId }) => {
             textStyle={styles.fundsButtonTextStyle}
           />
         </View>
-        {/* ************* End of Funds Button Placement ************* */}
+        {/* End of Funds Button Placement */}
 
         {/* Cost of Ownership Calculator */}
         <View style={{ padding: 16 }}>
@@ -1717,7 +1793,7 @@ const OwnerProfile = ({ ownerId }) => {
                 ).toFixed(2)}
               </Text>
               <CustomButton
-                onPress={onEditCostData} // Now correctly defined
+                onPress={onEditCostData}
                 title="Edit Cost Data"
                 style={{ marginTop: 16 }}
               />
@@ -1738,9 +1814,7 @@ const OwnerProfile = ({ ownerId }) => {
                 <CustomTextInput
                   placeholder="Loan Amount ($)"
                   value={costData.loanAmount}
-                  onChangeText={(value) =>
-                    handleInputChange("loanAmount", value)
-                  }
+                  onChangeText={(value) => handleInputChange("loanAmount", value)}
                   keyboardType="numeric"
                   accessibilityLabel="Loan Amount input"
                 />
@@ -1756,9 +1830,7 @@ const OwnerProfile = ({ ownerId }) => {
                 <CustomTextInput
                   placeholder="Loan Term (years)"
                   value={costData.loanTerm}
-                  onChangeText={(value) =>
-                    handleInputChange("loanTerm", value)
-                  }
+                  onChangeText={(value) => handleInputChange("loanTerm", value)}
                   keyboardType="numeric"
                   accessibilityLabel="Loan Term input"
                 />
@@ -1774,9 +1846,7 @@ const OwnerProfile = ({ ownerId }) => {
                 <CustomTextInput
                   placeholder="Useful Life (years)"
                   value={costData.usefulLife}
-                  onChangeText={(value) =>
-                    handleInputChange("usefulLife", value)
-                  }
+                  onChangeText={(value) => handleInputChange("usefulLife", value)}
                   keyboardType="numeric"
                   accessibilityLabel="Useful Life input"
                 />
@@ -1811,9 +1881,7 @@ const OwnerProfile = ({ ownerId }) => {
                 <CustomTextInput
                   placeholder="Hangar Cost ($)"
                   value={costData.hangarCost}
-                  onChangeText={(value) =>
-                    handleInputChange("hangarCost", value)
-                  }
+                  onChangeText={(value) => handleInputChange("hangarCost", value)}
                   keyboardType="numeric"
                   accessibilityLabel="Hangar Cost input"
                 />
@@ -1911,8 +1979,26 @@ const OwnerProfile = ({ ownerId }) => {
             </View>
           )}
         </View>
-        {/* ************* End of Cost of Ownership Calculator ************* */}
+        {/* End of Cost of Ownership Calculator */}
 
+        {/* Connect Stripe Account Section */}
+        {!isStripeConnected && (
+          <View style={{ padding: 16 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+              Connect Your Stripe Account
+            </Text>
+            <Text style={{ marginBottom: 16 }}>
+              To receive payments, you need to connect your Stripe account.
+            </Text>
+            <CustomButton
+              onPress={() => setConnectStripeModalVisible(true)}
+              title="Connect Stripe Account"
+              backgroundColor="#3182ce"
+              accessibilityLabel="Connect your Stripe account"
+              accessibilityRole="button"
+            />
+          </View>
+        )}
         {/* ************* Updated Section: Your Aircraft ************* */}
         <View style={{ padding: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
@@ -2036,9 +2122,7 @@ const OwnerProfile = ({ ownerId }) => {
                                   allAircrafts.filter((a) => a.id !== item.id)
                                 );
                                 setSelectedAircraftIds(
-                                  selectedAircraftIds.filter(
-                                    (id) => id !== item.id
-                                  )
+                                  selectedAircraftIds.filter((id) => id !== item.id)
                                 );
 
                                 Alert.alert(
@@ -2046,10 +2130,7 @@ const OwnerProfile = ({ ownerId }) => {
                                   "The aircraft has been removed."
                                 );
                               } catch (error) {
-                                console.error(
-                                  "Error removing aircraft:",
-                                  error
-                                );
+                                console.error("Error removing aircraft:", error);
                                 Alert.alert(
                                   "Error",
                                   "Failed to remove the aircraft."
@@ -2218,10 +2299,7 @@ const OwnerProfile = ({ ownerId }) => {
                                     "The listing has been removed."
                                   );
                                 } catch (error) {
-                                  console.error(
-                                    "Error removing listing:",
-                                    error
-                                  );
+                                  console.error("Error removing listing:", error);
                                   Alert.alert(
                                     "Error",
                                     "Failed to remove the listing."
@@ -2275,7 +2353,7 @@ const OwnerProfile = ({ ownerId }) => {
               scrollEnabled={false} // Disable scrolling to prevent nesting issues
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  key={item.id || `rentalRequest_${index}`}
+                  key={item.id}
                   onPress={async () => {
                     setSelectedRequest(item);
                     const listing = await fetchListingDetails(item.listingId);
@@ -2319,7 +2397,7 @@ const OwnerProfile = ({ ownerId }) => {
               {/* Display only first 3 active rentals */}
               {activeRentals.slice(0, 3).map((item, index) => (
                 <View
-                  key={item.id || `activeRental_${index}`}
+                  key={item.id}
                   style={styles.activeRentalContainer}
                 >
                   <TouchableOpacity
@@ -2358,7 +2436,7 @@ const OwnerProfile = ({ ownerId }) => {
               {/* View More Button */}
               {activeRentals.length > 3 && (
                 <CustomButton
-                  onPress={() => setViewMoreModalVisible(true)} // Updated to open the new modal
+                  onPress={() => setViewMoreModalVisible(true)}
                   title="View More"
                   backgroundColor="#3182ce"
                   style={{ marginTop: 16 }}
@@ -2480,8 +2558,10 @@ const OwnerProfile = ({ ownerId }) => {
                   {/* Display Owner's Total */}
                   <Text style={styles.modalText}>
                     <Text style={styles.modalLabel}>Owner's Total: </Text>$
-                    {(parseFloat(selectedRequest.baseCost) -
-                      parseFloat(selectedRequest.commission)).toFixed(2)}
+                    {(
+                      parseFloat(selectedRequest.baseCost) -
+                      parseFloat(selectedRequest.commission)
+                    ).toFixed(2)}
                   </Text>
                   <Text style={styles.modalText}>
                     <Text style={styles.modalLabel}>Requested Date: </Text>
@@ -2892,6 +2972,49 @@ const OwnerProfile = ({ ownerId }) => {
       </Modal>
       {/* ************* End of Aircraft Details Modal ************* */}
 
+      {/* Connect Stripe Modal */}
+      <Modal
+        visible={connectStripeModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setConnectStripeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <ModalHeader
+              title="Connect Stripe Account"
+              onClose={() => setConnectStripeModalVisible(false)}
+            />
+            <Text style={{ marginBottom: 16 }}>
+              Please provide your full name and email address to connect your
+              Stripe account.
+            </Text>
+            <CustomTextInput
+              placeholder="Full Name"
+              value={profileData.fullName}
+              onChangeText={(value) => handleInputChange("fullName", value)}
+              accessibilityLabel="Full Name input"
+            />
+            <CustomTextInput
+              placeholder="Email Address"
+              value={profileData.email}
+              onChangeText={(value) => handleInputChange("email", value)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              accessibilityLabel="Email Address input"
+            />
+            <CustomButton
+              onPress={handleConnectStripeSubmit}
+              title="Proceed"
+              backgroundColor="#3182ce"
+              style={{ marginTop: 16 }}
+              accessibilityLabel="Proceed to connect Stripe account"
+              accessibilityRole="button"
+            />
+          </View>
+        </View>
+      </Modal>
+
       {/* ************* Updated Withdraw Funds Modal ************* */}
       <Modal
         visible={depositModalVisible}
@@ -3287,6 +3410,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#edf2f7",
     padding: 16,
     borderRadius: 8,
+  },
+  connectStripeButton: {
+    backgroundColor: "#667eea",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  connectStripeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
 

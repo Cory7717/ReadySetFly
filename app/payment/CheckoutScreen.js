@@ -21,7 +21,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { getAuth } from 'firebase/auth'; // Import Firebase Auth
 
 // Configuration Constants
-const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api'; // Replace with your actual server URL
+const API_URL = process.env.API_URL || 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api'; // Use environment variable or default
 
 export default function CheckoutScreen() {
   const navigation = useNavigation();
@@ -35,8 +35,9 @@ export default function CheckoutScreen() {
   const {
     paymentType = 'rental', // 'classified' or 'rental'
     amount: initialAmount = 0, // For Classifieds (in cents)
-    perHour: initialPerHour = 0, // For Rentals
-    ownerId = '', // For Rentals
+    costPerHour = 0, // Renamed from perHour for Rentals
+    rentalHours = 1, // Added rentalHours for Rentals
+    ownerId = '', // For Rentals (may be inferred from rentalRequest)
     rentalRequestId = '', // For Rentals
     listingDetails = {}, // Additional details for listing creation
     selectedPricing: initialSelectedPricing = '', // Initial pricing tier
@@ -67,13 +68,13 @@ export default function CheckoutScreen() {
   useEffect(() => {
     startBouncing();
     if (paymentType === 'rental') {
-      // For Rentals, totalAmount is calculated based on perHour and fees
-      calculateRentalTotal(initialPerHour);
+      // For Rentals, totalAmount is calculated based on costPerHour and rentalHours
+      calculateRentalTotal(costPerHour, rentalHours);
     } else if (paymentType === 'classified') {
       // For Classifieds, use the initialAmount passed
       setTotalAmount(initialAmount);
     }
-  }, [initialAmount, paymentType, initialPerHour]);
+  }, [initialAmount, paymentType, costPerHour, rentalHours]);
 
   // Start the bouncing animation
   const startBouncing = () => {
@@ -96,11 +97,23 @@ export default function CheckoutScreen() {
   };
 
   // Function to calculate total amount for Rentals
-  const calculateRentalTotal = (perHour) => {
-    const bookingFee = perHour * 0.06; // 6%
-    const processingFee = perHour * 0.03; // 3%
-    const tax = (perHour + bookingFee) * 0.0825; // 8.25% on (perHour + bookingFee)
-    const total = Math.round((perHour + bookingFee + processingFee + tax) * 100); // Convert to cents
+  const calculateRentalTotal = (costPerHour, rentalHours) => {
+    // Ensure valid inputs
+    const validCostPerHour = parseFloat(costPerHour);
+    const validRentalHours = parseFloat(rentalHours);
+
+    if (isNaN(validCostPerHour) || isNaN(validRentalHours) || validCostPerHour <= 0 || validRentalHours <= 0) {
+      setErrorMessage('Invalid rental details. Please check your rental hours and cost per hour.');
+      setTotalAmount(0);
+      return;
+    }
+
+    const baseAmount = validCostPerHour * validRentalHours; // in dollars
+    const bookingFee = baseAmount * 0.06; // 6%
+    const processingFee = baseAmount * 0.03; // 3%
+    const tax = (baseAmount + bookingFee) * 0.0825; // 8.25% on (baseAmount + bookingFee)
+    const total = Math.round((baseAmount + bookingFee + processingFee + tax) * 100); // Convert to cents
+
     setTotalAmount(total);
   };
 
@@ -121,7 +134,7 @@ export default function CheckoutScreen() {
       const response = await fetch(`${API_URL}/validateDiscount`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ discountCode: code }),
+        body: JSON.stringify({ discountCode: code, amount: totalAmount }), // Pass current amount for accurate discount
       });
 
       let data;
@@ -148,7 +161,7 @@ export default function CheckoutScreen() {
       } else {
         setDiscountApplied(false);
         if (paymentType === 'rental') {
-          calculateRentalTotal(initialPerHour); // Recalculate for Rentals
+          calculateRentalTotal(costPerHour, rentalHours); // Recalculate for Rentals
         } else {
           setTotalAmount(initialAmount); // Reset to initial amount for Classifieds
         }
@@ -210,9 +223,10 @@ export default function CheckoutScreen() {
           ? '/create-rental-payment-intent'
           : '/create-classified-payment-intent';
 
+      // Prepare request body based on payment type
       const body =
         paymentType === 'rental'
-          ? { perHour: initialPerHour, ownerId, rentalRequestId }
+          ? { rentalRequestId } // Removed ownerId and costPerHour as backend infers them
           : { amount: initialAmount, currency: 'usd' };
 
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -354,7 +368,7 @@ export default function CheckoutScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Cancel button */}
-        <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
+        <TouchableOpacity onPress={handleCancel} style={styles.cancelButton} accessibilityLabel="Cancel payment" accessibilityRole="button">
           <Ionicons name="close-outline" size={28} color="#FF5A5F" />
         </TouchableOpacity>
 
@@ -366,6 +380,7 @@ export default function CheckoutScreen() {
               name={isPaymentSuccess ? "checkmark-circle-outline" : "card-outline"}
               size={80}
               color={isPaymentSuccess ? "#32CD32" : "#FF5A5F"} // Green on success, red otherwise
+              accessibilityLabel={isPaymentSuccess ? "Payment Successful" : "Payment Required"}
             />
           </Animated.View>
 
@@ -375,13 +390,14 @@ export default function CheckoutScreen() {
           {/* Display Payment Details */}
           {paymentType === 'rental' ? (
             <View style={styles.detailsContainer}>
-              <Text style={styles.detail}>Per Hour Amount: ${initialPerHour.toFixed(2)}</Text>
-              <Text style={styles.detail}>Booking Fee (6%): ${(initialPerHour * 0.06).toFixed(2)}</Text>
-              <Text style={styles.detail}>Processing Fee (3%): ${(initialPerHour * 0.03).toFixed(2)}</Text>
-              <Text style={styles.detail}>Tax (8.25%): ${((initialPerHour + initialPerHour * 0.06) * 0.0825).toFixed(2)}</Text>
+              <Text style={styles.detail}>Cost Per Hour: ${parseFloat(costPerHour).toFixed(2)}</Text>
+              <Text style={styles.detail}>Rental Hours: {parseFloat(rentalHours).toFixed(0)}</Text>
+              <Text style={styles.detail}>Booking Fee (6%): ${(parseFloat(costPerHour) * parseFloat(rentalHours) * 0.06).toFixed(2)}</Text>
+              <Text style={styles.detail}>Processing Fee (3%): ${(parseFloat(costPerHour) * parseFloat(rentalHours) * 0.03).toFixed(2)}</Text>
+              <Text style={styles.detail}>Tax (8.25%): ${((parseFloat(costPerHour) * parseFloat(rentalHours)) * 0.06 * 0.0825).toFixed(2)}</Text>
               <Text style={styles.amount}>
                 Total Amount: $
-                {((initialPerHour + initialPerHour * 0.06 + initialPerHour * 0.03 + (initialPerHour + initialPerHour * 0.06) * 0.0825)).toFixed(2)}
+                {(totalAmount / 100).toFixed(2)}
               </Text>
             </View>
           ) : (
@@ -402,11 +418,14 @@ export default function CheckoutScreen() {
                 onChangeText={setDiscountCode}
                 autoCapitalize="characters"
                 editable={!loading}
+                accessibilityLabel="Discount Code Input"
               />
               <TouchableOpacity 
                 onPress={applyDiscount} 
-                style={styles.applyButton}
+                style={[styles.applyButton, (loading || discountApplied) && styles.applyButtonDisabled]}
                 disabled={loading || discountApplied}
+                accessibilityLabel="Apply Discount"
+                accessibilityRole="button"
               >
                 <Text style={styles.applyButtonText}>Apply</Text>
               </TouchableOpacity>
@@ -415,7 +434,7 @@ export default function CheckoutScreen() {
 
           {/* Display error message if any */}
           {errorMessage !== '' && (
-            <Text style={styles.errorText}>{errorMessage}</Text>
+            <Text style={styles.errorText} accessibilityLiveRegion="polite">{errorMessage}</Text>
           )}
 
           {/* Cardholder Name Input */}
@@ -427,6 +446,7 @@ export default function CheckoutScreen() {
             onChangeText={setCardholderName}
             autoCapitalize="words"
             editable={!loading}
+            accessibilityLabel="Cardholder Name Input"
           />
 
           {/* Stripe CardField component */}
@@ -437,7 +457,8 @@ export default function CheckoutScreen() {
             style={styles.cardField}
             onCardChange={(cardDetails) => console.log('Card details:', cardDetails)}
             onFocus={() => console.log('CardField focused')}
-            editable={!discountApplied || totalAmount > 0} // Disable card input if discount makes it free
+            editable={!(discountApplied && totalAmount === 0)} // Disable card input if discount makes it free
+            accessibilityLabel="Credit Card Input"
           />
 
           {/* Pay Button */}
@@ -448,9 +469,11 @@ export default function CheckoutScreen() {
               styles.payButton, 
               (loading || (discountApplied && totalAmount === 0)) && styles.payButtonDisabled
             ]}
+            accessibilityLabel={discountApplied && totalAmount === 0 ? "Finalize Listing" : `Pay $${displayTotal}`}
+            accessibilityRole="button"
           >
             {loading ? (
-              <ActivityIndicator color="white" />
+              <ActivityIndicator color="white" accessibilityLabel="Processing Payment" />
             ) : (
               <Text style={styles.payButtonText}>
                 {discountApplied && totalAmount === 0 ? 'Finalize Listing' : `Pay $${displayTotal}`}
@@ -460,7 +483,7 @@ export default function CheckoutScreen() {
 
           {/* Secure Payment Text */}
           <View style={styles.securePaymentContainer}>
-            <Ionicons name="lock-closed-outline" size={16} color="#555" />
+            <Ionicons name="lock-closed-outline" size={16} color="#555" accessibilityLabel="Secure Payment Lock Icon" />
             <Text style={styles.securePaymentText}>
               Your payment is secure and encrypted.
             </Text>
@@ -544,6 +567,9 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderRadius: 8,
+  },
+  applyButtonDisabled: {
+    backgroundColor: '#a5d6a7',
   },
   applyButtonText: {
     color: 'white',

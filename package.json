@@ -58,6 +58,7 @@
     "lottie-react-native": "6.7.0",
     "metro": "^0.80.12",
     "nativewind": "^2.0.11",
+    "nodemailer": "^6.9.16",
     "patch-package": "^8.0.0",
     "postinstall-postinstall": "^2.1.0",
     "react": "18.2.0",
