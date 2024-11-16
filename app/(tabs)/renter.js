@@ -1,3 +1,5 @@
+// src/components/BookingCalendar.js
+
 import React, { useState, useEffect, useRef } from "react";
 import {
   TextInput,
@@ -50,17 +52,14 @@ import {
   Fontisto,
 } from "@expo/vector-icons";
 
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router"; // Use Expo Router's useRouter
 
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 
-// Import your components as needed
-import CheckoutScreen from "../payment/CheckoutScreen";
+// Removed direct import of CheckoutScreen
+// import CheckoutScreen from "../payment/CheckoutScreen"; // Removed
 import ConfirmationScreen from "../payment/ConfirmationScreen";
 import MessagesScreen from "../screens/MessagesScreen";
-
-// **Remove the import for API_URL from @env**
-// import { API_URL } from "@env"; // Removed
 
 // Define API_URL directly
 const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
@@ -69,7 +68,10 @@ const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api"
 import { db, auth } from "../../firebaseConfig"; // Adjust the path as necessary
 
 const BookingCalendar = () => {
-  const navigation = useNavigation();
+  const router = useRouter(); // Initialize Expo Router
+  // Removed React Navigation's useNavigation
+
+  // [All your existing state variables...]
 
   // State Variables
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -154,6 +156,9 @@ const BookingCalendar = () => {
 
   // New State for Payment Completion
   const [paymentComplete, setPaymentComplete] = useState(false);
+
+  // New State for Debouncing Payment Intent Creation
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Ref for tracking processed rentals to prevent duplicate notifications
   const processedRentalsRef = useRef([]);
@@ -490,225 +495,27 @@ const BookingCalendar = () => {
    * @param {string} rentalRequestId - The ID of the rental request.
    */
   const navigateToCheckout = async (rentalRequestId) => {
+    if (isProcessingPayment) {
+      // If a payment is already being processed, do not proceed
+      console.warn("Payment is already being processed.");
+      return;
+    }
+
     if (!rentalRequestId) {
       Alert.alert("Error", "No rental request selected.");
       return;
     }
 
     try {
-      const rentalRequestRef = doc(db, "rentalRequests", rentalRequestId);
-      const rentalRequestSnap = await getDoc(rentalRequestRef);
-
-      if (!rentalRequestSnap.exists()) {
-        Alert.alert("Error", "Rental request not found.");
-        return;
-      }
-
-      const rentalRequest = rentalRequestSnap.data();
-
-      console.log("Rental Request Data:", rentalRequest);
-
-      if (!rentalRequest.listingId) {
-        Alert.alert("Error", "Listing ID is missing in rental request.");
-        console.warn(
-          `Rental Request ID: ${rentalRequestId} is missing 'listingId'.`
-        );
-        return;
-      }
-
-      const listingRef = doc(db, "airplanes", rentalRequest.listingId);
-      const listingSnap = await getDoc(listingRef);
-
-      if (!listingSnap.exists()) {
-        Alert.alert("Error", "Listing not found.");
-        return;
-      }
-
-      const listingData = listingSnap.data();
-
-      console.log("Listing Data:", listingData);
-
-      // **Defensive Coding: Check if required fields exist and are numbers**
-      const rentalCostPerHour = parseFloat(listingData.costPerHour);
-      const rentalHours = rentalRequest.rentalHours;
-
-      console.log(
-        `rentalCostPerHour (${typeof rentalCostPerHour}):`,
-        rentalCostPerHour
-      );
-      console.log(`rentalHours (${typeof rentalHours}):`, rentalHours);
-
-      if (isNaN(rentalCostPerHour) || typeof rentalHours !== "number") {
-        Alert.alert(
-          "Error",
-          "One or more cost components are missing or invalid."
-        );
-        console.error(
-          `Rental Request ID: ${rentalRequestId} has invalid cost components:`,
-          { rentalCostPerHour, rentalHours }
-        );
-        return;
-      }
-
-      // **Compute Renter's Total Cost using the corrected calculation function**
-      const computedTotalCost = calculateTotalCost(
-        rentalCostPerHour, // Use costPerHour from listingData
-        rentalHours
-      );
-
-      setTotalCost(computedTotalCost);
-
-      // **Debugging: Log computedTotalCost**
-      console.log("Computed Total Cost:", computedTotalCost);
-
-      const amountInCents = Math.round(parseFloat(computedTotalCost.total) * 100);
-
-      console.log(
-        `Creating payment intent for rental ID: ${rentalRequestSnap.id} with amount: ${amountInCents} cents`
-      );
-
-      // Use ownerUid from rentalRequest
-      const ownerUid = rentalRequest.ownerId;
-
-      if (!ownerUid) {
-        console.error("Owner ID is missing in rental request.");
-        Alert.alert("Error", "Owner information is missing.");
-        return;
-      }
-
-      // Since ownerDocId is ownerUid, no need to fetch
-      const ownerDocId = ownerUid;
-
-      // Pass amount, rentalRequestId, ownerDocId, and renterId
-      const clientSecret = await createPaymentIntent(
-        amountInCents,
-        rentalRequestSnap.id,
-        ownerDocId, // Pass Firestore document ID
-        renterId // Pass renterId
-      );
-
-      if (clientSecret) {
-        console.log(
-          "Payment intent created successfully. Navigating to CheckoutScreen."
-        );
-
-        // Navigate to CheckoutScreen
-        // Ensure CheckoutScreen is properly imported and set up in your navigation
-        navigation.navigate("CheckoutScreen", {
-          rentalRequestId: rentalRequestSnap.id,
-          amount: computedTotalCost.total, // Pass the calculated total cost
-          clientSecret,
-        });
-      } else {
-        console.log("Failed to create payment intent.");
-        Alert.alert("Payment Error", "Unable to proceed with payment.");
-      }
+      console.log(`Navigating to CheckoutScreen with Rental Request ID: ${rentalRequestId}`);
+      // Navigate using Expo Router's router.push with the correct path
+      router.push({
+        pathname: "/payment/CheckoutScreen", // Adjust the path based on your file structure
+        params: { rentalRequestId },
+      });
     } catch (error) {
       console.error("Error navigating to CheckoutScreen:", error);
-      Alert.alert("Error", "An unexpected error occurred.");
-    }
-  };
-
-  /**
-   * Create Payment Intent
-   * @param {number} amount - The amount in cents.
-   * @param {string} rentalRequestId - The rental request ID.
-   * @param {string} ownerDocId - The Firestore document ID of the owner.
-   * @param {string} renterId - The UID of the renter.
-   * @returns {Promise<string|null>} - Returns the client secret if successful, else null.
-   */
-  const createPaymentIntent = async (
-    amount,
-    rentalRequestId,
-    ownerDocId,
-    renterId
-  ) => {
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert("Invalid Amount", "The payment amount is invalid.");
-      return null;
-    }
-
-    if (!rentalRequestId) {
-      Alert.alert("Invalid Rental Request", "Rental Request ID is missing.");
-      return null;
-    }
-
-    if (!ownerDocId) {
-      Alert.alert("Invalid Owner", "Owner ID is missing.");
-      return null;
-    }
-
-    if (!renterId) {
-      Alert.alert("Invalid Renter", "Renter ID is missing.");
-      return null;
-    }
-
-    try {
-      console.log(`Creating payment intent for amount: ${amount} cents`);
-      console.log(`Rental Request ID: ${rentalRequestId}`);
-      console.log(`Owner Document ID: ${ownerDocId}`);
-      console.log(`Renter ID: ${renterId}`);
-      console.log(`API_URL is: ${API_URL}`);
-
-      // **Fetch Owner Document ID based on UID**
-      const ownerDocRef = doc(db, "owners", ownerDocId);
-      const ownerDocSnap = await getDoc(ownerDocRef);
-
-      if (!ownerDocSnap.exists()) {
-        console.error(`Owner with ID ${ownerDocId} does not exist.`);
-        Alert.alert("Payment Error", "Associated owner does not exist.");
-        return null;
-      }
-
-      // **Ensure API_URL is defined**
-      if (!API_URL) {
-        console.error("API_URL is not defined.");
-        Alert.alert(
-          "Configuration Error",
-          "Payment processing is not available at this time."
-        );
-        return null;
-      }
-
-      const response = await fetch(`${API_URL}/create-rental-payment-intent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${await auth.currentUser.getIdToken()}`,
-        },
-        body: JSON.stringify({
-          amount,
-          rentalRequestId,
-          ownerId: ownerDocId,
-          renterId,
-        }), // Ensure correct ownerId
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error creating payment intent:", errorData);
-        Alert.alert(
-          "Payment Error",
-          errorData.message || "Failed to create payment intent."
-        );
-        return null;
-      }
-
-      const data = await response.json();
-
-      console.log("Payment Intent Response:", data);
-
-      if (data.clientSecret) {
-        return data.clientSecret;
-      } else {
-        console.error("clientSecret not found in response:", data);
-        Alert.alert("Payment Error", "Invalid response from payment server.");
-        return null;
-      }
-    } catch (error) {
-      console.error("Error creating payment intent:", error);
-      Alert.alert("Payment Error", "An unexpected error occurred.");
-      return null;
+      Alert.alert("Error", "Failed to navigate to payment screen.");
     }
   };
 
@@ -1076,18 +883,6 @@ const BookingCalendar = () => {
   };
 
   /**
-   * Handle Navigation to Home with Filters
-   */
-  const handleNavigation = (filter) => {
-    try {
-      navigation.navigate("Home", { filter });
-    } catch (error) {
-      console.error("Navigation error:", error);
-      Alert.alert("Error", "Failed to navigate to the home screen.");
-    }
-  };
-
-  /**
    * Get Current Location
    */
   const getCurrentLocation = async () => {
@@ -1322,6 +1117,32 @@ const BookingCalendar = () => {
     </TouchableOpacity>
   );
 
+  /**
+   * Handle Navigation based on filter
+   * Moved inside the component to access 'router'
+   */
+  const handleNavigationInternal = (filter) => {
+    // Implement navigation logic based on filter
+    // Example:
+    if (filter === "all") {
+      router.push("/AllAircraftScreen"); // Adjust path as per your file structure
+    } else if (filter === "jets") {
+      router.push("/JetsScreen"); // Adjust path as per your file structure
+    } else if (filter === "pistons") {
+      router.push("/PistonsScreen"); // Adjust path as per your file structure
+    } else if (filter === "helicopters") {
+      router.push("/HelicoptersScreen"); // Adjust path as per your file structure
+    } else if (filter === "cessna-172") {
+      // If you have specific screens for recommended listings
+      router.push("/payment/CheckoutScreen"); // Adjust path as per your file structure
+    } else if (filter === "beechcraft-baron") {
+      router.push("/payment/CheckoutScreen"); // Adjust path as per your file structure
+    } else if (filter === "cirrus-sr22") {
+      router.push("/payment/CheckoutScreen"); // Adjust path as per your file structure
+    }
+    // Add more navigation cases as needed
+  };
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -1410,7 +1231,7 @@ const BookingCalendar = () => {
           <View style={styles.navigationButtonsContainer}>
             <TouchableOpacity
               style={styles.navigationButton}
-              onPress={() => handleNavigation("all")}
+              onPress={() => handleNavigationInternal("all")}
               accessibilityLabel="View all aircraft"
               accessibilityRole="button"
             >
@@ -1419,7 +1240,7 @@ const BookingCalendar = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navigationButton}
-              onPress={() => handleNavigation("jets")}
+              onPress={() => handleNavigationInternal("jets")}
               accessibilityLabel="View jets"
               accessibilityRole="button"
             >
@@ -1428,7 +1249,7 @@ const BookingCalendar = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navigationButton}
-              onPress={() => handleNavigation("pistons")}
+              onPress={() => handleNavigationInternal("pistons")}
               accessibilityLabel="View piston aircraft"
               accessibilityRole="button"
             >
@@ -1441,7 +1262,7 @@ const BookingCalendar = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navigationButton}
-              onPress={() => handleNavigation("helicopters")}
+              onPress={() => handleNavigationInternal("helicopters")}
               accessibilityLabel="View helicopters"
               accessibilityRole="button"
             >
@@ -1475,7 +1296,7 @@ const BookingCalendar = () => {
             <View style={styles.aircraftTypesRow}>
               <TouchableOpacity
                 style={[styles.aircraftTypeButton, { marginRight: 8 }]}
-                onPress={() => handleNavigation("single-piston")}
+                onPress={() => handleNavigationInternal("single-piston")}
                 accessibilityLabel="View single engine piston aircraft"
                 accessibilityRole="button"
               >
@@ -1485,7 +1306,7 @@ const BookingCalendar = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.aircraftTypeButton}
-                onPress={() => handleNavigation("twin-piston")}
+                onPress={() => handleNavigationInternal("twin-piston")}
                 accessibilityLabel="View twin engine piston aircraft"
                 accessibilityRole="button"
               >
@@ -1506,7 +1327,7 @@ const BookingCalendar = () => {
                 onPress={() => {
                   setSelectedListingId("cessna-172-id"); // Set dynamic Listing ID
                   setSelectedListingName("Cessna 172"); // Optional: Set aircraft name
-                  handleNavigation("cessna-172");
+                  handleNavigationInternal("cessna-172");
                 }}
                 accessibilityLabel="Select Cessna 172"
                 accessibilityRole="button"
@@ -1525,7 +1346,7 @@ const BookingCalendar = () => {
                 onPress={() => {
                   setSelectedListingId("beechcraft-baron-id"); // Set dynamic Listing ID
                   setSelectedListingName("Beechcraft Baron"); // Optional: Set aircraft name
-                  handleNavigation("beechcraft-baron");
+                  handleNavigationInternal("beechcraft-baron");
                 }}
                 accessibilityLabel="Select Beechcraft Baron"
                 accessibilityRole="button"
@@ -1544,7 +1365,7 @@ const BookingCalendar = () => {
                 onPress={() => {
                   setSelectedListingId("cirrus-sr22-id"); // Set dynamic Listing ID
                   setSelectedListingName("Cirrus SR22"); // Optional: Set aircraft name
-                  handleNavigation("cirrus-sr22");
+                  handleNavigationInternal("cirrus-sr22");
                 }}
                 accessibilityLabel="Select Cirrus SR22"
                 accessibilityRole="button"
@@ -1697,8 +1518,7 @@ const BookingCalendar = () => {
           <TouchableOpacity
             onPress={() => {
               // Replace this with your navigation logic to the login screen
-              // For example:
-              navigation.navigate("Login");
+              router.push("/sign-in"); // Adjust the path as per your file structure
             }}
             style={styles.goToLoginButton}
             accessibilityLabel="Navigate to login screen"
@@ -1916,13 +1736,24 @@ const BookingCalendar = () => {
                           selectedNotification?.rentalRequest
                       )
                     }
-                    style={styles.proceedToPayButton}
+                    style={[
+                      styles.proceedToPayButton,
+                      isProcessingPayment && styles.disabledButton,
+                    ]}
                     accessibilityLabel="Proceed to payment"
                     accessibilityRole="button"
+                    disabled={isProcessingPayment} // Disable button while processing
                   >
-                    <Text style={styles.proceedToPayButtonText}>
-                      Proceed to Pay
-                    </Text>
+                    {isProcessingPayment ? (
+                      <ActivityIndicator
+                        size="small"
+                        color="#fff"
+                      />
+                    ) : (
+                      <Text style={styles.proceedToPayButtonText}>
+                        Proceed to Pay
+                      </Text>
+                    )}
                   </TouchableOpacity>
                 )}
 
@@ -2113,107 +1944,134 @@ const BookingCalendar = () => {
 
 export default BookingCalendar;
 
-// Stylesheet
+// Stylesheet (styles)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f7fafc",
+    backgroundColor: 'white',
   },
   safeArea: {
     flex: 0,
-    backgroundColor: "#f7fafc",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingBottom: 16,
   },
   headerImage: {
-    width: "100%",
+    width: '100%',
     height: 200,
-    justifyContent: "center",
+    justifyContent: 'center',
   },
   headerOverlay: {
-    backgroundColor: "rgba(0,0,0,0.3)",
     flex: 1,
-    justifyContent: "center",
+    backgroundColor: 'rgba(0,0,0,0.5)', // Semi-transparent overlay
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerContent: {
-    padding: 16,
+    width: '90%',
   },
   greetingText: {
-    fontSize: 24,
-    color: "#fff",
-    marginBottom: 16,
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
   },
   headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   datePickerButton: {
-    backgroundColor: "#3182ce",
-    padding: 8,
-    borderRadius: 4,
-    marginRight: 8,
+    backgroundColor: '#3182ce',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
   },
   datePickerText: {
-    color: "#fff",
+    color: '#fff',
+    fontSize: 16,
   },
   hoursInput: {
-    backgroundColor: "#3182ce",
-    padding: 8,
-    borderRadius: 4,
-    color: "#fff",
-    width: 80,
+    backgroundColor: '#3182ce',
+    color: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    width: 100,
+    textAlign: 'center',
+    fontSize: 16,
   },
   locationButton: {
-    backgroundColor: "#3182ce",
-    padding: 8,
-    borderRadius: 4,
-    marginTop: 8,
+    backgroundColor: '#3182ce',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 10,
   },
   locationText: {
-    color: "#fff",
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
   },
   navigationButtonsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 20,
   },
   navigationButton: {
-    alignItems: "center",
+    alignItems: 'center',
+  },
+  sectionContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#2d3748',
   },
   recentSearchesRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   recentSearchBox: {
-    backgroundColor: "#edf2f7",
-    padding: 12,
+    backgroundColor: '#f7fafc',
+    padding: 15,
     borderRadius: 8,
-    width: "48%",
+    width: '48%',
   },
   recentSearchDetails: {
-    color: "#a0aec0",
-    marginTop: 4,
+    color: '#718096',
+    marginTop: 5,
   },
   aircraftTypesRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   aircraftTypeButton: {
-    backgroundColor: "#edf2f7",
-    padding: 12,
+    backgroundColor: '#edf2f7',
+    padding: 15,
     borderRadius: 8,
     flex: 1,
-    alignItems: "center",
   },
   aircraftTypeText: {
-    color: "#2d3748",
+    textAlign: 'center',
+    color: '#2d3748',
+    fontWeight: '500',
   },
   recommendedBox: {
-    marginRight: 16,
-    alignItems: "center",
+    marginRight: 15,
+    alignItems: 'center',
+    width: 150,
   },
   recommendedImage: {
     width: 150,
@@ -2221,327 +2079,309 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   recommendedText: {
-    marginTop: 8,
+    marginTop: 5,
     fontSize: 16,
-    color: "#2d3748",
+    color: '#2d3748',
+    textAlign: 'center',
   },
   rentalBox: {
-    backgroundColor: "#edf2f7",
-    padding: 16,
+    backgroundColor: '#edf2f7',
+    padding: 15,
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   rentalAircraftModel: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#2d3748",
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2d3748',
   },
   rentalStatus: {
     fontSize: 14,
-    color: "#4a5568",
-    marginVertical: 4,
+    color: '#718096',
+    marginVertical: 5,
   },
   rentalTotalCost: {
-    fontSize: 16,
-    color: "#2b6cb0",
-    fontWeight: "bold",
+    fontSize: 14,
+    color: '#2d3748',
   },
   noMoreRentalsText: {
-    textAlign: "center",
-    color: "#a0aec0",
-    marginVertical: 16,
+    textAlign: 'center',
+    color: '#a0aec0',
+    marginVertical: 10,
   },
   loadMoreRentalsButton: {
-    backgroundColor: "#3182ce",
-    padding: 12,
+    backgroundColor: '#3182ce',
+    paddingVertical: 10,
     borderRadius: 8,
-    alignItems: "center",
-    marginVertical: 8,
+    alignItems: 'center',
+    marginTop: 10,
   },
   loadMoreRentalsButtonText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 16,
   },
   noActiveRentalsText: {
-    textAlign: "center",
-    color: "#a0aec0",
-    marginTop: 8,
-  },
-  sectionContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2d3748",
-    marginBottom: 8,
+    textAlign: 'center',
+    color: '#a0aec0',
+    fontSize: 16,
   },
   notificationBox: {
-    backgroundColor: "#edf2f7",
-    padding: 12,
+    backgroundColor: '#f7fafc',
+    padding: 15,
     borderRadius: 8,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   notificationMessageText: {
     fontSize: 16,
-    color: "#2d3748",
+    color: '#2d3748',
   },
   notificationDateText: {
     fontSize: 12,
-    color: "#a0aec0",
-    marginTop: 4,
+    color: '#a0aec0',
+    marginTop: 5,
   },
   noMoreNotificationsText: {
-    textAlign: "center",
-    color: "#a0aec0",
-    marginVertical: 16,
+    textAlign: 'center',
+    color: '#a0aec0',
+    marginVertical: 10,
   },
   noNotificationsText: {
-    textAlign: "center",
-    color: "#a0aec0",
-    marginTop: 8,
+    textAlign: 'center',
+    color: '#a0aec0',
+    fontSize: 16,
   },
   removeAllNotificationsButton: {
-    backgroundColor: "#e53e3e",
-    padding: 12,
+    backgroundColor: '#e53e3e',
+    paddingVertical: 10,
     borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
+    alignItems: 'center',
+    marginTop: 10,
   },
   removeAllNotificationsButtonText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 16,
   },
   viewAllNotificationsButton: {
-    backgroundColor: "#3182ce",
-    padding: 12,
+    backgroundColor: '#3182ce',
+    paddingVertical: 10,
     borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
+    alignItems: 'center',
+    marginTop: 10,
   },
   viewAllNotificationsButtonText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 16,
   },
   notAuthenticatedContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   notAuthenticatedText: {
     fontSize: 18,
-    color: "#2d3748",
-    textAlign: "center",
-    marginBottom: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#2d3748',
   },
   goToLoginButton: {
-    backgroundColor: "#3182ce",
-    padding: 12,
+    backgroundColor: '#3182ce',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
     borderRadius: 8,
   },
   goToLoginButtonText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 16,
   },
   profileContainer: {
-    backgroundColor: "#edf2f7",
-    padding: 16,
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#edf2f7',
+    padding: 15,
     borderRadius: 8,
-    margin: 16,
+    alignItems: 'center',
   },
   profileTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    color: "#2d3748",
-    marginBottom: 8,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#2d3748',
   },
   profileRow: {
-    flexDirection: "row",
-    marginBottom: 4,
+    flexDirection: 'row',
+    marginBottom: 5,
   },
   profileLabel: {
-    fontWeight: "bold",
-    color: "#2d3748",
-    marginRight: 8,
+    fontWeight: '500',
+    color: '#2d3748',
   },
   profileValue: {
-    color: "#2d3748",
+    marginLeft: 5,
+    color: '#2d3748',
   },
   profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginTop: 8,
+    marginTop: 10,
   },
   messageModalContainer: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   messagesHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: "#edf2f7",
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#edf2f7',
   },
   closeModalButton: {
-    padding: 8,
+    padding: 5,
   },
   messagesTitle: {
     flex: 1,
-    textAlign: "center",
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2d3748",
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2d3748',
   },
   chatBubble: {
-    maxWidth: "70%",
+    maxWidth: '80%',
     padding: 10,
-    borderRadius: 8,
-    marginVertical: 4,
-    marginHorizontal: 8,
+    borderRadius: 10,
+    marginVertical: 5,
   },
   chatBubbleLeft: {
-    backgroundColor: "#edf2f7",
-    alignSelf: "flex-start",
+    backgroundColor: '#edf2f7',
+    alignSelf: 'flex-start',
   },
   chatBubbleRight: {
-    backgroundColor: "#3182ce",
-    alignSelf: "flex-end",
+    backgroundColor: '#3182ce',
+    alignSelf: 'flex-end',
   },
   chatSenderName: {
-    fontWeight: "bold",
-    color: "#2d3748",
+    fontWeight: 'bold',
+    color: '#2d3748',
+    marginBottom: 2,
   },
   chatMessageText: {
-    color: "#fff",
+    color: '#2d3748',
   },
   chatTimestamp: {
     fontSize: 10,
-    color: "#a0aec0",
-    marginTop: 4,
-    textAlign: "right",
+    color: '#a0aec0',
+    marginTop: 2,
+    textAlign: 'right',
   },
   messagesList: {
-    padding: 16,
+    padding: 10,
   },
   messageInputContainer: {
-    flexDirection: "row",
-    padding: 16,
-    borderTopWidth: 1,
-    borderColor: "#e2e8f0",
-    alignItems: "center",
-    backgroundColor: "#fff",
+    flexDirection: 'row',
+    padding: 10,
+    backgroundColor: '#edf2f7',
+    alignItems: 'center',
   },
   messageTextInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: "#cbd5e0",
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
+    fontSize: 16,
+    marginRight: 10,
   },
   sendButton: {
-    backgroundColor: "#3182ce",
-    padding: 12,
+    backgroundColor: '#3182ce',
+    padding: 10,
     borderRadius: 20,
   },
   notificationModalContainer: {
     flex: 1,
-    padding: 16,
-    backgroundColor: "#fff",
+  },
+  detailLabel: {
+    fontWeight: 'bold',
+    color: '#2d3748',
+  },
+  detailValue: {
+    color: '#2d3748',
+    marginBottom: 5,
   },
   notificationDetailsTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#2d3748",
-    marginBottom: 12,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#2d3748',
   },
   notificationDetailBox: {
-    marginBottom: 12,
-  },
-  detailLabel: {
-    fontWeight: "bold",
-    color: "#2d3748",
-  },
-  detailValue: {
-    color: "#2d3748",
-    marginTop: 4,
-  },
-  detailTotalCostText: {
-    fontWeight: "bold",
-    color: "#2b6cb0",
-    marginTop: 8,
-    fontSize: 16,
+    marginBottom: 15,
   },
   proceedToPayButton: {
-    backgroundColor: "#48bb78",
-    padding: 16,
+    backgroundColor: '#38a169',
+    paddingVertical: 15,
     borderRadius: 8,
-    alignItems: "center",
-    marginTop: 16,
+    alignItems: 'center',
+    marginTop: 10,
   },
   proceedToPayButtonText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 16,
-    fontWeight: "bold",
-  },
-  messageOwnerButton: {
-    backgroundColor: "#3182ce",
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  messageOwnerButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
   },
   disabledButton: {
-    backgroundColor: "#a0aec0",
+    backgroundColor: '#a0aec0',
   },
   disabledButtonText: {
-    color: "#fff",
+    color: '#fff',
+  },
+  messageOwnerButton: {
+    backgroundColor: '#3182ce',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  messageOwnerButtonText: {
+    color: '#fff',
+    fontSize: 16,
   },
   closeNotificationModalButton: {
-    backgroundColor: "#e53e3e",
-    padding: 12,
+    backgroundColor: '#e53e3e',
+    paddingVertical: 15,
     borderRadius: 8,
-    alignItems: "center",
-    marginTop: 16,
+    alignItems: 'center',
+    marginTop: 20,
   },
   closeNotificationModalButtonText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 16,
   },
   allNotificationsModalContainer: {
     flex: 1,
-    padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
+    padding: 20,
+  },
+  allNotificationsTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#2d3748',
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  allNotificationsTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2d3748",
-    marginBottom: 16,
-    textAlign: "center",
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   chatBubbleIcon: {
-    position: "absolute",
-    bottom: 32,
-    right: 32,
-    backgroundColor: "#3182ce",
-    padding: 12,
-    borderRadius: 24,
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#3182ce',
+    padding: 15,
+    borderRadius: 30,
     elevation: 5,
   },
 });

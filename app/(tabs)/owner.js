@@ -1,5 +1,3 @@
-// owner.js
-
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -639,8 +637,8 @@ const OwnerProfile = ({ ownerId }) => {
 
               // Fetch renter's name and location
               if (renterId) {
-                // Ensure the correct Firestore path is used
-                const renterDocRef = doc(db, "users", renterId, "renters", renterId);
+                // Corrected Firestore path
+                const renterDocRef = doc(db, "renters", renterId);
                 const renterDocSnap = await getDoc(renterDocRef);
                 if (renterDocSnap.exists()) {
                   const renterData = renterDocSnap.data();
@@ -1039,7 +1037,7 @@ const OwnerProfile = ({ ownerId }) => {
           batch.delete(docSnap.ref);
           deletions += 1;
         } else {
-          const renterDocRef = doc(db, "users", renterId, "renters", renterId);
+          const renterDocRef = doc(db, "renters", renterId);
           const renterDocSnap = await getDoc(renterDocRef);
           if (!renterDocSnap.exists()) {
             // If renter document does not exist, delete the rental request

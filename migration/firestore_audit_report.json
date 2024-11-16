@@ -1,0 +1,1499 @@
+{
+  "collections": [
+    {
+      "name": "Category",
+      "documents": [
+        {
+          "id": "57r0rSkCC2wh4kIHfwZe",
+          "path": "/57r0rSkCC2wh4kIHfwZe",
+          "issues": []
+        },
+        {
+          "id": "7as4tsZQdHjkj2Odiiaq",
+          "path": "/7as4tsZQdHjkj2Odiiaq",
+          "issues": []
+        },
+        {
+          "id": "MjpcfSOylKizwKzZZQs1",
+          "path": "/MjpcfSOylKizwKzZZQs1",
+          "issues": []
+        },
+        {
+          "id": "PMud6o1WnPxCjyNYEpGH",
+          "path": "/PMud6o1WnPxCjyNYEpGH",
+          "issues": []
+        },
+        {
+          "id": "cfLnuudGmUJldBGV0oyT",
+          "path": "/cfLnuudGmUJldBGV0oyT",
+          "issues": []
+        },
+        {
+          "id": "ndcJAmvqHXhgBhLStbAb",
+          "path": "/ndcJAmvqHXhgBhLStbAb",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "Sliders",
+      "documents": [
+        {
+          "id": "aWwa25r9S5jWKU8aUVoX",
+          "path": "/aWwa25r9S5jWKU8aUVoX",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "UserPost",
+      "documents": [
+        {
+          "id": "0ey1cMCgPcn5o1p7Nrw4",
+          "path": "/0ey1cMCgPcn5o1p7Nrw4",
+          "issues": []
+        },
+        {
+          "id": "2hoBmHBDXc58xPfO1WEz",
+          "path": "/2hoBmHBDXc58xPfO1WEz",
+          "issues": []
+        },
+        {
+          "id": "4HIMrhoU9GkSc3V0xjmr",
+          "path": "/4HIMrhoU9GkSc3V0xjmr",
+          "issues": []
+        },
+        {
+          "id": "4J7CUaSLLF2g9SbwwtPU",
+          "path": "/4J7CUaSLLF2g9SbwwtPU",
+          "issues": []
+        },
+        {
+          "id": "6zSyb81zyMwlCGXckvz4",
+          "path": "/6zSyb81zyMwlCGXckvz4",
+          "issues": []
+        },
+        {
+          "id": "7tBWxsfOW9q30vkty4Oy",
+          "path": "/7tBWxsfOW9q30vkty4Oy",
+          "issues": []
+        },
+        {
+          "id": "80LlBZj4KiIJKoaAjyZq",
+          "path": "/80LlBZj4KiIJKoaAjyZq",
+          "issues": []
+        },
+        {
+          "id": "G6zqR0gWect2LLBlUUIM",
+          "path": "/G6zqR0gWect2LLBlUUIM",
+          "issues": []
+        },
+        {
+          "id": "IBpVWpbfR0SQnq5Ehc1P",
+          "path": "/IBpVWpbfR0SQnq5Ehc1P",
+          "issues": []
+        },
+        {
+          "id": "IGgdUQWE3aycgyDb3V1W",
+          "path": "/IGgdUQWE3aycgyDb3V1W",
+          "issues": []
+        },
+        {
+          "id": "IRgFEKeREQdD8KjxJV71",
+          "path": "/IRgFEKeREQdD8KjxJV71",
+          "issues": []
+        },
+        {
+          "id": "MkWazLoB0VOiZgrZ0d5w",
+          "path": "/MkWazLoB0VOiZgrZ0d5w",
+          "issues": []
+        },
+        {
+          "id": "NoDG8dhftST3DgOMFgYk",
+          "path": "/NoDG8dhftST3DgOMFgYk",
+          "issues": []
+        },
+        {
+          "id": "P3xQPTZKnURwbGbUCb9g",
+          "path": "/P3xQPTZKnURwbGbUCb9g",
+          "issues": []
+        },
+        {
+          "id": "RF36Iz6u9eEXDrTxLEPS",
+          "path": "/RF36Iz6u9eEXDrTxLEPS",
+          "issues": []
+        },
+        {
+          "id": "RRhiWR9mKN4chZjpdvVb",
+          "path": "/RRhiWR9mKN4chZjpdvVb",
+          "issues": []
+        },
+        {
+          "id": "U6P2SiEoGaltBEQm4gzC",
+          "path": "/U6P2SiEoGaltBEQm4gzC",
+          "issues": []
+        },
+        {
+          "id": "UFI0vs1MFN22wsCePTWK",
+          "path": "/UFI0vs1MFN22wsCePTWK",
+          "issues": []
+        },
+        {
+          "id": "WnDZVYXh2RC1lttuJXou",
+          "path": "/WnDZVYXh2RC1lttuJXou",
+          "issues": []
+        },
+        {
+          "id": "YQZxjxgXRynxoTYDEKpd",
+          "path": "/YQZxjxgXRynxoTYDEKpd",
+          "issues": []
+        },
+        {
+          "id": "YlbnhvlJf3ftGzTY8nAN",
+          "path": "/YlbnhvlJf3ftGzTY8nAN",
+          "issues": []
+        },
+        {
+          "id": "bVoqmbV8nFogHfHRWSyg",
+          "path": "/bVoqmbV8nFogHfHRWSyg",
+          "issues": []
+        },
+        {
+          "id": "cNTS9yCoNs8BFssKmOvE",
+          "path": "/cNTS9yCoNs8BFssKmOvE",
+          "issues": []
+        },
+        {
+          "id": "fJTlsqbkAECtJuneWKFs",
+          "path": "/fJTlsqbkAECtJuneWKFs",
+          "issues": []
+        },
+        {
+          "id": "lJzQ5UD9rqdEXuKNQAjP",
+          "path": "/lJzQ5UD9rqdEXuKNQAjP",
+          "issues": []
+        },
+        {
+          "id": "mxGjHNbmCINn4DgoU3pm",
+          "path": "/mxGjHNbmCINn4DgoU3pm",
+          "issues": []
+        },
+        {
+          "id": "nSh9dWCAUGZq52FWYdb7",
+          "path": "/nSh9dWCAUGZq52FWYdb7",
+          "issues": []
+        },
+        {
+          "id": "p0WCDtpWeq9W69HWkuId",
+          "path": "/p0WCDtpWeq9W69HWkuId",
+          "issues": []
+        },
+        {
+          "id": "rwXfMCTPZdaIy3w5TH4B",
+          "path": "/rwXfMCTPZdaIy3w5TH4B",
+          "issues": []
+        },
+        {
+          "id": "vU5umtHNiFd5S1Llxgao",
+          "path": "/vU5umtHNiFd5S1Llxgao",
+          "issues": []
+        },
+        {
+          "id": "vZMzBR9XIf1Tc7brsVgC",
+          "path": "/vZMzBR9XIf1Tc7brsVgC",
+          "issues": []
+        },
+        {
+          "id": "x7byGa0MxOeP4rFftIky",
+          "path": "/x7byGa0MxOeP4rFftIky",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "aircraftDetails",
+      "documents": [
+        {
+          "id": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "path": "/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "issues": []
+        },
+        {
+          "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "path": "/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "issues": []
+        },
+        {
+          "id": "user_2kc7sD2D9MXZy5uU5QX5aR1gxJi",
+          "path": "/user_2kc7sD2D9MXZy5uU5QX5aR1gxJi",
+          "issues": []
+        },
+        {
+          "id": "user_2mgOTMHTI2jpP2nPhiecZ1JEgMP",
+          "path": "/user_2mgOTMHTI2jpP2nPhiecZ1JEgMP",
+          "issues": []
+        },
+        {
+          "id": "utSWq1Buu4eoRSMDQ9xy",
+          "path": "/utSWq1Buu4eoRSMDQ9xy",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "airplanes",
+      "documents": [
+        {
+          "id": "ANARb2zjDFHVY8n0LnwL",
+          "path": "/ANARb2zjDFHVY8n0LnwL",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Field 'createdAt' has type 'object', expected 'timestamp'",
+            "❗ Field 'images' has type 'object', expected 'array'",
+            "❗ Field 'minimumHours' has type 'string', expected 'number'",
+            "❗ Field 'currentAnnualPdf' has type 'object', expected 'string'",
+            "❗ Field 'insurancePdf' has type 'object', expected 'string'",
+            "❗ Field 'ratesPerHour' has type 'string', expected 'number'",
+            "❗ Missing field 'availableDates'",
+            "❗ Missing field 'airplaneYear'",
+            "❗ Missing field 'userEmail'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Missing field 'documents'",
+            "❗ Missing field 'insuranceDocuments'",
+            "❗ Missing field 'boostListing'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "FrMdWRmqRka57Loepb33",
+          "path": "/FrMdWRmqRka57Loepb33",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Missing field 'createdAt'",
+            "❗ Field 'images' has type 'object', expected 'array'",
+            "❗ Missing field 'minimumHours'",
+            "❗ Missing field 'currentAnnualPdf'",
+            "❗ Missing field 'insurancePdf'",
+            "❗ Field 'ratesPerHour' has type 'string', expected 'number'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Field 'availableDates' has type 'object', expected 'array'",
+            "❗ Field 'airplaneYear' has type 'string', expected 'number'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Missing field 'documents'",
+            "❗ Missing field 'insuranceDocuments'",
+            "❗ Missing field 'boostListing'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "Frg8EA0D8Wg9Uogq2Kys",
+          "path": "/Frg8EA0D8Wg9Uogq2Kys",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Missing field 'createdAt'",
+            "❗ Missing field 'images'",
+            "❗ Missing field 'airplaneModel'",
+            "❗ Missing field 'minimumHours'",
+            "❗ Missing field 'currentAnnualPdf'",
+            "❗ Missing field 'insurancePdf'",
+            "❗ Missing field 'ratesPerHour'",
+            "❗ Missing field 'description'",
+            "❗ Missing field 'location'",
+            "❗ Missing field 'ownerId'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Missing field 'availableDates'",
+            "❗ Missing field 'airplaneYear'",
+            "❗ Missing field 'userEmail'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Missing field 'documents'",
+            "❗ Missing field 'insuranceDocuments'",
+            "❗ Missing field 'boostListing'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "ILO8TTW33ozxlQHqwyAb",
+          "path": "/ILO8TTW33ozxlQHqwyAb",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Field 'createdAt' has type 'object', expected 'timestamp'",
+            "❗ Field 'images' has type 'object', expected 'array'",
+            "❗ Field 'minimumHours' has type 'string', expected 'number'",
+            "❗ Field 'currentAnnualPdf' has type 'object', expected 'string'",
+            "❗ Field 'insurancePdf' has type 'object', expected 'string'",
+            "❗ Field 'ratesPerHour' has type 'string', expected 'number'",
+            "❗ Missing field 'listing'",
+            "❗ Missing field 'availableDates'",
+            "❗ Missing field 'airplaneYear'",
+            "❗ Missing field 'userEmail'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Missing field 'documents'",
+            "❗ Missing field 'insuranceDocuments'",
+            "❗ Missing field 'boostListing'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "Icw895tw8BS7AkxUe6Dl",
+          "path": "/Icw895tw8BS7AkxUe6Dl",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Field 'createdAt' has type 'object', expected 'timestamp'",
+            "❗ Field 'images' has type 'object', expected 'array'",
+            "❗ Missing field 'airplaneModel'",
+            "❗ Missing field 'minimumHours'",
+            "❗ Missing field 'currentAnnualPdf'",
+            "❗ Missing field 'insurancePdf'",
+            "❗ Missing field 'ratesPerHour'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Field 'costPerHour' has type 'string', expected 'number'",
+            "❗ Missing field 'availableDates'",
+            "❗ Missing field 'airplaneYear'",
+            "❗ Missing field 'userEmail'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Field 'totalTimeOnFrame' has type 'string', expected 'number'",
+            "❗ Missing field 'documents'",
+            "❗ Missing field 'insuranceDocuments'",
+            "❗ Missing field 'boostListing'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "QW1Z9RCqLETiuFqdePge",
+          "path": "/QW1Z9RCqLETiuFqdePge",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Missing field 'createdAt'",
+            "❗ Field 'images' has type 'object', expected 'array'",
+            "❗ Field 'minimumHours' has type 'string', expected 'number'",
+            "❗ Missing field 'currentAnnualPdf'",
+            "❗ Missing field 'insurancePdf'",
+            "❗ Field 'ratesPerHour' has type 'string', expected 'number'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Field 'availableDates' has type 'object', expected 'array'",
+            "❗ Field 'airplaneYear' has type 'string', expected 'number'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Field 'documents' has type 'object', expected 'array'",
+            "❗ Field 'insuranceDocuments' has type 'object', expected 'array'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "YRzBtEwTg64HLg6fMfLo",
+          "path": "/YRzBtEwTg64HLg6fMfLo",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Missing field 'createdAt'",
+            "❗ Field 'images' has type 'object', expected 'array'",
+            "❗ Field 'minimumHours' has type 'string', expected 'number'",
+            "❗ Missing field 'currentAnnualPdf'",
+            "❗ Missing field 'insurancePdf'",
+            "❗ Field 'ratesPerHour' has type 'string', expected 'number'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Field 'availableDates' has type 'object', expected 'array'",
+            "❗ Field 'airplaneYear' has type 'string', expected 'number'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Field 'documents' has type 'object', expected 'array'",
+            "❗ Field 'insuranceDocuments' has type 'object', expected 'array'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "cyqJCRZYLoeAnTEERwR2",
+          "path": "/cyqJCRZYLoeAnTEERwR2",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Missing field 'createdAt'",
+            "❗ Missing field 'images'",
+            "❗ Missing field 'airplaneModel'",
+            "❗ Missing field 'minimumHours'",
+            "❗ Missing field 'currentAnnualPdf'",
+            "❗ Missing field 'insurancePdf'",
+            "❗ Missing field 'ratesPerHour'",
+            "❗ Missing field 'description'",
+            "❗ Missing field 'location'",
+            "❗ Missing field 'ownerId'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Missing field 'availableDates'",
+            "❗ Missing field 'airplaneYear'",
+            "❗ Missing field 'userEmail'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Missing field 'documents'",
+            "❗ Missing field 'insuranceDocuments'",
+            "❗ Missing field 'boostListing'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "lXAaqxq9J1TJPYRqyjKr",
+          "path": "/lXAaqxq9J1TJPYRqyjKr",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Missing field 'createdAt'",
+            "❗ Missing field 'images'",
+            "❗ Missing field 'airplaneModel'",
+            "❗ Missing field 'minimumHours'",
+            "❗ Missing field 'currentAnnualPdf'",
+            "❗ Missing field 'insurancePdf'",
+            "❗ Missing field 'ratesPerHour'",
+            "❗ Missing field 'description'",
+            "❗ Missing field 'location'",
+            "❗ Missing field 'ownerId'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Missing field 'availableDates'",
+            "❗ Missing field 'airplaneYear'",
+            "❗ Missing field 'userEmail'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Missing field 'documents'",
+            "❗ Missing field 'insuranceDocuments'",
+            "❗ Missing field 'boostListing'"
+          ]
+        },
+        {
+          "id": "listingId",
+          "path": "/listingId",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Field 'createdAt' has type 'object', expected 'timestamp'",
+            "❗ Field 'images' has type 'object', expected 'array'",
+            "❗ Missing field 'airplaneModel'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Missing field 'availableDates'",
+            "❗ Missing field 'airplaneYear'",
+            "❗ Missing field 'userEmail'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Field 'tailNumber' has type 'number', expected 'string'",
+            "❗ Missing field 'documents'",
+            "❗ Missing field 'insuranceDocuments'",
+            "❗ Missing field 'boostListing'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        },
+        {
+          "id": "ljEtSjpNHrnOOPxzibhX",
+          "path": "/ljEtSjpNHrnOOPxzibhX",
+          "issues": [
+            "❗ Missing field 'baseCost'",
+            "❗ Missing field 'commission'",
+            "❗ Missing field 'ownerPayout'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'totalCost'",
+            "❗ Missing field 'createdAt'",
+            "❗ Field 'images' has type 'object', expected 'array'",
+            "❗ Field 'minimumHours' has type 'string', expected 'number'",
+            "❗ Missing field 'currentAnnualPdf'",
+            "❗ Missing field 'insurancePdf'",
+            "❗ Field 'ratesPerHour' has type 'string', expected 'number'",
+            "❗ Missing field 'boosted'",
+            "❗ Missing field 'listing'",
+            "❗ Field 'availableDates' has type 'object', expected 'array'",
+            "❗ Field 'airplaneYear' has type 'string', expected 'number'",
+            "❗ Missing field 'airplaneID'",
+            "❗ Missing field 'aircraftModel'",
+            "❗ Missing field 'tailNumber'",
+            "❗ Missing field 'engineType'",
+            "❗ Missing field 'totalTimeOnFrame'",
+            "❗ Missing field 'airportIdentifier'",
+            "❗ Missing field 'mainImage'",
+            "❗ Field 'documents' has type 'object', expected 'array'",
+            "❗ Field 'insuranceDocuments' has type 'object', expected 'array'",
+            "❗ Missing field 'airplaneId'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bookings",
+      "documents": [
+        {
+          "id": "B14An4ncdBJYfsJ56OB9",
+          "path": "/B14An4ncdBJYfsJ56OB9",
+          "issues": []
+        },
+        {
+          "id": "CMdm2LLawjESxgOSXzoX",
+          "path": "/CMdm2LLawjESxgOSXzoX",
+          "issues": []
+        },
+        {
+          "id": "HtQZj1i1YgyjhnqhPcGq",
+          "path": "/HtQZj1i1YgyjhnqhPcGq",
+          "issues": []
+        },
+        {
+          "id": "eU65zjI4wLzGK2HUevpK",
+          "path": "/eU65zjI4wLzGK2HUevpK",
+          "issues": []
+        },
+        {
+          "id": "wx4fej4oms7M9Mjlo4y2",
+          "path": "/wx4fej4oms7M9Mjlo4y2",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "messages",
+      "documents": [
+        {
+          "id": "1w5vPOSI8DkoedkVHWAd",
+          "path": "/1w5vPOSI8DkoedkVHWAd",
+          "issues": []
+        },
+        {
+          "id": "6npxVQjrg5zEMQAS9I00",
+          "path": "/6npxVQjrg5zEMQAS9I00",
+          "issues": []
+        },
+        {
+          "id": "8NVExiKLNF5Tctin0mvt",
+          "path": "/8NVExiKLNF5Tctin0mvt",
+          "issues": []
+        },
+        {
+          "id": "T7iz6tV5uUAtGnWSrMy2",
+          "path": "/T7iz6tV5uUAtGnWSrMy2",
+          "issues": []
+        },
+        {
+          "id": "YIuLf5bn6uBSFCw2l121",
+          "path": "/YIuLf5bn6uBSFCw2l121",
+          "issues": []
+        },
+        {
+          "id": "YpWWy1WYQWApZRU5RFAo",
+          "path": "/YpWWy1WYQWApZRU5RFAo",
+          "issues": []
+        },
+        {
+          "id": "aC0ePb00yMzUdCOgM5pl",
+          "path": "/aC0ePb00yMzUdCOgM5pl",
+          "issues": []
+        },
+        {
+          "id": "ah76MARvY4rRFWeBUfow",
+          "path": "/ah76MARvY4rRFWeBUfow",
+          "issues": []
+        },
+        {
+          "id": "cXNr9NmSoDBtT0oAjGAY",
+          "path": "/cXNr9NmSoDBtT0oAjGAY",
+          "issues": []
+        },
+        {
+          "id": "eo92dtFvs8hbBBn8OJIT",
+          "path": "/eo92dtFvs8hbBBn8OJIT",
+          "issues": []
+        },
+        {
+          "id": "lyf9B7kkoMhiWLsNbTrd",
+          "path": "/lyf9B7kkoMhiWLsNbTrd",
+          "issues": []
+        },
+        {
+          "id": "mMnattsMvWxnZFqlU8qt",
+          "path": "/mMnattsMvWxnZFqlU8qt",
+          "issues": []
+        },
+        {
+          "id": "nOO1xw1insRAMXp2vKUg",
+          "path": "/nOO1xw1insRAMXp2vKUg",
+          "issues": []
+        },
+        {
+          "id": "oIjQuwV635yUj3d9IbRX",
+          "path": "/oIjQuwV635yUj3d9IbRX",
+          "issues": []
+        },
+        {
+          "id": "sVKIAFvDspOuhasEnBlf",
+          "path": "/sVKIAFvDspOuhasEnBlf",
+          "issues": []
+        },
+        {
+          "id": "vXGCUUNp7NOr3ddF7NX3",
+          "path": "/vXGCUUNp7NOr3ddF7NX3",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "migrationFlags",
+      "documents": [
+        {
+          "id": "rentalRequestsAndAirplanesMigration",
+          "path": "/rentalRequestsAndAirplanesMigration",
+          "issues": []
+        },
+        {
+          "id": "rentalRequestsMigration",
+          "path": "/rentalRequestsMigration",
+          "issues": []
+        },
+        {
+          "id": "renterDataMigration",
+          "path": "/renterDataMigration",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "newListing",
+      "documents": [
+        {
+          "id": "g7NF56DulZRy1vT1v5Hv",
+          "path": "/g7NF56DulZRy1vT1v5Hv",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "notifications",
+      "documents": [
+        {
+          "id": "1duns3UKPPwNDUcV4dHB",
+          "path": "/1duns3UKPPwNDUcV4dHB",
+          "issues": []
+        },
+        {
+          "id": "4BWSZsEaYRm7Ax8t1pRs",
+          "path": "/4BWSZsEaYRm7Ax8t1pRs",
+          "issues": []
+        },
+        {
+          "id": "5gu9R7ufOXSFR9gonzzd",
+          "path": "/5gu9R7ufOXSFR9gonzzd",
+          "issues": []
+        },
+        {
+          "id": "7yhnjfaJX6Rtd64t60kG",
+          "path": "/7yhnjfaJX6Rtd64t60kG",
+          "issues": []
+        },
+        {
+          "id": "D6ZsF2MjkbXcMZxB8WPe",
+          "path": "/D6ZsF2MjkbXcMZxB8WPe",
+          "issues": []
+        },
+        {
+          "id": "E7v6Vf1tWKym0gUPPn1r",
+          "path": "/E7v6Vf1tWKym0gUPPn1r",
+          "issues": []
+        },
+        {
+          "id": "FtOwVSbFjzDWmsmLmPxC",
+          "path": "/FtOwVSbFjzDWmsmLmPxC",
+          "issues": []
+        },
+        {
+          "id": "H1tcgWGPcsoqNkpqveIC",
+          "path": "/H1tcgWGPcsoqNkpqveIC",
+          "issues": []
+        },
+        {
+          "id": "HT8eMGwPWlA6JRkV6uJH",
+          "path": "/HT8eMGwPWlA6JRkV6uJH",
+          "issues": []
+        },
+        {
+          "id": "IQUeAwr6RF5K4P7o4OR0",
+          "path": "/IQUeAwr6RF5K4P7o4OR0",
+          "issues": []
+        },
+        {
+          "id": "IYsvjvremFAJoUHjkdSn",
+          "path": "/IYsvjvremFAJoUHjkdSn",
+          "issues": []
+        },
+        {
+          "id": "Jog1wUVB4cOfc8r3pPjb",
+          "path": "/Jog1wUVB4cOfc8r3pPjb",
+          "issues": []
+        },
+        {
+          "id": "KgTZKMgMGN5CGxtmyJvc",
+          "path": "/KgTZKMgMGN5CGxtmyJvc",
+          "issues": []
+        },
+        {
+          "id": "MwguPq8aRWb2NwZthNQC",
+          "path": "/MwguPq8aRWb2NwZthNQC",
+          "issues": []
+        },
+        {
+          "id": "NNmhdigs3k6p8TV1Exfd",
+          "path": "/NNmhdigs3k6p8TV1Exfd",
+          "issues": []
+        },
+        {
+          "id": "OhlYFfNCRcqej3f2Dyxa",
+          "path": "/OhlYFfNCRcqej3f2Dyxa",
+          "issues": []
+        },
+        {
+          "id": "OsoyopgC0j3Em7fXzLzf",
+          "path": "/OsoyopgC0j3Em7fXzLzf",
+          "issues": []
+        },
+        {
+          "id": "P8kaRSlb1XIZUfa1JR8I",
+          "path": "/P8kaRSlb1XIZUfa1JR8I",
+          "issues": []
+        },
+        {
+          "id": "RagNm0e4xedmAJIMnwDd",
+          "path": "/RagNm0e4xedmAJIMnwDd",
+          "issues": []
+        },
+        {
+          "id": "TbFiyAejNaWuby11bAgO",
+          "path": "/TbFiyAejNaWuby11bAgO",
+          "issues": []
+        },
+        {
+          "id": "UNZ0VRHfe4q6yPTiaXxw",
+          "path": "/UNZ0VRHfe4q6yPTiaXxw",
+          "issues": []
+        },
+        {
+          "id": "VaqTfVnBrxiwFJKSvu3K",
+          "path": "/VaqTfVnBrxiwFJKSvu3K",
+          "issues": []
+        },
+        {
+          "id": "XOQctk8NIznqHZx1rOaE",
+          "path": "/XOQctk8NIznqHZx1rOaE",
+          "issues": []
+        },
+        {
+          "id": "XgcDHQsFQ2ElkCeQAtOD",
+          "path": "/XgcDHQsFQ2ElkCeQAtOD",
+          "issues": []
+        },
+        {
+          "id": "Z58RC3EHM7BRdFJfSBNZ",
+          "path": "/Z58RC3EHM7BRdFJfSBNZ",
+          "issues": []
+        },
+        {
+          "id": "h1O2TGlrsAdVgdhcXVaf",
+          "path": "/h1O2TGlrsAdVgdhcXVaf",
+          "issues": []
+        },
+        {
+          "id": "hjjPHEHqw9V0ybygh9FY",
+          "path": "/hjjPHEHqw9V0ybygh9FY",
+          "issues": []
+        },
+        {
+          "id": "hn7vBrWkQpMbFlXPAzpN",
+          "path": "/hn7vBrWkQpMbFlXPAzpN",
+          "issues": []
+        },
+        {
+          "id": "iCq18CJXw2RN45DJrvpf",
+          "path": "/iCq18CJXw2RN45DJrvpf",
+          "issues": []
+        },
+        {
+          "id": "nPF6bvs3TvUKaxFYlXhx",
+          "path": "/nPF6bvs3TvUKaxFYlXhx",
+          "issues": []
+        },
+        {
+          "id": "nv1Xcv0257himuPRG4GX",
+          "path": "/nv1Xcv0257himuPRG4GX",
+          "issues": []
+        },
+        {
+          "id": "oMpWGit73ylde4dWxvQM",
+          "path": "/oMpWGit73ylde4dWxvQM",
+          "issues": []
+        },
+        {
+          "id": "stZzlos2F85MKnlQnMh8",
+          "path": "/stZzlos2F85MKnlQnMh8",
+          "issues": []
+        },
+        {
+          "id": "tS58Zi3x9NetlH2sPRp2",
+          "path": "/tS58Zi3x9NetlH2sPRp2",
+          "issues": []
+        },
+        {
+          "id": "uzeTzw1e9WRFFiVpcOoC",
+          "path": "/uzeTzw1e9WRFFiVpcOoC",
+          "issues": []
+        },
+        {
+          "id": "v2Amuv8uTOeu3MaLqA2v",
+          "path": "/v2Amuv8uTOeu3MaLqA2v",
+          "issues": []
+        },
+        {
+          "id": "wfimWhkLDsBolWOlcAfe",
+          "path": "/wfimWhkLDsBolWOlcAfe",
+          "issues": []
+        },
+        {
+          "id": "wpE2XZLQ05UfiRmTjEf8",
+          "path": "/wpE2XZLQ05UfiRmTjEf8",
+          "issues": []
+        },
+        {
+          "id": "x0CUqsJcriv4WhAvZLhF",
+          "path": "/x0CUqsJcriv4WhAvZLhF",
+          "issues": []
+        },
+        {
+          "id": "xHmvhjEofyxSiLtV2jD5",
+          "path": "/xHmvhjEofyxSiLtV2jD5",
+          "issues": []
+        },
+        {
+          "id": "y1HBXlo2z6WIo5GHh8FK",
+          "path": "/y1HBXlo2z6WIo5GHh8FK",
+          "issues": []
+        },
+        {
+          "id": "yteMWUcwQ9cCWZN1krEQ",
+          "path": "/yteMWUcwQ9cCWZN1krEQ",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "documents": [
+        {
+          "id": "8YC4dzfJ5aiBknKNTfow",
+          "path": "/8YC4dzfJ5aiBknKNTfow",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "ownerId",
+      "documents": [
+        {
+          "id": "IyDdloGTg4tQSpCTAsn4",
+          "path": "/IyDdloGTg4tQSpCTAsn4",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "owners",
+      "documents": [
+        {
+          "id": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "path": "/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "issues": [
+            "❗ Missing field 'stripeAccountId'",
+            "❗ Missing field 'stripeAccountStatus'",
+            "❗ Missing field 'email'",
+            "❗ Missing field 'address'",
+            "❗ Missing field 'image'"
+          ]
+        },
+        {
+          "id": "jz9AzYg3oagHYpFqqm7i",
+          "path": "/jz9AzYg3oagHYpFqqm7i",
+          "issues": [
+            "❗ Missing field 'stripeAccountId'",
+            "❗ Missing field 'stripeAccountStatus'",
+            "❗ Missing field 'uid'",
+            "❗ Missing field 'fullName'",
+            "❗ Missing field 'contact'",
+            "❗ Missing field 'email'",
+            "❗ Missing field 'address'",
+            "❗ Missing field 'image'"
+          ]
+        },
+        {
+          "id": "ownerId",
+          "path": "/ownerId",
+          "issues": [
+            "❗ Missing field 'stripeAccountId'",
+            "❗ Missing field 'stripeAccountStatus'",
+            "❗ Missing field 'uid'",
+            "⚠️ Unexpected field 'createdAt'"
+          ]
+        },
+        {
+          "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "path": "/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "issues": [
+            "❗ Missing field 'stripeAccountStatus'",
+            "❗ Missing field 'email'",
+            "❗ Missing field 'address'",
+            "❗ Missing field 'image'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "payment-sheet",
+      "documents": [
+        {
+          "id": "wilqNIIjNjXCfZbDn9gR",
+          "path": "/wilqNIIjNjXCfZbDn9gR",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "posts",
+      "documents": [
+        {
+          "id": "17glybByz4nhLnoQ8QC1",
+          "path": "/17glybByz4nhLnoQ8QC1",
+          "issues": []
+        },
+        {
+          "id": "4dD3Qs3QaRge3SECXDRZ",
+          "path": "/4dD3Qs3QaRge3SECXDRZ",
+          "issues": []
+        },
+        {
+          "id": "6xR5eWOmm104HjNVSguV",
+          "path": "/6xR5eWOmm104HjNVSguV",
+          "issues": []
+        },
+        {
+          "id": "9hSjTWboyv51YawcybPm",
+          "path": "/9hSjTWboyv51YawcybPm",
+          "issues": []
+        },
+        {
+          "id": "B17OngrVSdicbnn1AIG2",
+          "path": "/B17OngrVSdicbnn1AIG2",
+          "issues": []
+        },
+        {
+          "id": "DHr7dyj5Y6Pk8PraFhwP",
+          "path": "/DHr7dyj5Y6Pk8PraFhwP",
+          "issues": []
+        },
+        {
+          "id": "EM7Aw4tStkUNEyYD6y3f",
+          "path": "/EM7Aw4tStkUNEyYD6y3f",
+          "issues": []
+        },
+        {
+          "id": "Er9W8OwXFSafyPwv3gat",
+          "path": "/Er9W8OwXFSafyPwv3gat",
+          "issues": []
+        },
+        {
+          "id": "Gj4dsTeuPjcSCnurKbwh",
+          "path": "/Gj4dsTeuPjcSCnurKbwh",
+          "issues": []
+        },
+        {
+          "id": "H8FTZm4SHzmI4WqxUUOd",
+          "path": "/H8FTZm4SHzmI4WqxUUOd",
+          "issues": []
+        },
+        {
+          "id": "LAgciqz96DVXIaOpezWo",
+          "path": "/LAgciqz96DVXIaOpezWo",
+          "issues": []
+        },
+        {
+          "id": "Oafja5HfJ7DKWbs82hRM",
+          "path": "/Oafja5HfJ7DKWbs82hRM",
+          "issues": []
+        },
+        {
+          "id": "QXDmyF09cnWKs6BspSCq",
+          "path": "/QXDmyF09cnWKs6BspSCq",
+          "issues": []
+        },
+        {
+          "id": "Uafz1rOqJy699hznAYcV",
+          "path": "/Uafz1rOqJy699hznAYcV",
+          "issues": []
+        },
+        {
+          "id": "W5LHN9kdY5sYRYLxYOfc",
+          "path": "/W5LHN9kdY5sYRYLxYOfc",
+          "issues": []
+        },
+        {
+          "id": "cF4qwgK2UsvMxERBaN7b",
+          "path": "/cF4qwgK2UsvMxERBaN7b",
+          "issues": []
+        },
+        {
+          "id": "cHWpfcJ02bNLKOpLxLu7",
+          "path": "/cHWpfcJ02bNLKOpLxLu7",
+          "issues": []
+        },
+        {
+          "id": "h8dMUN09bB3TzmAxEzUJ",
+          "path": "/h8dMUN09bB3TzmAxEzUJ",
+          "issues": []
+        },
+        {
+          "id": "hi53Pkvmi1qoVqrIKBxm",
+          "path": "/hi53Pkvmi1qoVqrIKBxm",
+          "issues": []
+        },
+        {
+          "id": "iVxKOCAVkssHBqvGxqNf",
+          "path": "/iVxKOCAVkssHBqvGxqNf",
+          "issues": []
+        },
+        {
+          "id": "lI54LdzRq5e4GeV59LqT",
+          "path": "/lI54LdzRq5e4GeV59LqT",
+          "issues": []
+        },
+        {
+          "id": "mDnAbxbnJN12ObfoGQLj",
+          "path": "/mDnAbxbnJN12ObfoGQLj",
+          "issues": []
+        },
+        {
+          "id": "pVpV1ke32wh6hunDL7Fv",
+          "path": "/pVpV1ke32wh6hunDL7Fv",
+          "issues": []
+        },
+        {
+          "id": "qSmsXGUwdeH6olnIyIK4",
+          "path": "/qSmsXGUwdeH6olnIyIK4",
+          "issues": []
+        },
+        {
+          "id": "tHwjxMORm17LfcxTfeeT",
+          "path": "/tHwjxMORm17LfcxTfeeT",
+          "issues": []
+        },
+        {
+          "id": "uHwIMnBunBTFDHxJBOGf",
+          "path": "/uHwIMnBunBTFDHxJBOGf",
+          "issues": []
+        },
+        {
+          "id": "yhcwriNkvrfKJG9EFZR7",
+          "path": "/yhcwriNkvrfKJG9EFZR7",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "rentalRequests",
+      "documents": [
+        {
+          "id": "3R8fuUGMFTkG0oanzY0d",
+          "path": "/3R8fuUGMFTkG0oanzY0d",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "Apumci7rbNdM0t5cwOgl",
+          "path": "/Apumci7rbNdM0t5cwOgl",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "❗ Field 'renterName' has type 'object', expected 'string'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "C3LKGFKohzUtKOiHzuWE",
+          "path": "/C3LKGFKohzUtKOiHzuWE",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "DX9kKYWJNmt2ygNTCVbM",
+          "path": "/DX9kKYWJNmt2ygNTCVbM",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "JWiEzdGKQL3XDC13nVP9",
+          "path": "/JWiEzdGKQL3XDC13nVP9",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "PvMYBNTTPgQqaCYV6Zf9",
+          "path": "/PvMYBNTTPgQqaCYV6Zf9",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "ZYjj0vaOzBNCMO5hE30E",
+          "path": "/ZYjj0vaOzBNCMO5hE30E",
+          "issues": [
+            "❗ Missing field 'rentalRequestId'",
+            "❗ Missing field 'rentalPeriod'",
+            "❗ Missing field 'rentalCost'",
+            "❗ Missing field 'transactionFee'",
+            "❗ Missing field 'bookingFee'",
+            "❗ Missing field 'salesTax'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'",
+            "⚠️ Unexpected field 'rentalHours'",
+            "⚠️ Unexpected field 'baseCost'",
+            "⚠️ Unexpected field 'commission'",
+            "⚠️ Unexpected field 'rentalDate'",
+            "⚠️ Unexpected field 'currentLocation'",
+            "⚠️ Unexpected field 'hasMedicalCertificate'",
+            "⚠️ Unexpected field 'hasRentersInsurance'",
+            "⚠️ Unexpected field 'flightHours'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'id'"
+          ]
+        },
+        {
+          "id": "bzn51XSMA6ni3jt6MyaM",
+          "path": "/bzn51XSMA6ni3jt6MyaM",
+          "issues": [
+            "❗ Missing field 'ownerId'",
+            "❗ Missing field 'renterId'",
+            "❗ Missing field 'listingId'",
+            "❗ Missing field 'renterName'",
+            "⚠️ Unexpected field 'airplaneModel'"
+          ]
+        },
+        {
+          "id": "jz9AzYg3oagHYpFqqm7i",
+          "path": "/jz9AzYg3oagHYpFqqm7i",
+          "issues": [
+            "❗ Missing field 'ownerId'",
+            "❗ Missing field 'listingId'",
+            "❗ Missing field 'renterName'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'rentalDate'",
+            "⚠️ Unexpected field 'senderId'",
+            "⚠️ Unexpected field 'senderName'"
+          ]
+        },
+        {
+          "id": "lqDg4ovwiJuVRM5berQM",
+          "path": "/lqDg4ovwiJuVRM5berQM",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "❗ Field 'renterName' has type 'object', expected 'string'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "ojGBDRzAtKI5DMTlfz67",
+          "path": "/ojGBDRzAtKI5DMTlfz67",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "rjl9kxGcU5rddf0fOf3D",
+          "path": "/rjl9kxGcU5rddf0fOf3D",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        },
+        {
+          "id": "ylqYZ7eC6vYyTrdfdGRc",
+          "path": "/ylqYZ7eC6vYyTrdfdGRc",
+          "issues": [
+            "❗ Missing field 'listingId'",
+            "⚠️ Unexpected field 'createdAt'",
+            "⚠️ Unexpected field 'airplaneModel'",
+            "⚠️ Unexpected field 'contact'"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "renters",
+      "documents": [
+        {
+          "id": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "path": "/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "issues": []
+        },
+        {
+          "id": "renterId",
+          "path": "/renterId",
+          "issues": []
+        },
+        {
+          "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "path": "/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "documents": [
+        {
+          "id": "08O5m7x11kG7lgPITLLs",
+          "path": "/08O5m7x11kG7lgPITLLs",
+          "issues": []
+        },
+        {
+          "id": "1kTTh0QKU7Y9FhA3f6D4axZOa6L2",
+          "path": "/1kTTh0QKU7Y9FhA3f6D4axZOa6L2",
+          "issues": []
+        },
+        {
+          "id": "2lIXc8K9s4M6iPmQ8E4v",
+          "path": "/2lIXc8K9s4M6iPmQ8E4v",
+          "issues": []
+        },
+        {
+          "id": "fqp5kbzrLrbA8jRsKTka",
+          "path": "/fqp5kbzrLrbA8jRsKTka",
+          "issues": []
+        },
+        {
+          "id": "iy3xZaoaxo1bt2KkVy3W",
+          "path": "/iy3xZaoaxo1bt2KkVy3W",
+          "issues": []
+        },
+        {
+          "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "path": "/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "issues": []
+        },
+        {
+          "id": "wugeeOo8cFl3fnTJ65HC",
+          "path": "/wugeeOo8cFl3fnTJ65HC",
+          "issues": []
+        }
+      ]
+    },
+    {
+      "name": "your-collection",
+      "documents": [
+        {
+          "id": "bPTNcCpPb1skOTZw7w7C",
+          "path": "/bPTNcCpPb1skOTZw7w7C",
+          "issues": []
+        },
+        {
+          "id": "rybSDAcMOxDZ54PgGzhH",
+          "path": "/rybSDAcMOxDZ54PgGzhH",
+          "issues": []
+        },
+        {
+          "id": "vpsk62W3aDzXCUpN3KlD",
+          "path": "/vpsk62W3aDzXCUpN3KlD",
+          "issues": []
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalCollections": 19,
+    "totalDocuments": 182,
+    "totalIssues": 379,
+    "issuesByType": {
+      "❗ Missing field 'baseCost'": 11,
+      "❗ Missing field 'commission'": 11,
+      "❗ Missing field 'ownerPayout'": 11,
+      "❗ Missing field 'rentalCost'": 12,
+      "❗ Missing field 'totalCost'": 11,
+      "❗ Field 'createdAt' has type 'object', expected 'timestamp'": 4,
+      "❗ Field 'images' has type 'object', expected 'array'": 8,
+      "❗ Field 'minimumHours' has type 'string', expected 'number'": 5,
+      "❗ Field 'currentAnnualPdf' has type 'object', expected 'string'": 2,
+      "❗ Field 'insurancePdf' has type 'object', expected 'string'": 2,
+      "❗ Field 'ratesPerHour' has type 'string', expected 'number'": 6,
+      "❗ Missing field 'availableDates'": 7,
+      "❗ Missing field 'airplaneYear'": 7,
+      "❗ Missing field 'userEmail'": 7,
+      "❗ Missing field 'airplaneID'": 9,
+      "❗ Missing field 'aircraftModel'": 9,
+      "❗ Missing field 'tailNumber'": 9,
+      "❗ Missing field 'engineType'": 9,
+      "❗ Missing field 'totalTimeOnFrame'": 9,
+      "❗ Missing field 'airportIdentifier'": 9,
+      "❗ Missing field 'mainImage'": 9,
+      "❗ Missing field 'documents'": 8,
+      "❗ Missing field 'insuranceDocuments'": 8,
+      "❗ Missing field 'boostListing'": 8,
+      "❗ Missing field 'airplaneId'": 10,
+      "❗ Missing field 'createdAt'": 7,
+      "❗ Missing field 'minimumHours'": 5,
+      "❗ Missing field 'currentAnnualPdf'": 8,
+      "❗ Missing field 'insurancePdf'": 8,
+      "❗ Missing field 'boosted'": 9,
+      "❗ Missing field 'listing'": 10,
+      "❗ Field 'availableDates' has type 'object', expected 'array'": 4,
+      "❗ Field 'airplaneYear' has type 'string', expected 'number'": 4,
+      "❗ Missing field 'images'": 3,
+      "❗ Missing field 'airplaneModel'": 5,
+      "❗ Missing field 'ratesPerHour'": 4,
+      "❗ Missing field 'description'": 3,
+      "❗ Missing field 'location'": 3,
+      "❗ Missing field 'ownerId'": 5,
+      "❗ Field 'costPerHour' has type 'string', expected 'number'": 1,
+      "❗ Field 'totalTimeOnFrame' has type 'string', expected 'number'": 1,
+      "❗ Field 'documents' has type 'object', expected 'array'": 3,
+      "❗ Field 'insuranceDocuments' has type 'object', expected 'array'": 3,
+      "❗ Field 'tailNumber' has type 'number', expected 'string'": 1,
+      "❗ Missing field 'stripeAccountId'": 3,
+      "❗ Missing field 'stripeAccountStatus'": 4,
+      "❗ Missing field 'email'": 3,
+      "❗ Missing field 'address'": 3,
+      "❗ Missing field 'image'": 3,
+      "❗ Missing field 'uid'": 2,
+      "❗ Missing field 'fullName'": 1,
+      "❗ Missing field 'contact'": 1,
+      "⚠️ Unexpected field 'createdAt'": 13,
+      "❗ Missing field 'listingId'": 12,
+      "⚠️ Unexpected field 'airplaneModel'": 12,
+      "⚠️ Unexpected field 'contact'": 11,
+      "❗ Field 'renterName' has type 'object', expected 'string'": 2,
+      "❗ Missing field 'rentalRequestId'": 1,
+      "❗ Missing field 'rentalPeriod'": 1,
+      "❗ Missing field 'transactionFee'": 1,
+      "❗ Missing field 'bookingFee'": 1,
+      "❗ Missing field 'salesTax'": 1,
+      "❗ Field 'totalCost' has type 'string', expected 'number'": 1,
+      "⚠️ Unexpected field 'rentalHours'": 1,
+      "⚠️ Unexpected field 'baseCost'": 1,
+      "⚠️ Unexpected field 'commission'": 1,
+      "⚠️ Unexpected field 'rentalDate'": 2,
+      "⚠️ Unexpected field 'currentLocation'": 1,
+      "⚠️ Unexpected field 'hasMedicalCertificate'": 1,
+      "⚠️ Unexpected field 'hasRentersInsurance'": 1,
+      "⚠️ Unexpected field 'flightHours'": 1,
+      "⚠️ Unexpected field 'id'": 1,
+      "❗ Missing field 'renterId'": 1,
+      "❗ Missing field 'renterName'": 2,
+      "⚠️ Unexpected field 'senderId'": 1,
+      "⚠️ Unexpected field 'senderName'": 1
+    }
+  }
+}

@@ -20,8 +20,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getAuth } from 'firebase/auth'; // Import Firebase Auth
 
+// Firestore Imports
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebaseConfig'; // Adjust the import based on your project structure
+
 // Configuration Constants
-const API_URL = process.env.API_URL || 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api'; // Use environment variable or default
+const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api'; // Defined directly
 
 export default function CheckoutScreen() {
   const navigation = useNavigation();
@@ -37,8 +41,7 @@ export default function CheckoutScreen() {
     amount: initialAmount = 0, // For Classifieds (in cents)
     costPerHour = 0, // Renamed from perHour for Rentals
     rentalHours = 1, // Added rentalHours for Rentals
-    ownerId = '', // For Rentals (may be inferred from rentalRequest)
-    rentalRequestId = '', // For Rentals
+    rentalRequestId: routeRentalRequestId = '', // For Rentals
     listingDetails = {}, // Additional details for listing creation
     selectedPricing: initialSelectedPricing = '', // Initial pricing tier
   } = route.params || {};
@@ -58,6 +61,9 @@ export default function CheckoutScreen() {
   // Manage totalAmount and selectedPricing as state to allow updates
   const [totalAmount, setTotalAmount] = useState(paymentType === 'rental' ? 0 : initialAmount);
   const [selectedPricing, setSelectedPricing] = useState(initialSelectedPricing);
+
+  // State to hold rentalRequestId
+  const [rentalRequestId, setRentalRequestId] = useState(routeRentalRequestId || '');
 
   // For displaying animation
   const bounceValue = useRef(new Animated.Value(0)).current;
@@ -115,6 +121,25 @@ export default function CheckoutScreen() {
     const total = Math.round((baseAmount + bookingFee + processingFee + tax) * 100); // Convert to cents
 
     setTotalAmount(total);
+  };
+
+  /**
+   * Function to get Firebase ID Token
+   * Ensures authenticated requests to the backend.
+   */
+  const getFirebaseIdToken = async () => {
+    try {
+      if (user) {
+        const token = await user.getIdToken(true);
+        return token;
+      } else {
+        throw new Error('User is not authenticated.');
+      }
+    } catch (error) {
+      console.error('Error fetching Firebase ID token:', error);
+      Alert.alert('Authentication Error', 'Failed to authenticate user.');
+      return '';
+    }
   };
 
   // Function to apply discount code by validating it with the backend
@@ -175,7 +200,98 @@ export default function CheckoutScreen() {
     }
   };
 
-  // Handle payment processing
+  /**
+   * Function to create a rental request under the correct Firestore path
+   */
+  const createRentalRequest = async () => {
+    try {
+      // Ensure ownerId and listingId are correctly obtained from listingDetails
+      const actualOwnerId = listingDetails.ownerId;
+      const actualListingId = listingDetails.id;
+
+      if (!actualOwnerId) {
+        Alert.alert('Error', 'Owner information is missing from listing details.');
+        return null;
+      }
+
+      if (!actualListingId) {
+        Alert.alert('Error', 'Listing information is missing.');
+        return null;
+      }
+
+      const rentalRequestData = {
+        renterId: user.uid,
+        ownerId: actualOwnerId,
+        listingId: actualListingId,
+        rentalStatus: 'pending', // Initial status
+        costPerHour: parseFloat(costPerHour),
+        rentalHours: parseFloat(rentalHours),
+        createdAt: serverTimestamp(),
+        // Add other relevant fields as necessary
+      };
+
+      // Create the rental request under the correct Firestore path
+      const rentalRequestRef = await addDoc(
+        collection(db, 'owners', actualOwnerId, 'rentalRequests'),
+        rentalRequestData
+      );
+
+      const newRentalRequestId = rentalRequestRef.id;
+      setRentalRequestId(newRentalRequestId);
+      console.log(`Rental Request Created with ID: ${newRentalRequestId}`);
+      return newRentalRequestId;
+    } catch (error) {
+      console.error('Error creating rental request:', error);
+      Alert.alert('Error', 'Failed to create rental request.');
+      return null;
+    }
+  };
+
+  /**
+   * Function to create the listing on the backend
+   */
+  const createListing = async () => {
+    try {
+      const token = await getFirebaseIdToken();
+      if (!token) {
+        throw new Error('Authentication token is missing.');
+      }
+
+      const response = await fetch(`${API_URL}/createListing`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`, // Include Firebase ID Token
+        },
+        body: JSON.stringify({ listingDetails }),
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        const text = await response.text();
+        console.error('Response is not JSON:', text);
+        Alert.alert('Error', 'Failed to create listing.');
+        return false;
+      }
+
+      if (!response.ok) {
+        Alert.alert('Error', data.message || 'Failed to create listing.');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Listing creation error:', error);
+      Alert.alert('Error', error.message || 'Failed to create listing.');
+      return false;
+    }
+  };
+
+  /**
+   * Handle payment processing
+   */
   const handlePayment = async () => {
     // Validate cardholder name
     if (cardholderName.trim() === '') {
@@ -216,6 +332,17 @@ export default function CheckoutScreen() {
     try {
       setLoading(true);
 
+      let currentRentalRequestId = rentalRequestId;
+
+      // If paymentType is 'rental' and rentalRequestId is not provided, create a new rental request
+      if (paymentType === 'rental' && !currentRentalRequestId) {
+        currentRentalRequestId = await createRentalRequest();
+        if (!currentRentalRequestId) {
+          setLoading(false);
+          return;
+        }
+      }
+
       let clientSecret = '';
 
       const endpoint =
@@ -226,14 +353,20 @@ export default function CheckoutScreen() {
       // Prepare request body based on payment type
       const body =
         paymentType === 'rental'
-          ? { rentalRequestId } // Removed ownerId and costPerHour as backend infers them
+          ? { rentalRequestId: currentRentalRequestId, ownerId: listingDetails.ownerId } // Include ownerId
           : { amount: initialAmount, currency: 'usd' };
+
+      // Fetch Firebase ID token for authenticated requests
+      const token = await getFirebaseIdToken();
+      if (!token) {
+        throw new Error('Authentication token is missing.');
+      }
 
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
+          Authorization: `Bearer ${token}`, // Include Firebase ID Token
         },
         body: JSON.stringify(body),
       });
@@ -284,7 +417,7 @@ export default function CheckoutScreen() {
                 text: 'OK',
                 onPress: () => {
                   if (paymentType === 'rental') {
-                    navigation.navigate('ConfirmationScreen', { rentalRequestId });
+                    navigation.navigate('ConfirmationScreen', { rentalRequestId: currentRentalRequestId });
                   } else {
                     navigation.navigate('Classifieds', { refresh: true });
                   }
@@ -301,53 +434,6 @@ export default function CheckoutScreen() {
       Alert.alert('Error', 'Payment processing failed.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Function to get Firebase ID Token
-  const getFirebaseIdToken = async () => {
-    try {
-      const token = await user.getIdToken(true);
-      return token;
-    } catch (error) {
-      console.error('Error fetching Firebase ID token:', error);
-      Alert.alert('Authentication Error', 'Failed to authenticate user.');
-      return '';
-    }
-  };
-
-  // Function to create the listing on the backend
-  const createListing = async () => {
-    try {
-      const response = await fetch(`${API_URL}/createListing`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${await getFirebaseIdToken()}`, // Include Firebase ID Token
-        },
-        body: JSON.stringify({ listingDetails }),
-      });
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        const text = await response.text();
-        console.error('Response is not JSON:', text);
-        Alert.alert('Error', 'Failed to create listing.');
-        return false;
-      }
-
-      if (!response.ok) {
-        Alert.alert('Error', data.message || 'Failed to create listing.');
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Listing creation error:', error);
-      Alert.alert('Error', error.message || 'Failed to create listing.');
-      return false;
     }
   };
 
@@ -368,7 +454,12 @@ export default function CheckoutScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Cancel button */}
-        <TouchableOpacity onPress={handleCancel} style={styles.cancelButton} accessibilityLabel="Cancel payment" accessibilityRole="button">
+        <TouchableOpacity 
+          onPress={handleCancel} 
+          style={styles.cancelButton} 
+          accessibilityLabel="Cancel payment" 
+          accessibilityRole="button"
+        >
           <Ionicons name="close-outline" size={28} color="#FF5A5F" />
         </TouchableOpacity>
 

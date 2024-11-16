@@ -1,5 +1,3 @@
-// home.js
-
 import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
@@ -42,8 +40,8 @@ import { Calendar } from "react-native-calendars";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
-import { Picker } from "@react-native-picker/picker"; // Ensure Picker is imported
-import { CardField } from "@stripe/stripe-react-native"; // Ensure Stripe is set up
+import { Picker } from "@react-native-picker/picker";
+import { CardField } from "@stripe/stripe-react-native";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -88,18 +86,11 @@ const Home = ({ route, navigation }) => {
   // State for Recommended Listings Loading
   const [isRecommendedLoading, setIsRecommendedLoading] = useState(false);
 
-  // **Notification Listener References**
+  // Notification Listener References
   const notificationListener = useRef();
   const responseListener = useRef();
 
-  /**
-   * **New Functionality: Register for Push Notifications and Update Firestore**
-   *
-   * This function handles:
-   * 1. Registering the device for push notifications.
-   * 2. Retrieving the Expo Push Notification Token (FCM Token).
-   * 3. Saving/updating the token in Firebase Firestore under the renter's document.
-   */
+  // Register for Push Notifications and Update Firestore
   useEffect(() => {
     const registerForPushNotificationsAsync = async () => {
       let token;
@@ -129,7 +120,6 @@ const Home = ({ route, navigation }) => {
 
       if (token && user) {
         try {
-          // Adjust the Firestore path as per your data structure
           const renterRef = doc(db, "users", user.uid, "renters", user.uid);
           await setDoc(renterRef, { fcmToken: token }, { merge: true });
           console.log("FCM Token saved to Firestore");
@@ -138,7 +128,6 @@ const Home = ({ route, navigation }) => {
         }
       }
 
-      // For Android, set notification channel
       if (Platform.OS === "android") {
         Notifications.setNotificationChannelAsync("default", {
           name: "default",
@@ -154,11 +143,7 @@ const Home = ({ route, navigation }) => {
     }
   }, [user]);
 
-  /**
-   * **Handle Incoming Notifications and Responses**
-   *
-   * This effect sets up listeners for incoming notifications and user interactions with notifications.
-   */
+  // Handle Incoming Notifications and Responses
   useEffect(() => {
     if (!user) return;
 
@@ -166,7 +151,7 @@ const Home = ({ route, navigation }) => {
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
         console.log("Notification Received:", notification);
-        // You can handle the notification here if needed
+        // Handle the notification here if needed
       });
 
     // Listener for user interacting with a notification
@@ -197,7 +182,7 @@ const Home = ({ route, navigation }) => {
             console.log("Listing set from notification:", listing);
             setImageIndex(0);
             setFullScreenModalVisible(true);
-            setFullName(user?.displayName || "");
+            setFullName(user?.displayName || fullName || "Anonymous");
             setCityStateCombined("");
             setHasMedicalCertificate(false);
             setHasRentersInsurance(false);
@@ -219,17 +204,17 @@ const Home = ({ route, navigation }) => {
         );
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(
-          responseListener.current
-        );
+        Notifications.removeNotificationSubscription(responseListener.current);
       }
     };
   }, [listings, recommendedListings, user]);
 
+  // Auth State Change Listener
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
+        setFullName(firebaseUser.displayName || fullName || "Anonymous");
       } else {
         Alert.alert("Authentication Error", "User is not authenticated.");
         navigation.replace("SignIn");
@@ -265,11 +250,7 @@ const Home = ({ route, navigation }) => {
     }
   }, [route?.params?.newListing, route?.params?.unlistedId]);
 
-  /**
-   * Helper function to parse the combined 'aircraftModel' field.
-   * Supports formats like "Year Make Model" and "Year/Make/Model".
-   * Returns an object with year, make, and airplaneModel.
-   */
+  // Helper function to parse the combined 'aircraftModel' field
   const parseAircraft = (aircraftModel) => {
     if (!aircraftModel || typeof aircraftModel !== "string") {
       return {
@@ -302,9 +283,7 @@ const Home = ({ route, navigation }) => {
     };
   };
 
-  /**
-   * Subscribe to Firestore listings with appropriate filtering and data mapping.
-   */
+  // Subscribe to Firestore listings
   const subscribeToListings = () => {
     const listingsRef = collection(db, "airplanes");
     let q = query(listingsRef, orderBy("createdAt", "desc"));
@@ -368,9 +347,7 @@ const Home = ({ route, navigation }) => {
     );
   };
 
-  /**
-   * Fetch Recommended Listings from Firestore
-   */
+  // Fetch Recommended Listings from Firestore
   const fetchRecommendedListings = async () => {
     setIsRecommendedLoading(true);
     try {
@@ -401,7 +378,9 @@ const Home = ({ route, navigation }) => {
       });
 
       // Filter out listings without a valid ownerId
-      const validRecommended = recommendedData.filter((listing) => listing.ownerId);
+      const validRecommended = recommendedData.filter(
+        (listing) => listing.ownerId
+      );
       setRecommendedListings(validRecommended);
       console.log(`Fetched ${validRecommended.length} recommended listings.`);
     } catch (error) {
@@ -416,9 +395,7 @@ const Home = ({ route, navigation }) => {
     fetchRecommendedListings();
   }, [filter]);
 
-  /**
-   * Calculate the total cost based on rental hours.
-   */
+  // Calculate the total cost based on rental hours
   const calculateTotalCost = (hours) => {
     if (!selectedListing) return;
 
@@ -446,11 +423,7 @@ const Home = ({ route, navigation }) => {
     });
   };
 
-  /**
-   * **Updated Function: Handle Sending a Rental Request to the Owner**
-   *
-   * This function now adds rental requests directly to the centralized 'rentalRequests' collection.
-   */
+  // Handle Sending a Rental Request to the Owner
   const handleSendRentalRequest = async () => {
     console.log("Attempting to send rental request.");
     console.log("Selected Listing:", selectedListing);
@@ -529,22 +502,15 @@ const Home = ({ route, navigation }) => {
     // Calculate owner's payout (rental cost minus 6% commission)
     const ownerPayout = rentalCost * 0.94;
 
-    // Declare rentalRequestData
+    // Prepare rentalRequestData
     let rentalRequestData = {};
 
     try {
-      // Assign 'Unknown Model' if airplaneModel is undefined
-      const airplaneModel =
-        selectedListing.airplaneModel || "Unknown Model";
-      if (airplaneModel === "Unknown Model") {
-        console.warn(
-          `Listing ID: ${selectedListing.id} is missing airplaneModel. Assigning 'Unknown Model'.`
-        );
-      }
+      const renterFullName = fullName.trim() || user?.displayName || "Anonymous";
 
       rentalRequestData = {
         renterId: user.uid,
-        renterName: fullName, // Correctly set renterName
+        renterName: renterFullName,
         ownerId: selectedListing.ownerId,
         listingId: selectedListing.id,
         rentalHours: rentalHours,
@@ -568,9 +534,12 @@ const Home = ({ route, navigation }) => {
         throw new Error("Listing ID is missing in the rental request data.");
       }
 
-      // **New: Add to Centralized 'rentalRequests' Collection**
+      // Add to Centralized 'rentalRequests' Collection
       const rentalRequestsRef = collection(db, "rentalRequests");
-      const rentalRequestDoc = await addDoc(rentalRequestsRef, rentalRequestData);
+      const rentalRequestDoc = await addDoc(
+        rentalRequestsRef,
+        rentalRequestData
+      );
       const rentalRequestId = rentalRequestDoc.id;
 
       // Optionally, update the document with its own ID
@@ -586,7 +555,7 @@ const Home = ({ route, navigation }) => {
 
       // Close the modal and reset form fields
       setFullScreenModalVisible(false);
-      setFullName("");
+      setFullName(user?.displayName || fullName || "Anonymous");
       setCityStateCombined("");
       setHasMedicalCertificate(false);
       setHasRentersInsurance(false);
@@ -683,10 +652,7 @@ const Home = ({ route, navigation }) => {
     extrapolate: "clamp",
   });
 
-  /**
-   * Render each listing item.
-   * Utilizes year, make, and airplaneModel fields for display.
-   */
+  // Render each listing item
   const renderItem = ({ item }) => {
     // Ensure correct field access with fallback values
     const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
@@ -708,7 +674,7 @@ const Home = ({ route, navigation }) => {
             console.log("Selected Listing:", item);
             setImageIndex(0);
             setFullScreenModalVisible(true);
-            setFullName(user?.displayName || "");
+            setFullName(user?.displayName || fullName || "Anonymous");
             setCityStateCombined("");
             setHasMedicalCertificate(false);
             setHasRentersInsurance(false);
@@ -757,16 +723,7 @@ const Home = ({ route, navigation }) => {
     );
   };
 
-  /**
-   * **New Functionality: Handle Rental Requests from Centralized Collection**
-   *
-   * This function can be used to fetch and display rental requests if needed.
-   * Currently, 'home.js' primarily handles sending rental requests.
-   * Ensure that any rental request handling aligns with the centralized structure.
-   */
-
-  // ... (Other existing functions)
-
+  // Render the main component
   return (
     <SafeAreaView style={styles.safeArea}>
       <Animated.View
@@ -819,7 +776,7 @@ const Home = ({ route, navigation }) => {
                   console.log("Selected Recommended Listing:", listing);
                   setImageIndex(0);
                   setFullScreenModalVisible(true);
-                  setFullName(user?.displayName || "");
+                  setFullName(user?.displayName || fullName || "Anonymous");
                   setCityStateCombined("");
                   setHasMedicalCertificate(false);
                   setHasRentersInsurance(false);
@@ -952,7 +909,9 @@ const Home = ({ route, navigation }) => {
                     ]}
                   >
                     <Ionicons name="image" size={50} color="#A0AEC0" />
-                    <Text style={{ color: "#A0AEC0" }}>No Image Available</Text>
+                    <Text style={{ color: "#A0AEC0" }}>
+                      No Image Available
+                    </Text>
                   </View>
                 )}
                 <TouchableOpacity
@@ -977,7 +936,10 @@ const Home = ({ route, navigation }) => {
                 >
                   ${parseFloat(selectedListing.costPerHour).toFixed(2)} per hour
                 </Text>
-                <Text style={styles.modalLocation} accessibilityLabel="Location">
+                <Text
+                  style={styles.modalLocation}
+                  accessibilityLabel="Location"
+                >
                   Location: {selectedListing.location}
                 </Text>
 
@@ -1260,6 +1222,8 @@ const Home = ({ route, navigation }) => {
     </SafeAreaView>
   );
 };
+
+
 
 // Styles
 const styles = StyleSheet.create({

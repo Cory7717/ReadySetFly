@@ -251,6 +251,7 @@ const Index = () => {
             <Stack.Screen name="OwnerProfile" options={{ headerShown: false }} />
             <Stack.Screen name="renter" options={{ headerShown: false }} />
             <Stack.Screen name="PaymentScreen" options={{ headerShown: false }} />
+            <Stack.Screen name="CheckoutScreen" options={{ headerShown: false }} />
           </Stack>
         </NavigationContainer>
       </SafeAreaProvider>

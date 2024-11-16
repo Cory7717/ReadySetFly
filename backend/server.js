@@ -3,6 +3,9 @@
 // Load environment variables from .env for local development
 require('dotenv').config();
 
+// =====================
+// Import Dependencies
+// =====================
 const { initializeApp, applicationDefault } = require('firebase-admin/app');
 const admin = require('firebase-admin'); // Firebase Admin SDK
 const express = require('express');
@@ -11,8 +14,13 @@ const bodyParser = require('body-parser');
 const stripePackage = require('stripe');
 const nodemailer = require('nodemailer');
 const logger = require("firebase-functions/logger");
+const { onRequest } = require('firebase-functions/v2/https');
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 
+// =====================
 // Initialize Firebase Admin SDK
+// =====================
 if (!admin.apps.length) {
   if (process.env.NODE_ENV === 'production') {
     admin.initializeApp({
@@ -28,30 +36,33 @@ if (!admin.apps.length) {
   }
 }
 
-// Initialize Firestore and Storage
+// Initialize Firestore, Storage, and Auth
 const db = admin.firestore();
 const storageBucket = admin.storage().bucket();
 const auth = admin.auth();
 
-// Initialize Express app
+// =====================
+// Initialize Express App
+// =====================
 const app = express();
 
 // CORS Configuration with Fallback
-let allowedOrigins = '*'; // Default to allow all origins (not recommended for production)
+let allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : null;
 
-if (process.env.ALLOWED_ORIGINS) {
-  allowedOrigins = process.env.ALLOWED_ORIGINS.split(',');
+if (allowedOrigins) {
+  app.use(cors({ origin: allowedOrigins }));
+  logger.info(`CORS enabled for origins: ${allowedOrigins.join(', ')}`);
 } else {
-  logger.warn("No ALLOWED_ORIGINS configured. CORS is set to allow all origins.");
-  // Optionally, you can set allowedOrigins to a specific value or handle the error
+  logger.error("ALLOWED_ORIGINS is not set. CORS cannot be configured securely.");
+  throw new Error("CORS configuration missing. Please set ALLOWED_ORIGINS in your environment variables.");
 }
-
-app.use(cors({ origin: allowedOrigins }));
 
 // Body Parser Middleware
 app.use(bodyParser.json());
 
-// Initialize Stripe with the secret key from Environment Variables
+// =====================
+// Initialize Stripe
+// =====================
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
 if (!stripeSecretKey) {
@@ -60,7 +71,9 @@ if (!stripeSecretKey) {
 }
 const stripe = stripePackage(stripeSecretKey);
 
-// Nodemailer Transporter
+// =====================
+// Initialize Nodemailer
+// =====================
 const emailUser = process.env.EMAIL_USER;
 const emailPass = process.env.EMAIL_PASS;
 
@@ -77,14 +90,89 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// =====================
 // Constants for Fee Calculations
+// =====================
 const bookingFeeRate = 0.06; // 6%
 const processingFeeRate = 0.03; // 3%
 const taxRate = 0.0825; // 8.25%
 
 // =====================
+// Helper Functions
+// =====================
+
+/**
+ * Function: sendNotification
+ * Description: Helper function to send FCM notifications
+ * @param {Array<string>} tokens - Array of FCM tokens
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body
+ */
+const sendNotification = async (tokens, title, body) => {
+  const payload = {
+    notification: {
+      title,
+      body,
+    },
+  };
+
+  try {
+    const response = await admin.messaging().sendToDevice(tokens, payload);
+    logger.info('Notifications sent successfully:', response);
+  } catch (error) {
+    logger.error('Error sending notifications:', error);
+  }
+};
+
+/**
+ * Function: sanitizeData
+ * Description: Helper function to sanitize input data
+ * @param {object} data - Data to sanitize
+ * @returns {object} - Sanitized data
+ */
+const sanitizeData = (data) => {
+  // Implement sanitization logic as needed
+  // For example, remove any malicious scripts or unwanted fields
+  // This is a placeholder and should be expanded based on specific requirements
+  return data;
+};
+
+/**
+ * Function: calculateTotalCost
+ * Description: Calculates the total cost breakdown based on rental cost per hour and rental hours.
+ * @param {number} rentalCostPerHour 
+ * @param {number} rentalHours 
+ * @returns {object} - Total cost breakdown
+ */
+const calculateTotalCost = (rentalCostPerHour, rentalHours) => {
+  // Fixed percentages
+  const bookingFeePercentage = 6; // 6%
+  const transactionFeePercentage = 3; // 3%
+  const salesTaxPercentage = 8.25; // 8.25%
+
+  const rentalTotalCost = rentalCostPerHour * rentalHours;
+  const bookingFee = rentalTotalCost * (bookingFeePercentage / 100);
+  const transactionFee = rentalTotalCost * (transactionFeePercentage / 100);
+  const tax = (rentalTotalCost + bookingFee) * (salesTaxPercentage / 100);
+  const renterTotalCost = rentalTotalCost + bookingFee + transactionFee + tax;
+
+  return {
+    rentalCost: parseFloat(rentalTotalCost.toFixed(2)),
+    bookingFee: parseFloat(bookingFee.toFixed(2)),
+    transactionFee: parseFloat(transactionFee.toFixed(2)),
+    salesTax: parseFloat(tax.toFixed(2)),
+    total: parseFloat(renterTotalCost.toFixed(2)),
+  };
+};
+
+// =====================
 // Authentication Middleware
 // =====================
+
+/**
+ * Middleware: authenticate
+ * Description: Verifies Firebase ID token and authenticates the user.
+ */
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -106,9 +194,10 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-// =====================
-// Helper Function: Secure Routes as Admin Only
-// =====================
+/**
+ * Middleware: authenticateAdmin
+ * Description: Secures routes to be accessible only by admin users.
+ */
 const authenticateAdmin = async (req, res, next) => {
   await authenticate(req, res, async () => {
     const userId = req.user.uid;
@@ -210,7 +299,7 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
     const listingData = listingDoc.data();
     const ownerId = listingData.ownerId;
     if (!ownerId) {
-      logger.warn("Owner ID is missing in listing data");
+      logger.warn(`Owner ID is missing in listing data for listingId: ${listingId}`);
       return res.status(400).json({ error: "Owner ID is missing in listing data" });
     }
 
@@ -263,7 +352,7 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
  */
 app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
   try {
-    const { rentalRequestId } = req.body; // Removed ownerId
+    const { rentalRequestId } = req.body;
 
     // Log received data
     logger.info(`Received create-rental-payment-intent request: rentalRequestId=${rentalRequestId}`);
@@ -277,24 +366,19 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
     const renterId = req.user.uid; // Infer renterId from authenticated user
     logger.info(`Authenticated renterId: ${renterId}`);
 
-    // Fetch rental request from root 'rentalRequests' collection
-    const rentalRequestRef = db.collection('rentalRequests').doc(rentalRequestId);
+    // Fetch rental request from the nested 'owners/{ownerId}/rentalRequests/{rentalRequestId}' collection
+    // First, find the ownerId associated with this rentalRequestId
+    const rentalRequestsSnapshot = await db.collectionGroup('rentalRequests').where(admin.firestore.FieldPath.documentId(), '==', rentalRequestId).get();
 
-    const rentalRequestSnap = await rentalRequestRef.get();
-
-    if (!rentalRequestSnap.exists) {
-      logger.warn(`Rental request ${rentalRequestId} not found`);
+    if (rentalRequestsSnapshot.empty) {
+      logger.warn(`Rental request ${rentalRequestId} not found in any owner's rentalRequests collection`);
       return res.status(404).json({ error: "Rental request not found" });
     }
 
-    const rentalRequest = rentalRequestSnap.data();
-
-    const ownerId = rentalRequest.ownerId; // Fetch ownerId from the document
-
-    if (!ownerId) {
-      logger.warn(`Owner ID is missing in rental request ${rentalRequestId}`);
-      return res.status(400).json({ error: "Owner ID is missing in rental request" });
-    }
+    // Assuming rentalRequestId is unique across all owners
+    const rentalRequestDoc = rentalRequestsSnapshot.docs[0];
+    const rentalRequest = rentalRequestDoc.data();
+    const ownerId = rentalRequestDoc.ref.parent.parent.id; // Get ownerId from the path
 
     // Verify that the authenticated renter is the one associated with this rental request
     if (rentalRequest.renterId !== renterId) {
@@ -302,18 +386,45 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
       return res.status(403).json({ error: "Forbidden: You do not have access to this rental request" });
     }
 
-    const costPerHour = parseFloat(rentalRequest.costPerHour);
+    // Defensive Coding: Check if required fields exist and are numbers
+    const rentalCostPerHour = parseFloat(rentalRequest.costPerHour);
     const rentalHours = parseFloat(rentalRequest.rentalHours);
 
-    if (isNaN(costPerHour) || costPerHour <= 0) {
-      logger.warn(`Invalid costPerHour value in rental request ${rentalRequestId}: ${costPerHour}`);
-      return res.status(400).json({ error: "Invalid costPerHour value in rental request" });
+    logger.info(`Processing Rental Request ID: ${rentalRequestId}`);
+    logger.info(`rentalCostPerHour (${typeof rentalCostPerHour}):`, rentalCostPerHour);
+    logger.info(`rentalHours (${typeof rentalHours}):`, rentalHours);
+
+    if (isNaN(rentalCostPerHour) || rentalCostPerHour <= 0) {
+      logger.warn(`Rental Request ID: ${rentalRequestId} has invalid cost components: rentalCostPerHour=${rentalCostPerHour}`);
+      return res.status(400).json({ error: "Invalid rentalCostPerHour value in rental request" });
     }
 
     if (isNaN(rentalHours) || rentalHours <= 0) {
-      logger.warn(`Invalid rentalHours value in rental request ${rentalRequestId}: ${rentalHours}`);
+      logger.warn(`Rental Request ID: ${rentalRequestId} has invalid rentalHours: rentalHours=${rentalHours}`);
       return res.status(400).json({ error: "Invalid rentalHours value in rental request" });
     }
+
+    // Compute Renter's Total Cost using the calculation function
+    const computedTotalCost = calculateTotalCost(
+      rentalCostPerHour, // Use costPerHour from rental request
+      rentalHours
+    );
+
+    // Store the total cost breakdown in Firestore or use as needed
+    // Example: Update the rental request with computed costs
+    await rentalRequestDoc.ref.update({
+      ...computedTotalCost,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    logger.info("Computed Total Cost:", computedTotalCost);
+
+    // Compute amount in cents based on total cost
+    const amountInCents = Math.round(parseFloat(computedTotalCost.total) * 100);
+
+    logger.info(
+      `Creating payment intent for rental ID: ${rentalRequestId} with amount: ${amountInCents} cents`
+    );
 
     // Fetch owner's Stripe account ID from Firestore
     const ownerDoc = await db.collection('owners').doc(ownerId).get();
@@ -328,544 +439,34 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
       return res.status(400).json({ error: "Owner has not connected a Stripe account" });
     }
 
-    // Calculate fees and total amount
-    const baseAmount = Math.round(costPerHour * rentalHours * 100); // Convert to cents
-    const bookingFee = Math.round(baseAmount * bookingFeeRate); // 6%
-    const processingFee = Math.round(baseAmount * processingFeeRate); // 3%
-    const tax = Math.round((baseAmount + bookingFee) * taxRate); // 8.25% on (baseAmount + bookingFee)
-    const totalAmount = baseAmount + bookingFee + processingFee + tax; // Total amount in cents
-    const applicationFeeAmount = bookingFee + tax; // Platform collects booking fee and tax
-
-    // Create the PaymentIntent
+    // Create PaymentIntent directly without making an HTTP request
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: totalAmount,
-      currency: 'usd', // Ensure this matches your Stripe account's supported currencies
+      amount: amountInCents,
+      currency: 'usd',
       automatic_payment_methods: { enabled: true },
       metadata: {
         paymentType: 'rental',
-        userId: renterId,
+        rentalRequestId: rentalRequestId,
+        renterId: renterId,
         ownerId: ownerId,
-        rentalId: rentalRequestId,
-        costPerHour: costPerHour.toFixed(2),
-        rentalHours: rentalHours,
-        bookingFee: (bookingFee / 100).toFixed(2),
-        tax: (tax / 100).toFixed(2),
+        amount: (computedTotalCost.total).toFixed(2),
       },
-      application_fee_amount: applicationFeeAmount,
+      // Optional: Add transfer_data if using Connect accounts
       transfer_data: {
         destination: connectedAccountId,
       },
     });
 
-    logger.info(`Rental PaymentIntent created: ${paymentIntent.id}`);
+    logger.info(`Payment Intent created successfully: ${paymentIntent.id}`);
+
+    // Optionally, update the rental request with paymentIntentId
+    await rentalRequestDoc.ref.update({ paymentIntentId: paymentIntent.id });
+
+    // Respond with clientSecret to the frontend
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
-    // Detailed error logging as previously described
-    if (error && error.type === 'StripeCardError') {
-      logger.error(`StripeCardError: ${error.message}`);
-      res.status(400).json({ error: error.message });
-    } else if (error && error.type === 'StripeInvalidRequestError') {
-      logger.error(`StripeInvalidRequestError: ${error.message}`);
-      res.status(400).json({ error: error.message });
-    } else if (error && error.type === 'StripeAPIError') {
-      logger.error(`StripeAPIError: ${error.message}`);
-      res.status(500).json({ error: "Internal Server Error. Please try again." });
-    } else if (error && error.type === 'StripeConnectionError') {
-      logger.error(`StripeConnectionError: ${error.message}`);
-      res.status(502).json({ error: "Bad Gateway. Please try again." });
-    } else if (error && error.type === 'StripeAuthenticationError') {
-      logger.error(`StripeAuthenticationError: ${error.message}`);
-      res.status(401).json({ error: "Authentication with payment gateway failed." });
-    } else {
-      logger.error(`Unexpected Error: ${error.message}`, error);
-      res.status(500).json({ error: "An unexpected error occurred." });
-    }
-  }
-});
-
-/**
- * Endpoint: /withdraw-funds
- * Description: Withdraw funds to owner's bank account
- * Method: POST
- */
-app.post('/withdraw-funds', authenticate, async (req, res) => {
-  try {
-    const { amount } = req.body; // ownerId is inferred from authenticated user
-
-    // Validate amount
-    if (typeof amount !== 'number' || amount <= 0) {
-      logger.warn(`Invalid amount for withdrawal: ${amount}`);
-      return res.status(400).json({ error: "Invalid amount. Must be a positive number." });
-    }
-
-    const ownerId = req.user.uid; // Use authenticated user's UID
-
-    // Fetch the owner's document
-    const ownerDoc = await db.collection('owners').doc(ownerId).get();
-    if (!ownerDoc.exists) {
-      logger.warn(`Owner with ID ${ownerId} not found`);
-      return res.status(404).json({ error: "Owner not found" });
-    }
-
-    const connectedAccountId = ownerDoc.data().stripeAccountId;
-    const availableBalance = ownerDoc.data().availableBalance || 0;
-    const currency = ownerDoc.data().currency || 'usd'; // Assuming a currency field exists
-
-    if (!connectedAccountId) {
-      logger.warn(`Owner with ID ${ownerId} has not connected a Stripe account`);
-      return res.status(400).json({ error: "Owner has not connected a Stripe account" });
-    }
-
-    // Check if the owner has sufficient balance
-    if (availableBalance < amount) {
-      logger.warn(`Owner ${ownerId} has insufficient balance: Requested ${amount}, Available ${availableBalance}`);
-      return res.status(400).json({ error: "Insufficient available balance" });
-    }
-
-    // Check for minimum payout amount (example for USD: $5.00)
-    const minimumPayoutCents = 500; // Adjust based on Stripe's requirements
-    if (Math.round(amount * 100) < minimumPayoutCents) {
-      logger.warn(`Withdrawal amount $${amount.toFixed(2)} is below the minimum payout limit`);
-      return res.status(400).json({ error: `Minimum withdrawal amount is $${(minimumPayoutCents / 100).toFixed(2)}` });
-    }
-
-    // Create a Payout from the connected account to the owner's bank account
-    const payout = await stripe.payouts.create(
-      {
-        amount: Math.round(amount * 100), // Convert to cents
-        currency,
-      },
-      {
-        stripeAccount: connectedAccountId,
-      }
-    );
-
-    // Deduct the amount from the owner's available balance
-    await db.collection('owners').doc(ownerId).update({
-      availableBalance: admin.firestore.FieldValue.increment(-amount),
-      lastWithdrawal: admin.firestore.FieldValue.serverTimestamp(),
-      lastPayoutId: payout.id,
-    });
-
-    // Record the payout in owner's transactions
-    await db.collection('owners').doc(ownerId).collection('transactions').add({
-      amount: -amount, // Negative to indicate withdrawal
-      description: `Withdrawal of $${amount.toFixed(2)}`,
-      payoutId: payout.id,
-      currency,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    logger.info(`Withdrawal of $${amount.toFixed(2)} for owner ${ownerId} successful. Payout ID: ${payout.id}`);
-    res.status(200).json({ message: "Withdrawal successful", payout });
-  } catch (error) {
-    logger.error("Error withdrawing funds:", error);
-
-    // Optional: Implement rollback if payout creation fails after balance deduction
-    // Note: Firestore transactions do not cover external API calls like Stripe payouts.
-    // To handle this, consider manually adjusting the balance or implementing compensating transactions.
-
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------------------
-// Other Functional Endpoints
-// ---------------------
-
-/**
- * Endpoint: /validateDiscount
- * Description: Validate discount codes
- * Method: POST
- */
-app.post('/validateDiscount', authenticate, async (req, res) => {
-  try {
-    const { discountCode, amount } = req.body;
-
-    // Validate amount
-    if (typeof amount !== 'number' || amount < 0) {
-      return res.status(400).json({ valid: false, message: 'Invalid amount provided' });
-    }
-
-    if (!discountCode || discountCode.trim() === '') {
-      return res.status(400).json({ valid: false, message: 'Discount code is required' });
-    }
-
-    // Trim and convert to lowercase
-    const code = discountCode.trim().toLowerCase();
-
-    // Check if the discount code exists in Firestore
-    const discountDoc = await db.collection('discounts').doc(code).get();
-
-    if (!discountDoc.exists) {
-      return res.status(404).json({ valid: false, message: 'Invalid discount code' });
-    }
-
-    const discountData = discountDoc.data();
-
-    // Check if the discount has expired
-    const now = new Date();
-    if (discountData.expiration && discountData.expiration.toDate() < now) {
-      return res.status(400).json({ valid: false, message: 'Discount code has expired' });
-    }
-
-    // Validate discount type
-    if (!['percentage', 'fixed'].includes(discountData.type)) {
-      return res.status(400).json({ valid: false, message: 'Invalid discount type' });
-    }
-
-    // Calculate the new adjusted amount based on the discount
-    let adjustedAmount = amount; // Use the provided amount
-    if (discountData.type === 'percentage') {
-      adjustedAmount = adjustedAmount * (1 - discountData.value / 100);
-    } else if (discountData.type === 'fixed') {
-      adjustedAmount = adjustedAmount - discountData.value;
-    }
-
-    // Ensure adjustedAmount is never negative
-    adjustedAmount = Math.max(0, adjustedAmount);
-
-    // Return the adjusted amount and discount details
-    res.status(200).json({
-      valid: true,
-      adjustedAmount: Math.round(adjustedAmount),
-      pricingTier: discountData.pricingTier || 'standard',
-      message: 'Discount applied successfully',
-    });
-  } catch (error) {
-    logger.error('Error validating discount code:', error);
-    res.status(500).json({ valid: false, message: 'Failed to apply discount' });
-  }
-});
-
-/**
- * Endpoint: /create-connected-account
- * Description: Create Stripe connected accounts for owners
- * Method: POST
- */
-app.post('/create-connected-account', authenticate, async (req, res) => {
-  try {
-    const { email, fullName, country } = req.body;
-
-    if (!email || !fullName) {
-      logger.warn("Missing required fields for connected account creation");
-      return res.status(400).json({ error: "Email and fullName are required" });
-    }
-
-    // Optional: Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: "Invalid email format" });
-    }
-
-    // Optional: Validate country code
-    const validCountries = ['US', 'CA']; // Add other supported countries as needed
-    if (country && !validCountries.includes(country.toUpperCase())) {
-      return res.status(400).json({ error: "Invalid country code" });
-    }
-
-    // Create a Custom Connected Account
-    const account = await stripe.accounts.create({
-      type: 'custom',
-      country: country || 'US',
-      email: email,
-      business_type: 'individual',
-      individual: {
-        first_name: fullName.split(' ')[0],
-        last_name: fullName.split(' ').slice(1).join(' ') || '',
-      },
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-    });
-
-    // Generate Account Link with Correct Redirect URLs
-    const frontendUrl = process.env.FRONTEND_URL; // e.g., https://yourapp.com
-
-    if (!frontendUrl) {
-      logger.error("Frontend URL is not configured. Please set FRONTEND_URL in your .env");
-      return res.status(500).json({ error: "Frontend URL is not configured" });
-    }
-
-    const accountLink = await stripe.accountLinks.create({
-      account: account.id,
-      refresh_url: `${frontendUrl}/reauth`,
-      return_url: `${frontendUrl}/return`,
-      type: 'account_onboarding',
-    });
-
-    // Save the Stripe account ID in Firestore associated with the ownerId
-    const ownerId = req.user.uid;
-    await db.collection('owners').doc(ownerId).set(
-      { stripeAccountId: account.id },
-      { merge: true }
-    );
-
-    logger.info(`Stripe connected account created for owner ${ownerId}: ${account.id}`);
-    res.status(200).send({ accountLinkUrl: accountLink.url }); // Changed from { url: ... } to { accountLinkUrl: ... }
-  } catch (error) {
-    logger.error("Error creating connected account:", error);
-    res.status(500).send({ error: error.message });
-  }
-});
-
-/**
- * Endpoint: /complete-onboarding
- * Description: Handle the completion of Stripe onboarding
- * Method: POST
- */
-app.post('/complete-onboarding', authenticate, async (req, res) => {
-  try {
-    const { code, state } = req.body;
-    const ownerId = req.user.uid;
-
-    if (!code) {
-      logger.warn("Missing authorization code from Stripe");
-      return res.status(400).json({ error: "Authorization code is required" });
-    }
-
-    // Exchange the authorization code for a Stripe account ID
-    const response = await stripe.oauth.token({
-      grant_type: 'authorization_code',
-      code,
-    });
-
-    const connectedAccountId = response.stripe_user_id;
-
-    // Save the connected account ID and update the account status
-    await db.collection('owners').doc(ownerId).update({
-      stripeAccountId: connectedAccountId,
-      stripeAccountStatus: 'active',
-    });
-
-    logger.info(`Stripe account ${connectedAccountId} connected for owner ${ownerId}`);
-    res.status(200).json({ message: 'Stripe account connected successfully.' });
-  } catch (error) {
-    logger.error('Error completing Stripe onboarding:', error);
-    res.status(500).json({ error: 'Failed to complete Stripe onboarding.' });
-  }
-});
-
-/**
- * Endpoint: /attach-bank-account
- * Description: Attach bank accounts to connected Stripe accounts
- * Method: POST
- */
-app.post('/attach-bank-account', authenticate, async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      logger.warn("Missing token for attaching bank account");
-      return res.status(400).json({ error: "Token is required" });
-    }
-
-    const ownerId = req.user.uid;
-
-    // Fetch the owner's connected account ID from Firestore
-    const ownerDoc = await db.collection('owners').doc(ownerId).get();
-    if (!ownerDoc.exists) {
-      logger.warn(`Owner with ID ${ownerId} not found`);
-      return res.status(404).json({ error: "Owner not found" });
-    }
-
-    const connectedAccountId = ownerDoc.data().stripeAccountId;
-    if (!connectedAccountId) {
-      logger.warn(`Owner with ID ${ownerId} has not connected a Stripe account`);
-      return res.status(400).json({ error: "Owner has not connected a Stripe account" });
-    }
-
-    // Validate Stripe account ID format
-    const stripeAccountIdRegex = /^acct_[A-Za-z0-9]+$/;
-    if (!stripeAccountIdRegex.test(connectedAccountId)) {
-      logger.warn(`Invalid Stripe account ID format for owner ${ownerId}`);
-      return res.status(400).json({ error: "Invalid Stripe account ID" });
-    }
-
-    // Attach the bank account to the connected account
-    const bankAccount = await stripe.accounts.createExternalAccount(connectedAccountId, {
-      external_account: token,
-    });
-
-    // Update Firestore with the attached bank account details
-    await db.collection('owners').doc(ownerId).update({
-      bankAccount: {
-        bankName: bankAccount.bank_name || '',
-        last4: bankAccount.last4 || '',
-        country: bankAccount.country || '',
-        routingNumber: bankAccount.routing_number || '',
-        accountType: bankAccount.account_type || '',
-        // Add other relevant fields as needed
-      },
-    });
-
-    logger.info(`Bank account attached for owner ${ownerId}: ${bankAccount.id}`);
-    res.status(200).json({ message: "Bank account attached successfully", bankAccount });
-  } catch (error) {
-    logger.error("Error attaching bank account:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * Endpoint: /createListing
- * Description: Create a new listing
- * Method: POST
- */
-app.post('/createListing', authenticate, async (req, res) => {
-  try {
-    const { listingDetails } = req.body;
-
-    if (!listingDetails || typeof listingDetails !== 'object') {
-      logger.warn("Invalid or missing listingDetails for listing creation");
-      return res.status(400).json({ error: "listingDetails are required and must be an object" });
-    }
-
-    // Validate required fields within listingDetails
-    const { title, description, price, category } = listingDetails;
-    if (!title || !description || typeof price !== 'number' || price < 0 || !category) {
-      return res.status(400).json({ error: "Title, description, price, and category are required and must be valid" });
-    }
-
-    const ownerId = req.user.uid;
-
-    // Add additional fields as necessary, such as createdAt
-    const newListing = {
-      ...listingDetails,
-      ownerId,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: 'active', // or other initial status
-    };
-
-    // Add the new listing to Firestore
-    const listingRef = await db.collection('listings').add(newListing);
-
-    logger.info(`Listing created successfully: ${listingRef.id} by owner ${ownerId}`);
-    res.status(201).json({ message: "Listing created successfully", listingId: listingRef.id });
-  } catch (error) {
-    logger.error("Error creating listing:", error);
-    res.status(500).json({ error: "Failed to create listing" });
-  }
-});
-
-/**
- * Endpoint: /firebase-user/:uid
- * Description: Fetch Firebase user information
- * Method: GET
- */
-app.get('/firebase-user/:uid', authenticate, async (req, res) => {
-  const { uid } = req.params;
-  
-  // Ensure that users can only fetch their own information
-  if (req.user.uid !== uid) {
-    logger.warn(`User ${req.user.uid} attempted to access user data for ${uid}`);
-    return res.status(403).json({ error: "Forbidden" });
-  }
-
-  try {
-    const userRecord = await admin.auth().getUser(uid);
-    // Sanitize user data before sending
-    const sanitizedUser = {
-      uid: userRecord.uid,
-      email: userRecord.email,
-      displayName: userRecord.displayName,
-      photoURL: userRecord.photoURL,
-      // Add other non-sensitive fields as needed
-    };
-    res.json({ user: sanitizedUser });
-  } catch (error) {
-    logger.error("Error fetching Firebase user:", error);
-    res.status(500).json({ error: "Failed to fetch Firebase user" });
-  }
-});
-
-/**
- * Endpoint: /admin/cleanupOrphanedRentalRequests
- * Description: Admin-only endpoint to cleanup orphaned rental requests
- * Method: POST
- */
-app.post('/admin/cleanupOrphanedRentalRequests', authenticateAdmin, async (req, res) => {
-  try {
-    let totalDeletions = 0;
-
-    // Step 1: Fetch all owners
-    const ownersSnapshot = await db.collection('owners').get();
-    logger.info(`Fetched ${ownersSnapshot.size} owners for scheduled cleanup.`);
-
-    for (const ownerDoc of ownersSnapshot.docs) {
-      const ownerId = ownerDoc.id;
-      logger.info(`Processing owner: ${ownerId}`);
-
-      const rentalRequestsRef = db.collection('owners').doc(ownerId).collection('rentalRequests');
-      const rentalRequestsSnapshot = await rentalRequestsRef.get();
-      logger.info(`Owner ${ownerId} has ${rentalRequestsSnapshot.size} rental requests.`);
-
-      const rentalBatch = db.batch();
-
-      for (const requestDoc of rentalRequestsSnapshot.docs) {
-        const requestData = requestDoc.data();
-        const rentalRequestId = requestDoc.id;
-        const renterId = requestData.renterId;
-        const chatThreadId = requestData.chatThreadId;
-
-        let shouldDelete = false;
-
-        if (!renterId) {
-          shouldDelete = true;
-          logger.warn(`Rental request ${rentalRequestId} for owner ${ownerId} has missing renterId.`);
-        } else {
-          const renterDocRef = db.collection('renters').doc(renterId);
-          const renterDoc = await renterDocRef.get();
-
-          if (!renterDoc.exists) {
-            shouldDelete = true;
-            logger.warn(`Rental request ${rentalRequestId} for owner ${ownerId} references non-existent renterId ${renterId}.`);
-          }
-        }
-
-        if (shouldDelete) {
-          // Delete the rental request
-          rentalBatch.delete(requestDoc.ref);
-          totalDeletions++;
-
-          // Delete associated chat thread if exists
-          if (chatThreadId) {
-            const chatThreadRef = db.collection('messages').doc(chatThreadId);
-            rentalBatch.delete(chatThreadRef);
-            logger.info(`Deleted associated chat thread ${chatThreadId} for rental request ${rentalRequestId}.`);
-            totalDeletions++;
-          }
-
-          // Delete notifications associated with the rental request
-          if (renterId) {
-            const notificationsRef = db.collection('renters').doc(renterId).collection('notifications')
-              .where('rentalRequestId', '==', rentalRequestId);
-            const notificationsSnapshot = await notificationsRef.get();
-
-            notificationsSnapshot.forEach(notificationDoc => {
-              rentalBatch.delete(notificationDoc.ref);
-              logger.info(`Deleted notification ${notificationDoc.id} for rental request ${rentalRequestId}.`);
-              totalDeletions++;
-            });
-          }
-        }
-      }
-
-      // Commit the batch if there are deletions
-      if (totalDeletions > 0) {
-        await rentalBatch.commit();
-        logger.info(`Committed batch deletions for owner ${ownerId}. Total deletions so far: ${totalDeletions}`);
-      } else {
-        logger.info(`No deletions needed for owner ${ownerId}.`);
-      }
-    }
-
-    logger.info(`Cleanup complete. Total deletions: ${totalDeletions}`);
-    res.status(200).send(`Cleanup complete. Total deletions: ${totalDeletions}`);
-  } catch (error) {
-    logger.error('Error removing orphaned rental requests:', error);
-    res.status(500).send('Internal Server Error');
+    logger.error("Error creating rental payment intent:", error);
+    res.status(500).json({ error: "An unexpected error occurred." });
   }
 });
 
@@ -902,42 +503,37 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
       logger.info(`PaymentIntent succeeded: ${paymentIntent.id}`);
 
       const paymentType = paymentIntent.metadata.paymentType;
-      const userId = paymentIntent.metadata.userId;
+      const rentalRequestId = paymentIntent.metadata.rentalRequestId;
+      const renterId = paymentIntent.metadata.renterId;
+      const ownerId = paymentIntent.metadata.ownerId;
+      const listingId = paymentIntent.metadata.listingId; // For classified
 
       try {
         if (paymentType === 'rental') {
-          const ownerId = paymentIntent.metadata.ownerId;
-          const rentalId = paymentIntent.metadata.rentalId;
-          const costPerHour = parseFloat(paymentIntent.metadata.costPerHour);
-          const rentalHours = parseFloat(paymentIntent.metadata.rentalHours);
-          const currency = paymentIntent.currency;
-
-          if (!ownerId || !rentalId || isNaN(costPerHour) || isNaN(rentalHours)) {
-            logger.warn("Missing ownerId, rentalId, or invalid costPerHour/rentalHours in rental payment intent metadata");
+          if (!rentalRequestId || !renterId || !ownerId) {
+            logger.warn("Missing rentalRequestId, renterId, or ownerId in rental payment intent metadata");
             break;
           }
 
-          // Update the rental request status to 'paid'
-          await db.collection('rentalRequests').doc(rentalId).update({
+          // Update the rental request status to 'paid' in the nested collection
+          const rentalRequestRef = db.collection('owners').doc(ownerId).collection('rentalRequests').doc(rentalRequestId);
+          await rentalRequestRef.update({
             status: 'paid',
             paymentIntentId: paymentIntent.id,
             paidAt: admin.firestore.FieldValue.serverTimestamp(),
           });
 
-          // Record the transaction under the owner
-          await db.collection('owners').doc(ownerId).collection('transactions').add({
-            amount: costPerHour * rentalHours, // Total amount in dollars
-            description: `Payment for rental ${rentalId}`,
-            transferId: paymentIntent.transfer_data.destination_payment || '',
-            currency,
+          // Record the transaction under the renter
+          await db.collection('renters').doc(renterId).collection('transactions').add({
+            amount: parseFloat(paymentIntent.amount_received) / 100, // Convert cents to dollars
+            description: `Payment for rental ${rentalRequestId}`,
+            transferId: paymentIntent.transfer || '',
+            currency: paymentIntent.currency,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
 
-          logger.info(`Rental ${rentalId} marked as paid and owner ${ownerId} notified.`);
+          logger.info(`Rental ${rentalRequestId} marked as paid and renter ${renterId} notified.`);
         } else if (paymentType === 'classified') {
-          const listingId = paymentIntent.metadata.listingId;
-          const currency = paymentIntent.currency;
-
           if (!listingId) {
             logger.warn("Missing listingId in classified payment intent metadata");
             break;
@@ -963,34 +559,40 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
       logger.warn(`PaymentIntent failed: ${paymentIntent.id}`);
 
       const paymentType = paymentIntent.metadata.paymentType;
-      const userId = paymentIntent.metadata.userId;
+      const rentalRequestId = paymentIntent.metadata.rentalRequestId;
+      const renterId = paymentIntent.metadata.renterId;
+      const ownerId = paymentIntent.metadata.ownerId;
+      const listingId = paymentIntent.metadata.listingId; // For classified
 
       // Optional: Handle failed payments, notify users, etc.
       try {
         if (paymentType === 'rental') {
-          const rentalId = paymentIntent.metadata.rentalId;
-
-          if (rentalId) {
-            await db.collection('rentalRequests').doc(rentalId).update({
-              status: 'payment_failed',
-              paymentIntentId: paymentIntent.id,
-              failedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-            logger.info(`Rental ${rentalId} marked as payment_failed.`);
+          if (!rentalRequestId || !renterId || !ownerId) {
+            logger.warn("Missing rentalRequestId, renterId, or ownerId in rental payment intent metadata");
+            break;
           }
+
+          const rentalRequestRef = db.collection('owners').doc(ownerId).collection('rentalRequests').doc(rentalRequestId);
+          await rentalRequestRef.update({
+            status: 'payment_failed',
+            paymentIntentId: paymentIntent.id,
+            failedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          logger.info(`Rental ${rentalRequestId} marked as payment_failed.`);
         } else if (paymentType === 'classified') {
-          const listingId = paymentIntent.metadata.listingId;
-
-          if (listingId) {
-            await db.collection('listings').doc(listingId).update({
-              status: 'payment_failed',
-              paymentIntentId: paymentIntent.id,
-              failedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-            logger.info(`Classified listing ${listingId} marked as payment_failed.`);
+          if (!listingId) {
+            logger.warn("Missing listingId in classified payment intent metadata");
+            break;
           }
+
+          await db.collection('listings').doc(listingId).update({
+            status: 'payment_failed',
+            paymentIntentId: paymentIntent.id,
+            failedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          logger.info(`Classified listing ${listingId} marked as payment_failed.`);
         }
       } catch (error) {
         logger.error("Error processing payment_intent.payment_failed webhook:", error);
@@ -1057,24 +659,20 @@ app.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, r
 });
 
 // =====================
-// Firestore Triggers (v2 Syntax)
+// Firestore Triggers
 // =====================
-
-const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
-const { onSchedule } = require('firebase-functions/v2/scheduler');
 
 /**
  * Function: onRentalRequestApproved
- * Trigger: Firestore Document Update
+ * Trigger: Firestore Document Update for owners/{ownerId}/rentalRequests/{rentalRequestId}
  */
-exports.onRentalRequestApproved = onDocumentUpdated('rentalRequests/{rentalRequestId}', async (event) => {
+exports.onRentalRequestApproved = onDocumentUpdated('owners/{ownerId}/rentalRequests/{rentalRequestId}', async (event) => {
   const before = event.data.before.data();
   const after = event.data.after.data();
-  const { rentalRequestId } = event.params;
+  const { rentalRequestId, ownerId } = event.params;
 
   // Check if the status has changed to 'approved'
   if (before.status !== 'approved' && after.status === 'approved') {
-    const ownerId = after.ownerId;
     const renterId = after.renterId;
     const listingId = after.listingId;
     const rentalDate = after.rentalDate || admin.firestore.FieldValue.serverTimestamp();
@@ -1093,33 +691,37 @@ exports.onRentalRequestApproved = onDocumentUpdated('rentalRequests/{rentalReque
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    const chatDocRef = await messagesRef.add(chatThread);
+    try {
+      const chatDocRef = await messagesRef.add(chatThread);
 
-    // Update the rental request with chatThreadId
-    await event.data.after.ref.update({ chatThreadId: chatDocRef.id });
+      // Update the rental request with chatThreadId
+      await event.data.after.ref.update({ chatThreadId: chatDocRef.id });
 
-    // Send notification to renter
-    const renterRef = db.collection('renters').doc(renterId);
-    const renterDoc = await renterRef.get();
+      // Send notification to renter
+      const renterRef = db.collection('renters').doc(renterId);
+      const renterDoc = await renterRef.get();
 
-    if (renterDoc.exists) {
-      const renterData = renterDoc.data();
-      const notification = {
-        type: 'rentalApproved',
-        message: `Your rental request for listing ${listingId} has been approved.`,
-        listingId,
-        ownerId,
-        rentalDate,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
+      if (renterDoc.exists) {
+        const renterData = renterDoc.data();
+        const notification = {
+          type: 'rentalApproved',
+          message: `Your rental request for listing ${listingId} has been approved.`,
+          listingId,
+          ownerId,
+          rentalDate,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
 
-      await renterRef.collection('notifications').add(notification);
-      logger.info(`Notification sent to renter ${renterId} for rental request ${rentalRequestId}.`);
-    } else {
-      logger.warn(`Renter document does not exist for renterId: ${renterId}`);
+        await renterRef.collection('notifications').add(notification);
+        logger.info(`Notification sent to renter ${renterId} for rental request ${rentalRequestId}.`);
+      } else {
+        logger.warn(`Renter document does not exist for renterId: ${renterId}`);
+      }
+
+      logger.info(`Rental request ${rentalRequestId} approved and chat thread created.`);
+    } catch (error) {
+      logger.error(`Error handling rental request approval for ${rentalRequestId}:`, error);
     }
-
-    logger.info(`Rental request ${rentalRequestId} approved and chat thread created.`);
   }
 
   return;
@@ -1127,11 +729,11 @@ exports.onRentalRequestApproved = onDocumentUpdated('rentalRequests/{rentalReque
 
 /**
  * Function: notifyNewMessage
- * Trigger: Firestore Document Creation
+ * Trigger: Firestore Document Creation for messages/{chatThreadId}/messages/{messageId}
  */
 exports.notifyNewMessage = onDocumentCreated('messages/{chatThreadId}/messages/{messageId}', async (event) => {
   const { chatThreadId } = event.params;
-  const messageData = event.data;
+  const messageData = event.data.data();
 
   const { senderId, text, createdAt } = messageData;
 
@@ -1163,51 +765,52 @@ exports.notifyNewMessage = onDocumentCreated('messages/{chatThreadId}/messages/{
   // Fetch FCM tokens for recipients
   const tokens = [];
 
-  for (const recipientId of recipients) {
-    const ownerRef = db.collection('owners').doc(recipientId);
-    const ownerDoc = await ownerRef.get();
-
-    if (ownerDoc.exists) {
-      const ownerData = ownerDoc.data();
-      if (ownerData.fcmToken) {
-        tokens.push(ownerData.fcmToken);
-      }
-    }
-
-    const renterRef = db.collection('renters').doc(recipientId);
-    const renterDoc = await renterRef.get();
-
-    if (renterDoc.exists) {
-      const renterData = renterDoc.data();
-      if (renterData.fcmToken) {
-        tokens.push(renterData.fcmToken);
-      }
-    }
-  }
-
-  if (tokens.length === 0) {
-    logger.warn('No FCM tokens found for recipients.');
-    return;
-  }
-
-  // Construct the notification payload
-  const payload = {
-    notification: {
-      title: 'New Message',
-      body: text.length > 50 ? `${text.substring(0, 47)}...` : text,
-      click_action: 'FLUTTER_NOTIFICATION_CLICK', // For React Native apps
-    },
-    data: {
-      chatThreadId,
-      senderId,
-    },
-  };
-
   try {
+    for (const recipientId of recipients) {
+      const ownerRef = db.collection('owners').doc(recipientId);
+      const ownerDoc = await ownerRef.get();
+
+      if (ownerDoc.exists) {
+        const ownerData = ownerDoc.data();
+        if (ownerData.fcmToken) {
+          tokens.push(ownerData.fcmToken);
+        }
+      }
+
+      const renterRef = db.collection('renters').doc(recipientId);
+      const renterDoc = await renterRef.get();
+
+      if (renterDoc.exists) {
+        const renterData = renterDoc.data();
+        if (renterData.fcmToken) {
+          tokens.push(renterData.fcmToken);
+        }
+      }
+    }
+
+    if (tokens.length === 0) {
+      logger.warn('No FCM tokens found for recipients.');
+      return;
+    }
+
+    // Construct the notification payload
+    const payload = {
+      notification: {
+        title: 'New Message',
+        body: text.length > 50 ? `${text.substring(0, 47)}...` : text,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK', // For React Native apps
+      },
+      data: {
+        chatThreadId,
+        senderId,
+      },
+    };
+
+    // Send notifications
     const response = await admin.messaging().sendToDevice(tokens, payload);
     logger.info('Notifications sent successfully:', response);
   } catch (error) {
-    logger.error('Error sending notifications:', error);
+    logger.error('Error fetching FCM tokens or sending notifications:', error);
   }
 
   return;
@@ -1215,11 +818,12 @@ exports.notifyNewMessage = onDocumentCreated('messages/{chatThreadId}/messages/{
 
 /**
  * Function: onListingDeleted
- * Trigger: Firestore Document Deletion
+ * Trigger: Firestore Document Deletion for airplanes/{listingId}
  */
 exports.onListingDeleted = onDocumentDeleted('airplanes/{listingId}', async (event) => {
   const { listingId } = event.params;
-
+  const deletedData = event.data.data();
+  
   try {
     let totalDeletions = 0;
 
@@ -1233,11 +837,18 @@ exports.onListingDeleted = onDocumentDeleted('airplanes/{listingId}', async (eve
     for (const requestDoc of rentalRequestsSnapshot.docs) {
       const requestData = requestDoc.data();
       const rentalRequestId = requestDoc.id;
+      const ownerId = requestData.ownerId;
       const renterId = requestData.renterId;
       const chatThreadId = requestData.chatThreadId;
 
-      // Delete rental request
-      rentalBatch.delete(requestDoc.ref);
+      if (!ownerId) {
+        logger.warn(`Rental request ${rentalRequestId} is missing ownerId. Skipping deletion.`);
+        continue;
+      }
+
+      // Delete the rental request from 'owners/{ownerId}/rentalRequests/{rentalRequestId}'
+      const rentalRequestRef = db.collection('owners').doc(ownerId).collection('rentalRequests').doc(rentalRequestId);
+      rentalBatch.delete(rentalRequestRef);
       totalDeletions++;
 
       // Delete associated chat thread if exists
@@ -1271,14 +882,20 @@ exports.onListingDeleted = onDocumentDeleted('airplanes/{listingId}', async (eve
     }
 
     // Step 2: Delete images from Firebase Storage
-    const images = event.data.images || [];
+    const images = deletedData.images || [];
     const deletePromises = images.map(async imageUrl => {
       // Extract the file path from the URL
-      const filePath = imageUrl.split('/o/')[1].split('?')[0].replace(/%2F/g, "/"); // Adjust based on your storage structure
-      try {
-        return await storageBucket.file(filePath).delete();
-      } catch (err) {
-        logger.error(`Failed to delete image ${filePath}:`, err);
+      const filePathMatch = imageUrl.match(/\/o\/(.+?)\?/);
+      if (filePathMatch && filePathMatch[1]) {
+        const filePath = decodeURIComponent(filePathMatch[1]).replace(/%2F/g, "/"); // Adjust based on your storage structure
+        try {
+          await storageBucket.file(filePath).delete();
+          logger.info(`Deleted image at path: ${filePath}`);
+        } catch (err) {
+          logger.error(`Failed to delete image ${filePath}:`, err);
+        }
+      } else {
+        logger.warn(`Unable to extract file path from image URL: ${imageUrl}`);
       }
     });
 
@@ -1336,8 +953,9 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule('every 24 hours', as
         }
 
         if (shouldDelete) {
-          // Delete the rental request
-          rentalBatch.delete(requestDoc.ref);
+          // Delete the rental request from 'owners/{ownerId}/rentalRequests/{rentalRequestId}'
+          const rentalRequestRef = db.collection('owners').doc(ownerId).collection('rentalRequests').doc(rentalRequestId);
+          rentalBatch.delete(rentalRequestRef);
           totalDeletions++;
 
           // Delete associated chat thread if exists
@@ -1387,7 +1005,7 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule('every 24 hours', as
  */
 exports.handleAircraftDetails = onDocumentCreated('aircraftDetails/{ownerId}', async (event) => {
   const ownerId = event.params.ownerId;
-  const newData = event.data;
+  const newData = event.data.data();
   logger.info(`New aircraftDetails created for ownerId: ${ownerId}`);
 
   // Initialize default fields if necessary
@@ -1468,6 +1086,15 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
       loanTerm,
       depreciationRate,
       rentalHoursPerYear,
+      insuranceCost,
+      hangarCost,
+      maintenanceReserve,
+      annualRegistrationFees,
+      fuelCostPerHour,
+      oilCostPerHour,
+      routineMaintenancePerHour,
+      tiresPerHour,
+      otherConsumablesPerHour,
     } = costData;
 
     if (
@@ -1496,29 +1123,27 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
       const totalFixedCosts =
         parseFloat(mortgageExpense) * 12 +
         parseFloat(depreciationExpense) +
-        parseFloat(costData.insuranceCost || 0) +
-        parseFloat(costData.hangarCost || 0) +
-        parseFloat(costData.maintenanceReserve || 0) +
-        parseFloat(costData.annualRegistrationFees || 0);
+        parseFloat(insuranceCost || 0) +
+        parseFloat(hangarCost || 0) +
+        parseFloat(maintenanceReserve || 0) +
+        parseFloat(annualRegistrationFees || 0);
 
       const totalVariableCosts =
-        (parseFloat(costData.fuelCostPerHour || 0) +
-          parseFloat(costData.oilCostPerHour || 0) +
-          parseFloat(costData.routineMaintenancePerHour || 0) +
-          parseFloat(costData.tiresPerHour || 0) +
-          parseFloat(costData.otherConsumablesPerHour || 0)) *
+        (parseFloat(fuelCostPerHour || 0) +
+          parseFloat(oilCostPerHour || 0) +
+          parseFloat(routineMaintenancePerHour || 0) +
+          parseFloat(tiresPerHour || 0) +
+          parseFloat(otherConsumablesPerHour || 0)) *
         parseFloat(rentalHoursPerYear);
 
       const totalCostPerYear = totalFixedCosts + totalVariableCosts;
-      const costPerHour = (
-        totalCostPerYear / parseFloat(rentalHoursPerYear)
-      ).toFixed(2);
+      const costPerHour = parseFloat((totalCostPerYear / parseFloat(rentalHoursPerYear)).toFixed(2));
 
       // Update the costPerHour field
       try {
         await db.collection('aircraftDetails').doc(ownerId).update({
-          "costData.mortgageExpense": mortgageExpense,
-          "costData.depreciationExpense": depreciationExpense,
+          "costData.mortgageExpense": parseFloat(mortgageExpense),
+          "costData.depreciationExpense": parseFloat(depreciationExpense),
           "costData.costPerHour": costPerHour,
         });
         logger.info(`Recalculated costPerHour for ownerId: ${ownerId}`);
@@ -1592,41 +1217,7 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
 });
 
 // =====================
-// Helper Functions
-// =====================
-
-/**
- * Function: sendNotification
- * Description: Helper function to send FCM notifications
- */
-const sendNotification = async (tokens, title, body) => {
-  const payload = {
-    notification: {
-      title,
-      body,
-    },
-  };
-
-  try {
-    const response = await admin.messaging().sendToDevice(tokens, payload);
-    logger.info('Notifications sent successfully:', response);
-  } catch (error) {
-    logger.error('Error sending notifications:', error);
-  }
-};
-
-/**
- * Function: sanitizeData
- * Description: Helper function to sanitize input data
- */
-const sanitizeData = (data) => {
-  // Implement sanitization logic as needed
-  // For example, remove any malicious scripts or unwanted fields
-  return data;
-};
-
-// =====================
 // Export Express App as Firebase Function
 // =====================
-const { onHttpRequest } = require('firebase-functions/v2/https');
-exports.api = onHttpRequest(app);
+
+exports.api = onRequest(app);
