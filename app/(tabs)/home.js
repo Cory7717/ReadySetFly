@@ -42,8 +42,9 @@ import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { Picker } from "@react-native-picker/picker";
 import { CardField } from "@stripe/stripe-react-native";
+import { LinearGradient } from 'expo-linear-gradient'; // Import LinearGradient
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const Home = ({ route, navigation }) => {
   const [user, setUser] = useState(null);
@@ -52,6 +53,8 @@ const Home = ({ route, navigation }) => {
   const [selectedListing, setSelectedListing] = useState(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
+  const [zoomModalVisible, setZoomModalVisible] = useState(false); // New state for zoom modal
+  const [zoomImageUri, setZoomImageUri] = useState(null); // URI of the image to zoom
   const [filter, setFilter] = useState({
     make: "",
     location: "",
@@ -605,18 +608,6 @@ const Home = ({ route, navigation }) => {
     // Implement navigation or modal for editing the listing
   };
 
-  const handleNextImage = () => {
-    if (selectedListing && imageIndex < selectedListing.images.length - 1) {
-      setImageIndex(imageIndex + 1);
-    }
-  };
-
-  const handlePreviousImage = () => {
-    if (selectedListing && imageIndex > 0) {
-      setImageIndex(imageIndex - 1);
-    }
-  };
-
   const handleScroll = (event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     setShowScrollToTop(offsetY > 200);
@@ -642,7 +633,7 @@ const Home = ({ route, navigation }) => {
 
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 150],
-    outputRange: [200, 0],
+    outputRange: [220, 0], // Adjusted to match padding
     extrapolate: "clamp",
   });
 
@@ -652,9 +643,32 @@ const Home = ({ route, navigation }) => {
     extrapolate: "clamp",
   });
 
+  // Render Pagination Dots
+  const renderPaginationDots = () => {
+    if (!selectedListing || !selectedListing.images) return null;
+    return (
+      <View style={styles.paginationDotsContainer}>
+        {selectedListing.images.map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.paginationDot,
+              index === imageIndex ? styles.activeDot : styles.inactiveDot,
+            ]}
+          />
+        ))}
+      </View>
+    );
+  };
+
+  // Handle image press to open zoom modal
+  const handleImagePress = (uri) => {
+    setZoomImageUri(uri);
+    setZoomModalVisible(true);
+  };
+
   // Render each listing item
   const renderItem = ({ item }) => {
-    // Ensure correct field access with fallback values
     const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
     const makeDisplay = item.make || "Unknown Make";
     const yearDisplay = item.year || "Unknown Year";
@@ -671,7 +685,6 @@ const Home = ({ route, navigation }) => {
               return;
             }
             setSelectedListing(item);
-            console.log("Selected Listing:", item);
             setImageIndex(0);
             setFullScreenModalVisible(true);
             setFullName(user?.displayName || fullName || "Anonymous");
@@ -752,10 +765,8 @@ const Home = ({ route, navigation }) => {
       </Animated.View>
 
       {/* Recommended for You Section */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 16 }}>
-          Recommended for you
-        </Text>
+      <View style={styles.recommendedListingsContainer}>
+        <Text style={styles.sectionTitle}>Recommended for You</Text>
         {isRecommendedLoading ? (
           <ActivityIndicator size="large" color="#1E90FF" />
         ) : recommendedListings.length > 0 ? (
@@ -763,7 +774,7 @@ const Home = ({ route, navigation }) => {
             {recommendedListings.map((listing) => (
               <TouchableOpacity
                 key={listing.id}
-                style={{ marginRight: 16 }}
+                style={styles.recommendedCard}
                 onPress={() => {
                   if (!listing.ownerId) {
                     Alert.alert(
@@ -773,9 +784,10 @@ const Home = ({ route, navigation }) => {
                     return;
                   }
                   setSelectedListing(listing);
-                  console.log("Selected Recommended Listing:", listing);
                   setImageIndex(0);
                   setFullScreenModalVisible(true);
+                  setZoomImageUri(null); // Reset zoom image
+                  setZoomModalVisible(false); // Ensure zoom modal is closed
                   setFullName(user?.displayName || fullName || "Anonymous");
                   setCityStateCombined("");
                   setHasMedicalCertificate(false);
@@ -788,32 +800,23 @@ const Home = ({ route, navigation }) => {
                 {listing.images && listing.images.length > 0 ? (
                   <Image
                     source={{ uri: listing.images[0] }}
-                    style={{ width: 200, height: 120, borderRadius: 8 }}
+                    style={styles.recommendedImage}
                     resizeMode="cover"
                   />
                 ) : (
-                  <View
-                    style={{
-                      width: 200,
-                      height: 120,
-                      borderRadius: 8,
-                      backgroundColor: "#A0AEC0",
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
-                  >
+                  <View style={styles.noImageContainer}>
                     <Ionicons name="image" size={50} color="#FFFFFF" />
-                    <Text style={{ color: "#FFFFFF" }}>No Image</Text>
+                    <Text style={styles.noImageText}>No Image</Text>
                   </View>
                 )}
-                <Text style={{ marginTop: 8, fontWeight: "bold" }}>
+                <Text style={styles.recommendedTitle}>
                   {`${listing.year} ${listing.make} ${listing.airplaneModel}`}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         ) : (
-          <Text style={{ textAlign: "center", color: "#718096" }}>
+          <Text style={styles.emptyListText}>
             No recommended listings available.
           </Text>
         )}
@@ -825,6 +828,7 @@ const Home = ({ route, navigation }) => {
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={styles.columnWrapper}
+        contentContainerStyle={{ paddingTop: 180 }} // Reduced paddingTop from 220 to 180
         ListHeaderComponent={
           <>
             <View style={styles.filterHeader}>
@@ -886,44 +890,67 @@ const Home = ({ route, navigation }) => {
               >
                 <Ionicons name="close" size={30} color="black" />
               </TouchableOpacity>
-              <View style={styles.modalImageContainer}>
-                <TouchableOpacity
-                  onPress={handlePreviousImage}
-                  style={styles.modalArrowButtonLeft}
-                  accessibilityLabel="Previous image"
-                  accessibilityRole="button"
-                >
-                  <Ionicons name="arrow-back" size={30} color="#1E90FF" />
-                </TouchableOpacity>
-                {selectedListing.images.length > 0 ? (
-                  <Image
-                    source={{ uri: selectedListing.images[imageIndex] }}
-                    style={styles.modalImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.modalImage,
-                      { justifyContent: "center", alignItems: "center" },
-                    ]}
-                  >
-                    <Ionicons name="image" size={50} color="#A0AEC0" />
-                    <Text style={{ color: "#A0AEC0" }}>
-                      No Image Available
-                    </Text>
-                  </View>
+
+              {/* Image Carousel with Swipe Gestures */}
+              <Animated.ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={Animated.event(
+                  [{ nativeEvent: { contentOffset: { x: scrollY } } }],
+                  { 
+                    useNativeDriver: false, 
+                    listener: (event) => {
+                      const offsetX = event.nativeEvent.contentOffset.x;
+                      const index = Math.round(offsetX / SCREEN_WIDTH);
+                      setImageIndex(index);
+                    }
+                  }
                 )}
-                <TouchableOpacity
-                  onPress={handleNextImage}
-                  style={styles.modalArrowButtonRight}
-                  accessibilityLabel="Next image"
-                  accessibilityRole="button"
-                >
-                  <Ionicons name="arrow-forward" size={30} color="#1E90FF" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView contentContainerStyle={styles.modalContent}>
+                scrollEventThrottle={16}
+                style={styles.carouselScrollView}
+              >
+                {selectedListing.images.map((image, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    activeOpacity={0.9}
+                    onPress={() => handleImagePress(image)}
+                  >
+                    <View style={styles.carouselImageContainer}>
+                      <Image
+                        source={{ uri: image }}
+                        style={styles.modalImage}
+                        resizeMode="contain" // Changed from 'cover' to 'contain'
+                      />
+                      {/* Gradient Overlay */}
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.7)']}
+                        style={styles.gradientOverlay}
+                      />
+                      {/* Image Information */}
+                      <View style={styles.imageInfoContainer}>
+                        <Text style={styles.imageTitle}>
+                          {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
+                        </Text>
+                        <Text style={styles.imageRate}>
+                          ${parseFloat(selectedListing.costPerHour).toFixed(2)}/hour
+                        </Text>
+                        <Text style={styles.imageLocation}>
+                          Location: {selectedListing.location}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </Animated.ScrollView>
+
+              {/* Pagination Dots */}
+              {renderPaginationDots()}
+
+              <ScrollView
+                contentContainerStyle={styles.modalContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <Text
                   style={styles.modalTitle}
                   accessibilityLabel="Listing title"
@@ -1115,6 +1142,41 @@ const Home = ({ route, navigation }) => {
         </SafeAreaView>
       </Modal>
 
+      {/* Zoom Image Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={zoomModalVisible}
+        onRequestClose={() => setZoomModalVisible(false)}
+      >
+        <View style={styles.zoomModalContainer}>
+          <TouchableOpacity
+            onPress={() => setZoomModalVisible(false)}
+            style={styles.zoomCloseButton}
+            accessibilityLabel="Close zoomed image"
+            accessibilityRole="button"
+          >
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
+          <ScrollView
+            contentContainerStyle={styles.zoomScrollView}
+            maximumZoomScale={3}
+            minimumZoomScale={1}
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            centerContent={true}
+          >
+            {zoomImageUri && (
+              <Image
+                source={{ uri: zoomImageUri }}
+                style={styles.zoomImage}
+                resizeMode="contain"
+              />
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* Calendar Modal */}
       <Modal
         animationType="slide"
@@ -1223,8 +1285,6 @@ const Home = ({ route, navigation }) => {
   );
 };
 
-
-
 // Styles
 const styles = StyleSheet.create({
   safeArea: {
@@ -1243,53 +1303,98 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   headerContent: {
-    backgroundColor: "rgba(0,0,0,0.3)",
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.4)", // Increased opacity
+    padding: 20, // Increased padding
+    borderRadius: 12, // More rounded
   },
   welcomeText: {
-    fontSize: 16,
+    fontSize: 18, // Increased font size
     color: "#FFFFFF",
   },
   userName: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 28, // Increased font size
+    fontWeight: "700",
     color: "#FFFFFF",
+    marginTop: 4, // Added margin
   },
   recommendedListingsContainer: {
     paddingHorizontal: 16,
-    paddingTop: 24,
+    paddingTop: 16, // Reduced paddingTop from 24 to 16
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 16,
+    color: "#2D3748",
+  },
+  recommendedCard: {
+    width: 200,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginRight: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    overflow: "hidden",
+  },
+  recommendedImage: {
+    width: "100%",
+    height: 120,
+  },
+  noImageContainer: {
+    width: "100%",
+    height: 120,
+    backgroundColor: "#A0AEC0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noImageText: {
+    color: "#FFFFFF",
+    marginTop: 8,
+  },
+  recommendedTitle: {
+    padding: 12,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2D3748",
   },
   listingContainer: {
     flex: 1,
-    margin: 8,
+    margin: 6, // Reduced margin from 8 to 6
     maxWidth: (SCREEN_WIDTH - 48) / 2, // Adjusted for padding and margins
   },
   listingCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
+    borderRadius: 12, // Slightly increased for a modern look
     overflow: "hidden",
-    elevation: 3, // For Android shadow
-    shadowColor: "#000", // For iOS shadow
-    shadowOffset: { width: 0, height: 2 }, // For iOS shadow
-    shadowOpacity: 0.1, // For iOS shadow
-    shadowRadius: 4, // For iOS shadow
+    elevation: 4, // Enhanced shadow for better depth
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    height: 220, // Further reduced height from 250 to 220
+    justifyContent: "space-between", // Ensure even spacing
   },
   listingHeader: {
-    padding: 8,
+    padding: 2, // Decreased padding from 8 to 6
   },
   listingTitle: {
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600", // Slightly lighter for modernity
+    color: "#2D3748",
   },
   listingImage: {
     width: "100%",
-    height: 120,
+    height: 90, // Reduced height from 100 to 90
     justifyContent: "flex-end",
   },
   listingImageOverlay: {
-    backgroundColor: "rgba(0,0,0,0.5)",
-    padding: 4,
+    backgroundColor: "rgba(0,0,0,0.4)", // Reduced opacity for better image visibility
+    padding: 4, // Decreased padding from 6 to 4
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
   },
   listingLocation: {
     color: "#FFFFFF",
@@ -1301,11 +1406,14 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   listingDescriptionContainer: {
-    padding: 8,
+    padding: 6, // Decreased padding from 8 to 6
+    height: 40, // Reduced height from 50 to 40
+    justifyContent: "center",
   },
   listingDescription: {
     fontSize: 14,
     color: "#4A5568",
+    lineHeight: 16, // Reduced line height from 18 to 16
   },
   filterHeader: {
     flexDirection: "row",
@@ -1316,31 +1424,38 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 16,
     fontWeight: "bold",
+    color: "#2D3748",
   },
   filterButton: {
     padding: 8,
   },
   availableListingsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "700",
     marginBottom: 16,
+    color: "#2D3748",
   },
   emptyListText: {
     textAlign: "center",
     color: "#718096",
     marginTop: 16,
+    fontSize: 16,
   },
   scrollToTopButton: {
     position: "absolute",
     bottom: 32,
     right: 32,
     backgroundColor: "#1E90FF",
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 30, // Fully rounded
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   modalSafeArea: {
     flex: 1,
@@ -1349,33 +1464,83 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     padding: 16,
+    position: "relative",
   },
   modalCloseButton: {
     alignSelf: "flex-end",
+    marginBottom: 10,
   },
-  modalImageContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
+  carouselScrollView: {
+    height: 250, // Increased height for better image visibility
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  carouselImageContainer: {
+    width: SCREEN_WIDTH - 32, // Slightly smaller than screen width for padding
+    height: 250,
+    marginRight: 16,
+    borderRadius: 12,
+    overflow: "hidden",
   },
   modalImage: {
-    width: SCREEN_WIDTH - 64,
-    height: 200,
-    borderRadius: 10,
+    width: "100%",
+    height: "100%",
+    borderRadius: 12,
   },
-  modalArrowButtonLeft: {
-    marginRight: 8,
+  gradientOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "40%",
   },
-  modalArrowButtonRight: {
-    marginLeft: 8,
+  imageInfoContainer: {
+    position: "absolute",
+    bottom: 16,
+    left: 16,
+  },
+  imageTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  imageRate: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  imageLocation: {
+    color: "#FFFFFF",
+    fontSize: 14,
+  },
+  paginationDotsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: "#1E90FF",
+  },
+  inactiveDot: {
+    backgroundColor: "#A0AEC0",
   },
   modalContent: {
     paddingVertical: 16,
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: "bold",
+    fontWeight: "700",
     marginBottom: 8,
+    color: "#2D3748",
   },
   modalRate: {
     fontSize: 18,
@@ -1385,6 +1550,7 @@ const styles = StyleSheet.create({
   modalLocation: {
     fontSize: 16,
     marginBottom: 8,
+    color: "#4A5568",
   },
   modalDescription: {
     fontSize: 16,
@@ -1414,7 +1580,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontWeight: "bold",
+    fontWeight: "700",
+    fontSize: 16,
   },
   inputGroup: {
     marginBottom: 16,
@@ -1422,6 +1589,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     marginBottom: 4,
+    color: "#2D3748",
   },
   textInput: {
     borderWidth: 1,
@@ -1456,7 +1624,7 @@ const styles = StyleSheet.create({
   calendarButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
   selectedDateText: {
     fontSize: 16,
@@ -1472,12 +1640,13 @@ const styles = StyleSheet.create({
   },
   totalCostTitle: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "700",
     marginBottom: 8,
+    color: "#2D3748",
   },
   totalCostValue: {
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: "700",
     marginTop: 8,
     color: "#2F855A",
   },
@@ -1491,7 +1660,7 @@ const styles = StyleSheet.create({
   sendRequestButtonText: {
     color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
   calendarModalContainer: {
     flex: 1,
@@ -1512,7 +1681,7 @@ const styles = StyleSheet.create({
   closeCalendarButtonText: {
     color: "#1E90FF",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
   filterModalOverlay: {
     flex: 1,
@@ -1534,7 +1703,8 @@ const styles = StyleSheet.create({
   },
   filterModalTitle: {
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: "700",
+    color: "#2D3748",
   },
   filterTextInput: {
     borderWidth: 1,
@@ -1549,6 +1719,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginVertical: 8,
     color: "#718096",
+    fontSize: 16,
   },
   filterButtonsContainer: {
     flexDirection: "row",
@@ -1572,7 +1743,7 @@ const styles = StyleSheet.create({
   },
   filterButtonText: {
     color: "#FFFFFF",
-    fontWeight: "bold",
+    fontWeight: "700",
     fontSize: 16,
   },
   loadingOverlay: {
@@ -1584,6 +1755,28 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.7)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  zoomModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  zoomCloseButton: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    zIndex: 1,
+  },
+  zoomScrollView: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  zoomImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
 });
 

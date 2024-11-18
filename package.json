@@ -94,7 +94,8 @@
     "react-native-view-shot": "3.8.0",
     "react-native-webview": "13.8.6",
     "stripe": "^16.12.0",
-    "typescript": "~5.3.3"
+    "typescript": "~5.3.3",
+    "expo-linear-gradient": "~13.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.8",

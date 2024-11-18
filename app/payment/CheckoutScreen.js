@@ -1,5 +1,3 @@
-// src/screens/CheckoutScreen.js
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
@@ -37,14 +35,17 @@ export default function CheckoutScreen() {
 
   // Extract parameters from navigation route
   const {
-    paymentType = 'rental', // 'classified' or 'rental'
-    amount: initialAmount = 0, // For Classifieds (in cents)
-    costPerHour = 0, // Renamed from perHour for Rentals
-    rentalHours = 1, // Added rentalHours for Rentals
-    rentalRequestId: routeRentalRequestId = '', // For Rentals
-    listingDetails = {}, // Additional details for listing creation
-    selectedPricing: initialSelectedPricing = '', // Initial pricing tier
+    paymentType = 'rental',
+    amount: initialAmount = 0,
+    costPerHour = 0,
+    rentalHours = 1,
+    rentalRequestId: routeRentalRequestId = '',
+    listingDetails = {},
+    selectedPricing: initialSelectedPricing = '',
   } = route.params || {};
+
+  // Log received parameters
+  console.log("CheckoutScreen received params:", route.params);
 
   // State Variables
   const [loading, setLoading] = useState(false);
@@ -72,10 +73,15 @@ export default function CheckoutScreen() {
   const displayTotal = (totalAmount / 100).toFixed(2);
 
   useEffect(() => {
+    console.log("CheckoutScreen useEffect triggered");
     startBouncing();
     if (paymentType === 'rental') {
       // For Rentals, totalAmount is calculated based on costPerHour and rentalHours
-      calculateRentalTotal(costPerHour, rentalHours);
+      if (costPerHour && rentalHours) {
+        calculateRentalTotal(parseFloat(costPerHour), parseFloat(rentalHours));
+      } else {
+        setErrorMessage('Missing rental details.');
+      }
     } else if (paymentType === 'classified') {
       // For Classifieds, use the initialAmount passed
       setTotalAmount(initialAmount);
@@ -102,7 +108,9 @@ export default function CheckoutScreen() {
     ).start();
   };
 
-  // Function to calculate total amount for Rentals
+  /**
+   * Function to calculate total amount for Rentals
+   */
   const calculateRentalTotal = (costPerHour, rentalHours) => {
     // Ensure valid inputs
     const validCostPerHour = parseFloat(costPerHour);
@@ -584,6 +592,9 @@ export default function CheckoutScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+// ... Rest of the styles ...
+
 
 const styles = StyleSheet.create({
   container: {

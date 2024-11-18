@@ -19,10 +19,15 @@ const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('fir
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 
 // =====================
+// Define Environment
+// =====================
+const isProduction = process.env.NODE_ENV === 'production';
+
+// =====================
 // Initialize Firebase Admin SDK
 // =====================
 if (!admin.apps.length) {
-  if (process.env.NODE_ENV === 'production') {
+  if (isProduction) { // Use isProduction flag
     admin.initializeApp({
       credential: applicationDefault(),
       storageBucket: 'ready-set-fly-71506.appspot.com', // Replace with your actual bucket name
@@ -190,7 +195,11 @@ const authenticate = async (req, res, next) => {
     next();
   } catch (error) {
     logger.error("Error verifying Firebase ID token:", error);
-    return res.status(401).json({ error: "Unauthorized" });
+    if (isProduction) {
+      res.status(401).json({ error: "Unauthorized" });
+    } else {
+      res.status(401).json({ error: error.message });
+    }
   }
 };
 
@@ -257,7 +266,11 @@ app.post('/create-payment-intent', authenticate, async (req, res) => {
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
     logger.error("Error creating general payment intent:", error);
-    res.status(500).json({ error: error.message });
+    if (isProduction) {
+      res.status(500).json({ error: "An unexpected error occurred." });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 
@@ -316,10 +329,21 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
       return res.status(400).json({ error: "Owner has not connected a Stripe account" });
     }
 
+    // Verify owner's Stripe account is active
+    const ownerStripeAccount = await stripe.accounts.retrieve(connectedAccountId);
+    if (!ownerStripeAccount || !ownerStripeAccount.charges_enabled || !ownerStripeAccount.payouts_enabled) {
+      logger.warn(`Owner with ID ${ownerId} has an inactive or incomplete Stripe account.`);
+      return res.status(400).json({ error: "Owner's Stripe account is not active or properly configured." });
+    }
+
     // Calculate tax
     const tax = Math.round(amount * taxRate); // Tax on amount
 
     const totalAmount = amount + tax;
+
+    // Optional: Include application fee (e.g., 5%)
+    const applicationFeeRate = 0.05; // 5%
+    const applicationFeeAmount = Math.round(amount * applicationFeeRate); // in cents
 
     // Create the PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
@@ -334,14 +358,24 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
         amount: (amount / 100).toFixed(2),
         tax: (tax / 100).toFixed(2),
       },
-      // No application_fee_amount or transfer_data since it's a classified payment
+      // Optional: Add application_fee_amount if platform takes a fee
+      application_fee_amount: applicationFeeAmount,
+      transfer_data: {
+        destination: connectedAccountId,
+      },
     });
 
     logger.info(`Classified PaymentIntent created: ${paymentIntent.id}`);
+    logger.info(`Amount: ${totalAmount} cents, Tax: ${tax} cents, Application Fee: ${applicationFeeAmount} cents`);
+
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
     logger.error("Error creating classified payment intent:", error);
-    res.status(500).json({ error: error.message });
+    if (isProduction) {
+      res.status(500).json({ error: "An unexpected error occurred." });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 
@@ -373,6 +407,11 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
     if (rentalRequestsSnapshot.empty) {
       logger.warn(`Rental request ${rentalRequestId} not found in any owner's rentalRequests collection`);
       return res.status(404).json({ error: "Rental request not found" });
+    }
+
+    if (rentalRequestsSnapshot.size > 1) {
+      logger.warn(`Multiple rental requests found with ID ${rentalRequestId}. Ensure rentalRequestId is unique.`);
+      return res.status(400).json({ error: "Multiple rental requests found. Please ensure rentalRequestId is unique." });
     }
 
     // Assuming rentalRequestId is unique across all owners
@@ -439,6 +478,17 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
       return res.status(400).json({ error: "Owner has not connected a Stripe account" });
     }
 
+    // Verify owner's Stripe account is active
+    const ownerStripeAccount = await stripe.accounts.retrieve(connectedAccountId);
+    if (!ownerStripeAccount || !ownerStripeAccount.charges_enabled || !ownerStripeAccount.payouts_enabled) {
+      logger.warn(`Owner with ID ${ownerId} has an inactive or incomplete Stripe account.`);
+      return res.status(400).json({ error: "Owner's Stripe account is not active or properly configured." });
+    }
+
+    // Optional: Include application fee (e.g., 5%)
+    const applicationFeeRate = 0.05; // 5%
+    const applicationFeeAmount = Math.round(amountInCents * applicationFeeRate); // in cents
+
     // Create PaymentIntent directly without making an HTTP request
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
@@ -455,9 +505,12 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
       transfer_data: {
         destination: connectedAccountId,
       },
+      // Optional: Include application_fee_amount if platform takes a fee
+      application_fee_amount: applicationFeeAmount,
     });
 
     logger.info(`Payment Intent created successfully: ${paymentIntent.id}`);
+    logger.info(`Amount: ${amountInCents} cents, Application Fee: ${applicationFeeAmount} cents`);
 
     // Optionally, update the rental request with paymentIntentId
     await rentalRequestDoc.ref.update({ paymentIntentId: paymentIntent.id });
@@ -466,7 +519,11 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
     logger.error("Error creating rental payment intent:", error);
-    res.status(500).json({ error: "An unexpected error occurred." });
+    if (isProduction) {
+      res.status(500).json({ error: "An unexpected error occurred." });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 });
 

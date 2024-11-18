@@ -493,8 +493,10 @@ const BookingCalendar = () => {
   /**
    * Navigate to Checkout Screen
    * @param {string} rentalRequestId - The ID of the rental request.
+   * @param {number} costPerHour - Cost per hour for the rental.
+   * @param {number} rentalHours - Number of hours for the rental.
    */
-  const navigateToCheckout = async (rentalRequestId) => {
+  const navigateToCheckout = async (rentalRequestId, costPerHour, rentalHours) => {
     if (isProcessingPayment) {
       // If a payment is already being processed, do not proceed
       console.warn("Payment is already being processed.");
@@ -508,10 +510,16 @@ const BookingCalendar = () => {
 
     try {
       console.log(`Navigating to CheckoutScreen with Rental Request ID: ${rentalRequestId}`);
-      // Navigate using Expo Router's router.push with the correct path
+      console.log(`Cost Per Hour: ${costPerHour}, Rental Hours: ${rentalHours}`);
+
+      // Navigate using Expo Router's router.push with the correct path and parameters
       router.push({
         pathname: "/payment/CheckoutScreen", // Adjust the path based on your file structure
-        params: { rentalRequestId },
+        params: { 
+          rentalRequestId, 
+          costPerHour, 
+          rentalHours 
+        },
       });
     } catch (error) {
       console.error("Error navigating to CheckoutScreen:", error);
@@ -935,7 +943,7 @@ const BookingCalendar = () => {
         messagesQueryInstance,
         (snapshot) => {
           const fetchedMessages = [];
-          snapshot.forEach((docSnap) => {
+          snapshot.docs.forEach((docSnap) => {
             const messageData = docSnap.data();
             if (
               messageData.participants.includes(renterId) &&
@@ -1733,7 +1741,9 @@ const BookingCalendar = () => {
                     onPress={() =>
                       navigateToCheckout(
                         selectedNotification?.rentalRequestId ||
-                          selectedNotification?.rentalRequest
+                          selectedNotification?.rentalRequest,
+                        parseFloat(selectedListing.costPerHour),
+                        parseFloat(selectedRentalRequest.rentalHours)
                       )
                     }
                     style={[
@@ -1943,6 +1953,7 @@ const BookingCalendar = () => {
 };
 
 export default BookingCalendar;
+
 
 // Stylesheet (styles)
 const styles = StyleSheet.create({
