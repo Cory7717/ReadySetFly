@@ -667,7 +667,7 @@ const Home = ({ route, navigation }) => {
     setZoomModalVisible(true);
   };
 
-  // Render each listing item
+  // Redesigned Render Item for Listing Cards
   const renderItem = ({ item }) => {
     const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
     const makeDisplay = item.make || "Unknown Make";
@@ -697,44 +697,93 @@ const Home = ({ route, navigation }) => {
           accessibilityLabel={`Select listing: ${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
           accessibilityRole="button"
         >
-          <View style={styles.listingHeader}>
+          {/* Listing Image */}
+          <View style={styles.imageContainer}>
+            {item.images && item.images.length > 0 ? (
+              <ImageBackground
+                source={{ uri: item.images[0] }}
+                style={styles.listingImage}
+                imageStyle={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+              >
+                {/* Overlay */}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.7)']}
+                  style={styles.imageOverlay}
+                >
+                  <Text style={styles.listingLocation}>{item.location}</Text>
+                  <Text style={styles.listingRate}>
+                    ${parseFloat(item.costPerHour).toFixed(2)}/hr
+                  </Text>
+                </LinearGradient>
+              </ImageBackground>
+            ) : (
+              <View style={styles.noImageContainer}>
+                <Ionicons name="image" size={50} color="#A0AEC0" />
+                <Text style={styles.noImageText}>No Image Available</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Listing Details */}
+          <View style={styles.listingDetails}>
             <Text style={styles.listingTitle} numberOfLines={1}>
               {`${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
             </Text>
-          </View>
-          {item.images && item.images.length > 0 ? (
-            <ImageBackground
-              source={{ uri: item.images[0] }}
-              style={styles.listingImage}
-              imageStyle={{ borderRadius: 10 }}
-            >
-              <View style={styles.listingImageOverlay}>
-                <Text style={styles.listingLocation}>{item.location}</Text>
-                <Text style={styles.listingRate}>
-                  ${parseFloat(item.costPerHour).toFixed(2)}/hour
-                </Text>
-              </View>
-            </ImageBackground>
-          ) : (
-            <View
-              style={[
-                styles.listingImage,
-                { justifyContent: "center", alignItems: "center" },
-              ]}
-            >
-              <Ionicons name="image" size={50} color="#A0AEC0" />
-              <Text style={{ color: "#A0AEC0" }}>No Image Available</Text>
-            </View>
-          )}
-          <View style={styles.listingDescriptionContainer}>
-            <Text numberOfLines={2} style={styles.listingDescription}>
+            <Text style={styles.listingDescription} numberOfLines={2}>
               {item.description}
             </Text>
           </View>
+
+          {/* Action Button */}
+          <TouchableOpacity
+            style={styles.rentButton}
+            onPress={() => {
+              if (!item.ownerId) {
+                Alert.alert(
+                  "Listing Unavailable",
+                  "This listing does not have a valid owner and cannot be rented."
+                );
+                return;
+              }
+              setSelectedListing(item);
+              setImageIndex(0);
+              setFullScreenModalVisible(true);
+              setFullName(user?.displayName || fullName || "Anonymous");
+              setCityStateCombined("");
+              setHasMedicalCertificate(false);
+              setHasRentersInsurance(false);
+              setFlightHours("");
+            }}
+            accessibilityLabel={`Rent ${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
+            accessibilityRole="button"
+          >
+            <Text style={styles.rentButtonText}>Rent Now</Text>
+          </TouchableOpacity>
         </TouchableOpacity>
       </View>
     );
   };
+
+  // Redesigned Filter Header
+  const renderListHeader = () => (
+    <>
+      <View style={styles.filterHeader}>
+        <Text style={styles.filterTitle}>Filter Listings</Text>
+        <TouchableOpacity
+          onPress={() => setFilterModalVisible(true)}
+          style={styles.filterButton}
+          accessibilityLabel="Open filter options"
+          accessibilityRole="button"
+        >
+          <Ionicons name="filter" size={24} color="#1E90FF" />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.availableListingsTitle}>
+        Available Listings
+      </Text>
+    </>
+  );
 
   // Render the main component
   return (
@@ -828,28 +877,8 @@ const Home = ({ route, navigation }) => {
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={{ paddingTop: 180 }} // Reduced paddingTop from 220 to 180
-        ListHeaderComponent={
-          <>
-            <View style={styles.filterHeader}>
-              <Text style={styles.filterText}>
-                Filter by location or Aircraft Make
-              </Text>
-              <TouchableOpacity
-                onPress={() => setFilterModalVisible(true)}
-                style={styles.filterButton}
-                accessibilityLabel="Open filter options"
-                accessibilityRole="button"
-              >
-                <Ionicons name="filter" size={24} color="gray" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.availableListingsTitle}>
-              Available Listings
-            </Text>
-          </>
-        }
+        contentContainerStyle={{ paddingTop: 180 }} // Adjusted paddingTop
+        ListHeaderComponent={renderListHeader}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <Text style={styles.emptyListText}>No listings available</Text>
@@ -1214,7 +1243,7 @@ const Home = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      {/* Filter Modal */}
+      {/* Redesigned Filter Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1223,6 +1252,7 @@ const Home = ({ route, navigation }) => {
       >
         <TouchableOpacity
           style={styles.filterModalOverlay}
+          activeOpacity={1}
           onPressOut={() => setFilterModalVisible(false)}
           accessibilityLabel="Close filter modal"
           accessibilityRole="button"
@@ -1235,31 +1265,58 @@ const Home = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <TextInput
-              placeholder="Enter City, State"
-              placeholderTextColor="#888"
-              value={cityState}
-              onChangeText={setCityState}
-              style={styles.filterTextInput}
-              accessibilityLabel="Filter by city and state"
-            />
-            <Text style={styles.orText}>OR</Text>
-            <TextInput
-              placeholder="Enter Make and Model"
-              placeholderTextColor="#888"
-              value={makeModel}
-              onChangeText={setMakeModel}
-              style={styles.filterTextInput}
-              accessibilityLabel="Filter by make and model"
-            />
-            <View style={styles.filterButtonsContainer}>
+            {/* Filter by Location */}
+            <Text style={styles.filterLabel}>Location</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={cityState}
+                onValueChange={(itemValue) => setCityState(itemValue)}
+                style={styles.picker}
+                accessibilityLabel="Filter by location"
+              >
+                <Picker.Item label="All Locations" value="" />
+                {/* Replace with dynamic location options if available */}
+                <Picker.Item label="New York, NY" value="new york, ny" />
+                <Picker.Item label="Los Angeles, CA" value="los angeles, ca" />
+                <Picker.Item label="Chicago, IL" value="chicago, il" />
+                {/* Add more locations as needed */}
+              </Picker>
+            </View>
+
+            {/* OR Separator */}
+            <View style={styles.orSeparator}>
+              <View style={styles.line} />
+              <Text style={styles.orText}>OR</Text>
+              <View style={styles.line} />
+            </View>
+
+            {/* Filter by Make */}
+            <Text style={styles.filterLabel}>Aircraft Make</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={makeModel}
+                onValueChange={(itemValue) => setMakeModel(itemValue)}
+                style={styles.picker}
+                accessibilityLabel="Filter by aircraft make"
+              >
+                <Picker.Item label="All Makes" value="" />
+                {/* Replace with dynamic make options if available */}
+                <Picker.Item label="Cessna" value="cessna" />
+                <Picker.Item label="Boeing" value="boeing" />
+                <Picker.Item label="Airbus" value="airbus" />
+                {/* Add more makes as needed */}
+              </Picker>
+            </View>
+
+            {/* Filter Actions */}
+            <View style={styles.filterActions}>
               <TouchableOpacity
                 onPress={clearFilter}
                 style={styles.clearFilterButton}
                 accessibilityLabel="Clear filters"
                 accessibilityRole="button"
               >
-                <Text style={styles.filterButtonText}>Clear Filter</Text>
+                <Text style={styles.filterActionText}>Clear</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1268,7 +1325,7 @@ const Home = ({ route, navigation }) => {
                 accessibilityLabel="Apply filters"
                 accessibilityRole="button"
               >
-                <Text style={styles.filterButtonText}>Apply Filter</Text>
+                <Text style={styles.filterActionText}>Apply</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1285,7 +1342,7 @@ const Home = ({ route, navigation }) => {
   );
 };
 
-// Styles
+// Redesigned Styles
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -1303,7 +1360,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   headerContent: {
-    backgroundColor: "rgba(0,0,0,0.4)", // Increased opacity
+    backgroundColor: "rgba(0,0,0,0.6)", // Increased opacity
     padding: 20, // Increased padding
     borderRadius: 12, // More rounded
   },
@@ -1353,6 +1410,7 @@ const styles = StyleSheet.create({
   noImageText: {
     color: "#FFFFFF",
     marginTop: 8,
+    fontSize: 14,
   },
   recommendedTitle: {
     padding: 12,
@@ -1362,68 +1420,79 @@ const styles = StyleSheet.create({
   },
   listingContainer: {
     flex: 1,
-    margin: 6, // Reduced margin from 8 to 6
+    margin: 8,
     maxWidth: (SCREEN_WIDTH - 48) / 2, // Adjusted for padding and margins
   },
   listingCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12, // Slightly increased for a modern look
+    borderRadius: 12,
     overflow: "hidden",
-    elevation: 4, // Enhanced shadow for better depth
+    elevation: 5, // Enhanced shadow
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    height: 220, // Further reduced height from 250 to 220
-    justifyContent: "space-between", // Ensure even spacing
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    height: 300, // Increased height for better content space
+    justifyContent: "space-between",
   },
-  listingHeader: {
-    padding: 2, // Decreased padding from 8 to 6
-  },
-  listingTitle: {
-    fontSize: 16,
-    fontWeight: "600", // Slightly lighter for modernity
-    color: "#2D3748",
+  imageContainer: {
+    width: "100%",
+    height: 150,
   },
   listingImage: {
     width: "100%",
-    height: 90, // Reduced height from 100 to 90
+    height: "100%",
     justifyContent: "flex-end",
   },
-  listingImageOverlay: {
-    backgroundColor: "rgba(0,0,0,0.4)", // Reduced opacity for better image visibility
-    padding: 4, // Decreased padding from 6 to 4
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
+  imageOverlay: {
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 8,
   },
   listingLocation: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: "600",
   },
   listingRate: {
-    color: "#FFFFFF",
+    color: "#FFD700",
     fontSize: 14,
-    fontWeight: "bold",
+    fontWeight: "700",
+    marginTop: 2,
   },
-  listingDescriptionContainer: {
-    padding: 6, // Decreased padding from 8 to 6
-    height: 40, // Reduced height from 50 to 40
-    justifyContent: "center",
+  listingDetails: {
+    padding: 12,
+  },
+  listingTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D3748",
+    marginBottom: 4,
   },
   listingDescription: {
     fontSize: 14,
     color: "#4A5568",
-    lineHeight: 16, // Reduced line height from 18 to 16
+  },
+  rentButton: {
+    backgroundColor: "#1E90FF",
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rentButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
   filterHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 16,
     marginBottom: 8,
   },
-  filterText: {
-    fontSize: 16,
-    fontWeight: "bold",
+  filterTitle: {
+    fontSize: 20,
+    fontWeight: "700",
     color: "#2D3748",
   },
   filterButton: {
@@ -1432,8 +1501,13 @@ const styles = StyleSheet.create({
   availableListingsTitle: {
     fontSize: 20,
     fontWeight: "700",
+    paddingHorizontal: 16,
     marginBottom: 16,
     color: "#2D3748",
+  },
+  columnWrapper: {
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
   },
   emptyListText: {
     textAlign: "center",
@@ -1686,65 +1760,84 @@ const styles = StyleSheet.create({
   filterModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "flex-end",
   },
   filterModalContent: {
-    width: "90%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    padding: 16,
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: SCREEN_HEIGHT * 0.6,
   },
   filterModalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 20,
   },
   filterModalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
     color: "#2D3748",
   },
-  filterTextInput: {
-    borderWidth: 1,
-    borderColor: "#A0AEC0",
-    borderRadius: 8,
-    padding: 12,
+  filterLabel: {
     fontSize: 16,
+    fontWeight: "600",
     color: "#2D3748",
+    marginBottom: 8,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#CBD5E0",
+    borderRadius: 8,
     marginBottom: 16,
+    overflow: "hidden",
+  },
+  picker: {
+    height: 50,
+    width: "100%",
+    color: "#2D3748",
+  },
+  orSeparator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#CBD5E0",
   },
   orText: {
-    textAlign: "center",
-    marginVertical: 8,
-    color: "#718096",
+    marginHorizontal: 10,
     fontSize: 16,
+    color: "#718096",
   },
-  filterButtonsContainer: {
+  filterActions: {
     flexDirection: "row",
     justifyContent: "space-between",
+    marginTop: 10,
   },
   clearFilterButton: {
     backgroundColor: "#E53E3E",
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     flex: 1,
-    marginRight: 8,
+    marginRight: 10,
     alignItems: "center",
   },
   applyFilterButton: {
     backgroundColor: "#1E90FF",
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     flex: 1,
-    marginLeft: 8,
+    marginLeft: 10,
     alignItems: "center",
   },
-  filterButtonText: {
+  filterActionText: {
     color: "#FFFFFF",
-    fontWeight: "700",
     fontSize: 16,
+    fontWeight: "700",
   },
   loadingOverlay: {
     position: "absolute",

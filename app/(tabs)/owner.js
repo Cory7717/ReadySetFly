@@ -15,7 +15,6 @@ import {
   Platform,
   FlatList,
   KeyboardAvoidingView,
-  StyleSheet,
   Linking,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -50,7 +49,9 @@ import BankDetailsForm from "../payment/BankDetailsForm";
 const API_URL =
   "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
 
-// Reusable Input Component
+/**
+ * Reusable Input Component
+ */
 const CustomTextInput = ({
   placeholder,
   value,
@@ -58,7 +59,7 @@ const CustomTextInput = ({
   keyboardType = "default",
   editable = true,
   multiline = false,
-  style,
+  className = "",
   ...rest
 }) => (
   <TextInput
@@ -67,49 +68,79 @@ const CustomTextInput = ({
     value={value}
     onChangeText={onChangeText}
     keyboardType={keyboardType}
-    style={[styles.input, style]}
+    style={{
+      borderWidth: 1,
+      borderColor: "#ccc",
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 12,
+      ...rest.style,
+    }}
     editable={editable}
     multiline={multiline}
     {...rest}
   />
 );
 
-// Reusable Section Component
+/**
+ * Reusable Section Component
+ */
 const Section = ({ title, children }) => (
   <View style={{ marginBottom: 16 }}>
-    <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
+    <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8 }}>
       {title}
     </Text>
     {children}
   </View>
 );
 
-// Reusable Button Component
+/**
+ * Reusable Button Component
+ */
 const CustomButton = ({
   onPress,
   title,
   backgroundColor = "#3182ce",
-  style,
-  textStyle,
+  style = {},
+  textStyle = {},
   accessibilityLabel,
+  accessibilityRole = "button",
 }) => (
   <TouchableOpacity
     onPress={onPress}
-    style={[styles.button, { backgroundColor }, style]}
+    style={{
+      backgroundColor,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      ...style,
+    }}
     accessibilityLabel={accessibilityLabel || title}
-    accessibilityRole="button"
+    accessibilityRole={accessibilityRole}
   >
-    <Text style={[styles.buttonText, textStyle]}>{title}</Text>
+    <Text style={{ color: "#fff", fontWeight: "bold", ...textStyle }}>
+      {title}
+    </Text>
   </TouchableOpacity>
 );
 
-// Reusable Modal Header
+/**
+ * Reusable Modal Header
+ */
 const ModalHeader = ({ title, onClose }) => (
-  <View style={styles.modalHeader}>
-    <Text style={styles.modalTitle}>{title}</Text>
+  <View
+    style={{
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    }}
+  >
+    <Text style={{ fontSize: 20, fontWeight: "bold" }}>{title}</Text>
     <TouchableOpacity
       onPress={onClose}
-      style={styles.closeModalButton}
+      style={{ padding: 8 }}
       accessibilityLabel="Close modal"
       accessibilityRole="button"
     >
@@ -118,7 +149,9 @@ const ModalHeader = ({ title, onClose }) => (
   </View>
 );
 
-// Helper function to format dates
+/**
+ * Helper function to format dates
+ */
 const formatDate = (date) => {
   if (!date) return "N/A";
   if (date.toDate) {
@@ -194,7 +227,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [userListings, setUserListings] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
   const [ratings, setRatings] = useState({});
-  const [availableBalance, setAvailableBalance] = useState(0);
+  const [availableBalance, setAvailableBalance] = useState(0); // Available balance state
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
   const [activeRentals, setActiveRentals] = useState([]);
@@ -214,7 +247,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [rentalRequestModalVisible, setRentalRequestModalVisible] =
     useState(false);
 
-  const [depositModalVisible, setDepositModalVisible] = useState(false);
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false); // Withdraw modal
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalEmail, setWithdrawalEmail] = useState("");
 
@@ -311,6 +344,9 @@ const OwnerProfile = ({ ownerId }) => {
         });
         setStripeAccountId(profile.stripeAccountId || null); // Set Stripe Account ID
         setIsStripeConnected(!!profile.stripeAccountId); // Update connection status
+
+        // Set Available Balance
+        setAvailableBalance(profile.availableBalance || 0);
       } else {
         console.log("No owner profile data found.");
         setIsStripeConnected(false); // Owner not connected
@@ -320,6 +356,7 @@ const OwnerProfile = ({ ownerId }) => {
           email: user.email || "",
           fullName: user.displayName || "",
         }));
+        setAvailableBalance(0); // Initialize balance
       }
 
       // Fetch Aircrafts from 'airplanes' collection where ownerId == resolvedOwnerId
@@ -345,7 +382,28 @@ const OwnerProfile = ({ ownerId }) => {
   useFocusEffect(
     useCallback(() => {
       fetchOwnerData();
-    }, [fetchOwnerData])
+
+      // Listen for real-time updates to availableBalance
+      if (resolvedOwnerId) {
+        const profileDocRef = doc(db, "users", resolvedOwnerId, "owners", resolvedOwnerId);
+        const unsubscribeBalance = onSnapshot(
+          profileDocRef,
+          (docSnap) => {
+            if (docSnap.exists()) {
+              const profile = docSnap.data();
+              setAvailableBalance(profile.availableBalance || 0);
+            }
+          },
+          (error) => {
+            console.error("Error listening to availableBalance updates:", error);
+          }
+        );
+
+        return () => {
+          unsubscribeBalance();
+        };
+      }
+    }, [fetchOwnerData, resolvedOwnerId])
   );
 
   /**
@@ -537,7 +595,7 @@ const OwnerProfile = ({ ownerId }) => {
         );
         setWithdrawalAmount("");
         setWithdrawalEmail(""); // Reset email field
-        setDepositModalVisible(false);
+        setWithdrawModalVisible(false);
         // The availableBalance will update automatically via Firestore snapshot
       } else {
         Alert.alert(
@@ -637,7 +695,6 @@ const OwnerProfile = ({ ownerId }) => {
 
               // Fetch renter's name and location
               if (renterId) {
-                // Corrected Firestore path
                 const renterDocRef = doc(db, "renters", renterId);
                 const renterDocSnap = await getDoc(renterDocRef);
                 if (renterDocSnap.exists()) {
@@ -1654,9 +1711,8 @@ const OwnerProfile = ({ ownerId }) => {
 
       // List each selected aircraft
       for (const aircraft of selectedAircrafts) {
-        // You can implement additional logic here if needed
+        // Implement additional logic here if needed
         // For now, we're assuming the aircraft is already listed in 'airplanes' collection
-        // If additional actions are required, implement them here
       }
 
       // Reset selection after listing
@@ -1702,7 +1758,7 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "white" }}>
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <StatusBar
         barStyle="light-content"
         translucent
@@ -1718,10 +1774,7 @@ const OwnerProfile = ({ ownerId }) => {
         {/* Header Section */}
         <ImageBackground
           source={wingtipClouds}
-          style={{
-            height: 224,
-            paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
-          }}
+          style={{ height: 224 }}
           resizeMode="cover"
         >
           <View
@@ -1730,15 +1783,12 @@ const OwnerProfile = ({ ownerId }) => {
               justifyContent: "space-between",
               alignItems: "center",
               paddingHorizontal: 16,
-              paddingTop:
-                Platform.OS === "android" ? StatusBar.currentHeight + 8 : 16,
+              paddingTop: 24,
             }}
           >
             <View>
-              <Text style={{ fontSize: 14, color: "white", marginTop: 1 }}>
-                Good Morning
-              </Text>
-              <Text style={{ fontSize: 18, fontWeight: "bold", color: "white" }}>
+              <Text style={{ fontSize: 14, color: "#fff" }}>Good Morning</Text>
+              <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>
                 {user?.displayName || "User"}
               </Text>
             </View>
@@ -1747,28 +1797,40 @@ const OwnerProfile = ({ ownerId }) => {
         </ImageBackground>
 
         {/* Funds Button Above Cost of Ownership */}
-        <View style={styles.fundsButtonContainer}>
+        <View
+          style={{
+            alignItems: "center",
+            marginTop: -56,
+            marginBottom: 16,
+          }}
+        >
           <CustomButton
-            onPress={() => setDepositModalVisible(true)}
+            onPress={() => setWithdrawModalVisible(true)} // Open withdraw modal
             title={`$${availableBalance.toFixed(2)}`}
-            backgroundColor="#000000" // Changed to black
-            style={styles.fundsButtonStyle}
-            textStyle={styles.fundsButtonTextStyle}
+            backgroundColor="#000"
+            style={{ width: 96, height: 48, borderRadius: 24 }}
+            textStyle={{ fontSize: 18, fontWeight: "bold" }}
           />
         </View>
         {/* End of Funds Button Placement */}
 
         {/* Cost of Ownership Calculator */}
-        <View style={{ padding: 16 }}>
+        <View style={{ paddingHorizontal: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Cost of Ownership Calculator
           </Text>
           {costSaved ? (
-            <View style={styles.calculatorResultContainer}>
-              <Text style={styles.calculatorTitle}>
+            <View
+              style={{
+                backgroundColor: "#f7fafc",
+                padding: 16,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
                 Estimated Cost per Hour: ${costData.costPerHour}
               </Text>
-              <Text style={styles.calculatorText}>
+              <Text style={{ fontSize: 16, marginBottom: 4 }}>
                 Total Fixed Costs per Year: $
                 {(
                   parseFloat(costData.mortgageExpense) * 12 +
@@ -1779,7 +1841,7 @@ const OwnerProfile = ({ ownerId }) => {
                   parseFloat(costData.annualRegistrationFees)
                 ).toFixed(2)}
               </Text>
-              <Text style={styles.calculatorText}>
+              <Text style={{ fontSize: 16, marginBottom: 16 }}>
                 Total Variable Costs per Year: $
                 {(
                   (parseFloat(costData.fuelCostPerHour) +
@@ -1793,7 +1855,8 @@ const OwnerProfile = ({ ownerId }) => {
               <CustomButton
                 onPress={onEditCostData}
                 title="Edit Cost Data"
-                style={{ marginTop: 16 }}
+                backgroundColor="#ecc94b"
+                accessibilityLabel="Edit Cost Data button"
               />
             </View>
           ) : (
@@ -1812,7 +1875,9 @@ const OwnerProfile = ({ ownerId }) => {
                 <CustomTextInput
                   placeholder="Loan Amount ($)"
                   value={costData.loanAmount}
-                  onChangeText={(value) => handleInputChange("loanAmount", value)}
+                  onChangeText={(value) =>
+                    handleInputChange("loanAmount", value)
+                  }
                   keyboardType="numeric"
                   accessibilityLabel="Loan Amount input"
                 />
@@ -1828,7 +1893,9 @@ const OwnerProfile = ({ ownerId }) => {
                 <CustomTextInput
                   placeholder="Loan Term (years)"
                   value={costData.loanTerm}
-                  onChangeText={(value) => handleInputChange("loanTerm", value)}
+                  onChangeText={(value) =>
+                    handleInputChange("loanTerm", value)
+                  }
                   keyboardType="numeric"
                   accessibilityLabel="Loan Term input"
                 />
@@ -1844,14 +1911,16 @@ const OwnerProfile = ({ ownerId }) => {
                 <CustomTextInput
                   placeholder="Useful Life (years)"
                   value={costData.usefulLife}
-                  onChangeText={(value) => handleInputChange("usefulLife", value)}
+                  onChangeText={(value) =>
+                    handleInputChange("usefulLife", value)
+                  }
                   keyboardType="numeric"
                   accessibilityLabel="Useful Life input"
                 />
-                <Text style={styles.modalText}>
+                <Text style={{ fontSize: 16, color: "#4a5568" }}>
                   Mortgage Expense: ${costData.mortgageExpense}
                 </Text>
-                <Text style={styles.modalText}>
+                <Text style={{ fontSize: 16, color: "#4a5568" }}>
                   Depreciation Expense: ${costData.depreciationExpense}
                 </Text>
               </Section>
@@ -1965,7 +2034,6 @@ const OwnerProfile = ({ ownerId }) => {
                 onPress={saveCostData}
                 title="Save Cost Data"
                 accessibilityLabel="Save Cost Data button"
-                accessibilityRole="button"
               />
               {loading && (
                 <ActivityIndicator
@@ -1981,7 +2049,7 @@ const OwnerProfile = ({ ownerId }) => {
 
         {/* Connect Stripe Account Section */}
         {!isStripeConnected && (
-          <View style={{ padding: 16 }}>
+          <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
             <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
               Connect Your Stripe Account
             </Text>
@@ -1993,12 +2061,11 @@ const OwnerProfile = ({ ownerId }) => {
               title="Connect Stripe Account"
               backgroundColor="#3182ce"
               accessibilityLabel="Connect your Stripe account"
-              accessibilityRole="button"
             />
           </View>
         )}
         {/* ************* Updated Section: Your Aircraft ************* */}
-        <View style={{ padding: 16 }}>
+        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Your Aircraft
           </Text>
@@ -2027,7 +2094,6 @@ const OwnerProfile = ({ ownerId }) => {
             backgroundColor="#3182ce"
             style={{ marginBottom: 16 }}
             accessibilityLabel="Add Aircraft button"
-            accessibilityRole="button"
           />
 
           {/* Horizontal ScrollView for Aircraft Cards */}
@@ -2046,19 +2112,34 @@ const OwnerProfile = ({ ownerId }) => {
                     setImages(item.images || []);
                     setAircraftModalVisible(true);
                   }}
-                  style={styles.aircraftCard}
+                  style={{
+                    width: 208,
+                    marginRight: 16,
+                    borderWidth: 1,
+                    borderColor: "#ccc",
+                    borderRadius: 8,
+                    padding: 8,
+                    backgroundColor: "#fff",
+                  }}
                   accessibilityLabel={`View details for aircraft ${item.aircraftModel}`}
                   accessibilityRole="button"
                 >
                   {/* Circle Selection Button */}
                   <TouchableOpacity
                     onPress={() => toggleSelectAircraft(item.id)}
-                    style={[
-                      styles.selectionButton,
-                      selectedAircraftIds.includes(item.id)
-                        ? styles.selectionButtonSelected
-                        : styles.selectionButtonUnselected,
-                    ]}
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      left: 8,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: selectedAircraftIds.includes(item.id)
+                        ? "#3182ce"
+                        : "#ccc",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
                     accessibilityLabel={
                       selectedAircraftIds.includes(item.id)
                         ? "Deselect aircraft"
@@ -2067,7 +2148,7 @@ const OwnerProfile = ({ ownerId }) => {
                     accessibilityRole="button"
                   >
                     {selectedAircraftIds.includes(item.id) && (
-                      <Ionicons name="checkmark" size={20} color="#fff" />
+                      <Ionicons name="checkmark" size={12} color="#fff" />
                     )}
                   </TouchableOpacity>
 
@@ -2075,26 +2156,39 @@ const OwnerProfile = ({ ownerId }) => {
                   {item.mainImage ? (
                     <Image
                       source={{ uri: item.mainImage }}
-                      style={styles.aircraftCardImage}
+                      style={{ width: "100%", height: 96, borderRadius: 8 }}
                     />
                   ) : (
-                    <View style={styles.noImageContainer}>
+                    <View
+                      style={{
+                        width: "100%",
+                        height: 96,
+                        borderRadius: 8,
+                        backgroundColor: "#e2e8f0",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
                       <Text style={{ color: "#a0aec0" }}>No Image</Text>
                     </View>
                   )}
 
                   {/* Aircraft Info */}
-                  <View style={styles.aircraftCardInfo}>
-                    <Text style={styles.aircraftCardTitle}>
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={{ fontWeight: "bold", fontSize: 16 }}>
                       {item.aircraftModel}
                     </Text>
-                    <Text>Tail Number: {item.tailNumber}</Text>
-                    <Text>Engine: {item.engineType}</Text>
-                    <Text>Total Time: {item.totalTimeOnFrame} hours</Text>
-                    <Text>
+                    <Text style={{ fontSize: 14 }}>Tail Number: {item.tailNumber}</Text>
+                    <Text style={{ fontSize: 14 }}>Engine: {item.engineType}</Text>
+                    <Text style={{ fontSize: 14 }}>
+                      Total Time: {item.totalTimeOnFrame} hours
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
                       Location: {item.location} ({item.airportIdentifier})
                     </Text>
-                    <Text>Cost Per Hour: ${item.costPerHour}</Text>
+                    <Text style={{ fontSize: 14 }}>
+                      Cost Per Hour: ${item.costPerHour}
+                    </Text>
                   </View>
 
                   {/* Remove Button */}
@@ -2139,7 +2233,11 @@ const OwnerProfile = ({ ownerId }) => {
                         ]
                       );
                     }}
-                    style={styles.removeAircraftButton}
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                    }}
                     accessibilityLabel={`Remove listing for aircraft ${item.aircraftModel}`}
                     accessibilityRole="button"
                   >
@@ -2149,7 +2247,7 @@ const OwnerProfile = ({ ownerId }) => {
               )}
             />
           ) : (
-            <Text>No aircraft added yet.</Text>
+            <Text style={{ color: "#a0aec0" }}>No aircraft added yet.</Text>
           )}
 
           {/* ************* Big Plus Sign to Add Additional Aircraft ************* */}
@@ -2172,7 +2270,11 @@ const OwnerProfile = ({ ownerId }) => {
               setImages([]);
               setAircraftModalVisible(true);
             }}
-            style={styles.addAircraftButton}
+            style={{
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 16,
+            }}
             accessibilityLabel="Add new aircraft"
             accessibilityRole="button"
           >
@@ -2184,10 +2286,9 @@ const OwnerProfile = ({ ownerId }) => {
           <CustomButton
             onPress={handleListForRentToggle}
             title="List Selected Aircraft"
-            backgroundColor="#48bb78"
+            backgroundColor="#38a169"
             style={{ marginTop: 16, marginBottom: 16 }}
             accessibilityLabel="List selected aircraft for rent"
-            accessibilityRole="button"
           />
         </View>
         {/* ************* End of Updated Section: Your Aircraft ************* */}
@@ -2195,7 +2296,7 @@ const OwnerProfile = ({ ownerId }) => {
         {/* ************* Admin Tools Section ************* */}
         {/* Show only for admin users */}
         {user?.email === "admin@example.com" && ( // Replace with your admin condition
-          <View style={{ padding: 16 }}>
+          <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
             <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
               Admin Tools
             </Text>
@@ -2215,10 +2316,9 @@ const OwnerProfile = ({ ownerId }) => {
                 );
               }}
               title="Perform Cleanup"
-              backgroundColor="#e53e3e" // Red color for destructive action
+              backgroundColor="#e53e3e"
               style={{ marginBottom: 16 }}
               accessibilityLabel="Perform data cleanup"
-              accessibilityRole="button"
             />
             {cleanupLoading && (
               <ActivityIndicator
@@ -2232,7 +2332,7 @@ const OwnerProfile = ({ ownerId }) => {
         {/* ************* End of Admin Tools Section ************* */}
 
         {/* Current Listings */}
-        <View style={{ padding: 16 }}>
+        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Current Listings
           </Text>
@@ -2251,14 +2351,27 @@ const OwnerProfile = ({ ownerId }) => {
                     setImages(item.images || []);
                     setAircraftModalVisible(true);
                   }}
-                  style={styles.listingContainer}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#ccc",
+                    borderRadius: 8,
+                    padding: 16,
+                    marginBottom: 16,
+                    backgroundColor: "#fff",
+                  }}
                   accessibilityLabel={`View details for listing ${item.aircraftModel}`}
                   accessibilityRole="button"
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
                     {/* Pressable Area */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+                      <Text style={{ fontSize: 20, fontWeight: "bold" }}>
                         {item.aircraftModel}
                       </Text>
                       <Text>{item.description}</Text>
@@ -2287,9 +2400,7 @@ const OwnerProfile = ({ ownerId }) => {
                                     allAircrafts.filter((a) => a.id !== item.id)
                                   );
                                   setSelectedAircraftIds(
-                                    selectedAircraftIds.filter(
-                                      (id) => id !== item.id
-                                    )
+                                    selectedAircraftIds.filter((id) => id !== item.id)
                                   );
 
                                   Alert.alert(
@@ -2308,7 +2419,7 @@ const OwnerProfile = ({ ownerId }) => {
                           ]
                         );
                       }}
-                      style={styles.removeAircraftButton}
+                      style={{ marginLeft: 16 }}
                       accessibilityLabel={`Remove listing for aircraft ${item.aircraftModel}`}
                       accessibilityRole="button"
                     >
@@ -2325,21 +2436,28 @@ const OwnerProfile = ({ ownerId }) => {
                       renderItem={({ item: image }) => (
                         <Image
                           source={{ uri: image }}
-                          style={styles.listingImage}
+                          style={{
+                            width: 96,
+                            height: 96,
+                            borderRadius: 8,
+                            marginTop: 8,
+                            marginRight: 8,
+                          }}
                         />
                       )}
+                      style={{ marginTop: 8 }}
                     />
                   )}
                 </TouchableOpacity>
               )}
             />
           ) : (
-            <Text>No current listings.</Text>
+            <Text style={{ color: "#a0aec0" }}>No current listings.</Text>
           )}
         </View>
 
         {/* ************* New Section: Incoming Rental Requests ************* */}
-        <View style={{ padding: 16 }}>
+        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Incoming Rental Requests
           </Text>
@@ -2358,7 +2476,14 @@ const OwnerProfile = ({ ownerId }) => {
                     setSelectedListingDetails(listing);
                     setRentalRequestModalVisible(true);
                   }}
-                  style={styles.rentalRequestContainer}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#ccc",
+                    borderRadius: 8,
+                    padding: 16,
+                    marginBottom: 16,
+                    backgroundColor: "#fff",
+                  }}
                   accessibilityLabel={`View details for rental request from ${item.renterName}`}
                   accessibilityRole="button"
                 >
@@ -2372,7 +2497,7 @@ const OwnerProfile = ({ ownerId }) => {
                       ? `${item.listingDetails.aircraftModel}`
                       : "Listing details not available"}
                   </Text>
-                  {/* Update to display only base cost */}
+                  {/* Display Base Cost */}
                   <Text>Total Cost: ${item.baseCost}</Text>
                   <Text>Requested Date: {formatDate(item.rentalDate)}</Text>
                   <Text>Status: {item.status}</Text>
@@ -2380,13 +2505,13 @@ const OwnerProfile = ({ ownerId }) => {
               )}
             />
           ) : (
-            <Text>No incoming rental requests.</Text>
+            <Text style={{ color: "#a0aec0" }}>No incoming rental requests.</Text>
           )}
         </View>
         {/* ************* End of Incoming Rental Requests ************* */}
 
         {/* ************* New Section: Active Rentals ************* */}
-        <View style={{ padding: 16 }}>
+        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Active Rentals
           </Text>
@@ -2396,7 +2521,15 @@ const OwnerProfile = ({ ownerId }) => {
               {activeRentals.slice(0, 3).map((item, index) => (
                 <View
                   key={item.id}
-                  style={styles.activeRentalContainer}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#ccc",
+                    borderRadius: 8,
+                    padding: 16,
+                    marginBottom: 16,
+                    backgroundColor: "#fff",
+                    position: "relative",
+                  }}
                 >
                   <TouchableOpacity
                     onPress={() => {
@@ -2414,7 +2547,7 @@ const OwnerProfile = ({ ownerId }) => {
                         : "Listing details not available"}
                     </Text>
                     <Text>Renter: {item.renterName}</Text>
-                    {/* Update to display only base cost */}
+                    {/* Display Base Cost */}
                     <Text>Total Cost: ${item.baseCost}</Text>
                     <Text>Rental Date: {formatDate(item.rentalDate)}</Text>
                     <Text>Status: {item.status}</Text>
@@ -2422,7 +2555,11 @@ const OwnerProfile = ({ ownerId }) => {
                   {/* Remove Button */}
                   <TouchableOpacity
                     onPress={() => handleDeleteActiveRental(item.id)}
-                    style={styles.removeAircraftButton}
+                    style={{
+                      position: "absolute",
+                      top: 16,
+                      right: 16,
+                    }}
                     accessibilityLabel={`Delete active rental for ${item.listingDetails?.aircraftModel}`}
                     accessibilityRole="button"
                   >
@@ -2437,9 +2574,8 @@ const OwnerProfile = ({ ownerId }) => {
                   onPress={() => setViewMoreModalVisible(true)}
                   title="View More"
                   backgroundColor="#3182ce"
-                  style={{ marginTop: 16 }}
+                  style={{ marginTop: 16, marginBottom: 16 }}
                   accessibilityLabel="View more active rentals"
-                  accessibilityRole="button"
                 />
               )}
 
@@ -2473,14 +2609,13 @@ const OwnerProfile = ({ ownerId }) => {
                   )
                 }
                 title="Delete All Active Rentals"
-                backgroundColor="#e53e3e" // Red color for destructive action
+                backgroundColor="#e53e3e"
                 style={{ marginTop: 16 }}
                 accessibilityLabel="Delete all active rentals"
-                accessibilityRole="button"
               />
             </>
           ) : (
-            <Text>No active rentals.</Text>
+            <Text style={{ color: "#a0aec0" }}>No active rentals.</Text>
           )}
         </View>
         {/* ************* End of Active Rentals ************* */}
@@ -2495,8 +2630,23 @@ const OwnerProfile = ({ ownerId }) => {
         transparent={true}
         onRequestClose={() => setRentalRequestModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              maxHeight: "90%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
             {selectedRequest && selectedListingDetails ? (
               <>
                 <ModalHeader
@@ -2505,94 +2655,95 @@ const OwnerProfile = ({ ownerId }) => {
                 />
                 <View style={{ marginBottom: 16 }}>
                   {/* Renter's Additional Information */}
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Renter Name: </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Renter Name: </Text>
                     {selectedRequest.renterName}
                   </Text>
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Location: </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Location: </Text>
                     {selectedRequest.renterCityState}
                   </Text>
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Rental Hours: </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Rental Hours: </Text>
                     {selectedRequest.rentalHours}
                   </Text>
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Current Medical: </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Current Medical: </Text>
                     {selectedRequest.currentMedical}
                   </Text>
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>
                       Current Renter's Insurance:{" "}
                     </Text>
                     {selectedRequest.currentRentersInsurance}
                   </Text>
 
                   {/* Existing Rental Request Details */}
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Listing: </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Listing: </Text>
                     {selectedListingDetails
                       ? `${selectedListingDetails.aircraftModel}`
                       : "Listing details not available"}
                   </Text>
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Rate per Hour: </Text>$
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Rate per Hour: </Text>$
                     {selectedListingDetails.costPerHour}
                   </Text>
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Number of Hours: </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Number of Hours: </Text>
                     {selectedRequest.rentalHours}
                   </Text>
                   {/* Display Base Cost */}
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Base Cost: </Text>$
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Base Cost: </Text>$
                     {selectedRequest.baseCost}
                   </Text>
                   {/* Display Commission */}
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>6% Commission: </Text>$
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>6% Commission: </Text>$
                     {selectedRequest.commission}
                   </Text>
                   {/* Display Owner's Total */}
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Owner's Total: </Text>$
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Owner's Total: </Text>$
                     {(
                       parseFloat(selectedRequest.baseCost) -
                       parseFloat(selectedRequest.commission)
                     ).toFixed(2)}
                   </Text>
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Requested Date: </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Requested Date: </Text>
                     {formatDate(selectedRequest.rentalDate)}
                   </Text>
-                  <Text style={styles.modalText}>
-                    <Text style={styles.modalLabel}>Status: </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: "bold" }}>Status: </Text>
                     {selectedRequest.status}
                   </Text>
                 </View>
 
                 {selectedRequest.status === "pending" && (
-                  <View style={styles.modalButtonsContainer}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                    }}
+                  >
                     <CustomButton
                       onPress={() => {
-                        // Changed to handleApproveRentalRequest
+                        // Handle approving rental request
                         handleApproveRentalRequest(selectedRequest);
                       }}
                       title="Approve"
                       backgroundColor="#48bb78"
                       style={{ flex: 1, marginRight: 8 }}
-                      textStyle={{ fontSize: 16 }}
                       accessibilityLabel="Approve rental request"
-                      accessibilityRole="button"
                     />
                     <CustomButton
                       onPress={() => handleDenyRentalRequest(selectedRequest)}
                       title="Deny"
-                      backgroundColor="#e53e3e"
+                      backgroundColor="#f56565"
                       style={{ flex: 1, marginLeft: 8 }}
-                      textStyle={{ fontSize: 16 }}
                       accessibilityLabel="Deny rental request"
-                      accessibilityRole="button"
                     />
                   </View>
                 )}
@@ -2607,11 +2758,9 @@ const OwnerProfile = ({ ownerId }) => {
                       );
                     }}
                     title="Manage Rental"
-                    backgroundColor="#3182ce"
+                    backgroundColor="#4299e1"
                     style={{ marginTop: 16 }}
-                    textStyle={{ fontSize: 16 }}
                     accessibilityLabel="Manage active rental"
-                    accessibilityRole="button"
                   />
                 )}
               </>
@@ -2629,11 +2778,26 @@ const OwnerProfile = ({ ownerId }) => {
         transparent={true}
         onRequestClose={() => setMessageModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.messageModalContainer}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              height: "80%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
             <TouchableOpacity
               onPress={() => setMessageModalVisible(false)}
-              style={styles.closeModalButton}
+              style={{ position: "absolute", top: 16, right: 16 }}
               accessibilityLabel="Close messages"
               accessibilityRole="button"
             >
@@ -2648,18 +2812,28 @@ const OwnerProfile = ({ ownerId }) => {
                 } // Ensures unique keys by including index
                 renderItem={({ item }) => (
                   <View
-                    style={[
-                      styles.chatBubble,
-                      item.senderId === user.uid
-                        ? styles.chatBubbleRight
-                        : styles.chatBubbleLeft,
-                    ]}
+                    style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      marginBottom: 8,
+                      maxWidth: "75%",
+                      alignSelf: item.senderId === user.uid ? "flex-end" : "flex-start",
+                      backgroundColor:
+                        item.senderId === user.uid ? "#3182ce" : "#e2e8f0",
+                    }}
                   >
-                    <Text style={{ fontWeight: "bold" }}>
+                    <Text
+                      style={{
+                        fontWeight: "bold",
+                        color: item.senderId === user.uid ? "#fff" : "#000",
+                      }}
+                    >
                       {item.senderName}:
                     </Text>
-                    <Text>{item.text}</Text>
-                    <Text style={styles.chatTimestamp}>
+                    <Text style={{ color: item.senderId === user.uid ? "#fff" : "#000" }}>
+                      {item.text}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: "#a0aec0", marginTop: 4 }}>
                       {item.createdAt
                         ? item.createdAt.toDate
                           ? item.createdAt.toDate().toLocaleString()
@@ -2668,28 +2842,44 @@ const OwnerProfile = ({ ownerId }) => {
                     </Text>
                   </View>
                 )}
+                style={{ flex: 1 }}
               />
             ) : (
-              <Text>No messages yet.</Text>
+              <Text style={{ color: "#a0aec0", textAlign: "center" }}>
+                No messages yet.
+              </Text>
             )}
 
-            <View style={styles.messageInputContainer}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 16 }}>
               <TextInput
                 placeholder="Type your message..."
                 value={messageInput}
                 onChangeText={(text) => setMessageInput(text)}
-                style={styles.messageTextInput}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: "#ccc",
+                  borderRadius: 8,
+                  padding: 12,
+                  marginRight: 8,
+                }}
                 keyboardType="default"
                 autoCapitalize="none"
                 accessibilityLabel="Type a message"
               />
               <TouchableOpacity
                 onPress={sendMessage}
-                style={styles.sendButton}
+                style={{
+                  backgroundColor: "#3182ce",
+                  padding: 12,
+                  borderRadius: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
                 accessibilityLabel="Send message"
                 accessibilityRole="button"
               >
-                <Ionicons name="send" size={24} color="white" />
+                <Ionicons name="send" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
@@ -2707,8 +2897,23 @@ const OwnerProfile = ({ ownerId }) => {
           style={{ flex: 1 }}
           keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0} // Adjust offset as needed
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                width: "90%",
+                height: "85%",
+                backgroundColor: "#fff",
+                borderRadius: 8,
+                padding: 24,
+              }}
+            >
               <ModalHeader
                 title="All Active Rentals"
                 onClose={() => setViewMoreModalVisible(false)}
@@ -2725,7 +2930,14 @@ const OwnerProfile = ({ ownerId }) => {
                       setRentalRequestModalVisible(true);
                       setViewMoreModalVisible(false);
                     }}
-                    style={styles.activeRentalContainer}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#ccc",
+                      borderRadius: 8,
+                      padding: 16,
+                      marginBottom: 16,
+                      backgroundColor: "#fff",
+                    }}
                     accessibilityLabel={`View details for active rental of ${item.listingDetails?.aircraftModel}`}
                     accessibilityRole="button"
                   >
@@ -2736,7 +2948,7 @@ const OwnerProfile = ({ ownerId }) => {
                         : "Listing details not available"}
                     </Text>
                     <Text>Renter: {item.renterName}</Text>
-                    {/* Display only base cost */}
+                    {/* Display Base Cost */}
                     <Text>Total Cost: ${item.baseCost}</Text>
                     <Text>Rental Date: {formatDate(item.rentalDate)}</Text>
                     <Text>Status: {item.status}</Text>
@@ -2750,19 +2962,14 @@ const OwnerProfile = ({ ownerId }) => {
                       style={{ marginVertical: 16 }}
                     />
                   ) : (
-                    <Text
-                      style={{
-                        textAlign: "center",
-                        color: "#4a5568",
-                        marginVertical: 16,
-                      }}
-                    >
+                    <Text style={{ textAlign: "center", color: "#a0aec0", marginTop: 16 }}>
                       No more active rentals to load.
                     </Text>
                   )
                 }
                 onEndReached={handleLoadMoreActiveRentals}
                 onEndReachedThreshold={0.5}
+                style={{ flex: 1 }}
               />
             </View>
           </View>
@@ -2776,7 +2983,7 @@ const OwnerProfile = ({ ownerId }) => {
         animationType="slide"
         onRequestClose={() => setAircraftModalVisible(false)}
       >
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <ScrollView style={{ flex: 1, padding: 16 }}>
           <ModalHeader
             title={isEditing ? "Edit Aircraft Details" : "Aircraft Details"}
             onClose={() => setAircraftModalVisible(false)}
@@ -2855,7 +3062,7 @@ const OwnerProfile = ({ ownerId }) => {
               placeholder="Description"
               value={aircraftDetails.description}
               onChangeText={(value) => handleInputChange("description", value)}
-              style={{ height: 100 }}
+              style={{ height: 96, textAlignVertical: "top" }}
               multiline={true}
               editable={isEditing}
               accessibilityLabel="Description input"
@@ -2869,25 +3076,38 @@ const OwnerProfile = ({ ownerId }) => {
               horizontal
               keyExtractor={(item, index) => `${item}_${index}`} // Ensures unique keys by combining URI with index
               renderItem={({ item }) => (
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: item }} style={styles.imagePreview} />
+                <View style={{ position: "relative", marginRight: 8 }}>
+                  <Image
+                    source={{ uri: item }}
+                    style={{ width: 96, height: 96, borderRadius: 8 }}
+                  />
                   {isEditing && (
                     <>
                       {/* Set Main Image Button */}
                       <TouchableOpacity
                         onPress={() => selectMainImage(item)}
-                        style={styles.setMainImageButton}
+                        style={{
+                          position: "absolute",
+                          bottom: 4,
+                          left: 4,
+                          backgroundColor: "#3182ce",
+                          paddingVertical: 4,
+                          paddingHorizontal: 8,
+                          borderRadius: 4,
+                        }}
                         accessibilityLabel="Set as main image"
                         accessibilityRole="button"
                       >
-                        <Text style={{ color: "white", fontSize: 10 }}>
-                          Set Main
-                        </Text>
+                        <Text style={{ color: "#fff", fontSize: 12 }}>Set Main</Text>
                       </TouchableOpacity>
                       {/* Remove Image Button */}
                       <TouchableOpacity
                         onPress={() => removeImage(item)}
-                        style={styles.removeImageButton}
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                        }}
                         accessibilityLabel="Remove image"
                         accessibilityRole="button"
                       >
@@ -2897,8 +3117,9 @@ const OwnerProfile = ({ ownerId }) => {
                   )}
                 </View>
               )}
+              style={{ marginBottom: 8 }}
             />
-            <Text style={{ marginTop: 4, color: "#4a5568" }}>
+            <Text style={{ color: "#a0aec0" }}>
               {images.length}/7 images
             </Text>
           </Section>
@@ -2910,12 +3131,11 @@ const OwnerProfile = ({ ownerId }) => {
                 onPress={pickImage}
                 title="Upload Images"
                 backgroundColor="#3182ce"
-                style={{ marginTop: 16 }}
+                style={{ marginTop: 16, marginBottom: 8 }}
                 accessibilityLabel="Upload images"
-                accessibilityRole="button"
               />
               {images.length >= 7 && (
-                <Text style={{ color: "red", marginTop: 4 }}>
+                <Text style={{ color: "#f56565" }}>
                   Maximum of 7 images reached.
                 </Text>
               )}
@@ -2925,12 +3145,12 @@ const OwnerProfile = ({ ownerId }) => {
           {/* Main Image Display */}
           {selectedAircraft && selectedAircraft.mainImage && (
             <View style={{ marginTop: 16, alignItems: "center" }}>
-              <Text style={{ fontSize: 16, fontWeight: "bold" }}>
+              <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>
                 Main Image:
               </Text>
               <Image
                 source={{ uri: selectedAircraft.mainImage }}
-                style={styles.mainImageDisplay}
+                style={{ width: 192, height: 192, borderRadius: 8 }}
               />
             </View>
           )}
@@ -2945,24 +3165,21 @@ const OwnerProfile = ({ ownerId }) => {
                   backgroundColor="#3182ce"
                   style={{ marginBottom: 16 }}
                   accessibilityLabel="Save aircraft details"
-                  accessibilityRole="button"
                 />
                 <CustomButton
                   onPress={() => setAircraftModalVisible(false)}
                   title="Cancel"
                   backgroundColor="#e53e3e"
                   accessibilityLabel="Cancel aircraft details modal"
-                  accessibilityRole="button"
                 />
               </>
             ) : (
               <CustomButton
                 onPress={onEditAircraftDetails}
                 title="Edit Aircraft"
-                backgroundColor="#48bb78"
+                backgroundColor="#38a169"
                 style={{ marginBottom: 16 }}
                 accessibilityLabel="Edit aircraft details"
-                accessibilityRole="button"
               />
             )}
           </View>
@@ -2977,8 +3194,23 @@ const OwnerProfile = ({ ownerId }) => {
         transparent={true}
         onRequestClose={() => setConnectStripeModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              maxHeight: "90%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
             <ModalHeader
               title="Connect Stripe Account"
               onClose={() => setConnectStripeModalVisible(false)}
@@ -2998,7 +3230,6 @@ const OwnerProfile = ({ ownerId }) => {
               value={profileData.email}
               onChangeText={(value) => handleInputChange("email", value)}
               keyboardType="email-address"
-              autoCapitalize="none"
               accessibilityLabel="Email Address input"
             />
             <CustomButton
@@ -3007,7 +3238,6 @@ const OwnerProfile = ({ ownerId }) => {
               backgroundColor="#3182ce"
               style={{ marginTop: 16 }}
               accessibilityLabel="Proceed to connect Stripe account"
-              accessibilityRole="button"
             />
           </View>
         </View>
@@ -3015,40 +3245,62 @@ const OwnerProfile = ({ ownerId }) => {
 
       {/* ************* Updated Withdraw Funds Modal ************* */}
       <Modal
-        visible={depositModalVisible}
+        visible={withdrawModalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setDepositModalVisible(false)}
+        onRequestClose={() => setWithdrawModalVisible(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
           keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0} // Adjust offset as needed
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.depositModalContainer}>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                width: "88%",
+                maxHeight: "90%",
+                backgroundColor: "#fff",
+                borderRadius: 8,
+                padding: 24,
+              }}
+            >
               <ScrollView
-                contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
+                contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
                 keyboardShouldPersistTaps="handled"
-                showsHorizontalScrollIndicator="false"
+                showsHorizontalScrollIndicator={false}
               >
                 <ModalHeader
                   title="Withdraw Funds"
-                  onClose={() => setDepositModalVisible(false)}
+                  onClose={() => setWithdrawModalVisible(false)}
                 />
-                <Text style={styles.modalText}>
+                <Text style={{ fontSize: 16, marginBottom: 16 }}>
                   Available Balance: ${availableBalance.toFixed(2)}
                 </Text>
 
                 {/* Payment Method Selection */}
                 <Section title="Payment Method">
-                  <View style={styles.pickerContainer}>
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#ccc",
+                      borderRadius: 8,
+                      marginBottom: 16,
+                    }}
+                  >
                     <Picker
                       selectedValue={paymentMethod}
                       onValueChange={(itemValue, itemIndex) =>
                         setPaymentMethod(itemValue)
                       }
-                      style={styles.picker}
+                      style={{ height: 48, width: "100%" }}
                       accessibilityLabel="Select payment method"
                     >
                       <Picker.Item label="Bank Account" value="bank" />
@@ -3081,7 +3333,7 @@ const OwnerProfile = ({ ownerId }) => {
                       style={{
                         width: "100%",
                         height: 50,
-                        marginVertical: 30,
+                        marginVertical: 24,
                       }}
                       onCardChange={(details) => {
                         setCardDetails(details); // Update cardDetails state
@@ -3095,11 +3347,9 @@ const OwnerProfile = ({ ownerId }) => {
                 <Section title="Withdrawal Email">
                   <CustomTextInput
                     placeholder="Email Address"
-                    placeholderTextColor="#888"
                     value={withdrawalEmail}
                     onChangeText={(value) => setWithdrawalEmail(value)}
                     keyboardType="email-address"
-                    autoCapitalize="none"
                     accessibilityLabel="Withdrawal email input"
                   />
                 </Section>
@@ -3108,7 +3358,6 @@ const OwnerProfile = ({ ownerId }) => {
                 <Section title="Withdrawal Amount">
                   <CustomTextInput
                     placeholder="Amount to Withdraw ($)"
-                    placeholderTextColor="#888"
                     value={withdrawalAmount}
                     onChangeText={(value) => setWithdrawalAmount(value)}
                     keyboardType="numeric"
@@ -3120,17 +3369,14 @@ const OwnerProfile = ({ ownerId }) => {
                   onPress={handleWithdraw}
                   title="Withdraw"
                   backgroundColor="#48bb78"
-                  style={{ marginTop: 16 }}
+                  style={{ marginTop: 16, marginBottom: 8 }}
                   accessibilityLabel="Withdraw funds"
-                  accessibilityRole="button"
                 />
                 <CustomButton
-                  onPress={() => setDepositModalVisible(false)}
+                  onPress={() => setWithdrawModalVisible(false)}
                   title="Cancel"
-                  backgroundColor="#e53e3e"
-                  style={{ marginTop: 8 }}
+                  backgroundColor="#f56565"
                   accessibilityLabel="Cancel withdrawal"
-                  accessibilityRole="button"
                 />
                 {loading && (
                   <ActivityIndicator
@@ -3148,279 +3394,5 @@ const OwnerProfile = ({ ownerId }) => {
     </View>
   );
 };
-
-// Styles
-const styles = StyleSheet.create({
-  input: {
-    borderWidth: 1,
-    borderColor: "#a0aec0",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  button: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  closeModalButton: {
-    padding: 4,
-  },
-  fundsButtonContainer: {
-    alignItems: "center",
-    marginTop: -32,
-    marginBottom: 16,
-  },
-  fundsButtonStyle: {
-    width: 100,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  fundsButtonTextStyle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  calculatorResultContainer: {
-    backgroundColor: "#edf2f7",
-    padding: 16,
-    borderRadius: 8,
-  },
-  calculatorTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  calculatorText: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: "#a0aec0",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  picker: {
-    height: 50,
-    width: "100%",
-  },
-  imagePreviewContainer: {
-    position: "relative",
-    marginRight: 8,
-  },
-  imagePreview: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-  },
-  setMainImageButton: {
-    position: "absolute",
-    bottom: 4,
-    left: 4,
-    backgroundColor: "#3182ce",
-    padding: 2,
-    borderRadius: 4,
-  },
-  removeImageButton: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-  },
-  mainImageDisplay: {
-    width: 200,
-    height: 200,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  selectionButton: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#a0aec0",
-  },
-  selectionButtonSelected: {
-    backgroundColor: "#3182ce",
-  },
-  selectionButtonUnselected: {
-    backgroundColor: "#a0aec0",
-  },
-  aircraftCard: {
-    width: 200,
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: "#a0aec0",
-    borderRadius: 8,
-    padding: 8,
-    backgroundColor: "#fff",
-  },
-  aircraftCardImage: {
-    width: "100%",
-    height: 100,
-    borderRadius: 8,
-  },
-  noImageContainer: {
-    width: "100%",
-    height: 100,
-    borderRadius: 8,
-    backgroundColor: "#edf2f7",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  aircraftCardInfo: {
-    marginTop: 8,
-  },
-  aircraftCardTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  removeAircraftButton: {
-    marginTop: 8,
-    alignSelf: "flex-end",
-  },
-  addAircraftButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 16,
-  },
-  listingContainer: {
-    borderWidth: 1,
-    borderColor: "#a0aec0",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    backgroundColor: "#fff",
-  },
-  listingImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    marginTop: 8,
-    marginRight: 8,
-  },
-  rentalRequestContainer: {
-    borderWidth: 1,
-    borderColor: "#a0aec0",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    backgroundColor: "#fff",
-  },
-  activeRentalContainer: {
-    borderWidth: 1,
-    borderColor: "#a0aec0",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    backgroundColor: "#fff",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContainer: {
-    width: "90%",
-    maxHeight: "80%",
-    backgroundColor: "white",
-    borderRadius: 8,
-    padding: 16,
-  },
-  messageModalContainer: {
-    width: "90%",
-    maxHeight: "80%",
-    backgroundColor: "white",
-    borderRadius: 8,
-    padding: 16,
-    justifyContent: "space-between",
-  },
-  messageInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 16,
-  },
-  messageTextInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#a0aec0",
-    borderRadius: 8,
-    padding: 12,
-    marginRight: 8,
-  },
-  sendButton: {
-    backgroundColor: "#3182ce",
-    padding: 12,
-    borderRadius: 8,
-  },
-  chatBubble: {
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 8,
-    maxWidth: "80%",
-  },
-  chatBubbleLeft: {
-    backgroundColor: "#edf2f7",
-    alignSelf: "flex-start",
-  },
-  chatBubbleRight: {
-    backgroundColor: "#3182ce",
-    alignSelf: "flex-end",
-  },
-  chatTimestamp: {
-    fontSize: 10,
-    color: "#718096",
-    marginTop: 4,
-    textAlign: "right",
-  },
-  modalButtonsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  depositModalContainer: {
-    width: "90%",
-    maxHeight: "80%",
-    backgroundColor: "white",
-    borderRadius: 8,
-    padding: 16,
-  },
-  calculatorResultContainer: {
-    backgroundColor: "#edf2f7",
-    padding: 16,
-    borderRadius: 8,
-  },
-  connectStripeButton: {
-    backgroundColor: "#667eea",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  connectStripeButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-});
 
 export default OwnerProfile;

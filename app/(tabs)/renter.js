@@ -1,4 +1,4 @@
-// src/components/BookingCalendar.js
+// src/components/renter.js (originally BookingCalendar.js)
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -67,7 +67,7 @@ const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api"
 // Import Firebase configuration
 import { db, auth } from "../../firebaseConfig"; // Adjust the path as necessary
 
-const BookingCalendar = () => {
+const renter = () => {
   const router = useRouter(); // Initialize Expo Router
   // Removed React Navigation's useNavigation
 
@@ -1332,11 +1332,7 @@ const BookingCalendar = () => {
               {/* Cessna 172 */}
               <TouchableOpacity
                 style={styles.recommendedBox}
-                onPress={() => {
-                  setSelectedListingId("cessna-172-id"); // Set dynamic Listing ID
-                  setSelectedListingName("Cessna 172"); // Optional: Set aircraft name
-                  handleNavigationInternal("cessna-172");
-                }}
+                onPress={() => {}} // Navigation disabled
                 accessibilityLabel="Select Cessna 172"
                 accessibilityRole="button"
               >
@@ -1351,11 +1347,7 @@ const BookingCalendar = () => {
               {/* Beechcraft Baron */}
               <TouchableOpacity
                 style={styles.recommendedBox}
-                onPress={() => {
-                  setSelectedListingId("beechcraft-baron-id"); // Set dynamic Listing ID
-                  setSelectedListingName("Beechcraft Baron"); // Optional: Set aircraft name
-                  handleNavigationInternal("beechcraft-baron");
-                }}
+                onPress={() => {}} // Navigation disabled
                 accessibilityLabel="Select Beechcraft Baron"
                 accessibilityRole="button"
               >
@@ -1370,11 +1362,7 @@ const BookingCalendar = () => {
               {/* Cirrus SR22 */}
               <TouchableOpacity
                 style={styles.recommendedBox}
-                onPress={() => {
-                  setSelectedListingId("cirrus-sr22-id"); // Set dynamic Listing ID
-                  setSelectedListingName("Cirrus SR22"); // Optional: Set aircraft name
-                  handleNavigationInternal("cirrus-sr22");
-                }}
+                onPress={() => {}} // Navigation disabled
                 accessibilityLabel="Select Cirrus SR22"
                 accessibilityRole="button"
               >
@@ -1952,447 +1940,446 @@ const BookingCalendar = () => {
   );
 };
 
-export default BookingCalendar;
+export default renter;
 
-
-// Stylesheet (styles)
+// Styles (Assuming you have a StyleSheet defined below)
 const styles = StyleSheet.create({
+  // ... [Your existing styles go here]
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: "#f7fafc",
   },
   safeArea: {
     flex: 0,
+    backgroundColor: "#f7fafc",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingBottom: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerImage: {
-    width: '100%',
+    width: "100%",
     height: 200,
-    justifyContent: 'center',
+    justifyContent: "flex-end",
   },
   headerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)', // Semi-transparent overlay
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "flex-end",
   },
   headerContent: {
-    width: '90%',
+    padding: 16,
   },
   greetingText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 8,
   },
   headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
   },
   datePickerButton: {
-    backgroundColor: '#3182ce',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    padding: 8,
     borderRadius: 8,
+    marginRight: 8,
   },
   datePickerText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
   },
   hoursInput: {
-    backgroundColor: '#3182ce',
-    color: '#fff',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    padding: 8,
     borderRadius: 8,
-    width: 100,
-    textAlign: 'center',
-    fontSize: 16,
+    color: "#fff",
+    width: 80,
+    textAlign: "center",
   },
   locationButton: {
-    backgroundColor: '#3182ce',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    padding: 8,
     borderRadius: 8,
-    marginTop: 10,
   },
   locationText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    textAlign: 'center',
   },
   navigationButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 20,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 16,
   },
   navigationButton: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   sectionContainer: {
-    marginHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#2d3748',
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 8,
   },
   recentSearchesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   recentSearchBox: {
-    backgroundColor: '#f7fafc',
-    padding: 15,
+    backgroundColor: "#edf2f7",
+    padding: 12,
     borderRadius: 8,
-    width: '48%',
+    width: "48%",
   },
   recentSearchDetails: {
-    color: '#718096',
-    marginTop: 5,
+    color: "#a0aec0",
+    marginTop: 4,
   },
   aircraftTypesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   aircraftTypeButton: {
-    backgroundColor: '#edf2f7',
-    padding: 15,
+    backgroundColor: "#3182ce",
+    padding: 12,
     borderRadius: 8,
     flex: 1,
+    alignItems: "center",
   },
   aircraftTypeText: {
-    textAlign: 'center',
-    color: '#2d3748',
-    fontWeight: '500',
+    color: "#fff",
+    fontSize: 16,
   },
   recommendedBox: {
-    marginRight: 15,
-    alignItems: 'center',
-    width: 150,
+    marginRight: 16,
+    alignItems: "center",
+    width: 120,
   },
   recommendedImage: {
-    width: 150,
-    height: 100,
+    width: 100,
+    height: 80,
     borderRadius: 8,
   },
   recommendedText: {
-    marginTop: 5,
-    fontSize: 16,
-    color: '#2d3748',
-    textAlign: 'center',
+    marginTop: 8,
+    textAlign: "center",
+    fontSize: 14,
   },
   rentalBox: {
-    backgroundColor: '#edf2f7',
-    padding: 15,
+    backgroundColor: "#fff",
+    padding: 16,
     borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   rentalAircraftModel: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2d3748',
+    fontWeight: "bold",
   },
   rentalStatus: {
     fontSize: 14,
-    color: '#718096',
-    marginVertical: 5,
+    color: "#718096",
+    marginVertical: 4,
   },
   rentalTotalCost: {
     fontSize: 14,
-    color: '#2d3748',
+    color: "#2d3748",
   },
   noMoreRentalsText: {
-    textAlign: 'center',
-    color: '#a0aec0',
-    marginVertical: 10,
+    textAlign: "center",
+    color: "#a0aec0",
+    marginVertical: 16,
   },
   loadMoreRentalsButton: {
-    backgroundColor: '#3182ce',
-    paddingVertical: 10,
+    backgroundColor: "#3182ce",
+    padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
+    alignItems: "center",
+    marginTop: 8,
   },
   loadMoreRentalsButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
   },
   noActiveRentalsText: {
-    textAlign: 'center',
-    color: '#a0aec0',
-    fontSize: 16,
+    textAlign: "center",
+    color: "#a0aec0",
+    marginVertical: 16,
   },
   notificationBox: {
-    backgroundColor: '#f7fafc',
-    padding: 15,
+    backgroundColor: "#fff",
+    padding: 12,
     borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   notificationMessageText: {
     fontSize: 16,
-    color: '#2d3748',
+    color: "#2d3748",
   },
   notificationDateText: {
     fontSize: 12,
-    color: '#a0aec0',
-    marginTop: 5,
+    color: "#a0aec0",
+    marginTop: 4,
   },
   noMoreNotificationsText: {
-    textAlign: 'center',
-    color: '#a0aec0',
-    marginVertical: 10,
-  },
-  noNotificationsText: {
-    textAlign: 'center',
-    color: '#a0aec0',
-    fontSize: 16,
+    textAlign: "center",
+    color: "#a0aec0",
+    marginVertical: 16,
   },
   removeAllNotificationsButton: {
-    backgroundColor: '#e53e3e',
-    paddingVertical: 10,
+    backgroundColor: "#e53e3e",
+    padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
+    alignItems: "center",
+    marginTop: 8,
   },
   removeAllNotificationsButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
   },
   viewAllNotificationsButton: {
-    backgroundColor: '#3182ce',
-    paddingVertical: 10,
+    padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
+    alignItems: "center",
+    marginTop: 8,
   },
   viewAllNotificationsButtonText: {
-    color: '#fff',
+    color: "#3182ce",
     fontSize: 16,
   },
   notAuthenticatedContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
   },
   notAuthenticatedText: {
     fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 20,
-    color: '#2d3748',
+    textAlign: "center",
+    marginBottom: 16,
   },
   goToLoginButton: {
-    backgroundColor: '#3182ce',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
+    backgroundColor: "#3182ce",
+    padding: 12,
     borderRadius: 8,
   },
   goToLoginButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
   },
   profileContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: '#edf2f7',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+    padding: 16,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderColor: "#e2e8f0",
   },
   profileTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#2d3748',
+    fontWeight: "bold",
+    marginBottom: 8,
   },
   profileRow: {
-    flexDirection: 'row',
-    marginBottom: 5,
+    flexDirection: "row",
+    marginBottom: 4,
   },
   profileLabel: {
-    fontWeight: '500',
-    color: '#2d3748',
+    fontWeight: "bold",
+    marginRight: 4,
   },
   profileValue: {
-    marginLeft: 5,
-    color: '#2d3748',
+    color: "#4a5568",
   },
   profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginTop: 10,
+    marginTop: 8,
   },
   messageModalContainer: {
     flex: 1,
+    backgroundColor: "#f7fafc",
   },
   messagesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#edf2f7',
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderColor: "#e2e8f0",
   },
   closeModalButton: {
-    padding: 5,
+    padding: 8,
   },
   messagesTitle: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2d3748',
+    fontWeight: "bold",
   },
   chatBubble: {
-    maxWidth: '80%',
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 5,
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 4,
+    maxWidth: "80%",
   },
   chatBubbleLeft: {
-    backgroundColor: '#edf2f7',
-    alignSelf: 'flex-start',
+    backgroundColor: "#edf2f7",
+    alignSelf: "flex-start",
   },
   chatBubbleRight: {
-    backgroundColor: '#3182ce',
-    alignSelf: 'flex-end',
+    backgroundColor: "#3182ce",
+    alignSelf: "flex-end",
   },
   chatSenderName: {
-    fontWeight: 'bold',
-    color: '#2d3748',
-    marginBottom: 2,
+    fontWeight: "bold",
+    color: "#2d3748",
+    marginBottom: 4,
   },
   chatMessageText: {
-    color: '#2d3748',
+    color: "#2d3748",
   },
   chatTimestamp: {
     fontSize: 10,
-    color: '#a0aec0',
-    marginTop: 2,
-    textAlign: 'right',
+    color: "#a0aec0",
+    marginTop: 4,
+    textAlign: "right",
   },
   messagesList: {
-    padding: 10,
+    padding: 16,
   },
   messageInputContainer: {
-    flexDirection: 'row',
-    padding: 10,
-    backgroundColor: '#edf2f7',
-    alignItems: 'center',
+    flexDirection: "row",
+    padding: 16,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
   },
   messageTextInput: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    backgroundColor: "#edf2f7",
+    padding: 12,
     borderRadius: 20,
-    fontSize: 16,
-    marginRight: 10,
+    marginRight: 8,
+    color: "#2d3748",
   },
   sendButton: {
-    backgroundColor: '#3182ce',
-    padding: 10,
+    backgroundColor: "#3182ce",
+    padding: 12,
     borderRadius: 20,
   },
   notificationModalContainer: {
     flex: 1,
-  },
-  detailLabel: {
-    fontWeight: 'bold',
-    color: '#2d3748',
-  },
-  detailValue: {
-    color: '#2d3748',
-    marginBottom: 5,
+    backgroundColor: "#fff",
+    paddingTop: 40,
   },
   notificationDetailsTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#2d3748',
+    fontWeight: "bold",
+    marginBottom: 12,
   },
   notificationDetailBox: {
-    marginBottom: 15,
+    marginBottom: 12,
+  },
+  detailLabel: {
+    fontWeight: "bold",
+    fontSize: 16,
+    color: "#2d3748",
+  },
+  detailValue: {
+    fontSize: 16,
+    color: "#4a5568",
+    marginTop: 4,
+  },
+  detailTotalCostText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2d3748",
+    marginTop: 8,
   },
   proceedToPayButton: {
-    backgroundColor: '#38a169',
-    paddingVertical: 15,
+    backgroundColor: "#38a169",
+    padding: 16,
     borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
+    alignItems: "center",
+    marginTop: 16,
   },
   proceedToPayButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
+    fontWeight: "bold",
   },
   disabledButton: {
-    backgroundColor: '#a0aec0',
-  },
-  disabledButtonText: {
-    color: '#fff',
+    backgroundColor: "#a0aec0",
   },
   messageOwnerButton: {
-    backgroundColor: '#3182ce',
-    paddingVertical: 15,
+    backgroundColor: "#3182ce",
+    padding: 16,
     borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
+    alignItems: "center",
+    marginTop: 8,
   },
   messageOwnerButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
+    fontWeight: "bold",
+  },
+  disabledButtonText: {
+    color: "#cbd5e0",
   },
   closeNotificationModalButton: {
-    backgroundColor: '#e53e3e',
-    paddingVertical: 15,
+    backgroundColor: "#e2e8f0",
+    padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
+    alignItems: "center",
+    marginTop: 16,
   },
   closeNotificationModalButtonText: {
-    color: '#fff',
+    color: "#2d3748",
     fontSize: 16,
   },
   allNotificationsModalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-  },
-  allNotificationsTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#2d3748',
-    textAlign: 'center',
+    backgroundColor: "#fff",
+    padding: 16,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  allNotificationsTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+    textAlign: "center",
   },
   chatBubbleIcon: {
-    position: 'absolute',
-    bottom: 30,
-    right: 20,
-    backgroundColor: '#3182ce',
-    padding: 15,
+    position: "absolute",
+    bottom: 32,
+    right: 32,
+    backgroundColor: "#3182ce",
+    width: 60,
+    height: 60,
     borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 5,
   },
 });

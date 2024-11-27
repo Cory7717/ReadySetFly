@@ -38,6 +38,7 @@
     "expo-document-picker": "~12.0.2",
     "expo-font": "~12.0.10",
     "expo-image-picker": "~15.0.7",
+    "expo-linear-gradient": "~13.0.2",
     "expo-linking": "~6.3.1",
     "expo-localization": "^15.0.3",
     "expo-location": "~17.0.1",
@@ -58,6 +59,7 @@
     "lottie-ios": "^3.1.8",
     "lottie-react-native": "6.7.0",
     "metro": "^0.80.12",
+    "multer": "^1.4.5-lts.1",
     "nativewind": "^2.0.11",
     "nodemailer": "^6.9.16",
     "patch-package": "^8.0.0",
@@ -95,7 +97,7 @@
     "react-native-webview": "13.8.6",
     "stripe": "^16.12.0",
     "typescript": "~5.3.3",
-    "expo-linear-gradient": "~13.0.2"
+    "yup": "^1.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.8",

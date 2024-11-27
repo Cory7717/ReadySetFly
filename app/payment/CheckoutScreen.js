@@ -1,3 +1,5 @@
+// src/payment/CheckoutScreen.js
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
@@ -16,14 +18,173 @@ import {
 import { CardField, useConfirmPayment } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { getAuth } from 'firebase/auth'; // Import Firebase Auth
-
-// Firestore Imports
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth'; // Firebase Auth
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebaseConfig'; // Adjust the import based on your project structure
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 
 // Configuration Constants
-const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api'; // Defined directly
+const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api'; // Backend API URL
+
+// Colors Constants
+const COLORS = {
+  primary: '#FF5A5F',
+  secondary: '#6B7280',
+  background: '#F9F9F9',
+  white: '#FFFFFF',
+  black: '#000000',
+  gray: '#9CA3AF',
+  lightGray: '#D1D5DB',
+  green: '#32CD32', // Success color
+  red: '#EF4444', // Error color
+};
+
+// Stylesheet
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    padding: 20,
+    justifyContent: 'flex-start',
+    flexGrow: 1,
+  },
+  cancelButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  animatedContainer: {
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+    color: COLORS.black,
+  },
+  description: {
+    fontSize: 16,
+    marginBottom: 10,
+    textAlign: 'center',
+    color: COLORS.gray,
+  },
+  detailsContainer: {
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  detail: {
+    fontSize: 16,
+    marginBottom: 5,
+    color: COLORS.black,
+  },
+  amount: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 10,
+    textAlign: 'center',
+    color: COLORS.black,
+  },
+  discountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  discountInput: {
+    flex: 1,
+    height: 50,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: COLORS.white,
+    fontSize: 16,
+  },
+  applyButton: {
+    marginLeft: 10,
+    backgroundColor: COLORS.green,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  applyButtonDisabled: {
+    backgroundColor: '#a5d6a7',
+  },
+  applyButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  errorText: {
+    color: COLORS.red,
+    marginTop: 10,
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  nameInput: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: COLORS.white,
+    marginBottom: 15,
+    fontSize: 16,
+    color: COLORS.black,
+  },
+  cardField: {
+    width: '100%',
+    height: 50,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: COLORS.white,
+  },
+  payButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    marginTop: 20,
+    width: '100%',
+    alignItems: 'center',
+  },
+  payButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  payButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  securePaymentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 30,
+    justifyContent: 'center',
+  },
+  securePaymentText: {
+    marginLeft: 5,
+    color: '#555',
+    fontSize: 14,
+  },
+  detailsText: {
+    fontSize: 16,
+    color: COLORS.black,
+    marginBottom: 5,
+  },
+  // Add other styles as needed
+});
 
 export default function CheckoutScreen() {
   const navigation = useNavigation();
@@ -35,16 +196,17 @@ export default function CheckoutScreen() {
 
   // Extract parameters from navigation route
   const {
-    paymentType = 'rental',
-    amount: initialAmount = 0,
-    costPerHour = 0,
-    rentalHours = 1,
-    rentalRequestId: routeRentalRequestId = '',
-    listingDetails = {},
-    selectedPricing: initialSelectedPricing = '',
+    paymentType = 'rental', // Default to 'rental' if not provided
+    amount: initialAmount = 0, // For 'classified' payments (in cents)
+    costPerHour = 0, // For 'rental' payments
+    rentalHours = 1, // For 'rental' payments
+    rentalRequestId: routeRentalRequestId = '', // Existing rental request ID, if any
+    listingDetails = {}, // Details of the listing
+    selectedPricing: initialSelectedPricing = '', // Pricing tier selected
+    images: listingImages = [], // Images for classified listings
   } = route.params || {};
 
-  // Log received parameters
+  // Log received parameters for debugging
   console.log("CheckoutScreen received params:", route.params);
 
   // State Variables
@@ -72,21 +234,72 @@ export default function CheckoutScreen() {
   // Convert totalAmount to a fixed amount for displaying
   const displayTotal = (totalAmount / 100).toFixed(2);
 
+  /**
+   * Effect to validate navigation parameters upon component mount
+   * Ensures that all required data is present before proceeding
+   */
   useEffect(() => {
     console.log("CheckoutScreen useEffect triggered");
     startBouncing();
-    if (paymentType === 'rental') {
-      // For Rentals, totalAmount is calculated based on costPerHour and rentalHours
-      if (costPerHour && rentalHours) {
-        calculateRentalTotal(parseFloat(costPerHour), parseFloat(rentalHours));
-      } else {
-        setErrorMessage('Missing rental details.');
+
+    // Parameter Validation
+    const validateParameters = () => {
+      // Validate paymentType
+      const validPaymentTypes = ['rental', 'classified'];
+      if (!validPaymentTypes.includes(paymentType)) {
+        Alert.alert('Invalid Payment Type', `Unsupported payment type: ${paymentType}`);
+        navigation.goBack();
+        return false;
       }
-    } else if (paymentType === 'classified') {
-      // For Classifieds, use the initialAmount passed
-      setTotalAmount(initialAmount);
+
+      if (paymentType === 'rental') {
+        // For Rentals, ensure costPerHour and rentalHours are positive numbers
+        if (isNaN(costPerHour) || costPerHour <= 0) {
+          Alert.alert('Invalid Cost Per Hour', 'Please provide a valid cost per hour for the rental.');
+          navigation.goBack();
+          return false;
+        }
+
+        if (isNaN(rentalHours) || rentalHours <= 0) {
+          Alert.alert('Invalid Rental Hours', 'Please provide valid rental hours.');
+          navigation.goBack();
+          return false;
+        }
+
+        calculateRentalTotal(parseFloat(costPerHour), parseFloat(rentalHours));
+      } else if (paymentType === 'classified') {
+        // For Classifieds, ensure initialAmount is a positive number
+        if (isNaN(initialAmount) || initialAmount <= 0) {
+          Alert.alert('Invalid Amount', 'Please provide a valid amount for the listing.');
+          navigation.goBack();
+          return false;
+        }
+
+        // Ensure listingDetails has required fields: id and ownerId
+        if (!listingDetails.id || !listingDetails.ownerId) {
+          Alert.alert('Invalid Listing Details', 'Listing details are incomplete.');
+          navigation.goBack();
+          return false;
+        }
+
+        // Ensure lat and lng are present in listingDetails
+        if (!listingDetails.lat || !listingDetails.lng) {
+          Alert.alert('Invalid Location Data', 'Listing location information is missing.');
+          navigation.goBack();
+          return false;
+        }
+
+        setTotalAmount(initialAmount);
+      }
+
+      return true;
+    };
+
+    // Proceed only if parameters are valid
+    if (validateParameters()) {
+      // Additional setup if needed
     }
-  }, [initialAmount, paymentType, costPerHour, rentalHours]);
+  }, [paymentType, costPerHour, rentalHours, initialAmount, listingDetails, navigation]);
 
   // Start the bouncing animation
   const startBouncing = () => {
@@ -139,6 +352,7 @@ export default function CheckoutScreen() {
     try {
       if (user) {
         const token = await user.getIdToken(true);
+        console.log("Firebase ID Token:", token); // Add this line for debugging
         return token;
       } else {
         throw new Error('User is not authenticated.');
@@ -150,9 +364,11 @@ export default function CheckoutScreen() {
     }
   };
 
-  // Function to apply discount code by validating it with the backend
+  /**
+   * Function to apply discount code by validating it with the backend
+   */
   const applyDiscount = async () => {
-    const code = discountCode.trim().toLowerCase();
+    const code = discountCode.trim().toUpperCase();
 
     if (code === '') {
       setErrorMessage('Please enter a discount code.');
@@ -258,51 +474,150 @@ export default function CheckoutScreen() {
   /**
    * Function to create the listing on the backend
    */
-  const createListing = async () => {
+  const createListingBackend = async (values, isFree = false) => {
     try {
       const token = await getFirebaseIdToken();
       if (!token) {
         throw new Error('Authentication token is missing.');
       }
 
+      // Merge selectedPricing into listingDetails if not a free listing
+      const mergedListingDetails = { ...values.listingDetails };
+      if (!isFree) {
+        mergedListingDetails.selectedPricing = selectedPricing;
+      }
+
+      // Ensure that 'isFreeListing' is set correctly
+      mergedListingDetails.isFreeListing = isFree;
+
+      // Validate that all required fields are present before sending
+      const category = mergedListingDetails.category;
+      const requiredFieldsByCategory = {
+        'Aircraft for Sale': ['title', 'description'],
+        'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
+        'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
+      };
+
+      const requiredFields = requiredFieldsByCategory[category];
+      if (!requiredFields) {
+        throw new Error(`Invalid category: ${category}`);
+      }
+
+      // Conditionally require 'price' and 'selectedPricing' if not a free listing and category is 'Aircraft for Sale'
+      if (category === 'Aircraft for Sale' && !isFree) {
+        requiredFields.push('price', 'selectedPricing');
+      }
+
+      // Check for missing required fields
+      const missingFields = requiredFields.filter(field => !mergedListingDetails[field]);
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+
+      // Ensure 'lat' and 'lng' are present and valid
+      const { lat, lng } = mergedListingDetails;
+      if (!lat || !lng || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) {
+        throw new Error("Invalid or missing location data (lat, lng).");
+      }
+
+      // Construct FormData
+      const formData = new FormData();
+
+      // Append listing details as a JSON string
+      formData.append('listingDetails', JSON.stringify(mergedListingDetails));
+
+      // Append images if any (assuming images are passed via route.params as local URIs)
+      if (listingImages.length > 0) {
+        listingImages.forEach((imageUri, index) => {
+          if (typeof imageUri === 'string' && imageUri.startsWith('file://')) {
+            formData.append('images', {
+              uri: imageUri,
+              name: `image_${index}.jpg`,
+              type: 'image/jpeg',
+            });
+          } else {
+            console.warn(`Invalid image URI at index ${index}:`, imageUri);
+          }
+        });
+      } else {
+        console.log('No images to upload.');
+      }
+
       const response = await fetch(`${API_URL}/createListing`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`, // Include Firebase ID Token
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // 'Content-Type': 'multipart/form-data' is set automatically by fetch when using FormData
         },
-        body: JSON.stringify({ listingDetails }),
+        body: formData,
       });
 
-      let data;
+      let responseData;
       try {
-        data = await response.json();
+        responseData = await response.json();
       } catch (e) {
         const text = await response.text();
         console.error('Response is not JSON:', text);
-        Alert.alert('Error', 'Failed to create listing.');
-        return false;
+        throw new Error('Failed to create listing. Please try again.');
       }
 
       if (!response.ok) {
-        Alert.alert('Error', data.message || 'Failed to create listing.');
-        return false;
+        throw new Error(responseData.error || 'Failed to create listing.');
       }
 
-      return true;
+      console.log('Listing creation response:', responseData);
+      return responseData.listingId; // Return the listingId for further processing
     } catch (error) {
       console.error('Listing creation error:', error);
       Alert.alert('Error', error.message || 'Failed to create listing.');
-      return false;
+      return null;
     }
+  };
+
+  /**
+   * Function to handle form submission
+   */
+  const handleFormSubmit = async (values) => {
+    // If discount is applied and totalAmount is zero (free listing)
+    if (discountApplied && totalAmount === 0) {
+      try {
+        setLoading(true);
+        const listingId = await createListingBackend(values, true); // Pass 'true' to indicate a free listing
+        if (listingId) {
+          Alert.alert(
+            'Success',
+            'Your listing has been created with a free package.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (paymentType === 'rental') {
+                    navigation.navigate('ConfirmationScreen', { rentalRequestId });
+                  } else {
+                    navigation.navigate('Classifieds', { refresh: true });
+                  }
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Proceed with payment
+    handlePayment(values);
   };
 
   /**
    * Handle payment processing
    */
-  const handlePayment = async () => {
+  const handlePayment = async (values) => {
     // Validate cardholder name
-    if (cardholderName.trim() === '') {
+    if (values.cardholderName.trim() === '') {
       Alert.alert('Validation Error', 'Please enter the name on the credit card.');
       return;
     }
@@ -311,8 +626,8 @@ export default function CheckoutScreen() {
     if (discountApplied && totalAmount === 0) {
       try {
         setLoading(true);
-        const listingCreated = await createListing();
-        if (listingCreated) {
+        const listingId = await createListingBackend(values, true); // Pass 'true' to indicate a free listing
+        if (listingId) {
           Alert.alert(
             'Success',
             'Your listing has been created with a free package.',
@@ -341,6 +656,7 @@ export default function CheckoutScreen() {
       setLoading(true);
 
       let currentRentalRequestId = rentalRequestId;
+      let currentListingId = listingDetails.id;
 
       // If paymentType is 'rental' and rentalRequestId is not provided, create a new rental request
       if (paymentType === 'rental' && !currentRentalRequestId) {
@@ -351,6 +667,19 @@ export default function CheckoutScreen() {
         }
       }
 
+      // For 'classified', create the listing first to get listingId if not already present
+      if (paymentType === 'classified' && !currentListingId) {
+        const listingId = await createListingBackend(values);
+        if (!listingId) {
+          setLoading(false);
+          return;
+        }
+        currentListingId = listingId;
+        // Update listingDetails with listingId if necessary
+        // Note: Since listingDetails is extracted from route.params, it's immutable. 
+        // If you need to update it, consider using a state or a context.
+      }
+
       let clientSecret = '';
 
       const endpoint =
@@ -359,10 +688,16 @@ export default function CheckoutScreen() {
           : '/create-classified-payment-intent';
 
       // Prepare request body based on payment type
-      const body =
-        paymentType === 'rental'
-          ? { rentalRequestId: currentRentalRequestId, ownerId: listingDetails.ownerId } // Include ownerId
-          : { amount: initialAmount, currency: 'usd' };
+      let body = {};
+      if (paymentType === 'rental') {
+        body = { rentalRequestId: currentRentalRequestId };
+      } else if (paymentType === 'classified') {
+        body = { 
+          amount: totalAmount, 
+          currency: 'usd', 
+          listingId: currentListingId 
+        };
+      }
 
       // Fetch Firebase ID token for authenticated requests
       const token = await getFirebaseIdToken();
@@ -373,7 +708,7 @@ export default function CheckoutScreen() {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', // JSON since server expects JSON body
           Authorization: `Bearer ${token}`, // Include Firebase ID Token
         },
         body: JSON.stringify(body),
@@ -408,34 +743,31 @@ export default function CheckoutScreen() {
       // Confirm the payment with Stripe using the client secret
       const { error, paymentIntent } = await confirmPayment(clientSecret, {
         type: 'Card',
-        billingDetails: { name: cardholderName.trim() }, // Use user's input name
+        billingDetails: { name: values.cardholderName.trim() }, // Use user's input name
       });
 
       if (error) {
         Alert.alert('Payment failed', error.message);
       } else if (paymentIntent && paymentIntent.status === 'Succeeded') {
-        // After successful payment, create the listing
-        const listingCreated = await createListing();
-        if (listingCreated) {
-          Alert.alert(
-            'Success',
-            'Payment processed successfully and your listing has been created.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  if (paymentType === 'rental') {
-                    navigation.navigate('ConfirmationScreen', { rentalRequestId: currentRentalRequestId });
-                  } else {
-                    navigation.navigate('Classifieds', { refresh: true });
-                  }
-                },
+        // After successful payment, navigate accordingly
+        Alert.alert(
+          'Success',
+          'Payment processed successfully and your listing has been created.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                if (paymentType === 'rental') {
+                  navigation.navigate('ConfirmationScreen', { rentalRequestId: currentRentalRequestId });
+                } else {
+                  navigation.navigate('Classifieds', { refresh: true });
+                }
               },
-            ],
-            { cancelable: false }
-          );
-          setIsPaymentSuccess(true); // Update state to reflect successful payment
-        }
+            },
+          ],
+          { cancelable: false }
+        );
+        setIsPaymentSuccess(true); // Update state to reflect successful payment
       }
     } catch (error) {
       console.error('Payment error:', error);
@@ -445,7 +777,9 @@ export default function CheckoutScreen() {
     }
   };
 
-  // Handle cancellation
+  /**
+   * Handle cancellation
+   */
   const handleCancel = () => {
     if (!loading) {
       navigation.goBack();
@@ -468,7 +802,7 @@ export default function CheckoutScreen() {
           accessibilityLabel="Cancel payment" 
           accessibilityRole="button"
         >
-          <Ionicons name="close-outline" size={28} color="#FF5A5F" />
+          <Ionicons name="close-outline" size={28} color={COLORS.red} />
         </TouchableOpacity>
 
         {/* Main Content */}
@@ -478,7 +812,7 @@ export default function CheckoutScreen() {
             <Ionicons
               name={isPaymentSuccess ? "checkmark-circle-outline" : "card-outline"}
               size={80}
-              color={isPaymentSuccess ? "#32CD32" : "#FF5A5F"} // Green on success, red otherwise
+              color={isPaymentSuccess ? COLORS.green : COLORS.primary} // Green on success, red otherwise
               accessibilityLabel={isPaymentSuccess ? "Payment Successful" : "Payment Required"}
             />
           </Animated.View>
@@ -486,249 +820,152 @@ export default function CheckoutScreen() {
           <Text style={styles.title}>Complete Your Payment</Text>
           <Text style={styles.description}>Verify your payment details below.</Text>
 
-          {/* Display Payment Details */}
-          {paymentType === 'rental' ? (
-            <View style={styles.detailsContainer}>
-              <Text style={styles.detail}>Cost Per Hour: ${parseFloat(costPerHour).toFixed(2)}</Text>
-              <Text style={styles.detail}>Rental Hours: {parseFloat(rentalHours).toFixed(0)}</Text>
-              <Text style={styles.detail}>Booking Fee (6%): ${(parseFloat(costPerHour) * parseFloat(rentalHours) * 0.06).toFixed(2)}</Text>
-              <Text style={styles.detail}>Processing Fee (3%): ${(parseFloat(costPerHour) * parseFloat(rentalHours) * 0.03).toFixed(2)}</Text>
-              <Text style={styles.detail}>Tax (8.25%): ${((parseFloat(costPerHour) * parseFloat(rentalHours)) * 0.06 * 0.0825).toFixed(2)}</Text>
-              <Text style={styles.amount}>
-                Total Amount: $
-                {(totalAmount / 100).toFixed(2)}
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.detailsContainer}>
-              <Text style={styles.detail}>Listing Type: {listingDetails.type || 'N/A'}</Text>
-              <Text style={styles.detail}>Amount: ${(initialAmount / 100).toFixed(2)}</Text>
-            </View>
-          )}
-
-          {/* Discount Code Input */}
-          {!discountApplied && (
-            <View style={styles.discountContainer}>
-              <TextInput
-                style={styles.discountInput}
-                placeholder="Enter Discount Code"
-                placeholderTextColor="#888"
-                value={discountCode}
-                onChangeText={setDiscountCode}
-                autoCapitalize="characters"
-                editable={!loading}
-                accessibilityLabel="Discount Code Input"
-              />
-              <TouchableOpacity 
-                onPress={applyDiscount} 
-                style={[styles.applyButton, (loading || discountApplied) && styles.applyButtonDisabled]}
-                disabled={loading || discountApplied}
-                accessibilityLabel="Apply Discount"
-                accessibilityRole="button"
-              >
-                <Text style={styles.applyButtonText}>Apply</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Display error message if any */}
-          {errorMessage !== '' && (
-            <Text style={styles.errorText} accessibilityLiveRegion="polite">{errorMessage}</Text>
-          )}
-
-          {/* Cardholder Name Input */}
-          <TextInput
-            style={styles.nameInput}
-            placeholder="Name on Card"
-            placeholderTextColor="#888"
-            value={cardholderName}
-            onChangeText={setCardholderName}
-            autoCapitalize="words"
-            editable={!loading}
-            accessibilityLabel="Cardholder Name Input"
-          />
-
-          {/* Stripe CardField component */}
-          <CardField
-            postalCodeEnabled={true}
-            placeholders={{ number: '**** **** **** ****' }} // Stripe test card
-            placeholderTextColor="#888"
-            style={styles.cardField}
-            onCardChange={(cardDetails) => console.log('Card details:', cardDetails)}
-            onFocus={() => console.log('CardField focused')}
-            editable={!(discountApplied && totalAmount === 0)} // Disable card input if discount makes it free
-            accessibilityLabel="Credit Card Input"
-          />
-
-          {/* Pay Button */}
-          <TouchableOpacity
-            onPress={handlePayment}
-            disabled={loading || (discountApplied && totalAmount === 0)}
-            style={[
-              styles.payButton, 
-              (loading || (discountApplied && totalAmount === 0)) && styles.payButtonDisabled
-            ]}
-            accessibilityLabel={discountApplied && totalAmount === 0 ? "Finalize Listing" : `Pay $${displayTotal}`}
-            accessibilityRole="button"
+          {/* Formik Form */}
+          <Formik
+            initialValues={{
+              cardholderName: cardholderName,
+              discountCode: discountCode,
+              listingDetails: listingDetails,
+            }}
+            validationSchema={Yup.object({
+              cardholderName: Yup.string()
+                .required('Name on card is required.'),
+              discountCode: Yup.string(),
+            })}
+            onSubmit={handleFormSubmit}
+            enableReinitialize={true}
           >
-            {loading ? (
-              <ActivityIndicator color="white" accessibilityLabel="Processing Payment" />
-            ) : (
-              <Text style={styles.payButtonText}>
-                {discountApplied && totalAmount === 0 ? 'Finalize Listing' : `Pay $${displayTotal}`}
-              </Text>
-            )}
-          </TouchableOpacity>
+            {({
+              handleChange,
+              handleBlur,
+              handleSubmit,
+              values,
+              errors,
+              touched,
+              setFieldValue,
+            }) => (
+              <>
+                {/* Display Payment Details */}
+                {paymentType === 'rental' ? (
+                  <View style={styles.detailsContainer}>
+                    <Text style={styles.detail}>Cost Per Hour: ${parseFloat(costPerHour).toFixed(2)}</Text>
+                    <Text style={styles.detail}>Rental Hours: {parseFloat(rentalHours).toFixed(0)}</Text>
+                    <Text style={styles.detail}>Booking Fee (6%): ${(parseFloat(costPerHour) * parseFloat(rentalHours) * 0.06).toFixed(2)}</Text>
+                    <Text style={styles.detail}>Processing Fee (3%): ${(parseFloat(costPerHour) * parseFloat(rentalHours) * 0.03).toFixed(2)}</Text>
+                    <Text style={styles.detail}>Tax (8.25%): ${(parseFloat(costPerHour) * parseFloat(rentalHours) * 0.06 * 0.0825).toFixed(2)}</Text>
+                    <Text style={styles.amount}>
+                      Total Amount: $
+                      {(totalAmount / 100).toFixed(2)}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.detailsContainer}>
+                    <Text style={styles.detail}>Listing Type: {listingDetails.type || 'N/A'}</Text>
+                    <Text style={styles.detail}>Amount: ${(initialAmount / 100).toFixed(2)}</Text>
+                    {/* Display selected pricing tier if available */}
+                    {!listingDetails.isFreeListing && selectedPricing && (
+                      <Text style={styles.detail}>Package Type: {selectedPricing}</Text>
+                    )}
+                  </View>
+                )}
 
-          {/* Secure Payment Text */}
-          <View style={styles.securePaymentContainer}>
-            <Ionicons name="lock-closed-outline" size={16} color="#555" accessibilityLabel="Secure Payment Lock Icon" />
-            <Text style={styles.securePaymentText}>
-              Your payment is secure and encrypted.
-            </Text>
-          </View>
+                {/* Discount Code Input */}
+                {!discountApplied && (
+                  <View style={styles.discountContainer}>
+                    <TextInput
+                      style={styles.discountInput}
+                      placeholder="Enter Discount Code"
+                      placeholderTextColor="#888"
+                      value={discountCode}
+                      onChangeText={(text) => {
+                        setDiscountCode(text);
+                        setFieldValue('discountCode', text);
+                      }}
+                      autoCapitalize="characters"
+                      editable={!loading}
+                      accessibilityLabel="Discount Code Input"
+                    />
+                    <TouchableOpacity 
+                      onPress={applyDiscount} 
+                      style={[styles.applyButton, (loading || discountApplied) && styles.applyButtonDisabled]}
+                      disabled={loading || discountApplied}
+                      accessibilityLabel="Apply Discount"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.applyButtonText}>Apply</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Display error message if any */}
+                {errorMessage !== '' && (
+                  <Text style={styles.errorText} accessibilityLiveRegion="polite">{errorMessage}</Text>
+                )}
+
+                {/* Cardholder Name Input */}
+                <TextInput
+                  style={styles.nameInput}
+                  placeholder="Name on Card"
+                  placeholderTextColor="#888"
+                  value={values.cardholderName}
+                  onChangeText={(text) => {
+                    setCardholderName(text);
+                    setFieldValue('cardholderName', text);
+                  }}
+                  autoCapitalize="words"
+                  editable={!loading}
+                  accessibilityLabel="Cardholder Name Input"
+                />
+                {touched.cardholderName && errors.cardholderName && (
+                  <Text style={styles.errorText}>{errors.cardholderName}</Text>
+                )}
+
+                {/* Stripe CardField component */}
+                <CardField
+                  postalCodeEnabled={true}
+                  placeholders={{ number: '**** **** **** ****' }} // Stripe test card
+                  placeholderTextColor="#888"
+                  style={styles.cardField}
+                  onCardChange={(cardDetails) => {
+                    console.log('Card details:', cardDetails);
+                  }}
+                  onFocus={() => console.log('CardField focused')}
+                  editable={!(discountApplied && totalAmount === 0)} // Disable card input if discount makes it free
+                  accessibilityLabel="Credit Card Input"
+                />
+
+                {/* Pay Button */}
+                <TouchableOpacity
+                  onPress={handleSubmit}
+                  disabled={loading || (discountApplied && totalAmount === 0)}
+                  style={[
+                    styles.payButton, 
+                    (loading || (discountApplied && totalAmount === 0)) && styles.payButtonDisabled
+                  ]}
+                  accessibilityLabel={discountApplied && totalAmount === 0 ? "Finalize Listing" : `Pay $${displayTotal}`}
+                  accessibilityRole="button"
+                >
+                  {loading ? (
+                    <ActivityIndicator color="white" accessibilityLabel="Processing Payment" />
+                  ) : (
+                    <Text style={styles.payButtonText}>
+                      {discountApplied && totalAmount === 0 ? 'Finalize Listing' : `Pay $${displayTotal}`}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Secure Payment Text */}
+                <View style={styles.securePaymentContainer}>
+                  <Ionicons name="lock-closed-outline" size={16} color="#555" accessibilityLabel="Secure Payment Lock Icon" />
+                  <Text style={styles.securePaymentText}>
+                    Your payment is secure and encrypted.
+                  </Text>
+                </View>
+              </>
+            )}
+          </Formik>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-// ... Rest of the styles ...
-
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9f9f9',
-  },
-  scrollContent: {
-    padding: 20,
-    justifyContent: 'flex-start', // Accommodate the logo and content
-    flexGrow: 1,
-  },
-  cancelButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    zIndex: 10,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  animatedContainer: {
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  description: {
-    fontSize: 16,
-    marginBottom: 10,
-    textAlign: 'center',
-    color: '#555',
-  },
-  detailsContainer: {
-    marginBottom: 20,
-    paddingHorizontal: 10,
-  },
-  detail: {
-    fontSize: 16,
-    marginBottom: 5,
-    color: '#333',
-  },
-  amount: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 10,
-    textAlign: 'center',
-    color: '#000',
-  },
-  discountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  discountInput: {
-    flex: 1,
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    backgroundColor: 'white',
-    fontSize: 16,
-  },
-  applyButton: {
-    marginLeft: 10,
-    backgroundColor: '#32CD32',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  applyButtonDisabled: {
-    backgroundColor: '#a5d6a7',
-  },
-  applyButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  errorText: {
-    color: '#FF5A5F',
-    marginTop: 10,
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  nameInput: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    backgroundColor: 'white',
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  cardField: {
-    width: '100%',
-    height: 50,
-    marginVertical: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: 'white',
-  },
-  payButton: {
-    backgroundColor: '#FF5A5F',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-    marginTop: 20,
-    width: '100%',
-    alignItems: 'center',
-  },
-  payButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  payButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  securePaymentContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 30,
-    justifyContent: 'center',
-  },
-  securePaymentText: {
-    marginLeft: 5,
-    color: '#555',
-    fontSize: 14,
-  },
-});
