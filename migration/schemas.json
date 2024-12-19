@@ -1,0 +1,261 @@
+{
+  "Category": {
+    "fields": {
+      "name": "string",
+      "icon": "string"
+    }
+  },
+  "Sliders": {
+    "fields": {}
+  },
+  "aircraftDetails": {
+    "fields": {
+      "profileData": "object",
+      "selectedAircraftIds": "object",
+      "costData": "object",
+      "additionalAircrafts": "object",
+      "aircraftDetails": "object",
+      "airplaneModel": "string",
+      "location": "string",
+      "airportIdentifier": "string",
+      "decsription": "string",
+      "ratesPerHour": "string",
+      "minimumHours": "string",
+      "images": "string",
+      "ownerId": "string",
+      "createdAt": "object",
+      "boosted": "string",
+      "boostedListing": "string"
+    }
+  },
+  "airplanes": {
+    "fields": {
+      "createdAt": "object",
+      "images": "object",
+      "airplaneModel": "string",
+      "minimumHours": "string",
+      "currentAnnualPdf": "object",
+      "insurancePdf": "object",
+      "ratesPerHour": "string",
+      "description": "string",
+      "location": "string",
+      "ownerId": "string",
+      "boosted": "boolean",
+      "listing": "string",
+      "costPerHour": "number",
+      "baseCost": "number",
+      "commission": "number",
+      "ownerPayout": "number",
+      "rentalCost": "number",
+      "totalCost": "number",
+      "availableDates": "object",
+      "airplaneYear": "string",
+      "userEmail": "string",
+      "airplaneID": "string",
+      "documents": "object",
+      "insuranceDocuments": "object",
+      "boostListing": "boolean",
+      "airplaneId": "string",
+      "airportIdentifier": "string",
+      "mainImage": "string",
+      "tailNumber": "number",
+      "engineType": "string",
+      "totalTimeOnFrame": "number",
+      "aircraftModel": "string"
+    }
+  },
+  "bookings": {
+    "fields": {
+      "bookingId": "string",
+      "bookingID": "string",
+      " bookingId": "string"
+    }
+  },
+  "listings": {
+    "fields": {
+      "images": "object",
+      "title": "string",
+      "tailNumber": "string",
+      "price": "number",
+      "description": "string",
+      "city": "string",
+      "state": "string",
+      "email": "string",
+      "phone": "string",
+      "companyName": "string",
+      "jobTitle": "string",
+      "jobDescription": "string",
+      "category": "string",
+      "flightSchoolName": "string",
+      "flightSchoolDetails": "string",
+      "isFreeListing": "boolean",
+      "location": "object",
+      "ownerId": "string",
+      "status": "string",
+      "createdAt": "object",
+      "salePrice": "number",
+      "packageType": "object",
+      "packageCost": "number",
+      "updatedAt": "object"
+    }
+  },
+  "messages": {
+    "fields": {
+      "createdAt": "object",
+      "senderId": "string",
+      "senderName": "string",
+      "text": "string",
+      "ownerId": "string",
+      "receiverId": "string",
+      "participants": "object",
+      "rentalRequestId": "string",
+      "listingId": "string",
+      "timestamp": "object",
+      "status": "string",
+      "timeStamp": "string",
+      "messages": "object"
+    }
+  },
+  "migrationFlags": {
+    "fields": {
+      "migrated": "boolean",
+      "migratedAt": "object"
+    }
+  },
+  "newListing": {
+    "fields": {}
+  },
+  "notifications": {
+    "fields": {
+      "createdAt": "object",
+      "ownerId": "string",
+      "message": "string",
+      "confirmed": "boolean",
+      "renter": "object",
+      "fromUserName": "string",
+      "fromUserId": "string",
+      "postId": "string",
+      "type": "string",
+      "toUserId": "string",
+      "read": "boolean",
+      "commentId": "string",
+      "renterId": "string",
+      "airplaneModel": "string",
+      "rentalHours": "number",
+      "renterName": "string",
+      "totalCost": "string",
+      "status": "string",
+      "listingId": "string"
+    }
+  },
+  "orders": {
+    "fields": {}
+  },
+  "ownerId": {
+    "fields": {}
+  },
+  "owners": {
+    "fields": {
+      "stripeAccountId": "string",
+      "stripeAccountStatus": "string",
+      "uid": "string",
+      "fullName": "string",
+      "contact": "string",
+      "email": "string",
+      "address": "string",
+      "image": "string"
+    }
+  },
+  "payment-sheet": {
+    "fields": {}
+  },
+  "posts": {
+    "fields": {
+      "image": "object",
+      "createdAt": "object",
+      "profileImage": "string",
+      "userName": "string",
+      "content": "string",
+      "likes": "object",
+      "userId": "string",
+      "comments": "object",
+      "images": "object"
+    }
+  },
+  "rentalRequests": {
+    "fields": {
+      "renterId": "string",
+      "rentalPeriod": "string",
+      "renterName": "object",
+      "ownerId": "string",
+      "rentalCost": "number",
+      "transactionFee": "number",
+      "bookingFee": "number",
+      "salesTax": "number",
+      "totalCost": "number",
+      "rentalRequestId": "string",
+      "listingId": "string",
+      "rentalHours": "number",
+      "rentalCostPerHour": "number",
+      "rentalStatus": "string",
+      "baseCost": "string",
+      "commission": "string",
+      "rentalDate": "string",
+      "currentLocation": "string",
+      "hasMedicalCertificate": "boolean",
+      "hasRentersInsurance": "boolean",
+      "flightHours": "number",
+      "createdAt": "object",
+      "id": "string",
+      "status": "string"
+    }
+  },
+  "renters": {
+    "fields": {
+      "listingId": "string",
+      "renterId": "string",
+      "status": "string",
+      "rentalPeriod": "string",
+      "totalCost": "string",
+      "createdAt": "object",
+      "name": "string",
+      "email": "string",
+      "contact": "string",
+      "address": "string",
+      "aircraftType": "string",
+      "certifications": "string",
+      "fcmToken": "string"
+    }
+  },
+  "users": {
+    "fields": {
+      "firstName": "string",
+      "lastName": "string",
+      "role": "string",
+      "city": "string",
+      "state": "string",
+      "aircraftType": "string",
+      "medicalStatus": "string",
+      "insuranceStatus": "string",
+      "annualDate": "string",
+      "userId": "string",
+      "image": "string",
+      "profileImageLikes": "object",
+      "profileData": "object",
+      "costData": "object",
+      "aircraftDetails": "object",
+      "userEmail": "string",
+      "userID": "string"
+    }
+  },
+  "your-collection": {
+    "fields": {
+      "image": "string",
+      "address": "string",
+      "price": "string",
+      "contact": "string",
+      "name": "string",
+      "certifications": "string"
+    }
+  }
+}

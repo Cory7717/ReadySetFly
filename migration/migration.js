@@ -72,6 +72,38 @@ const transporter = nodemailer.createTransport({
 });
 
 // ====================
+// Load and Manage Schemas
+// ====================
+
+const schemasPath = path.join(__dirname, 'schemas.json');
+
+// Load existing schemas or initialize an empty object
+let expectedSchemas = {};
+if (fs.existsSync(schemasPath)) {
+  try {
+    const schemasData = fs.readFileSync(schemasPath, 'utf-8');
+    expectedSchemas = JSON.parse(schemasData);
+    console.log('✅ Loaded existing schemas from schemas.json.');
+  } catch (error) {
+    console.error('❌ Failed to read or parse schemas.json:', error);
+    process.exit(1);
+  }
+} else {
+  console.warn('⚠️ schemas.json not found. Starting with an empty schema.');
+  expectedSchemas = {};
+}
+
+// Utility function to save updated schemas back to schemas.json
+const saveSchemas = () => {
+  try {
+    fs.writeFileSync(schemasPath, JSON.stringify(expectedSchemas, null, 2));
+    console.log('✅ schemas.json has been updated.');
+  } catch (error) {
+    console.error('❌ Failed to write to schemas.json:', error);
+  }
+};
+
+// ====================
 // Migration Functions
 // ====================
 
@@ -372,101 +404,8 @@ const fixRentalHoursAndCostPerHour = async () => {
 };
 
 // ====================
-// Audit Functions
+// Audit and Dynamic Schema Management Functions
 // ====================
-
-/**
- * Define expected schemas for your collections.
- * Update this object based on your application's data structure.
- */
-const expectedSchemas = {
-  owners: {
-    fields: {
-      stripeAccountId: 'string',
-      stripeAccountStatus: 'string',
-      uid: 'string',
-      fullName: 'string',
-      contact: 'string',
-      email: 'string',
-      address: 'string',
-      image: 'string',
-      // Add other expected fields and their types
-    },
-  },
-  rentalRequests: {
-    fields: {
-      rentalRequestId: 'string',
-      ownerId: 'string',
-      renterId: 'string',
-      listingId: 'string',
-      rentalStatus: 'string',
-      rentalPeriod: 'string',
-      renterName: 'string',
-      rentalCostPerHour: 'number',
-      rentalHours: 'number',
-      rentalCost: 'number',
-      transactionFee: 'number',
-      bookingFee: 'number',
-      salesTax: 'number',
-      totalCost: 'number',
-      // Add other expected fields and their types
-    },
-  },
-  airplanes: {
-    fields: {
-      baseCost: 'number',
-      commission: 'number',
-      ownerPayout: 'number',
-      rentalCost: 'number',
-      totalCost: 'number',
-      createdAt: 'object', // Firestore timestamp
-      images: 'object', // Array in Firestore is of type object
-      airplaneModel: 'string',
-      minimumHours: 'number',
-      currentAnnualPdf: 'string',
-      insurancePdf: 'string',
-      ratesPerHour: 'number',
-      description: 'string',
-      location: 'string',
-      ownerId: 'string',
-      boosted: 'boolean',
-      listing: 'string',
-      costPerHour: 'number',
-      availableDates: 'object', // Array in Firestore is of type object
-      airplaneYear: 'number',
-      userEmail: 'string',
-      airplaneID: 'string',
-      aircraftModel: 'string',
-      tailNumber: 'string',
-      engineType: 'string',
-      totalTimeOnFrame: 'number',
-      airportIdentifier: 'string',
-      mainImage: 'string',
-      documents: 'object', // Array in Firestore is of type object
-      insuranceDocuments: 'object', // Array in Firestore is of type object
-      boostListing: 'boolean',
-      airplaneId: 'string',
-      // Add other expected fields and their types
-    },
-  },
-  UserPost: {
-    fields: {
-      ownerId: 'string',
-      title: 'string',
-      tailNumber: 'string',
-      price: 'string', // Assuming price was stored as string and needs conversion
-      description: 'string',
-      city: 'string',
-      state: 'string',
-      email: 'string',
-      phone: 'string',
-      category: 'string',
-      images: 'object', // Array in Firestore is of type object
-      // Add other expected fields and their types
-    },
-  },
-  // Define schemas for other collections as needed
-};
 
 /**
  * Utility Function: Recursively Traverse Collections and Subcollections
@@ -543,16 +482,30 @@ const analyzeDocument = (collectionName, docData, docPath) => {
       }
     }
   } else {
-    // If no schema is defined for the collection, optionally flag or skip
-    // For now, we'll skip detailed analysis
+    // If no schema is defined for the collection, consider it as a new collection
+    console.log(`🔍 Detected new collection: '${collectionName}'. Adding to schemas.json.`);
+    expectedSchemas[collectionName] = { fields: {} };
+    saveSchemas();
+    // After adding, no issues to report for this document
   }
 
   return issues;
 };
 
 /**
+ * Function: Infer Data Type from Value
+ * @param {any} value
+ * @returns {string} Inferred data type
+ */
+const inferDataType = (value) => {
+  if (value instanceof admin.firestore.Timestamp) return 'object';
+  if (Array.isArray(value)) return 'object'; // Firestore arrays are of type 'object'
+  return typeof value;
+};
+
+/**
  * Function: Fix Missing Fields
- * Assign default values to missing fields based on predefined defaults or logic.
+ * Assign default values to missing fields based on predefined defaults or inferred types.
  */
 const fixMissingFields = async (collectionName, docRef, field, ownerId = null) => {
   // Validate docRef
@@ -562,69 +515,34 @@ const fixMissingFields = async (collectionName, docRef, field, ownerId = null) =
   }
 
   const defaultValues = {
-    airplanes: {
-      baseCost: 0,
-      commission: 0,
-      ownerPayout: 0,
-      rentalCost: 0,
-      totalCost: 0,
-      // Add other fields with their default values
-    },
-    owners: {
-      stripeAccountId: '',
-      stripeAccountStatus: 'inactive',
-      uid: '',
-      fullName: '',
-      contact: '',
-      email: '',
-      address: '',
-      image: '',
-      // Add other fields with their default values
-    },
-    rentalRequests: {
-      rentalRequestId: '',
-      ownerId: ownerId || '',
-      renterId: '',
-      listingId: '',
-      rentalStatus: 'pending',
-      rentalPeriod: '',
-      renterName: '',
-      rentalCostPerHour: 0,
-      rentalHours: 0,
-      rentalCost: 0,
-      transactionFee: 0,
-      bookingFee: 0,
-      salesTax: 0,
-      totalCost: 0,
-      // Add other fields with their default values
-    },
-    UserPost: {
-      ownerId: '',
-      title: '',
-      tailNumber: '',
-      price: '',
-      description: '',
-      city: '',
-      state: '',
-      email: '',
-      phone: '',
-      category: '',
-      images: [],
-      // Add other fields with their default values
-    },
-    // Add default values for other collections
+    string: '',
+    number: 0,
+    boolean: false,
+    object: {}, // For arrays and objects
+    // Add other default types if necessary
   };
-  
-  if (defaultValues[collectionName] && defaultValues[collectionName][field] !== undefined) {
-    const defaultValue = defaultValues[collectionName][field];
-    try {
-      await docRef.update({ [field]: defaultValue });
-      console.log(`🛠️ Fixed missing field '${field}' for document ID: ${docRef.id} in collection: ${collectionName}`);
-    } catch (updateError) {
-      console.error(`❌ Failed to update field '${field}' for document ID: ${docRef.id} in collection: ${collectionName}:`, updateError);
-    }
+
+  // Determine default value based on expected type
+  const fieldType = expectedSchemas[collectionName]?.fields[field];
+  let defaultValue = null;
+
+  if (fieldType && defaultValues[fieldType] !== undefined) {
+    defaultValue = defaultValues[fieldType];
   } else {
-    console.warn(`⚠️ No default value defined for missing field '${field}' in collection: ${collectionName}`);
+    // If type is unknown, set to null
+    defaultValue = null;
+  }
+
+  if (defaultValue === null) {
+    console.warn(`⚠️ No default value defined for field '${field}' in collection '${collectionName}'. Skipping.`);
+    return;
+  }
+
+  try {
+    await docRef.update({ [field]: defaultValue });
+    console.log(`🛠️ Fixed missing field '${field}' for document ID: ${docRef.id} in collection: ${collectionName}`);
+  } catch (updateError) {
+    console.error(`❌ Failed to update field '${field}' for document ID: ${docRef.id} in collection: ${collectionName}:`, updateError);
   }
 };
 
@@ -648,8 +566,27 @@ const removeUnexpectedFields = async (collectionName, docRef, field) => {
 };
 
 /**
+ * Function: Add New Field to Schema
+ * Automatically adds a new field to the schema with inferred type and assigns a default value.
+ */
+const addFieldToSchema = async (collectionName, field, value) => {
+  if (!expectedSchemas[collectionName]) {
+    expectedSchemas[collectionName] = { fields: {} };
+  }
+
+  const inferredType = inferDataType(value);
+  expectedSchemas[collectionName].fields[field] = inferredType;
+  console.log(`🆕 Added new field '${field}' with type '${inferredType}' to collection '${collectionName}' in schemas.json.`);
+  saveSchemas();
+
+  // Assign default value to existing documents
+  // (This can be resource-intensive; consider implementing batching or queuing if necessary)
+};
+
+/**
  * Function: Generate Audit Report and Fix Issues
  * This function traverses all collections and documents, analyzes them, logs issues, and fixes missing/unexpected fields.
+ * It also detects and handles new fields and collections dynamically.
  */
 const generateAuditReportAndFix = async () => {
   console.log('\n🔍 Starting Firestore Audit and Fixes...');
@@ -706,18 +643,12 @@ const generateAuditReportAndFix = async () => {
               const fieldMatch = issue.match(/'(.+)'/);
               if (fieldMatch && fieldMatch[1]) {
                 const field = fieldMatch[1];
-                const shouldRemove = true; // Set to false if you want to retain the field
-                if (shouldRemove) {
-                  await removeUnexpectedFields(collectionName, doc.ref, field);
-                } else {
-                  console.log(`ℹ️ Retaining unexpected field '${field}' as per configuration.`);
-                  // Optionally, update expectedSchemas to include this field
-                  if (expectedSchemas[collectionName]) {
-                    const fieldType = typeof doc.data[field];
-                    expectedSchemas[collectionName].fields[field] = fieldType;
-                    console.log(`✅ Updated expected schema to include field '${field}' with type '${fieldType}'.`);
-                  }
-                }
+                // Automatically add the new field to the schema with inferred type
+                const fieldValue = doc.data[field];
+                await addFieldToSchema(collectionName, field, fieldValue);
+
+                // Assign default value to this field in the current document
+                await fixMissingFields(collectionName, doc.ref, field);
               }
             }
           }
@@ -863,7 +794,7 @@ const runMigrationsAndAudit = async () => {
   // Perform Cleanup
   await cleanupOrphanedListings();
 
-  // Perform Audit and Fixes
+  // Perform Audit and Dynamic Schema Management
   await generateAuditReportAndFix();
 
   console.log('🏁 Migration and Audit script completed.');

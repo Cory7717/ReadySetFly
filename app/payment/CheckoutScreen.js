@@ -167,6 +167,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
+  finalizeButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    marginTop: 20,
+    width: '100%',
+    alignItems: 'center',
+  },
+  finalizeButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  finalizeButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 16,
+  },
   securePaymentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -197,7 +214,6 @@ export default function CheckoutScreen() {
   // Extract parameters from navigation route
   const {
     paymentType = 'rental', // Default to 'rental' if not provided
-    amount: initialAmount = 0, // For 'classified' payments (in cents)
     costPerHour = 0, // For 'rental' payments
     rentalHours = 1, // For 'rental' payments
     rentalRequestId: routeRentalRequestId = '', // Existing rental request ID, if any
@@ -211,18 +227,18 @@ export default function CheckoutScreen() {
 
   // State Variables
   const [loading, setLoading] = useState(false);
-  const [isPaymentSuccess, setIsPaymentSuccess] = useState(false);
+  const [isOperationSuccess, setIsOperationSuccess] = useState(false);
   
-  // Discount Code State
+  // Discount Code State (Applicable only for rentals)
   const [discountCode, setDiscountCode] = useState('');
   const [discountApplied, setDiscountApplied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Cardholder Name State
+  // Cardholder Name State (Applicable only for rentals)
   const [cardholderName, setCardholderName] = useState(user?.displayName || '');
 
   // Manage totalAmount and selectedPricing as state to allow updates
-  const [totalAmount, setTotalAmount] = useState(paymentType === 'rental' ? 0 : initialAmount);
+  const [totalAmount, setTotalAmount] = useState(0); // Initialize to 0 for classified
   const [selectedPricing, setSelectedPricing] = useState(initialSelectedPricing);
 
   // State to hold rentalRequestId
@@ -268,9 +284,9 @@ export default function CheckoutScreen() {
 
         calculateRentalTotal(parseFloat(costPerHour), parseFloat(rentalHours));
       } else if (paymentType === 'classified') {
-        // For Classifieds, ensure initialAmount is a positive number
-        if (isNaN(initialAmount) || initialAmount <= 0) {
-          Alert.alert('Invalid Amount', 'Please provide a valid amount for the listing.');
+        // For Classifieds, ensure salePrice is a positive number
+        if (!listingDetails.salePrice || isNaN(listingDetails.salePrice) || listingDetails.salePrice <= 0) {
+          Alert.alert('Invalid Sale Price', 'Please provide a valid sale price for your aircraft.');
           navigation.goBack();
           return false;
         }
@@ -289,7 +305,7 @@ export default function CheckoutScreen() {
           return false;
         }
 
-        setTotalAmount(initialAmount);
+        setTotalAmount(Math.round(listingDetails.salePrice * 100)); // Convert to cents
       }
 
       return true;
@@ -299,7 +315,7 @@ export default function CheckoutScreen() {
     if (validateParameters()) {
       // Additional setup if needed
     }
-  }, [paymentType, costPerHour, rentalHours, initialAmount, listingDetails, navigation]);
+  }, [paymentType, costPerHour, rentalHours, listingDetails, navigation]);
 
   // Start the bouncing animation
   const startBouncing = () => {
@@ -366,8 +382,13 @@ export default function CheckoutScreen() {
 
   /**
    * Function to apply discount code by validating it with the backend
+   * Applicable only for rentals
    */
   const applyDiscount = async () => {
+    if (paymentType !== 'rental') {
+      return; // Discounts are not applicable for classified listings
+    }
+
     const code = discountCode.trim().toUpperCase();
 
     if (code === '') {
@@ -411,8 +432,6 @@ export default function CheckoutScreen() {
         setDiscountApplied(false);
         if (paymentType === 'rental') {
           calculateRentalTotal(costPerHour, rentalHours); // Recalculate for Rentals
-        } else {
-          setTotalAmount(initialAmount); // Reset to initial amount for Classifieds
         }
         setErrorMessage(data.message || 'Invalid discount code.');
       }
@@ -426,8 +445,13 @@ export default function CheckoutScreen() {
 
   /**
    * Function to create a rental request under the correct Firestore path
+   * Applicable only for rentals
    */
   const createRentalRequest = async () => {
+    if (paymentType !== 'rental') {
+      return null; // Only applicable for rentals
+    }
+
     try {
       // Ensure ownerId and listingId are correctly obtained from listingDetails
       const actualOwnerId = listingDetails.ownerId;
@@ -473,8 +497,13 @@ export default function CheckoutScreen() {
 
   /**
    * Function to create the listing on the backend
+   * Applicable only for classifieds
    */
   const createListingBackend = async (values, isFree = false) => {
+    if (paymentType !== 'classified') {
+      return null; // Only applicable for classified listings
+    }
+
     try {
       const token = await getFirebaseIdToken();
       if (!token) {
@@ -503,9 +532,9 @@ export default function CheckoutScreen() {
         throw new Error(`Invalid category: ${category}`);
       }
 
-      // Conditionally require 'price' and 'selectedPricing' if not a free listing and category is 'Aircraft for Sale'
+      // Conditionally require 'selectedPricing' if not a free listing and category is 'Aircraft for Sale'
       if (category === 'Aircraft for Sale' && !isFree) {
-        requiredFields.push('price', 'selectedPricing');
+        requiredFields.push('selectedPricing');
       }
 
       // Check for missing required fields
@@ -578,24 +607,20 @@ export default function CheckoutScreen() {
    * Function to handle form submission
    */
   const handleFormSubmit = async (values) => {
-    // If discount is applied and totalAmount is zero (free listing)
-    if (discountApplied && totalAmount === 0) {
+    if (paymentType === 'classified') {
+      // Finalize the listing without payment
       try {
         setLoading(true);
         const listingId = await createListingBackend(values, true); // Pass 'true' to indicate a free listing
         if (listingId) {
           Alert.alert(
             'Success',
-            'Your listing has been created with a free package.',
+            'Your listing has been finalized successfully.',
             [
               {
                 text: 'OK',
                 onPress: () => {
-                  if (paymentType === 'rental') {
-                    navigation.navigate('ConfirmationScreen', { rentalRequestId });
-                  } else {
-                    navigation.navigate('Classifieds', { refresh: true });
-                  }
+                  navigation.navigate('Classifieds', { refresh: true });
                 },
               },
             ],
@@ -608,12 +633,12 @@ export default function CheckoutScreen() {
       return;
     }
 
-    // Proceed with payment
+    // Proceed with payment for rentals
     handlePayment(values);
   };
 
   /**
-   * Handle payment processing
+   * Handle payment processing for rentals
    */
   const handlePayment = async (values) => {
     // Validate cardholder name
@@ -622,41 +647,11 @@ export default function CheckoutScreen() {
       return;
     }
 
-    // If discount is applied and totalAmount is zero (free listing)
-    if (discountApplied && totalAmount === 0) {
-      try {
-        setLoading(true);
-        const listingId = await createListingBackend(values, true); // Pass 'true' to indicate a free listing
-        if (listingId) {
-          Alert.alert(
-            'Success',
-            'Your listing has been created with a free package.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  if (paymentType === 'rental') {
-                    navigation.navigate('ConfirmationScreen', { rentalRequestId });
-                  } else {
-                    navigation.navigate('Classifieds', { refresh: true });
-                  }
-                },
-              },
-            ],
-            { cancelable: false }
-          );
-        }
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
     try {
       setLoading(true);
 
       let currentRentalRequestId = rentalRequestId;
-      let currentListingId = listingDetails.id;
+      let clientSecret = '';
 
       // If paymentType is 'rental' and rentalRequestId is not provided, create a new rental request
       if (paymentType === 'rental' && !currentRentalRequestId) {
@@ -667,37 +662,13 @@ export default function CheckoutScreen() {
         }
       }
 
-      // For 'classified', create the listing first to get listingId if not already present
-      if (paymentType === 'classified' && !currentListingId) {
-        const listingId = await createListingBackend(values);
-        if (!listingId) {
-          setLoading(false);
-          return;
-        }
-        currentListingId = listingId;
-        // Update listingDetails with listingId if necessary
-        // Note: Since listingDetails is extracted from route.params, it's immutable. 
-        // If you need to update it, consider using a state or a context.
-      }
-
-      let clientSecret = '';
-
-      const endpoint =
-        paymentType === 'rental'
-          ? '/create-rental-payment-intent'
-          : '/create-classified-payment-intent';
+      const endpoint = '/create-rental-payment-intent';
 
       // Prepare request body based on payment type
-      let body = {};
-      if (paymentType === 'rental') {
-        body = { rentalRequestId: currentRentalRequestId };
-      } else if (paymentType === 'classified') {
-        body = { 
-          amount: totalAmount, 
-          currency: 'usd', 
-          listingId: currentListingId 
-        };
-      }
+      const body = { 
+        rentalRequestId: currentRentalRequestId,
+        ownerId: listingDetails.ownerId, // Include ownerId here
+      };
 
       // Fetch Firebase ID token for authenticated requests
       const token = await getFirebaseIdToken();
@@ -752,22 +723,18 @@ export default function CheckoutScreen() {
         // After successful payment, navigate accordingly
         Alert.alert(
           'Success',
-          'Payment processed successfully and your listing has been created.',
+          'Payment processed successfully and your rental request has been created.',
           [
             {
               text: 'OK',
               onPress: () => {
-                if (paymentType === 'rental') {
-                  navigation.navigate('ConfirmationScreen', { rentalRequestId: currentRentalRequestId });
-                } else {
-                  navigation.navigate('Classifieds', { refresh: true });
-                }
+                navigation.navigate('ConfirmationScreen', { rentalRequestId: currentRentalRequestId });
               },
             },
           ],
           { cancelable: false }
         );
-        setIsPaymentSuccess(true); // Update state to reflect successful payment
+        setIsOperationSuccess(true); // Update state to reflect successful payment
       }
     } catch (error) {
       console.error('Payment error:', error);
@@ -784,7 +751,7 @@ export default function CheckoutScreen() {
     if (!loading) {
       navigation.goBack();
     } else {
-      Alert.alert('Please wait', 'Payment is being processed. Please wait until it finishes.');
+      Alert.alert('Please wait', 'Operation is in progress. Please wait until it finishes.');
     }
   };
 
@@ -799,7 +766,7 @@ export default function CheckoutScreen() {
         <TouchableOpacity 
           onPress={handleCancel} 
           style={styles.cancelButton} 
-          accessibilityLabel="Cancel payment" 
+          accessibilityLabel="Cancel operation" 
           accessibilityRole="button"
         >
           <Ionicons name="close-outline" size={28} color={COLORS.red} />
@@ -810,15 +777,21 @@ export default function CheckoutScreen() {
           {/* Bouncing animation */}
           <Animated.View style={[styles.animatedContainer, { transform: [{ translateY: bounceValue }] }]}>
             <Ionicons
-              name={isPaymentSuccess ? "checkmark-circle-outline" : "card-outline"}
+              name={isOperationSuccess ? "checkmark-circle-outline" : "card-outline"}
               size={80}
-              color={isPaymentSuccess ? COLORS.green : COLORS.primary} // Green on success, red otherwise
-              accessibilityLabel={isPaymentSuccess ? "Payment Successful" : "Payment Required"}
+              color={isOperationSuccess ? COLORS.green : COLORS.primary} // Green on success, red otherwise
+              accessibilityLabel={isOperationSuccess ? "Operation Successful" : "Operation Required"}
             />
           </Animated.View>
 
-          <Text style={styles.title}>Complete Your Payment</Text>
-          <Text style={styles.description}>Verify your payment details below.</Text>
+          <Text style={styles.title}>
+            {paymentType === 'rental' ? 'Complete Your Payment' : 'Finalize Your Listing'}
+          </Text>
+          <Text style={styles.description}>
+            {paymentType === 'rental' 
+              ? 'Verify your payment details below.' 
+              : 'Review your listing details below and finalize your listing.'}
+          </Text>
 
           {/* Formik Form */}
           <Formik
@@ -828,9 +801,13 @@ export default function CheckoutScreen() {
               listingDetails: listingDetails,
             }}
             validationSchema={Yup.object({
-              cardholderName: Yup.string()
-                .required('Name on card is required.'),
-              discountCode: Yup.string(),
+              cardholderName: paymentType === 'rental' 
+                ? Yup.string()
+                    .required('Name on card is required.') 
+                : Yup.string(), // Optional for classifieds
+              discountCode: paymentType === 'rental' 
+                ? Yup.string()
+                : Yup.string().notRequired(),
             })}
             onSubmit={handleFormSubmit}
             enableReinitialize={true}
@@ -845,7 +822,7 @@ export default function CheckoutScreen() {
               setFieldValue,
             }) => (
               <>
-                {/* Display Payment Details */}
+                {/* Display Payment or Listing Details */}
                 {paymentType === 'rental' ? (
                   <View style={styles.detailsContainer}>
                     <Text style={styles.detail}>Cost Per Hour: ${parseFloat(costPerHour).toFixed(2)}</Text>
@@ -861,7 +838,7 @@ export default function CheckoutScreen() {
                 ) : (
                   <View style={styles.detailsContainer}>
                     <Text style={styles.detail}>Listing Type: {listingDetails.type || 'N/A'}</Text>
-                    <Text style={styles.detail}>Amount: ${(initialAmount / 100).toFixed(2)}</Text>
+                    <Text style={styles.detail}>Sale Price: ${listingDetails.salePrice ? listingDetails.salePrice.toFixed(2) : 'N/A'}</Text>
                     {/* Display selected pricing tier if available */}
                     {!listingDetails.isFreeListing && selectedPricing && (
                       <Text style={styles.detail}>Package Type: {selectedPricing}</Text>
@@ -869,8 +846,8 @@ export default function CheckoutScreen() {
                   </View>
                 )}
 
-                {/* Discount Code Input */}
-                {!discountApplied && (
+                {/* Discount Code Input (Applicable only for rentals) */}
+                {paymentType === 'rental' && !discountApplied && (
                   <View style={styles.discountContainer}>
                     <TextInput
                       style={styles.discountInput}
@@ -902,65 +879,95 @@ export default function CheckoutScreen() {
                   <Text style={styles.errorText} accessibilityLiveRegion="polite">{errorMessage}</Text>
                 )}
 
-                {/* Cardholder Name Input */}
-                <TextInput
-                  style={styles.nameInput}
-                  placeholder="Name on Card"
-                  placeholderTextColor="#888"
-                  value={values.cardholderName}
-                  onChangeText={(text) => {
-                    setCardholderName(text);
-                    setFieldValue('cardholderName', text);
-                  }}
-                  autoCapitalize="words"
-                  editable={!loading}
-                  accessibilityLabel="Cardholder Name Input"
-                />
-                {touched.cardholderName && errors.cardholderName && (
-                  <Text style={styles.errorText}>{errors.cardholderName}</Text>
+                {/* Cardholder Name Input (Applicable only for rentals) */}
+                {paymentType === 'rental' && (
+                  <>
+                    <TextInput
+                      style={styles.nameInput}
+                      placeholder="Name on Card"
+                      placeholderTextColor="#888"
+                      value={values.cardholderName}
+                      onChangeText={(text) => {
+                        setCardholderName(text);
+                        setFieldValue('cardholderName', text);
+                      }}
+                      autoCapitalize="words"
+                      editable={!loading}
+                      accessibilityLabel="Cardholder Name Input"
+                    />
+                    {touched.cardholderName && errors.cardholderName && (
+                      <Text style={styles.errorText}>{errors.cardholderName}</Text>
+                    )}
+
+                    {/* Stripe CardField component */}
+                    <CardField
+                      postalCodeEnabled={true}
+                      placeholders={{ number: '**** **** **** ****' }} // Stripe test card
+                      placeholderTextColor="#888"
+                      style={styles.cardField}
+                      onCardChange={(cardDetails) => {
+                        console.log('Card details:', cardDetails);
+                      }}
+                      onFocus={() => console.log('CardField focused')}
+                      editable={!loading}
+                      accessibilityLabel="Credit Card Input"
+                    />
+                  </>
                 )}
 
-                {/* Stripe CardField component */}
-                <CardField
-                  postalCodeEnabled={true}
-                  placeholders={{ number: '**** **** **** ****' }} // Stripe test card
-                  placeholderTextColor="#888"
-                  style={styles.cardField}
-                  onCardChange={(cardDetails) => {
-                    console.log('Card details:', cardDetails);
-                  }}
-                  onFocus={() => console.log('CardField focused')}
-                  editable={!(discountApplied && totalAmount === 0)} // Disable card input if discount makes it free
-                  accessibilityLabel="Credit Card Input"
-                />
+                {/* Pay Button for rentals */}
+                {paymentType === 'rental' && (
+                  <TouchableOpacity
+                    onPress={handleSubmit}
+                    disabled={loading || (discountApplied && totalAmount === 0)}
+                    style={[
+                      styles.payButton, 
+                      (loading || (discountApplied && totalAmount === 0)) && styles.payButtonDisabled
+                    ]}
+                    accessibilityLabel={discountApplied && totalAmount === 0 ? "Finalize Rental" : `Pay $${displayTotal}`}
+                    accessibilityRole="button"
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="white" accessibilityLabel="Processing Payment" />
+                    ) : (
+                      <Text style={styles.payButtonText}>
+                        {discountApplied && totalAmount === 0 ? 'Finalize Rental' : `Pay $${displayTotal}`}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
 
-                {/* Pay Button */}
-                <TouchableOpacity
-                  onPress={handleSubmit}
-                  disabled={loading || (discountApplied && totalAmount === 0)}
-                  style={[
-                    styles.payButton, 
-                    (loading || (discountApplied && totalAmount === 0)) && styles.payButtonDisabled
-                  ]}
-                  accessibilityLabel={discountApplied && totalAmount === 0 ? "Finalize Listing" : `Pay $${displayTotal}`}
-                  accessibilityRole="button"
-                >
-                  {loading ? (
-                    <ActivityIndicator color="white" accessibilityLabel="Processing Payment" />
-                  ) : (
-                    <Text style={styles.payButtonText}>
-                      {discountApplied && totalAmount === 0 ? 'Finalize Listing' : `Pay $${displayTotal}`}
+                {/* Finalize Listing Button for classifieds */}
+                {paymentType === 'classified' && (
+                  <TouchableOpacity
+                    onPress={handleSubmit}
+                    disabled={loading}
+                    style={[
+                      styles.finalizeButton, 
+                      loading && styles.finalizeButtonDisabled
+                    ]}
+                    accessibilityLabel="Finalize Listing"
+                    accessibilityRole="button"
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="white" accessibilityLabel="Finalizing Listing" />
+                    ) : (
+                      <Text style={styles.finalizeButtonText}>
+                        Finalize Listing
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* Secure Payment Text (Applicable only for rentals) */}
+                {paymentType === 'rental' && (
+                  <View style={styles.securePaymentContainer}>
+                    <Ionicons name="lock-closed-outline" size={16} color="#555" accessibilityLabel="Secure Payment Lock Icon" />
+                    <Text style={styles.securePaymentText}>
+                      Your payment is secure and encrypted.
                     </Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Secure Payment Text */}
-                <View style={styles.securePaymentContainer}>
-                  <Ionicons name="lock-closed-outline" size={16} color="#555" accessibilityLabel="Secure Payment Lock Icon" />
-                  <Text style={styles.securePaymentText}>
-                    Your payment is secure and encrypted.
-                  </Text>
-                </View>
+                  </View>
+                )}
               </>
             )}
           </Formik>

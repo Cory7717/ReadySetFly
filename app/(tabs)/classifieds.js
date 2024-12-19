@@ -42,10 +42,9 @@ import wingtipClouds from '../../Assets/images/wingtip_clouds.jpg';
 import * as ImagePicker from 'expo-image-picker';
 import { Formik } from 'formik';
 import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
-import { useStripe } from '@stripe/stripe-react-native';
 import CheckoutScreen from '../payment/CheckoutScreen'; // Standardized Import
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const COLORS = {
   primary: '#1D4ED8',
@@ -68,61 +67,85 @@ const API_URL =
 const Classifieds = () => {
   const auth = getAuth(); // Initialize Firebase Auth
   const navigation = useNavigation();
-  const [user, setUser] = useState(null); // Manage authenticated user state
-  const [loadingAuth, setLoadingAuth] = useState(true); // Track auth loading state
-  const { initPaymentSheet } = useStripe();
+  
+  // Existing state variables
+  const [user, setUser] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const [listings, setListings] = useState([]);
   const [filteredListings, setFilteredListings] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [jobDetailsModalVisible, setJobDetailsModalVisible] = useState(false);
-  // Removed editModalVisible as we are using modalVisible for both add and edit
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPricing, setSelectedPricing] = useState('Basic');
-  const [totalCost, setTotalCost] = useState(0);
   const [selectedListing, setSelectedListing] = useState(null);
   const [editingListing, setEditingListing] = useState(null); // State to hold the listing being edited
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [location, setLocation] = useState(null);
-  const [pricingModalVisible, setPricingModalVisible] = useState({
-    Basic: false,
-    Featured: false,
-    Enhanced: false,
-  });
-
-  // Reintroduce selectedCategory state
+  const [imageIndex, setImageIndex] = useState(0);
+  const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
+  const [zoomImageUri, setZoomImageUri] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Aircraft for Sale'); // Default category
-
+  
+  // **Added location state**
+  const [location, setLocation] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(true); // Track location loading state
+  
   const scaleValue = useRef(new Animated.Value(0)).current;
-
   const scrollY = useRef(new Animated.Value(0)).current;
-
+  
+  // **Added scrollX state**
+  const scrollX = useRef(new Animated.Value(0)).current;
+  
   const categories = ['Aircraft for Sale', 'Aviation Jobs', 'Flight Schools'];
-
+  
   const defaultPricingPackages = {
     Basic: 25,
     Featured: 70,
     Enhanced: 150, // This will be updated to allow up to 20 images
   };
-
+  
   const [pricingPackages, setPricingPackages] = useState(defaultPricingPackages);
-
+  
   const pricingDescriptions = {
-    Basic: 'Basic package includes 7 days of listing.',
-    Featured: 'Featured package includes 14 days of listing and enhanced visibility.',
-    Enhanced: 'Enhanced package includes 30 days of listing and premium placement.',
-  };
+    Basic: `Basic Package Includes:
+• 30-day listing
+• Add up to 5 images
+• Add up to 7 lines of listing description`,
 
+    Featured: `Featured Package Includes:
+• 46-day listing
+• Add up to 10 images
+• Add up to 12 lines of description
+• Listing will be periodically refreshed to keep closer to the top of the listing page`,
+
+    Enhanced: `Enhanced Package Includes:
+• 60-day listing
+• Add up to 20 images
+• Unlimited lines of aircraft description
+• Listing will frequently be refreshed to keep closer to the top of the listings page`,
+  };
+  
   const openPricingInfo = (packageType) => {
     setPricingModalVisible((prev) => ({ ...prev, [packageType]: true }));
   };
-
+  
   const closePricingInfo = (packageType) => {
     setPricingModalVisible((prev) => ({ ...prev, [packageType]: false }));
   };
-
+  
+  const [pricingModalVisible, setPricingModalVisible] = useState({
+    Basic: false,
+    Featured: false,
+    Enhanced: false,
+  });
+  
+  // **Added scrollViewRef for the up button functionality**
+  const scrollViewRef = useRef(null);
+  
+  // **Added state for showing the up button**
+  const [showUpButton, setShowUpButton] = useState(false);
+  
   // Listen to authentication state changes
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -142,6 +165,7 @@ const Classifieds = () => {
           if (status !== 'granted') {
             Alert.alert('Permission denied', 'Location access is required.');
             setLocation(null);
+            setLocationLoading(false);
             return;
           }
 
@@ -154,10 +178,15 @@ const Classifieds = () => {
             'Location is unavailable. Make sure that location services are enabled.'
           );
           setLocation(null);
+        } finally {
+          setLocationLoading(false);
         }
       };
 
       fetchLocation();
+    } else {
+      setLocation(null);
+      setLocationLoading(false);
     }
   }, [user]);
 
@@ -225,6 +254,21 @@ const Classifieds = () => {
       setFilteredListings(listings);
     }
   }, [listings, selectedCategory]);
+
+  // **Added listener for scrollY to show/hide up button**
+  useEffect(() => {
+    const listener = scrollY.addListener(({ value }) => {
+      if (value > 200 && !showUpButton) {
+        setShowUpButton(true);
+      } else if (value <= 200 && showUpButton) {
+        setShowUpButton(false);
+      }
+    });
+
+    return () => {
+      scrollY.removeListener(listener);
+    };
+  }, [scrollY, showUpButton]);
 
   // Image picker functionality
   const pickImage = async () => {
@@ -324,26 +368,51 @@ const Classifieds = () => {
   // Render listing images in FlatList
   const renderListingImages = (item) => {
     return (
-      <FlatList
-        data={item.images}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(imageUri, index) => `${item.id}-${index}`}
-        renderItem={({ item: imageUri }) => (
-          <Image
-            source={{ uri: imageUri }}
-            style={{
-              width: width - 32,
-              height: 200,
-              borderRadius: 10,
-              marginBottom: 8,
-              marginRight: 8,
-            }}
-            accessible={true}
-            accessibilityLabel="Listing Image"
-          />
+      <View style={{ position: 'relative' }}>
+        <FlatList
+          data={item.images || []} // Ensure data is an array
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(imageUri, index) => `${item.id}-${index}`}
+          renderItem={({ item: imageUri }) => (
+            <TouchableOpacity
+              onPress={() => handleImagePress(imageUri)}
+              activeOpacity={0.9}
+              accessible={true}
+              accessibilityLabel="View Listing Image"
+              accessibilityRole="imagebutton"
+            >
+              <Image
+                source={{ uri: imageUri }}
+                style={{
+                  width: SCREEN_WIDTH - 32, // Adjusted width to account for padding
+                  height: 200, // Adjust height as needed
+                  borderRadius: 10,
+                  marginBottom: 10, // Add margin below images
+                }}
+              />
+            </TouchableOpacity>
+          )}
+        />
+        {/* Overlay for Price and Location */}
+        {item.category === 'Aircraft for Sale' && (
+          <View style={styles.priceLocationOverlay}>
+            {/* Price on the left */}
+            <Text style={styles.priceText}>
+              Price: $
+              {typeof item.salePrice === 'string' ? item.salePrice : 'N/A'}
+            </Text>
+
+            {/* Location on the right with pin icon */}
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={20} color={COLORS.white} />
+              <Text style={styles.locationText}>
+                {item.city ? item.city : 'N/A'}, {item.state ? item.state : 'N/A'}
+              </Text>
+            </View>
+          </View>
         )}
-      />
+      </View>
     );
   };
 
@@ -408,7 +477,7 @@ const Classifieds = () => {
   const handleEditListing = (listing) => {
     setEditingListing(listing);
     setImages(listing.images || []);
-    
+
     // Set selectedCategory based on the listing's category
     setSelectedCategory(listing.category);
 
@@ -466,9 +535,9 @@ const Classifieds = () => {
 
   // Handle asking a question via email
   const handleAskQuestion = () => {
-    if (selectedListing && selectedListing.email) { // Changed from contactEmail to email
+    if (selectedListing && selectedListing.email) {
       const email = selectedListing.email;
-      const subject = encodeURIComponent(`Inquiry about ${selectedListing.title}`);
+      const subject = encodeURIComponent(`Inquiry about ${selectedListing.title || 'Your Listing'}`);
       const mailUrl = `mailto:${email}?subject=${subject}`;
 
       Linking.openURL(mailUrl).catch((error) => {
@@ -520,16 +589,17 @@ const Classifieds = () => {
       // Upload images to Firebase Storage and get URLs
       const imageUrls = await uploadImagesToFirebase(images);
 
-      // Construct listingDetails with location and price
+      // Construct listingDetails with location and salePrice
       const listingDetailsWithLocation = {
         ...values,
         location: {
           lat: parseFloat(values.lat),
           lng: parseFloat(values.lng),
         },
-        price: isFree ? 0 : parseFloat(values.price), // Set price to 0 if free
+        salePrice: values.salePrice, // **Changed from parseFloat(values.salePrice) to send as string**
         isFreeListing: isFree, // Correct field name
         packageType: isFree ? null : values.selectedPricing, // Include packageType
+        packageCost: isFree ? 0 : parseFloat(values.packageCost), // New field
         images: imageUrls, // Include image URLs
         ownerId: user.uid, // Ensure ownerId is included
       };
@@ -546,11 +616,7 @@ const Classifieds = () => {
       // Validate that all required fields are present
       for (const field of requiredFields) {
         if (!listingDetailsWithLocation[field]) {
-          Alert.alert(
-            'Validation Error',
-            `${field.charAt(0).toUpperCase() + field.slice(1)} is required for ${values.category}.`
-          );
-          return false;
+          throw new Error(`Missing required fields: ${field}`);
         }
       }
 
@@ -601,16 +667,17 @@ const Classifieds = () => {
         imageUrls = selectedListing.images || [];
       }
 
-      // Construct listingDetails with location and price
+      // Construct listingDetails with location and salePrice
       const listingDetailsWithLocation = {
         ...values,
         location: {
           lat: parseFloat(values.lat),
           lng: parseFloat(values.lng),
         },
-        price: isFree ? 0 : parseFloat(values.price), // Set price to 0 if free
+        salePrice: values.salePrice, // **Changed from parseFloat(values.salePrice) to send as string**
         isFreeListing: isFree, // Correct field name
         packageType: isFree ? null : values.selectedPricing, // Include packageType
+        packageCost: isFree ? 0 : parseFloat(values.packageCost), // New field
         images: imageUrls, // Include image URLs
         ownerId: user.uid, // Ensure ownerId is included
       };
@@ -627,11 +694,7 @@ const Classifieds = () => {
       // Validate that all required fields are present
       for (const field of requiredFields) {
         if (!listingDetailsWithLocation[field]) {
-          Alert.alert(
-            'Validation Error',
-            `${field.charAt(0).toUpperCase() + field.slice(1)} is required for ${values.category}.`
-          );
-          return false;
+          throw new Error(`Missing required fields: ${field}`);
         }
       }
 
@@ -679,7 +742,7 @@ const Classifieds = () => {
   };
 
   // Handle form submission for listing
-  const onSubmitMethod = async (values, { setFieldValue }) => {
+  const onSubmitMethod = async (values) => {
     if (!user) {
       Alert.alert('Error', 'User information is not available.');
       setLoading(false);
@@ -705,7 +768,8 @@ const Classifieds = () => {
               onPress: () => {
                 setModalVisible(false);
                 setEditingListing(null);
-                setFieldValue('isFreeListing', false); // Reset isFreeListing in Formik
+                // **Reset isFreeListing in Formik**
+                // Note: To reset Formik values, you might need to use Formik's resetForm or similar
                 setImages([]); // Clear images after successful submission
                 // Optionally, refresh listings or navigate as needed
               },
@@ -721,7 +785,8 @@ const Classifieds = () => {
               text: 'OK',
               onPress: () => {
                 setModalVisible(false);
-                setFieldValue('isFreeListing', false); // Reset isFreeListing in Formik
+                // **Reset isFreeListing in Formik**
+                // Note: To reset Formik values, you might need to use Formik's resetForm or similar
                 setImages([]); // Clear images after successful submission
                 // Optionally, refresh listings or navigate as needed
               },
@@ -733,60 +798,74 @@ const Classifieds = () => {
       return;
     }
 
-    // Set price based on selectedPricing to ensure consistency
-    if (!values.isFreeListing) {
-      values.price = pricingPackages[selectedPricing];
-    }
+    // For Paid Listings: Do Not Post Immediately
+    // Instead, navigate to CheckoutScreen with listing details
 
-    // Proceed with payment as usual
-    const selectedPackagePrice = pricingPackages[selectedPricing];
-    const totalWithTaxInCents = Math.round(selectedPackagePrice * 1.0825 * 100);
-    setTotalCost(totalWithTaxInCents);
-    setSelectedListing(null); // Reset selectedListing
+    try {
+      // Optional: Show a loading indicator or similar UI feedback
+      // Upload images to Firebase Storage and get URLs
+      const imageUrls = await uploadImagesToFirebase(images);
 
-    if (editingListing) {
-      // Update existing listing
-      const success = await updateListingBackend(editingListing.id, values, false);
-      if (success) {
-        // Navigate to CheckoutScreen if listing update was successful
-        navigation.navigate('CheckoutScreen', {
-          paymentType: 'classified', // Specifies the payment type
-          amount: totalWithTaxInCents, // Total cost in cents
-          listingDetails: {
-            ...values,
-            location: {
-              lat: location.coords.latitude,
-              lng: location.coords.longitude,
-            },
-          },
-          images,
-          selectedCategory, // Pass the selectedCategory state
-          selectedPricing,
-        });
+      // Prepare listing details with image URLs
+      const listingDetails = {
+        ...values,
+        location: {
+          lat: parseFloat(values.lat),
+          lng: parseFloat(values.lng),
+        },
+        salePrice: parseFloat(values.salePrice), // **Handled as string now, but converted to float for backend consistency**
+        isFreeListing: false,
+        packageType: selectedPricing,
+        packageCost: parseFloat(pricingPackages[selectedPricing]),
+        images: imageUrls,
+        ownerId: user.uid,
+      };
+
+      // Define category requirements (must match server-side)
+      const categoryRequirements = {
+        'Aircraft for Sale': ['title', 'description'],
+        'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
+        'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
+      };
+
+      const requiredFields = categoryRequirements[selectedCategory];
+
+      // Validate that all required fields are present
+      for (const field of requiredFields) {
+        if (!listingDetails[field]) {
+          Alert.alert('Validation Error', `Missing required fields: ${field}`);
+          setLoading(false);
+          return;
+        }
       }
-    } else {
-      // Create new listing
-      const success = await createListingBackend(values, false);
-      if (success) {
-        // Navigate to CheckoutScreen if listing creation was successful
-        navigation.navigate('CheckoutScreen', {
-          paymentType: 'classified', // Specifies the payment type
-          amount: totalWithTaxInCents, // Total cost in cents
-          listingDetails: {
-            ...values,
-            location: {
-              lat: location.coords.latitude,
-              lng: location.coords.longitude,
-            },
-          },
-          images,
-          selectedCategory, // Pass the selectedCategory state
-          selectedPricing,
-        });
-      }
-    }
 
-    setLoading(false);
+      // Conditionally validate salePrice for 'Aircraft for Sale' category
+      if (selectedCategory === 'Aircraft for Sale' && !values.isFreeListing) {
+        if (!listingDetails.salePrice || isNaN(listingDetails.salePrice)) {
+          Alert.alert('Validation Error', 'Sale Price is required for paid Aircraft for Sale listings.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // If editing, include listingId
+      const listingId = editingListing ? editingListing.id : null;
+
+      // Navigate to CheckoutScreen with necessary data
+      navigation.navigate('CheckoutScreen', {
+        paymentType: 'classified', // Specifies the payment type
+        amount: Math.round(pricingPackages[selectedPricing] * 1.0825 * 100), // Total cost in cents including tax (assuming 8.25% tax)
+        listingDetails,
+        selectedCategory, // Pass the selectedCategory state
+        selectedPricing,
+        listingId, // Null for new listings, non-null for updates
+      });
+    } catch (error) {
+      console.error('Error preparing for payment:', error);
+      Alert.alert('Error', 'Failed to prepare listing for payment.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle test submission without payment
@@ -815,9 +894,9 @@ const Classifieds = () => {
 
       let requiredFields = categoryRequirements[selectedCategory];
 
-      // Conditionally add 'price' if it's not a free listing and category is 'Aircraft for Sale'
+      // Conditionally add 'salePrice' if it's not a free listing and category is 'Aircraft for Sale'
       if (selectedCategory === 'Aircraft for Sale' && !values.isFreeListing) {
-        requiredFields = [...requiredFields, 'price'];
+        requiredFields = [...requiredFields, 'salePrice'];
       }
 
       const missingFields = requiredFields.filter((field) => !values[field]);
@@ -865,34 +944,11 @@ const Classifieds = () => {
     return unsubscribe;
   }, [navigation]);
 
-  // Navigate through images in listing details modal
-  const goToNextImage = () => {
-    if (
-      selectedListing?.images &&
-      selectedListing.images.length > 0 &&
-      currentImageIndex < selectedListing.images.length - 1
-    ) {
-      setCurrentImageIndex(currentImageIndex + 1);
-    } else {
-      setCurrentImageIndex(0);
-    }
+  // Handle image press to open zoom modal
+  const handleImagePress = (uri) => {
+    setZoomImageUri(uri);
+    setFullScreenModalVisible(true);
   };
-
-  const goToPreviousImage = () => {
-    if (
-      selectedListing?.images &&
-      selectedListing.images.length > 0 &&
-      currentImageIndex > 0
-    ) {
-      setCurrentImageIndex(currentImageIndex - 1);
-    } else if (selectedListing?.images && selectedListing.images.length > 0) {
-      setCurrentImageIndex(selectedListing.images.length - 1);
-    }
-  };
-
-  useEffect(() => {
-    setCurrentImageIndex(0);
-  }, [selectedListing]);
 
   // Animated header styles
   const headerHeight = scrollY.interpolate({
@@ -913,6 +969,13 @@ const Classifieds = () => {
     extrapolate: 'clamp',
   });
 
+  // **Added header opacity for disappearance on scroll**
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
   // Animate modal scaling
   useEffect(() => {
     if (modalVisible) {
@@ -926,8 +989,8 @@ const Classifieds = () => {
     }
   }, [modalVisible]);
 
-  // If authentication state is loading
-  if (loadingAuth) {
+  // If authentication state or location is loading
+  if (loadingAuth || locationLoading) {
     return (
       <SafeAreaView
         style={{
@@ -974,37 +1037,26 @@ const Classifieds = () => {
     );
   }
 
-  // Render Edit and Delete buttons
+  // Render Edit and Delete buttons with enhanced design
   const renderEditAndDeleteButtons = (listing) => {
     if (user && listing?.ownerId === user.uid) {
       return (
-        <View style={{ flexDirection: 'row', marginTop: 10 }}>
+        <View style={styles.editDeleteContainer}>
           <TouchableOpacity
-            style={{
-              backgroundColor: COLORS.primary,
-              padding: 10,
-              borderRadius: 10,
-              alignItems: 'center',
-              marginRight: 10,
-            }}
+            style={styles.editButton}
             onPress={() => handleEditListing(listing)}
             accessibilityLabel="Edit Listing"
             accessibilityRole="button"
           >
-            <Text style={{ color: COLORS.white, fontSize: 16 }}>Edit</Text>
+            <Ionicons name="create-outline" size={20} color={COLORS.white} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={{
-              backgroundColor: COLORS.red,
-              padding: 10,
-              borderRadius: 10,
-              alignItems: 'center',
-            }}
+            style={styles.deleteButton}
             onPress={() => handleDeleteListing(listing.id)}
             accessibilityLabel="Delete Listing"
             accessibilityRole="button"
           >
-            <Text style={{ color: COLORS.white, fontSize: 16 }}>Delete</Text>
+            <Ionicons name="trash-outline" size={20} color={COLORS.white} />
           </TouchableOpacity>
         </View>
       );
@@ -1012,11 +1064,29 @@ const Classifieds = () => {
     return null;
   };
 
+  // Render Pagination Dots
+  const renderPaginationDots = () => {
+    if (!selectedListing || !selectedListing.images) return null;
+    return (
+      <View style={styles.paginationDotsContainer}>
+        {selectedListing.images.map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.paginationDot,
+              index === imageIndex ? styles.activeDot : styles.inactiveDot,
+            ]}
+          />
+        ))}
+      </View>
+    );
+  };
+
   // Main content when user is authenticated
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
       {/* Animated Header */}
-      <Animated.View style={{ overflow: 'hidden', height: headerHeight }}>
+      <Animated.View style={{ overflow: 'hidden', height: headerHeight, opacity: headerOpacity }}>
         <ImageBackground
           source={wingtipClouds}
           style={{ flex: 1, justifyContent: 'flex-end' }}
@@ -1031,6 +1101,7 @@ const Classifieds = () => {
           >
             <Animated.Text
               style={{ color: COLORS.white, fontWeight: 'bold', fontSize: headerFontSize }}
+              accessibilityLabel="Greeting Text"
             >
               Good Morning
             </Animated.Text>
@@ -1040,6 +1111,7 @@ const Classifieds = () => {
                 fontWeight: 'bold',
                 fontSize: headerFontSize,
               }}
+              accessibilityLabel="User Name"
             >
               {user?.displayName ? user.displayName : 'User'}
             </Animated.Text>
@@ -1049,6 +1121,7 @@ const Classifieds = () => {
 
       {/* Main ScrollView */}
       <Animated.ScrollView
+        ref={scrollViewRef} // Assigning the ref to ScrollView
         contentContainerStyle={{ padding: 16 }}
         scrollEventThrottle={16}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
@@ -1096,7 +1169,10 @@ const Classifieds = () => {
                 style={{
                   fontSize: 14,
                   fontWeight: 'bold',
-                  color: selectedCategory === item ? COLORS.white : COLORS.black,
+                  color:
+                    selectedCategory === item
+                      ? COLORS.white
+                      : COLORS.black,
                 }}
               >
                 {item}
@@ -1166,13 +1242,30 @@ const Classifieds = () => {
                 accessibilityLabel={`View details of listing ${item.title || 'No Title'}`}
                 accessibilityRole="button"
               >
+                {/* Images with Overlay */}
+                {item.images && item.images.length > 0 ? (
+                  <View>{renderListingImages(item)}</View>
+                ) : (
+                  <Text
+                    style={{
+                      textAlign: 'center',
+                      color: COLORS.gray,
+                      marginTop: 10,
+                      padding: 10,
+                    }}
+                  >
+                    No Images Available
+                  </Text>
+                )}
+
                 {/* Main Title */}
                 <Text
                   style={{
                     fontSize: 18,
                     fontWeight: 'bold',
                     color: COLORS.black,
-                    padding: 10,
+                    paddingHorizontal: 10,
+                    marginTop: 10, // Added margin top to separate from images
                   }}
                 >
                   {item.title ? item.title : 'No Title'}
@@ -1204,8 +1297,7 @@ const Classifieds = () => {
                       {item.companyName ? item.companyName : 'No Company Name'}
                     </Text>
                     <Text style={{ fontSize: 14, color: COLORS.gray }}>
-                      {item.city ? item.city : 'No City'},{' '}
-                      {item.state ? item.state : 'No State'}
+                      {item.city ? item.city : 'No City'}, {item.state ? item.state : 'No State'}
                     </Text>
                   </View>
                 ) : item.category === 'Flight Schools' ? (
@@ -1246,17 +1338,6 @@ const Classifieds = () => {
                       marginBottom: 10,
                     }}
                   >
-                    {/* Price */}
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        color: COLORS.black,
-                        marginBottom: 5,
-                      }}
-                    >
-                      Price: ${item.price !== undefined ? item.price.toLocaleString() : 'N/A'}
-                    </Text>
-
                     {/* Tail Number */}
                     <Text
                       style={{
@@ -1266,17 +1347,6 @@ const Classifieds = () => {
                       }}
                     >
                       Tail Number: {item.tailNumber ? item.tailNumber : 'N/A'}
-                    </Text>
-
-                    {/* City and State */}
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        color: COLORS.black,
-                        marginBottom: 5,
-                      }}
-                    >
-                      Location: {item.city ? item.city : 'N/A'}, {item.state ? item.state : 'N/A'}
                     </Text>
 
                     {/* Contact Email */}
@@ -1302,22 +1372,6 @@ const Classifieds = () => {
                     </Text>
                   </View>
                 )}
-
-                {/* Images */}
-                {item.images && item.images.length > 0 ? (
-                  <View>{renderListingImages(item)}</View>
-                ) : (
-                  <Text
-                    style={{
-                      textAlign: 'center',
-                      color: COLORS.gray,
-                      marginTop: 10,
-                      padding: 10,
-                    }}
-                  >
-                    No Images Available
-                  </Text>
-                )}
               </TouchableOpacity>
               {renderEditAndDeleteButtons(item)}
             </View>
@@ -1328,6 +1382,20 @@ const Classifieds = () => {
           </Text>
         )}
       </Animated.ScrollView>
+
+      {/* **Moved the Up Button below the ScrollView and added higher zIndex** */}
+      {showUpButton && (
+        <TouchableOpacity
+          onPress={() => {
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+          }}
+          style={styles.upButton}
+          accessibilityLabel="Scroll to top"
+          accessibilityRole="button"
+        >
+          <Ionicons name="arrow-up" size={24} color={COLORS.white} />
+        </TouchableOpacity>
+      )}
 
       {/* Job Details Modal */}
       <Modal
@@ -1375,10 +1443,13 @@ const Classifieds = () => {
                 ? selectedListing.companyName
                 : 'No Company Name'}
             </Text>
-            <Text style={{ fontSize: 16, color: COLORS.gray, marginBottom: 10 }}>
-              {selectedListing?.city ? selectedListing.city : 'No City'},{' '}
-              {selectedListing?.state ? selectedListing.state : 'No State'}
-            </Text>
+            {/* **Centered Location and Icon** */}
+            <View style={styles.centeredRow}>
+              <Ionicons name="location-outline" size={20} color={COLORS.gray} />
+              <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
+                {selectedListing?.city ? selectedListing.city : 'No City'}, {selectedListing?.state ? selectedListing.state : 'No State'}
+              </Text>
+            </View>
             <Text
               style={{
                 fontSize: 16,
@@ -1416,49 +1487,63 @@ const Classifieds = () => {
         onRequestClose={() => setDetailsModalVisible(false)}
         animationType="slide"
       >
+        {/* **Ensured the modal covers the entire screen by setting flex: 1 and proper backgroundColor** */}
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)' }}>
           <SafeAreaView style={{ flex: 1 }}>
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              {renderEditAndDeleteButtons(selectedListing)}
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              {/* Close Button */}
+              <TouchableOpacity
+                style={{ alignSelf: 'flex-end', marginBottom: 10 }}
+                onPress={() => setDetailsModalVisible(false)}
+                accessibilityLabel="Close Details Modal"
+                accessibilityRole="button"
+              >
+                <Ionicons name="close" size={30} color={COLORS.white} />
+              </TouchableOpacity>
 
+              {/* Image Carousel */}
               {selectedListing?.images && selectedListing.images.length > 0 ? (
-                <View style={{ width: '90%', height: '50%', position: 'relative' }}>
-                  <Image
-                    source={{ uri: selectedListing.images[currentImageIndex] }}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      resizeMode: 'contain',
-                    }}
-                    accessible={true}
-                    accessibilityLabel="Listing Image"
-                  />
-                  <TouchableOpacity
-                    style={{
-                      position: 'absolute',
-                      top: '45%',
-                      padding: 10,
-                      left: 10,
-                    }}
-                    onPress={goToPreviousImage}
-                    accessibilityLabel="Previous Image"
-                    accessibilityRole="button"
+                <View style={{ position: 'relative' }}>
+                  <Animated.ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={Animated.event(
+                      [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                      { 
+                        useNativeDriver: false, 
+                        listener: (event) => {
+                          const offsetX = event.nativeEvent.contentOffset.x;
+                          const index = Math.round(offsetX / (SCREEN_WIDTH - 32)); // Updated to match image width
+                          setImageIndex(index);
+                        }
+                      }
+                    )}
+                    scrollEventThrottle={16}
+                    style={{ height: 250, borderRadius: 10, overflow: 'hidden' }}
                   >
-                    <Ionicons name="arrow-back" size={36} color="white" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      position: 'absolute',
-                      top: '45%',
-                      padding: 10,
-                      right: 10,
-                    }}
-                    onPress={goToNextImage}
-                    accessibilityLabel="Next Image"
-                    accessibilityRole="button"
-                  >
-                    <Ionicons name="arrow-forward" size={36} color="white" />
-                  </TouchableOpacity>
+                    {selectedListing.images.map((image, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        activeOpacity={0.9}
+                        onPress={() => handleImagePress(image)}
+                        accessibilityLabel={`View Image ${index + 1}`}
+                        accessibilityRole="imagebutton"
+                      >
+                        <Image
+                          source={{ uri: image }}
+                          style={{
+                            width: SCREEN_WIDTH - 32, // Adjusted width
+                            height: 250,
+                            resizeMode: 'cover',
+                          }}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </Animated.ScrollView>
+
+                  {/* Pagination Dots */}
+                  {renderPaginationDots()}
                 </View>
               ) : (
                 <Text style={{ color: COLORS.white, marginTop: 20 }}>
@@ -1473,6 +1558,7 @@ const Classifieds = () => {
                   fontSize: 24,
                   fontWeight: 'bold',
                   marginTop: 20,
+                  textAlign: 'center',
                 }}
               >
                 {selectedListing?.flightSchoolName
@@ -1482,28 +1568,13 @@ const Classifieds = () => {
                   : 'No Title'}
               </Text>
 
-              {/* Description */}
-              <Text
-                style={{
-                  color: COLORS.white,
-                  fontSize: 18,
-                  marginTop: 10,
-                  textAlign: 'center',
-                  paddingHorizontal: 20,
-                }}
-              >
-                {selectedListing?.flightSchoolDetails
-                  ? selectedListing.flightSchoolDetails
-                  : selectedListing?.description
-                  ? selectedListing.description
-                  : 'No Description'}
-              </Text>
-
-              {/* Location */}
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
-                {selectedListing?.city ? selectedListing.city : 'No City'},{' '}
-                {selectedListing?.state ? selectedListing.state : 'No State'}
-              </Text>
+              {/* **Centered Location and Icon in Modal** */}
+              <View style={styles.centeredRow}>
+                <Ionicons name="location-outline" size={20} color={COLORS.gray} />
+                <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
+                  {selectedListing?.city ? selectedListing.city : 'No City'}, {selectedListing?.state ? selectedListing.state : 'No State'}
+                </Text>
+              </View>
 
               {/* Contact Email */}
               <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
@@ -1522,7 +1593,24 @@ const Classifieds = () => {
 
               {/* Price */}
               <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                Price: ${selectedListing?.price !== undefined ? selectedListing.price.toLocaleString() : 'N/A'}
+                Price: ${typeof selectedListing?.salePrice === 'string' ? selectedListing.salePrice : 'N/A'}
+              </Text>
+
+              {/* Description */}
+              <Text
+                style={{
+                  color: COLORS.white,
+                  fontSize: 18,
+                  marginTop: 20,
+                  textAlign: 'left', // Changed to left alignment
+                  paddingHorizontal: 20,
+                }}
+              >
+                {selectedListing?.flightSchoolDetails
+                  ? selectedListing.flightSchoolDetails
+                  : selectedListing?.description
+                  ? selectedListing.description
+                  : 'No Description'}
               </Text>
 
               {/* Ask a Question Button */}
@@ -1541,22 +1629,8 @@ const Classifieds = () => {
                   Ask a question
                 </Text>
               </TouchableOpacity>
-
-              {/* Close Button */}
-              <TouchableOpacity
-                style={{
-                  marginTop: 20,
-                  backgroundColor: COLORS.red,
-                  padding: 10,
-                  borderRadius: 10,
-                }}
-                onPress={() => setDetailsModalVisible(false)}
-                accessibilityLabel="Close Details Modal"
-                accessibilityRole="button"
-              >
-                <Text style={{ color: COLORS.white, fontSize: 16 }}>Close</Text>
-              </TouchableOpacity>
-            </View>
+              {renderEditAndDeleteButtons(selectedListing)}
+            </ScrollView>
           </SafeAreaView>
         </View>
       </Modal>
@@ -1779,24 +1853,25 @@ const Classifieds = () => {
 
                 <Formik
                   initialValues={{
-                    title: editingListing ? editingListing.title : '',
-                    tailNumber: editingListing ? editingListing.tailNumber : '',
-                    price: editingListing ? editingListing.price.toString() : '',
-                    description: editingListing ? editingListing.description : '',
-                    city: editingListing ? editingListing.city : '',
-                    state: editingListing ? editingListing.state : '',
-                    email: editingListing ? editingListing.email : '',
-                    phone: editingListing ? editingListing.phone : '',
-                    companyName: editingListing ? editingListing.companyName : '',
-                    jobTitle: editingListing ? editingListing.jobTitle : '',
-                    jobDescription: editingListing ? editingListing.jobDescription : '',
-                    category: editingListing ? editingListing.category : selectedCategory, // Initialize with selectedCategory
-                    flightSchoolName: editingListing ? editingListing.flightSchoolName : '',
-                    flightSchoolDetails: editingListing ? editingListing.flightSchoolDetails : '',
-                    isFreeListing: editingListing ? editingListing.isFreeListing : false, // Added isFreeListing to initialValues
-                    lat: editingListing ? editingListing.location.lat.toString() : location?.coords?.latitude?.toString() || '',
-                    lng: editingListing ? editingListing.location.lng.toString() : location?.coords?.longitude?.toString() || '',
-                    selectedPricing: selectedPricing, // Initialize selectedPricing
+                    title: editingListing ? editingListing.title || '' : '',
+                    tailNumber: editingListing ? editingListing.tailNumber || '' : '',
+                    salePrice: editingListing?.salePrice?.toString() || '', // **Changed to handle as string**
+                    description: editingListing ? editingListing.description || '' : '',
+                    city: editingListing ? editingListing.city || '' : '',
+                    state: editingListing ? editingListing.state || '' : '',
+                    email: editingListing ? editingListing.email || '' : '',
+                    phone: editingListing ? editingListing.phone || '' : '',
+                    companyName: editingListing ? editingListing.companyName || '' : '',
+                    jobTitle: editingListing ? editingListing.jobTitle || '' : '',
+                    jobDescription: editingListing ? editingListing.jobDescription || '' : '',
+                    category: editingListing ? editingListing.category || selectedCategory : selectedCategory,
+                    flightSchoolName: editingListing ? editingListing.flightSchoolName || '' : '',
+                    flightSchoolDetails: editingListing ? editingListing.flightSchoolDetails || '' : '',
+                    isFreeListing: editingListing ? editingListing.isFreeListing || false : false, // Added isFreeListing to initialValues
+                    lat: editingListing?.location?.lat?.toString() || location?.coords?.latitude?.toString() || '',
+                    lng: editingListing?.location?.lng?.toString() || location?.coords?.longitude?.toString() || '',
+                    selectedPricing: selectedPricing || 'Basic',
+                    packageCost: selectedPricing ? pricingPackages[selectedPricing] || 0 : 0,
                   }}
                   enableReinitialize={true} // To update initialValues when selectedCategory or editingListing changes
                   validate={(values) => {
@@ -1812,14 +1887,9 @@ const Classifieds = () => {
 
                     let requiredFields = categoryRequirements[category];
 
-                    if (!requiredFields) {
-                      errors.category = 'Invalid category selected.';
-                      return errors;
-                    }
-
-                    // Conditionally add 'price' if it's not a free listing and category is 'Aircraft for Sale'
+                    // Conditionally add 'salePrice' if it's not a free listing and category is 'Aircraft for Sale'
                     if (category === 'Aircraft for Sale' && !isFreeListing) {
-                      requiredFields = [...requiredFields, 'price'];
+                      requiredFields = [...requiredFields, 'salePrice'];
                     }
 
                     requiredFields.forEach((field) => {
@@ -1855,7 +1925,7 @@ const Classifieds = () => {
 
                     return errors;
                   }}
-                  onSubmit={onSubmitMethod}
+                  onSubmit={onSubmitMethod} // Updated to point to onSubmitMethod
                 >
                   {({
                     handleChange,
@@ -1922,8 +1992,8 @@ const Classifieds = () => {
                                 key={packageType}
                                 onPress={() => {
                                   setSelectedPricing(packageType);
-                                  setFieldValue('selectedPricing', packageType); // Synchronize with Formik
-                                  setFieldValue('price', pricingPackages[packageType].toString()); // Update price based on selectedPricing
+                                  setFieldValue('selectedPricing', packageType);
+                                  setFieldValue('packageCost', pricingPackages[packageType]); // Set packageCost
                                 }}
                                 style={{
                                   padding: 10,
@@ -2200,32 +2270,15 @@ const Classifieds = () => {
                               {errors.tailNumber}
                             </Text>
                           )}
-                          <TextInput
-                            placeholder="Price"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('price')}
-                            onBlur={handleBlur('price')}
-                            value={values.price}
-                            keyboardType="numeric" // Changed to 'numeric' for price input
-                            editable={!editingListing} 
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Price Display"
-                            accessibilityRole="text"
-                          />
-                          {/* If you prefer to display price as read-only, uncomment the above and remove the following editable TextInput */}
                           {/* 
+                            **UPDATED SALE PRICE FIELD TO BE EDITABLE IN EDIT MODAL**
+                          */}
                           <TextInput
-                            placeholder="Price"
+                            placeholder="Sale Price" // Updated Placeholder
                             placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('price')}
-                            onBlur={handleBlur('price')}
-                            value={values.price}
+                            onChangeText={handleChange('salePrice')} // Updated Field
+                            onBlur={handleBlur('salePrice')}
+                            value={values.salePrice} // Updated Value
                             keyboardType="numeric"
                             style={{
                               borderBottomWidth: 1,
@@ -2234,14 +2287,13 @@ const Classifieds = () => {
                               padding: 8,
                               color: COLORS.black,
                             }}
-                            accessibilityLabel="Price Input"
+                            accessibilityLabel="Sale Price Input"
                           />
-                          {touched.price && errors.price && (
+                          {touched.salePrice && errors.salePrice && (
                             <Text style={{ color: 'red', marginBottom: 8 }}>
-                              {errors.price}
+                              {errors.salePrice}
                             </Text>
                           )}
-                          */}
                           <TextInput
                             placeholder="Description"
                             placeholderTextColor={COLORS.gray}
@@ -2470,30 +2522,6 @@ const Classifieds = () => {
                             </TouchableOpacity>
                           )}
 
-                          {/* Submit Without Payment (Test) */}
-                          <TouchableOpacity
-                            onPress={() => handleTestSubmitListing(values, { setFieldValue })}
-                            style={{
-                              backgroundColor: COLORS.secondary,
-                              paddingVertical: 12,
-                              borderRadius: 50,
-                              marginTop: 16,
-                              marginBottom: 16,
-                            }}
-                            accessibilityLabel="Submit Without Payment (Test)"
-                            accessibilityRole="button"
-                          >
-                            <Text
-                              style={{
-                                color: COLORS.white,
-                                textAlign: 'center',
-                                fontWeight: 'bold',
-                              }}
-                            >
-                              Submit Without Payment (Test)
-                            </Text>
-                          </TouchableOpacity>
-
                           {/* Submit Listing & Proceed to Pay */}
                           {!values.isFreeListing && (
                             loading ? (
@@ -2525,6 +2553,30 @@ const Classifieds = () => {
                               </TouchableOpacity>
                             )
                           )}
+
+                          {/* Submit Without Payment (Test) */}
+                          <TouchableOpacity
+                            onPress={() => handleTestSubmitListing(values, { setFieldValue })}
+                            style={{
+                              backgroundColor: COLORS.secondary,
+                              paddingVertical: 12,
+                              borderRadius: 50,
+                              marginTop: 16,
+                              marginBottom: 16,
+                            }}
+                            accessibilityLabel="Submit Without Payment (Test)"
+                            accessibilityRole="button"
+                          >
+                            <Text
+                              style={{
+                                color: COLORS.white,
+                                textAlign: 'center',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              Submit Without Payment (Test)
+                            </Text>
+                          </TouchableOpacity>
                         </>
                       )}
 
@@ -2556,6 +2608,41 @@ const Classifieds = () => {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Full-Screen Image Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={fullScreenModalVisible}
+        onRequestClose={() => setFullScreenModalVisible(false)}
+      >
+        <View style={styles.zoomModalContainer}>
+          <TouchableOpacity
+            onPress={() => setFullScreenModalVisible(false)}
+            style={styles.zoomCloseButton}
+            accessibilityLabel="Close zoomed image"
+            accessibilityRole="button"
+          >
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
+          <ScrollView
+            contentContainerStyle={styles.zoomScrollView}
+            maximumZoomScale={3}
+            minimumZoomScale={1}
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            centerContent={true}
+          >
+            {zoomImageUri && (
+              <Image
+                source={{ uri: zoomImageUri }}
+                style={styles.zoomImage}
+                resizeMode="contain"
+              />
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -2585,97 +2672,126 @@ export default AppNavigator;
 // Styles
 // =====================
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  fieldContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    marginBottom: 4,
-    color: COLORS.black,
-    fontWeight: 'bold',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    borderRadius: 8,
-    padding: 10,
-    color: COLORS.black,
-    backgroundColor: '#f9f9f9',
-  },
-  textArea: {
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    borderRadius: 8,
-    padding: 10,
-    color: COLORS.black,
-    backgroundColor: '#f9f9f9',
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  uploadLabel: {
-    marginBottom: 8,
-    color: COLORS.black,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  imageList: {
-    marginBottom: 16,
-  },
-  imagePreview: {
-    width: 96,
-    height: 96,
-    marginRight: 8,
-    borderRadius: 8,
-  },
-  imageUploadButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+  paginationDotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 8,
-    marginBottom: 16,
   },
-  imageUploadButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
   },
-  submitButton: {
-    backgroundColor: COLORS.secondary,
-    paddingVertical: 12,
-    borderRadius: 50,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  payButton: {
+  activeDot: {
     backgroundColor: COLORS.primary,
-    paddingVertical: 12,
-    borderRadius: 50,
+  },
+  inactiveDot: {
+    backgroundColor: COLORS.lightGray,
+  },
+  zoomModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  payButtonText: {
-    color: '#fff',
+  zoomCloseButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 30,
+    right: 20,
+    zIndex: 1,
+  },
+  zoomScrollView: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  rowBetween: { // Added rowBetween style for price and location alignment
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  // **New Styles for Price and Location Overlay**
+  priceLocationOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background for readability
+  },
+  priceText: {
+    color: COLORS.white,
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  errorText: {
-    color: 'red',
-    marginTop: 4,
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+  locationText: {
+    color: COLORS.white,
+    fontSize: 16,
+    marginLeft: 5,
   },
-  picker: {
+  // **Centered Row Style for Modal Location**
+  centeredRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  // **Edit and Delete Buttons Styles**
+  editDeleteContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 10,
+  },
+  editButton: {
+    backgroundColor: COLORS.primary,
+    padding: 8,
+    borderRadius: 20,
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButton: {
+    backgroundColor: COLORS.red,
+    padding: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // **Up Button Styles**
+  upButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: COLORS.primary,
+    width: 50,
     height: 50,
-    width: '100%',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+    zIndex: 1000, // Added high zIndex to ensure it's on top
   },
 });
