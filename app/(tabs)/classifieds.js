@@ -29,12 +29,8 @@ import {
   collection,
   onSnapshot,
   orderBy,
-  addDoc,
   query,
   where,
-  deleteDoc,
-  doc,
-  updateDoc,
 } from 'firebase/firestore';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -385,10 +381,10 @@ const Classifieds = () => {
               <Image
                 source={{ uri: imageUri }}
                 style={{
-                  width: SCREEN_WIDTH - 32, // Adjusted width to account for padding
-                  height: 200, // Adjust height as needed
+                  width: SCREEN_WIDTH - 32,
+                  height: 200,
                   borderRadius: 10,
-                  marginBottom: 10, // Add margin below images
+                  marginBottom: 10,
                 }}
               />
             </TouchableOpacity>
@@ -400,7 +396,9 @@ const Classifieds = () => {
             {/* Price on the left */}
             <Text style={styles.priceText}>
               Price: $
-              {typeof item.salePrice === 'string' ? item.salePrice : 'N/A'}
+              {item.salePrice != null
+                ? String(item.salePrice)
+                : 'N/A'}
             </Text>
 
             {/* Location on the right with pin icon */}
@@ -491,6 +489,18 @@ const Classifieds = () => {
     setModalVisible(true);
   };
 
+  // Utility to get Firebase token
+  const getFirebaseIdToken = async () => {
+    try {
+      const token = await user.getIdToken(true);
+      return token;
+    } catch (error) {
+      console.error('Error fetching Firebase ID token:', error);
+      Alert.alert('Authentication Error', 'Failed to authenticate user.');
+      return '';
+    }
+  };
+
   // Handle deleting a listing
   const handleDeleteListing = async (listingId) => {
     try {
@@ -521,8 +531,15 @@ const Classifieds = () => {
               setListings(updatedListings);
               setFilteredListings(updatedListings);
             } else {
-              const errorData = await response.json();
-              throw new Error(errorData.error || 'Failed to delete listing.');
+              // Try reading JSON carefully to avoid parse errors
+              let errorMsg = 'Failed to delete listing.';
+              try {
+                const errorData = await response.json();
+                errorMsg = errorData.error || errorMsg;
+              } catch (err) {
+                console.error('Error parsing deleteListing error data:', err);
+              }
+              throw new Error(errorMsg);
             }
           },
         },
@@ -537,7 +554,9 @@ const Classifieds = () => {
   const handleAskQuestion = () => {
     if (selectedListing && selectedListing.email) {
       const email = selectedListing.email;
-      const subject = encodeURIComponent(`Inquiry about ${selectedListing.title || 'Your Listing'}`);
+      const subject = encodeURIComponent(
+        `Inquiry about ${selectedListing.title || 'Your Listing'}`
+      );
       const mailUrl = `mailto:${email}?subject=${subject}`;
 
       Linking.openURL(mailUrl).catch((error) => {
@@ -549,7 +568,7 @@ const Classifieds = () => {
     }
   };
 
-  // Function to upload images to Firebase Storage and get their URLs
+  // Upload images to Firebase Storage and return their URLs
   const uploadImagesToFirebase = async (imageUris) => {
     try {
       const uploadPromises = imageUris.map(async (uri, index) => {
@@ -575,72 +594,83 @@ const Classifieds = () => {
     }
   };
 
-  // Function to create the listing on the backend
+  /**
+   * Create listing on the backend
+   * Updated with fallback logic for non-JSON error responses.
+   */
   const createListingBackend = async (values, isFree = false) => {
     try {
       const token = await getFirebaseIdToken();
-
-      // Ensure location data is available
       if (!location) {
         Alert.alert('Error', 'Location data is not available.');
         return false;
       }
 
-      // Upload images to Firebase Storage and get URLs
       const imageUrls = await uploadImagesToFirebase(images);
-
-      // Construct listingDetails with location and salePrice
       const listingDetailsWithLocation = {
         ...values,
         location: {
           lat: parseFloat(values.lat),
           lng: parseFloat(values.lng),
         },
-        salePrice: values.salePrice, // **Changed from parseFloat(values.salePrice) to send as string**
-        isFreeListing: isFree, // Correct field name
-        packageType: isFree ? null : values.selectedPricing, // Include packageType
-        packageCost: isFree ? 0 : parseFloat(values.packageCost), // New field
-        images: imageUrls, // Include image URLs
-        ownerId: user.uid, // Ensure ownerId is included
+        salePrice: values.salePrice, // Keep as string
+        isFreeListing: isFree,
+        packageType: isFree ? null : values.selectedPricing,
+        packageCost: isFree ? 0 : parseFloat(values.packageCost),
+        images: imageUrls,
+        ownerId: user.uid,
       };
 
-      // Define category requirements (must match server-side)
+      // Category requirements
       const categoryRequirements = {
         'Aircraft for Sale': ['title', 'description'],
         'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
         'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
       };
-
       const requiredFields = categoryRequirements[values.category];
 
-      // Validate that all required fields are present
+      // Validate required
       for (const field of requiredFields) {
         if (!listingDetailsWithLocation[field]) {
           throw new Error(`Missing required fields: ${field}`);
         }
       }
 
-      // Log the listingDetailsWithLocation for debugging
       console.log('Listing Details with Location:', listingDetailsWithLocation);
 
-      // Send listing data as JSON to backend with 'listingDetails' key
       const response = await fetch(`${API_URL}/createListing`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ listingDetails: listingDetailsWithLocation }), // Wrap in 'listingDetails'
+        body: JSON.stringify({ listingDetails: listingDetailsWithLocation }),
       });
 
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('Listing creation response:', responseData);
-        return true;
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create listing.');
+      // Read entire response as text
+      const responseText = await response.text();
+      console.log('Raw createListing response text:', responseText); // <--- Added logging
+      let responseData = null;
+
+      // Attempt to parse JSON
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (err) {
+        console.error('Error parsing createListing response text:', responseText, err);
+        responseData = null;
       }
+
+      if (!response.ok) {
+        if (responseData && responseData.error) {
+          throw new Error(responseData.error);
+        } else {
+          throw new Error(responseText || 'Failed to create listing.');
+        }
+      }
+
+      // If OK, we have a successful create
+      console.log('Listing creation response:', responseData);
+      return true;
     } catch (error) {
       console.error('Listing creation error:', error);
       Alert.alert('Error', error.message || 'Failed to create listing.');
@@ -648,18 +678,18 @@ const Classifieds = () => {
     }
   };
 
-  // Function to update the listing on the backend
+  /**
+   * Update listing on the backend
+   * Updated with fallback logic for non-JSON error responses.
+   */
   const updateListingBackend = async (listingId, values, isFree = false) => {
     try {
       const token = await getFirebaseIdToken();
-
-      // Ensure location data is available
       if (!location) {
         Alert.alert('Error', 'Location data is not available.');
         return false;
       }
 
-      // Upload new images to Firebase Storage and get URLs
       let imageUrls = [];
       if (images.length > 0) {
         imageUrls = await uploadImagesToFirebase(images);
@@ -667,41 +697,37 @@ const Classifieds = () => {
         imageUrls = selectedListing.images || [];
       }
 
-      // Construct listingDetails with location and salePrice
       const listingDetailsWithLocation = {
         ...values,
         location: {
           lat: parseFloat(values.lat),
           lng: parseFloat(values.lng),
         },
-        salePrice: values.salePrice, // **Changed from parseFloat(values.salePrice) to send as string**
-        isFreeListing: isFree, // Correct field name
-        packageType: isFree ? null : values.selectedPricing, // Include packageType
-        packageCost: isFree ? 0 : parseFloat(values.packageCost), // New field
-        images: imageUrls, // Include image URLs
-        ownerId: user.uid, // Ensure ownerId is included
+        salePrice: values.salePrice, // Keep as string
+        isFreeListing: isFree,
+        packageType: isFree ? null : values.selectedPricing,
+        packageCost: isFree ? 0 : parseFloat(values.packageCost),
+        images: imageUrls,
+        ownerId: user.uid,
       };
 
-      // Define category requirements (must match server-side)
+      // Category requirements
       const categoryRequirements = {
         'Aircraft for Sale': ['title', 'description'],
         'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
         'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
       };
-
       const requiredFields = categoryRequirements[values.category];
 
-      // Validate that all required fields are present
+      // Validate required
       for (const field of requiredFields) {
         if (!listingDetailsWithLocation[field]) {
           throw new Error(`Missing required fields: ${field}`);
         }
       }
 
-      // Log the listingDetailsWithLocation for debugging
       console.log('Listing Details with Location:', listingDetailsWithLocation);
 
-      // Send listing data as JSON to backend with 'listingDetails' key
       const response = await fetch(`${API_URL}/updateListing`, {
         method: 'PUT',
         headers: {
@@ -711,33 +737,36 @@ const Classifieds = () => {
         body: JSON.stringify({
           listingId,
           listingDetails: listingDetailsWithLocation,
-        }), // Wrap in 'listingDetails' and include listingId
+        }),
       });
 
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('Listing update response:', responseData);
-        return true;
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update listing.');
+      // Read entire response as text
+      const responseText = await response.text();
+      console.log('Raw updateListing response text:', responseText); // <--- Added logging
+      let responseData = null;
+
+      // Attempt to parse JSON
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (err) {
+        console.error('Error parsing updateListing response text:', responseText, err);
+        responseData = null;
       }
+
+      if (!response.ok) {
+        if (responseData && responseData.error) {
+          throw new Error(responseData.error);
+        } else {
+          throw new Error(responseText || 'Failed to update listing.');
+        }
+      }
+
+      console.log('Listing update response:', responseData);
+      return true;
     } catch (error) {
       console.error('Listing update error:', error);
       Alert.alert('Error', error.message || 'Failed to update listing.');
       return false;
-    }
-  };
-
-  // Function to get Firebase ID Token
-  const getFirebaseIdToken = async () => {
-    try {
-      const token = await user.getIdToken(true);
-      return token;
-    } catch (error) {
-      console.error('Error fetching Firebase ID token:', error);
-      Alert.alert('Authentication Error', 'Failed to authenticate user.');
-      return '';
     }
   };
 
@@ -748,7 +777,6 @@ const Classifieds = () => {
       setLoading(false);
       return;
     }
-
     if (!location) {
       Alert.alert('Error', 'Location data is not available.');
       setLoading(false);
@@ -757,6 +785,7 @@ const Classifieds = () => {
 
     setLoading(true);
 
+    // If it's a free listing, create or update immediately
     if (values.isFreeListing) {
       if (editingListing) {
         // Update existing listing as free
@@ -768,27 +797,21 @@ const Classifieds = () => {
               onPress: () => {
                 setModalVisible(false);
                 setEditingListing(null);
-                // **Reset isFreeListing in Formik**
-                // Note: To reset Formik values, you might need to use Formik's resetForm or similar
-                setImages([]); // Clear images after successful submission
-                // Optionally, refresh listings or navigate as needed
+                setImages([]);
               },
             },
           ]);
         }
       } else {
         // Create new free listing
-        const success = await createListingBackend(values, true); // Pass 'true' to indicate a free listing
+        const success = await createListingBackend(values, true);
         if (success) {
           Alert.alert('Success', 'Your free listing has been posted successfully.', [
             {
               text: 'OK',
               onPress: () => {
                 setModalVisible(false);
-                // **Reset isFreeListing in Formik**
-                // Note: To reset Formik values, you might need to use Formik's resetForm or similar
-                setImages([]); // Clear images after successful submission
-                // Optionally, refresh listings or navigate as needed
+                setImages([]);
               },
             },
           ]);
@@ -798,22 +821,20 @@ const Classifieds = () => {
       return;
     }
 
-    // For Paid Listings: Do Not Post Immediately
-    // Instead, navigate to CheckoutScreen with listing details
-
+    // For Paid Listings: do NOT create listing immediately.
+    // Instead, pass listing details to CheckoutScreen
     try {
-      // Optional: Show a loading indicator or similar UI feedback
-      // Upload images to Firebase Storage and get URLs
+      // Upload images to get their URLs
       const imageUrls = await uploadImagesToFirebase(images);
 
-      // Prepare listing details with image URLs
+      // Prepare listing details object (NOT created in DB yet)
       const listingDetails = {
         ...values,
         location: {
           lat: parseFloat(values.lat),
           lng: parseFloat(values.lng),
         },
-        salePrice: parseFloat(values.salePrice), // **Handled as string now, but converted to float for backend consistency**
+        salePrice: parseFloat(values.salePrice), // Convert to float
         isFreeListing: false,
         packageType: selectedPricing,
         packageCost: parseFloat(pricingPackages[selectedPricing]),
@@ -821,16 +842,13 @@ const Classifieds = () => {
         ownerId: user.uid,
       };
 
-      // Define category requirements (must match server-side)
+      // Validate required fields for the chosen category
       const categoryRequirements = {
         'Aircraft for Sale': ['title', 'description'],
         'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
         'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
       };
-
       const requiredFields = categoryRequirements[selectedCategory];
-
-      // Validate that all required fields are present
       for (const field of requiredFields) {
         if (!listingDetails[field]) {
           Alert.alert('Validation Error', `Missing required fields: ${field}`);
@@ -839,26 +857,22 @@ const Classifieds = () => {
         }
       }
 
-      // Conditionally validate salePrice for 'Aircraft for Sale' category
-      if (selectedCategory === 'Aircraft for Sale' && !values.isFreeListing) {
-        if (!listingDetails.salePrice || isNaN(listingDetails.salePrice)) {
-          Alert.alert('Validation Error', 'Sale Price is required for paid Aircraft for Sale listings.');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // If editing, include listingId
+      // If editing, pass listingId as well
       const listingId = editingListing ? editingListing.id : null;
 
-      // Navigate to CheckoutScreen with necessary data
+      // Pricing + 8.25% tax
+      const totalCost = pricingPackages[selectedPricing];
+      const totalWithTax = totalCost * 1.0825;
+      const amountInCents = Math.round(totalWithTax * 100);
+
+      // Navigate to CheckoutScreen for payment
       navigation.navigate('CheckoutScreen', {
-        paymentType: 'classified', // Specifies the payment type
-        amount: Math.round(pricingPackages[selectedPricing] * 1.0825 * 100), // Total cost in cents including tax (assuming 8.25% tax)
+        paymentType: 'classified',
+        amount: amountInCents,
         listingDetails,
-        selectedCategory, // Pass the selectedCategory state
+        selectedCategory,
         selectedPricing,
-        listingId, // Null for new listings, non-null for updates
+        listingId,
       });
     } catch (error) {
       console.error('Error preparing for payment:', error);
@@ -868,14 +882,13 @@ const Classifieds = () => {
     }
   };
 
-  // Handle test submission without payment
+  // Handle test submission (no payment) — for dev/test only
   const handleTestSubmitListing = async (values, { setFieldValue }) => {
     if (!user) {
       Alert.alert('Error', 'User information is not available.');
       setLoading(false);
       return;
     }
-
     if (!location) {
       Alert.alert('Error', 'Location data is not available.');
       setLoading(false);
@@ -885,22 +898,17 @@ const Classifieds = () => {
     try {
       setLoading(true);
 
-      // Validate required fields before submission
       const categoryRequirements = {
         'Aircraft for Sale': ['title', 'description'],
         'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
         'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
       };
-
       let requiredFields = categoryRequirements[selectedCategory];
-
-      // Conditionally add 'salePrice' if it's not a free listing and category is 'Aircraft for Sale'
       if (selectedCategory === 'Aircraft for Sale' && !values.isFreeListing) {
         requiredFields = [...requiredFields, 'salePrice'];
       }
 
       const missingFields = requiredFields.filter((field) => !values[field]);
-
       if (missingFields.length > 0) {
         Alert.alert(
           'Validation Error',
@@ -911,17 +919,15 @@ const Classifieds = () => {
       }
 
       if (editingListing) {
-        // Update existing listing
         const success = await updateListingBackend(editingListing.id, values, values.isFreeListing);
         if (success) {
-          setImages([]); // Clear images after successful submission
+          setImages([]);
           Alert.alert('Success', 'Your listing has been submitted successfully.');
         }
       } else {
-        // Create new listing
         const success = await createListingBackend(values, values.isFreeListing);
         if (success) {
-          setImages([]); // Clear images after successful submission
+          setImages([]);
           Alert.alert('Success', 'Your listing has been submitted successfully.');
         }
       }
@@ -930,7 +936,7 @@ const Classifieds = () => {
     }
   };
 
-  // Reset modals when screen gains focus
+  // Reset modals when screen regains focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       setModalVisible(false);
@@ -940,11 +946,10 @@ const Classifieds = () => {
       setEditingListing(null);
       setImages([]);
     });
-
     return unsubscribe;
   }, [navigation]);
 
-  // Handle image press to open zoom modal
+  // Zoom modal
   const handleImagePress = (uri) => {
     setZoomImageUri(uri);
     setFullScreenModalVisible(true);
@@ -969,7 +974,7 @@ const Classifieds = () => {
     extrapolate: 'clamp',
   });
 
-  // **Added header opacity for disappearance on scroll**
+  // Header opacity
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 100],
     outputRange: [1, 0],
@@ -989,7 +994,7 @@ const Classifieds = () => {
     }
   }, [modalVisible]);
 
-  // If authentication state or location is loading
+  // If auth or location is loading
   if (loadingAuth || locationLoading) {
     return (
       <SafeAreaView
@@ -1010,7 +1015,7 @@ const Classifieds = () => {
     );
   }
 
-  // If user is not authenticated
+  // If not authenticated
   if (!user) {
     return (
       <SafeAreaView
@@ -1037,7 +1042,7 @@ const Classifieds = () => {
     );
   }
 
-  // Render Edit and Delete buttons with enhanced design
+  // Render Edit and Delete buttons
   const renderEditAndDeleteButtons = (listing) => {
     if (user && listing?.ownerId === user.uid) {
       return (
@@ -1064,7 +1069,7 @@ const Classifieds = () => {
     return null;
   };
 
-  // Render Pagination Dots
+  // Render pagination dots
   const renderPaginationDots = () => {
     if (!selectedListing || !selectedListing.images) return null;
     return (
@@ -1082,7 +1087,7 @@ const Classifieds = () => {
     );
   };
 
-  // Main content when user is authenticated
+  // Main UI
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
       {/* Animated Header */}
@@ -1121,7 +1126,7 @@ const Classifieds = () => {
 
       {/* Main ScrollView */}
       <Animated.ScrollView
-        ref={scrollViewRef} // Assigning the ref to ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={{ padding: 16 }}
         scrollEventThrottle={16}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
@@ -1129,9 +1134,7 @@ const Classifieds = () => {
         })}
       >
         {/* Filter Section */}
-        <View
-          style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}
-        >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
           <Text style={{ fontSize: 18, color: COLORS.secondary }}>
             Filter by Location or Aircraft Make
           </Text>
@@ -1169,10 +1172,7 @@ const Classifieds = () => {
                 style={{
                   fontSize: 14,
                   fontWeight: 'bold',
-                  color:
-                    selectedCategory === item
-                      ? COLORS.white
-                      : COLORS.black,
+                  color: selectedCategory === item ? COLORS.white : COLORS.black,
                 }}
               >
                 {item}
@@ -1265,7 +1265,7 @@ const Classifieds = () => {
                     fontWeight: 'bold',
                     color: COLORS.black,
                     paddingHorizontal: 10,
-                    marginTop: 10, // Added margin top to separate from images
+                    marginTop: 10,
                   }}
                 >
                   {item.title ? item.title : 'No Title'}
@@ -1291,9 +1291,7 @@ const Classifieds = () => {
                     >
                       {item.jobTitle ? item.jobTitle : 'No Job Title'}
                     </Text>
-                    <Text
-                      style={{ fontSize: 16, color: COLORS.secondary, marginBottom: 5 }}
-                    >
+                    <Text style={{ fontSize: 16, color: COLORS.secondary, marginBottom: 5 }}>
                       {item.companyName ? item.companyName : 'No Company Name'}
                     </Text>
                     <Text style={{ fontSize: 14, color: COLORS.gray }}>
@@ -1309,9 +1307,7 @@ const Classifieds = () => {
                       marginBottom: 10,
                     }}
                   >
-                    <Text
-                      style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}
-                    >
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}>
                       {item.flightSchoolName
                         ? item.flightSchoolName
                         : 'No Flight School Name'}
@@ -1383,7 +1379,7 @@ const Classifieds = () => {
         )}
       </Animated.ScrollView>
 
-      {/* **Moved the Up Button below the ScrollView and added higher zIndex** */}
+      {/* Up Button */}
       {showUpButton && (
         <TouchableOpacity
           onPress={() => {
@@ -1443,11 +1439,12 @@ const Classifieds = () => {
                 ? selectedListing.companyName
                 : 'No Company Name'}
             </Text>
-            {/* **Centered Location and Icon** */}
+            {/* Centered Location and Icon */}
             <View style={styles.centeredRow}>
               <Ionicons name="location-outline" size={20} color={COLORS.gray} />
               <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
-                {selectedListing?.city ? selectedListing.city : 'No City'}, {selectedListing?.state ? selectedListing.state : 'No State'}
+                {selectedListing?.city ? selectedListing.city : 'No City'},{' '}
+                {selectedListing?.state ? selectedListing.state : 'No State'}
               </Text>
             </View>
             <Text
@@ -1487,7 +1484,6 @@ const Classifieds = () => {
         onRequestClose={() => setDetailsModalVisible(false)}
         animationType="slide"
       >
-        {/* **Ensured the modal covers the entire screen by setting flex: 1 and proper backgroundColor** */}
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.9)' }}>
           <SafeAreaView style={{ flex: 1 }}>
             <ScrollView contentContainerStyle={{ padding: 16 }}>
@@ -1510,13 +1506,13 @@ const Classifieds = () => {
                     showsHorizontalScrollIndicator={false}
                     onScroll={Animated.event(
                       [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                      { 
-                        useNativeDriver: false, 
+                      {
+                        useNativeDriver: false,
                         listener: (event) => {
                           const offsetX = event.nativeEvent.contentOffset.x;
-                          const index = Math.round(offsetX / (SCREEN_WIDTH - 32)); // Updated to match image width
+                          const index = Math.round(offsetX / (SCREEN_WIDTH - 32));
                           setImageIndex(index);
-                        }
+                        },
                       }
                     )}
                     scrollEventThrottle={16}
@@ -1533,7 +1529,7 @@ const Classifieds = () => {
                         <Image
                           source={{ uri: image }}
                           style={{
-                            width: SCREEN_WIDTH - 32, // Adjusted width
+                            width: SCREEN_WIDTH - 32,
                             height: 250,
                             resizeMode: 'cover',
                           }}
@@ -1568,11 +1564,12 @@ const Classifieds = () => {
                   : 'No Title'}
               </Text>
 
-              {/* **Centered Location and Icon in Modal** */}
+              {/* Location and Icon */}
               <View style={styles.centeredRow}>
                 <Ionicons name="location-outline" size={20} color={COLORS.gray} />
                 <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
-                  {selectedListing?.city ? selectedListing.city : 'No City'}, {selectedListing?.state ? selectedListing.state : 'No State'}
+                  {selectedListing?.city ? selectedListing.city : 'No City'},{' '}
+                  {selectedListing?.state ? selectedListing.state : 'No State'}
                 </Text>
               </View>
 
@@ -1593,7 +1590,10 @@ const Classifieds = () => {
 
               {/* Price */}
               <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                Price: ${typeof selectedListing?.salePrice === 'string' ? selectedListing.salePrice : 'N/A'}
+                Price: $
+                {selectedListing?.salePrice != null
+                  ? String(selectedListing.salePrice)
+                  : 'N/A'}
               </Text>
 
               {/* Description */}
@@ -1602,7 +1602,7 @@ const Classifieds = () => {
                   color: COLORS.white,
                   fontSize: 18,
                   marginTop: 20,
-                  textAlign: 'left', // Changed to left alignment
+                  textAlign: 'left',
                   paddingHorizontal: 20,
                 }}
               >
@@ -1625,9 +1625,7 @@ const Classifieds = () => {
                 accessibilityLabel="Ask a Question"
                 accessibilityRole="button"
               >
-                <Text style={{ color: COLORS.white, fontSize: 16 }}>
-                  Ask a question
-                </Text>
+                <Text style={{ color: COLORS.white, fontSize: 16 }}>Ask a question</Text>
               </TouchableOpacity>
               {renderEditAndDeleteButtons(selectedListing)}
             </ScrollView>
@@ -1855,7 +1853,7 @@ const Classifieds = () => {
                   initialValues={{
                     title: editingListing ? editingListing.title || '' : '',
                     tailNumber: editingListing ? editingListing.tailNumber || '' : '',
-                    salePrice: editingListing?.salePrice?.toString() || '', // **Changed to handle as string**
+                    salePrice: editingListing?.salePrice?.toString() || '', // handle as string
                     description: editingListing ? editingListing.description || '' : '',
                     city: editingListing ? editingListing.city || '' : '',
                     state: editingListing ? editingListing.state || '' : '',
@@ -1866,28 +1864,35 @@ const Classifieds = () => {
                     jobDescription: editingListing ? editingListing.jobDescription || '' : '',
                     category: editingListing ? editingListing.category || selectedCategory : selectedCategory,
                     flightSchoolName: editingListing ? editingListing.flightSchoolName || '' : '',
-                    flightSchoolDetails: editingListing ? editingListing.flightSchoolDetails || '' : '',
-                    isFreeListing: editingListing ? editingListing.isFreeListing || false : false, // Added isFreeListing to initialValues
-                    lat: editingListing?.location?.lat?.toString() || location?.coords?.latitude?.toString() || '',
-                    lng: editingListing?.location?.lng?.toString() || location?.coords?.longitude?.toString() || '',
+                    flightSchoolDetails: editingListing
+                      ? editingListing.flightSchoolDetails || ''
+                      : '',
+                    isFreeListing: editingListing ? editingListing.isFreeListing || false : false,
+                    lat:
+                      editingListing?.location?.lat?.toString() ||
+                      location?.coords?.latitude?.toString() ||
+                      '',
+                    lng:
+                      editingListing?.location?.lng?.toString() ||
+                      location?.coords?.longitude?.toString() ||
+                      '',
                     selectedPricing: selectedPricing || 'Basic',
                     packageCost: selectedPricing ? pricingPackages[selectedPricing] || 0 : 0,
                   }}
-                  enableReinitialize={true} // To update initialValues when selectedCategory or editingListing changes
+                  enableReinitialize={true}
                   validate={(values) => {
                     const errors = {};
                     const { category, isFreeListing, selectedPricing } = values;
 
-                    // Define required fields based on category
+                    // Category requirements
                     const categoryRequirements = {
                       'Aircraft for Sale': ['title', 'description'],
                       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
                       'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
                     };
-
                     let requiredFields = categoryRequirements[category];
 
-                    // Conditionally add 'salePrice' if it's not a free listing and category is 'Aircraft for Sale'
+                    // For non-free Aircraft for Sale, also require salePrice
                     if (category === 'Aircraft for Sale' && !isFreeListing) {
                       requiredFields = [...requiredFields, 'salePrice'];
                     }
@@ -1916,7 +1921,7 @@ const Classifieds = () => {
                       errors.email = 'Invalid email address.';
                     }
 
-                    // Additional validation based on selectedPricing
+                    // Extra check for selectedPricing if user chooses paid package
                     if (!isFreeListing && category === 'Aircraft for Sale') {
                       if (selectedPricing && !pricingPackages[selectedPricing]) {
                         errors.selectedPricing = 'Invalid pricing package selected.';
@@ -1925,7 +1930,7 @@ const Classifieds = () => {
 
                     return errors;
                   }}
-                  onSubmit={onSubmitMethod} // Updated to point to onSubmitMethod
+                  onSubmit={onSubmitMethod}
                 >
                   {({
                     handleChange,
@@ -1941,11 +1946,11 @@ const Classifieds = () => {
                       {!editingListing && (
                         <TouchableOpacity
                           onPress={() => {
-                            setFieldValue('isFreeListing', true); // Set isFreeListing to true within Formik
+                            setFieldValue('isFreeListing', true);
                             handleSubmit();
                           }}
                           style={{
-                            backgroundColor: COLORS.green, // Color for free listing
+                            backgroundColor: COLORS.green,
                             paddingVertical: 12,
                             borderRadius: 50,
                             marginBottom: 16,
@@ -1993,7 +1998,7 @@ const Classifieds = () => {
                                 onPress={() => {
                                   setSelectedPricing(packageType);
                                   setFieldValue('selectedPricing', packageType);
-                                  setFieldValue('packageCost', pricingPackages[packageType]); // Set packageCost
+                                  setFieldValue('packageCost', pricingPackages[packageType]);
                                 }}
                                 style={{
                                   padding: 10,
@@ -2071,7 +2076,7 @@ const Classifieds = () => {
                             key={item}
                             onPress={() => {
                               setFieldValue('category', item);
-                              setSelectedCategory(item); // Synchronize with selectedCategory state
+                              setSelectedCategory(item);
                             }}
                             style={{
                               padding: 8,
@@ -2105,7 +2110,6 @@ const Classifieds = () => {
                         style={{ marginBottom: 16 }}
                       />
 
-                      {/* Display validation error for category */}
                       {touched.category && errors.category && (
                         <Text style={{ color: 'red', marginBottom: 8 }}>
                           {errors.category}
@@ -2196,12 +2200,11 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Flight School Name Input"
                           />
-                          {touched.flightSchoolName &&
-                            errors.flightSchoolName && (
-                              <Text style={{ color: 'red', marginBottom: 8 }}>
-                                {errors.flightSchoolName}
-                              </Text>
-                            )}
+                          {touched.flightSchoolName && errors.flightSchoolName && (
+                            <Text style={{ color: 'red', marginBottom: 8 }}>
+                              {errors.flightSchoolName}
+                            </Text>
+                          )}
                           <TextInput
                             placeholder="Flight School Details"
                             placeholderTextColor={COLORS.gray}
@@ -2220,12 +2223,11 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Flight School Details Input"
                           />
-                          {touched.flightSchoolDetails &&
-                            errors.flightSchoolDetails && (
-                              <Text style={{ color: 'red', marginBottom: 8 }}>
-                                {errors.flightSchoolDetails}
-                              </Text>
-                            )}
+                          {touched.flightSchoolDetails && errors.flightSchoolDetails && (
+                            <Text style={{ color: 'red', marginBottom: 8 }}>
+                              {errors.flightSchoolDetails}
+                            </Text>
+                          )}
                         </>
                       ) : (
                         <>
@@ -2270,15 +2272,12 @@ const Classifieds = () => {
                               {errors.tailNumber}
                             </Text>
                           )}
-                          {/* 
-                            **UPDATED SALE PRICE FIELD TO BE EDITABLE IN EDIT MODAL**
-                          */}
                           <TextInput
-                            placeholder="Sale Price" // Updated Placeholder
+                            placeholder="Sale Price"
                             placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('salePrice')} // Updated Field
+                            onChangeText={handleChange('salePrice')}
                             onBlur={handleBlur('salePrice')}
-                            value={values.salePrice} // Updated Value
+                            value={values.salePrice}
                             keyboardType="numeric"
                             style={{
                               borderBottomWidth: 1,
@@ -2458,10 +2457,9 @@ const Classifieds = () => {
                         </>
                       )}
 
-                      {/* Conditional Buttons Based on Editing State */}
+                      {/* If editing an existing listing */}
                       {editingListing ? (
                         <>
-                          {/* Save Changes Button */}
                           {loading ? (
                             <ActivityIndicator
                               size="large"
@@ -2497,11 +2495,11 @@ const Classifieds = () => {
                           {!values.isFreeListing && (
                             <TouchableOpacity
                               onPress={() => {
-                                setFieldValue('isFreeListing', true); // Set isFreeListing to true within Formik
+                                setFieldValue('isFreeListing', true);
                                 handleSubmit();
                               }}
                               style={{
-                                backgroundColor: COLORS.green, // Color for free listing
+                                backgroundColor: COLORS.green,
                                 paddingVertical: 12,
                                 borderRadius: 50,
                                 marginTop: 16,
@@ -2717,13 +2715,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 5,
   },
-  rowBetween: { // Added rowBetween style for price and location alignment
+  rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 5,
   },
-  // **New Styles for Price and Location Overlay**
+  // New Styles for Price and Location Overlay
   priceLocationOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -2732,7 +2730,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background for readability
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   priceText: {
     color: COLORS.white,
@@ -2748,14 +2746,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 5,
   },
-  // **Centered Row Style for Modal Location**
   centeredRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
   },
-  // **Edit and Delete Buttons Styles**
   editDeleteContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -2776,7 +2772,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // **Up Button Styles**
   upButton: {
     position: 'absolute',
     bottom: 30,
@@ -2792,6 +2787,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 5,
-    zIndex: 1000, // Added high zIndex to ensure it's on top
+    zIndex: 1000,
   },
 });

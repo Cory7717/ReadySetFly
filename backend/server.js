@@ -84,7 +84,7 @@ app.post(
       admin.logger.error(`Webhook signature verification failed: ${err.message}`);
       return res
         .status(400)
-        .json({ error: `Webhook Error: ${err.message}` }); // Changed to JSON response
+        .json({ error: `Webhook Error: ${err.message}` }); // Return JSON
     }
 
     // Handle the event
@@ -174,7 +174,6 @@ app.post(
 // =====================
 
 // After defining the /webhook route, apply body parsing for other routes.
-// This ensures that /webhook is not affected by these parsers.
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -230,9 +229,9 @@ const sanitizeData = (data) => {
  */
 const calculateTotalCost = (packageType) => {
   const packagePrices = {
-    Basic: 2500, // $25.00
+    Basic: 2500,    // $25.00
     Featured: 7000, // $70.00
-    Enhanced: 15000, // $150.00
+    Enhanced: 15000 // $150.00
   };
 
   return packagePrices[packageType] || 2500; // Default to Basic if unknown
@@ -413,7 +412,7 @@ app.post('/createListing', authenticate, async (req, res) => {
         });
     }
 
-    // Parse and validate latitude and longitude
+    // Parse and validate latitude/longitude
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
     if (isNaN(latitude) || isNaN(longitude)) {
@@ -556,8 +555,27 @@ app.put('/updateListing', authenticate, async (req, res) => {
         .json({ error: 'Missing listingDetails in request body' });
     }
 
+    // --- NEW: Attempt to parse listingDetails if it's a string
+    let parsedListingDetails;
+    if (typeof listingDetails === 'string') {
+      try {
+        parsedListingDetails = JSON.parse(listingDetails);
+        admin.logger.info(
+          `Parsed listingDetails (updateListing): ${JSON.stringify(parsedListingDetails)}`
+        );
+      } catch (parseError) {
+        admin.logger.warn("Invalid JSON in 'listingDetails' field for updateListing");
+        admin.logger.error('Error parsing listingDetails for updateListing:', parseError);
+        return res
+          .status(400)
+          .json({ error: "Invalid JSON in 'listingDetails' field" });
+      }
+    } else {
+      parsedListingDetails = listingDetails;
+    }
+
     // Sanitize listingDetails
-    const sanitizedListingDetails = sanitizeData(listingDetails);
+    const sanitizedListingDetails = sanitizeData(parsedListingDetails);
 
     const {
       title,
@@ -657,7 +675,7 @@ app.put('/updateListing', authenticate, async (req, res) => {
         });
     }
 
-    // Parse and validate latitude and longitude
+    // Parse and validate latitude/longitude
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
     if (isNaN(latitude) || isNaN(longitude)) {
@@ -713,7 +731,7 @@ app.put('/updateListing', authenticate, async (req, res) => {
       `Received image URLs for update: ${JSON.stringify(imageUrls)}`
     );
 
-    // Construct updateData with existing values if new ones are not provided
+    // Construct updateData
     const updateData = {
       title: title || listingData.title,
       tailNumber: tailNumber || listingData.tailNumber,
@@ -1090,11 +1108,11 @@ app.post(
         adjustedAmount = Math.round(
           adjustedAmount * (1 - discount.value / 100)
         );
-        pricingTier = 'Featured'; // Example: Upgrade pricing tier
+        pricingTier = 'Featured'; // Example: could be upgraded
       } else if (discount.type === 'fixed') {
         adjustedAmount = adjustedAmount - discount.value;
         if (adjustedAmount < 0) adjustedAmount = 0;
-        pricingTier = 'Enhanced'; // Example: Upgrade pricing tier
+        pricingTier = 'Enhanced'; // Example: could be upgraded
       }
 
       admin.logger.info(
@@ -1181,7 +1199,7 @@ exports.onMessageSent = onDocumentCreated(
           title: 'New Message',
           body:
             text.length > 50 ? `${text.substring(0, 47)}...` : text,
-          click_action: 'FLUTTER_NOTIFICATION_CLICK', // Adjust based on your app's requirements
+          click_action: 'FLUTTER_NOTIFICATION_CLICK', // Adjust if needed
         },
         data: {
           chatThreadId,
@@ -1244,7 +1262,7 @@ exports.onListingDeleted = onDocumentDeleted(
           continue;
         }
 
-        // Delete the rental request from 'owners/{ownerId}/rentalRequests/{rentalRequestId}'
+        // owners/{ownerId}/rentalRequests/{rentalRequestId}
         const rentalRequestRef = db
           .collection('owners')
           .doc(ownerId)
@@ -1284,7 +1302,6 @@ exports.onListingDeleted = onDocumentDeleted(
         }
       }
 
-      // Commit the batch if there are deletions
       if (totalDeletions > 0) {
         await rentalBatch.commit();
         admin.logger.info(
@@ -1339,7 +1356,6 @@ exports.onListingDeleted = onDocumentDeleted(
 /**
  * handleAircraftDetails
  * Trigger: Firestore Document Create for aircraftDetails/{ownerId}
- * Description: Initializes default fields and validates initial data upon creation of aircraftDetails.
  */
 exports.handleAircraftDetails = onDocumentCreated(
   'aircraftDetails/{ownerId}',
@@ -1350,7 +1366,6 @@ exports.handleAircraftDetails = onDocumentCreated(
       `New aircraftDetails created for ownerId: ${ownerId}`
     );
 
-    // Initialize default fields if necessary
     const updatedData = {
       profileData: sanitizeData(newData.profileData || {}),
       aircraftDetails: sanitizeData(newData.aircraftDetails || {}),
@@ -1381,7 +1396,6 @@ exports.handleAircraftDetails = onDocumentCreated(
 /**
  * handleAircraftDetailsUpdate
  * Trigger: Firestore Document Update for aircraftDetails/{ownerId}
- * Description: Handles updates to aircraftDetails, including profile updates, cost recalculations, and validation.
  */
 exports.handleAircraftDetailsUpdate = onDocumentUpdated(
   'aircraftDetails/{ownerId}',
@@ -1407,7 +1421,6 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated(
         afterData.profileData.displayName
       ) {
         try {
-          // Assume fcmToken is stored in profileData
           const fcmToken = afterData.profileData.fcmToken;
           if (fcmToken) {
             await sendNotification(
@@ -1434,7 +1447,6 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated(
         `Aircraft details updated for ownerId: ${ownerId}`
       );
       // Example: Validate aircraft details or update related listings
-      // Add your validation logic here
     }
 
     // Handle Cost Data Updates
@@ -1549,10 +1561,10 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated(
       const selectedIds = afterData.selectedAircraftIds || [];
       const additionalAircrafts = afterData.additionalAircrafts || [];
 
-      // Fetch all valid aircraft IDs (including main aircraft)
+      // Fetch all valid aircraft IDs
       const validAircraftIds = [
-        ownerId, // Assuming main aircraft has id === ownerId
-        ...additionalAircrafts.map((aircraft) => aircraft.id),
+        ownerId, // main aircraft id
+        ...additionalAircrafts.map((ac) => ac.id),
       ];
 
       const invalidSelectedIds = selectedIds.filter(
@@ -1561,12 +1573,9 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated(
 
       if (invalidSelectedIds.length > 0) {
         admin.logger.warn(
-          `OwnerId: ${ownerId} has invalid selectedAircraftIds: ${invalidSelectedIds.join(
-            ', '
-          )}`
+          `OwnerId: ${ownerId} has invalid selectedAircraftIds: ${invalidSelectedIds.join(', ')}`
         );
 
-        // Remove invalid IDs from selectedAircraftIds
         const updatedSelectedIds = selectedIds.filter((id) =>
           validAircraftIds.includes(id)
         );
@@ -1588,8 +1597,6 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated(
           );
         }
       }
-
-      // Additional actions can be performed here, such as updating listings for rent
     }
 
     // Handle Additional Aircrafts Updates
@@ -1601,7 +1608,6 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated(
         `Additional aircrafts updated for ownerId: ${ownerId}`
       );
       // Example: Validate additional aircrafts or trigger related updates
-      // Add your validation logic here
     }
 
     return null;
@@ -1650,8 +1656,7 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule(
           const renterId = requestData.renterId;
           const chatThreadId = requestData.chatThreadId;
 
-          // Define criteria for orphaned rental requests
-          // Example: Rental requests older than 30 days with no active status
+          // Example: older than 30 days, not active
           const createdAt = requestData.createdAt;
           const thirtyDaysAgo = admin.firestore.Timestamp.fromDate(
             new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
@@ -1662,11 +1667,9 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule(
             createdAt.toDate() < thirtyDaysAgo.toDate() &&
             requestData.status !== 'active'
           ) {
-            // Delete the rental request
             rentalBatch.delete(requestDoc.ref);
             totalDeletions++;
 
-            // Delete associated chat thread if exists
             if (chatThreadId) {
               const chatThreadRef = db
                 .collection('messages')
@@ -1678,7 +1681,6 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule(
               totalDeletions++;
             }
 
-            // Delete notifications associated with the rental request
             if (renterId) {
               const notificationsRef = db
                 .collection('renters')
@@ -1698,7 +1700,6 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule(
           }
         }
 
-        // Commit the batch if there are deletions
         if (totalDeletions > 0) {
           await rentalBatch.commit();
           admin.logger.info(
@@ -1725,10 +1726,10 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule(
 // =====================
 // Error-Handling Middleware
 // =====================
-
-// This should be placed after all other app.use() and routes calls
 app.use((err, req, res, next) => {
   admin.logger.error('Unhandled error:', err);
+  // Force "application/json" content type:
+  res.setHeader('Content-Type', 'application/json');
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
