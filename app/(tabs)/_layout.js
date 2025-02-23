@@ -66,14 +66,14 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="classifieds"
           options={{
-            title: "Classifieds",
+            title: "Marketplace",
             headerShown: false,
             tabBarIcon: ({ color }) => (
-              <FontAwesome6 name="money-bill-1" size={24} color={color} />
+              <FontAwesome6 name="shop" size={24} color={color} />
             ),
           }}
         />
-        <Tabs.Screen
+        {/* <Tabs.Screen
           name="flights"
           options={{
             title: "Social",
@@ -82,7 +82,7 @@ const TabsLayout = () => {
               <Ionicons name="people-outline" size={32} color={color} />
             ),
           }}
-        />
+        /> */}
         <Tabs.Screen
           name="home"
           options={{
@@ -100,20 +100,20 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="owner"
           options={{
-            title: "Owner Dashboard",
+            title: "Owner",
             headerShown: false,
             tabBarIcon: ({ color }) => (
-              <FontAwesome name="sign-in" size={32} color={color} />
+              <Ionicons name="person-circle-outline" size={32} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="renter"
           options={{
-            title: "Renter Dashboard",
+            title: "Renter",
             headerShown: false,
             tabBarIcon: ({ color }) => (
-              <Octicons name="paper-airplane" size={26} color={color} />
+              <Ionicons name="person-outline" size={32} color={color} />
             ),
           }}
         />

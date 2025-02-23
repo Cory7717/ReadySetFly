@@ -1,3 +1,5 @@
+// src/payment/classifiedsPaymentScreen.js
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
@@ -12,19 +14,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Modal
 } from 'react-native';
 import { CardField, useConfirmPayment } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getAuth } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebaseConfig'; 
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 
+// Configuration Constants
 const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api';
 
+// Colors Constants
 const COLORS = {
   primary: '#FF5A5F',
   secondary: '#6B7280',
@@ -37,6 +39,7 @@ const COLORS = {
   red: '#EF4444',
 };
 
+// Stylesheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -74,6 +77,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: COLORS.gray,
   },
+  discountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  discountInput: {
+    flex: 1,
+    height: 50,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: COLORS.white,
+    fontSize: 16,
+  },
+  applyButton: {
+    marginLeft: 10,
+    backgroundColor: COLORS.green,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  applyButtonDisabled: {
+    backgroundColor: '#a5d6a7',
+  },
+  applyButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  errorText: {
+    color: COLORS.red,
+    marginTop: 10,
+    textAlign: 'center',
+    fontSize: 14,
+  },
   nameInput: {
     height: 50,
     borderWidth: 1,
@@ -95,7 +133,7 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: COLORS.white,
   },
-  payButton: {
+  finalizeButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: 15,
     paddingHorizontal: 30,
@@ -104,34 +142,17 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  payButtonDisabled: {
+  finalizeButtonDisabled: {
     backgroundColor: '#ccc',
   },
-  payButtonText: {
+  finalizeButtonText: {
     color: COLORS.white,
     fontWeight: '600',
     fontSize: 16,
   },
-  securePaymentContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 30,
-    justifyContent: 'center',
-  },
-  securePaymentText: {
-    marginLeft: 5,
-    color: '#555',
-    fontSize: 14,
-  },
-  errorText: {
-    color: COLORS.red,
-    marginTop: 10,
-    textAlign: 'center',
-    fontSize: 14,
-  },
 });
 
-export default function CheckoutScreen() {
+export default function ClassifiedsPaymentScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { confirmPayment } = useConfirmPayment();
@@ -140,52 +161,38 @@ export default function CheckoutScreen() {
   const auth = getAuth();
   const user = auth.currentUser;
 
-  // Expected parameters (including ownerId)
+  // Extract route parameters. Notice we now also extract listingId separately.
   const {
-    costPerHour = 0,
-    rentalHours = 1,
-    rentalRequestId: routeRentalRequestId = '',
-    ownerId: routeOwnerId = '',
     listingDetails = {},
     selectedPricing: initialSelectedPricing = '',
+    amount = 0,
+    listingId: routeListingId = '',
   } = route.params || {};
 
-  console.log("CheckoutScreen (Rental) received params:", route.params);
+  console.log("ClassifiedsPaymentScreen received params:", route.params);
 
   // Local state
   const [loading, setLoading] = useState(false);
   const [isOperationSuccess, setIsOperationSuccess] = useState(false);
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountApplied, setDiscountApplied] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [cardholderName, setCardholderName] = useState(user?.displayName || '');
-  const [totalAmount, setTotalAmount] = useState(0);
+  const [totalAmount, setTotalAmount] = useState(amount);
   const [selectedPricing, setSelectedPricing] = useState(initialSelectedPricing);
-  const [rentalRequestId, setRentalRequestId] = useState(routeRentalRequestId || '');
-  const [ownerId, setOwnerId] = useState(routeOwnerId || '');
-  // New state to control confirmation modal visibility
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
   // Animation
   const bounceValue = useRef(new Animated.Value(0)).current;
   const displayTotal = (totalAmount / 100).toFixed(2);
 
   useEffect(() => {
-    console.log("CheckoutScreen (Rental) useEffect triggered");
+    console.log("ClassifiedsPaymentScreen useEffect triggered");
     startBouncing();
-    validateParamsAndSetAmount();
-  }, [costPerHour, rentalHours, navigation]);
-
-  const validateParamsAndSetAmount = () => {
-    if (isNaN(costPerHour) || costPerHour <= 0) {
-      Alert.alert('Invalid Cost Per Hour', 'Please provide a valid cost per hour.');
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Invalid Payment Amount', 'The listing cost is invalid.');
       navigation.goBack();
-      return;
     }
-    if (isNaN(rentalHours) || rentalHours <= 0) {
-      Alert.alert('Invalid Rental Hours', 'Please provide valid rental hours.');
-      navigation.goBack();
-      return;
-    }
-    calculateRentalTotal(parseFloat(costPerHour), parseFloat(rentalHours));
-  };
+  }, [amount, navigation]);
 
   const startBouncing = () => {
     Animated.loop(
@@ -206,16 +213,6 @@ export default function CheckoutScreen() {
     ).start();
   };
 
-  // Updated calculation: Tax is now computed on the baseAmount only.
-  const calculateRentalTotal = (costHr, hours) => {
-    const baseAmount = costHr * hours;
-    const bookingFee = baseAmount * 0.06;
-    const processingFee = baseAmount * 0.03;
-    const tax = baseAmount * 0.0825;
-    const totalCents = Math.round((baseAmount + bookingFee + processingFee + tax) * 100);
-    setTotalAmount(totalCents);
-  };
-
   const getFirebaseIdToken = async () => {
     try {
       if (user) {
@@ -232,62 +229,115 @@ export default function CheckoutScreen() {
     }
   };
 
-  // Create a rental request document in Firestore
-  const createRentalRequest = async () => {
+  // Apply discount code logic
+  const applyDiscount = async () => {
+    const code = discountCode.trim().toUpperCase();
+    if (!code) {
+      setErrorMessage('Please enter a discount code.');
+      return;
+    }
+
     try {
-      const actualListingId = listingDetails.id;
-      if (!actualListingId) {
-        Alert.alert('Error', 'Listing information is missing.');
-        return null;
+      setLoading(true);
+      setErrorMessage('');
+
+      const response = await fetch(`${API_URL}/validateDiscount`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discountCode: code, amount: totalAmount }),
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        const text = await response.clone().text();
+        console.error('Response is not JSON:', text);
+        setErrorMessage('Failed to apply discount. Please try again.');
+        setLoading(false);
+        return;
       }
-      const rentalRequestData = {
-        renterId: user.uid,
-        listingId: actualListingId,
-        rentalStatus: 'pending',
-        costPerHour: parseFloat(costPerHour),
-        rentalHours: parseFloat(rentalHours),
-        createdAt: serverTimestamp(),
-      };
-      const rentalRequestRef = await addDoc(collection(db, 'rentalRequests'), rentalRequestData);
-      const newRentalRequestId = rentalRequestRef.id;
-      setRentalRequestId(newRentalRequestId);
-      console.log(`Rental Request Created with ID: ${newRentalRequestId}`);
-      return newRentalRequestId;
+
+      if (response.ok && data.valid) {
+        setDiscountApplied(true);
+        setTotalAmount(data.adjustedAmount);
+        setSelectedPricing(data.pricingTier);
+        Alert.alert('Discount Applied', data.message || 'Discount has been successfully applied.', 
+          [{ text: 'OK' }],
+          { cancelable: false }
+        );
+      } else {
+        setDiscountApplied(false);
+        setErrorMessage(data.message || 'Invalid discount code.');
+      }
     } catch (error) {
-      console.error('Error creating rental request:', error);
-      Alert.alert('Error', 'Failed to create rental request.');
-      return null;
+      console.error('Discount application error:', error);
+      setErrorMessage('Failed to apply discount. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle rental payment (owner info passed to server)
-  const handleRentalPayment = async (values) => {
+  // Finalize the classified listing on the backend
+  const finalizeClassifiedListingOnBackend = async () => {
+    try {
+      const token = await getFirebaseIdToken();
+      if (!token) {
+        throw new Error('Failed to get user token for listing creation.');
+      }
+
+      const response = await fetch(`${API_URL}/createListing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ listingDetails }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create classified listing.');
+      }
+
+      const result = await response.json();
+      console.log('Classified listing creation success:', result);
+      return true;
+    } catch (error) {
+      console.error('Classified listing creation error:', error);
+      Alert.alert('Error', error.message || 'Unable to finalize your listing.');
+      return false;
+    }
+  };
+
+  // Handle classifieds payment
+  const handleClassifiedPayment = async (values) => {
     if (values.cardholderName.trim() === '') {
       Alert.alert('Validation Error', 'Please enter the name on the credit card.');
       return;
     }
     try {
       setLoading(true);
-      let currentRentalRequestId = rentalRequestId;
-      if (!currentRentalRequestId) {
-        currentRentalRequestId = await createRentalRequest();
-        if (!currentRentalRequestId) {
-          setLoading(false);
-          return;
-        }
-      }
-      const endpoint = '/create-rental-payment-intent';
-      const body = {
-        rentalRequestId: currentRentalRequestId,
-        ownerId, // Include ownerId in the request body
-        amount: totalAmount,
-        renterId: user.uid,
-      };
       const token = await getFirebaseIdToken();
       if (!token) {
-        throw new Error('Authentication token is missing for rental payment.');
+        throw new Error('Authentication token is missing for classifieds payment.');
       }
-      const response = await fetch(`${API_URL}${endpoint}`, {
+
+      // Ensure we have a valid listing ID.
+      // If listingDetails.id is missing, fallback to the route parameter listingId.
+      const finalListingId = listingDetails.id || routeListingId || '';
+      if (!finalListingId) {
+        Alert.alert('Error', 'Missing listing ID.');
+        setLoading(false);
+        return;
+      }
+
+      const body = {
+        amount: totalAmount,    // in cents
+        listingId: finalListingId,
+      };
+
+      const response = await fetch(`${API_URL}/create-classified-payment-intent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -295,42 +345,62 @@ export default function CheckoutScreen() {
         },
         body: JSON.stringify(body),
       });
+
       let data;
       try {
         data = await response.json();
       } catch (e) {
         const text = await response.clone().text();
         console.error('Response is not JSON:', text);
-        Alert.alert('Error', 'Failed to create payment intent.');
+        Alert.alert('Error', 'Failed to create payment intent for classified.');
         setLoading(false);
         return;
       }
+
       if (!response.ok) {
         Alert.alert('Error', data.error || 'Failed to create payment intent.');
         setLoading(false);
         return;
       }
+
       const clientSecret = data.clientSecret;
       if (!clientSecret) {
-        console.error("Error: Client secret is missing for rental payment.");
+        console.error("Error: Client secret is missing for classified payment.");
         Alert.alert('Error', 'Payment details are missing.');
         setLoading(false);
         return;
       }
+
       const { error, paymentIntent } = await confirmPayment(clientSecret, {
         paymentMethodType: 'Card',
         billingDetails: { name: values.cardholderName.trim() },
-      });      
+      });  
+
       if (error) {
         Alert.alert('Payment failed', error.message);
+        setLoading(false);
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Instead of navigating immediately, show the confirmation modal
-        setIsOperationSuccess(true);
-        setShowConfirmationModal(true);
+        const success = await finalizeClassifiedListingOnBackend();
+        if (success) {
+          Alert.alert(
+            'Success',
+            'Payment processed and your listing has been finalized!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.navigate('Classifieds', { refresh: true });
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+          setIsOperationSuccess(true);
+        }
       }
     } catch (error) {
-      console.error('Rental payment error:', error);
-      Alert.alert('Error', 'Payment processing failed for your rental.');
+      console.error('Classified payment error:', error);
+      Alert.alert('Error', 'Payment processing failed for your listing.');
     } finally {
       setLoading(false);
     }
@@ -341,15 +411,7 @@ export default function CheckoutScreen() {
       console.warn("Operation is already in progress.");
       return;
     }
-    handleRentalPayment(values);
-  };
-
-  const handleCancel = () => {
-    if (!loading) {
-      navigation.goBack();
-    } else {
-      Alert.alert('Please wait', 'Operation is in progress. Please wait until it finishes.');
-    }
+    handleClassifiedPayment(values);
   };
 
   return (
@@ -360,7 +422,7 @@ export default function CheckoutScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <TouchableOpacity
-          onPress={handleCancel}
+          onPress={() => navigation.goBack()}
           style={styles.cancelButton}
           accessibilityLabel="Cancel operation"
           accessibilityRole="button"
@@ -376,18 +438,53 @@ export default function CheckoutScreen() {
               accessibilityLabel={isOperationSuccess ? "Operation Successful" : "Operation Required"}
             />
           </Animated.View>
-          <Text style={styles.title}>Complete Your Payment</Text>
-          <Text style={styles.description}>Verify your payment details below.</Text>
+          <Text style={styles.title}>Finalize Your Listing</Text>
+          <Text style={styles.description}>Provide your payment details below to finalize your listing.</Text>
           <Formik
-            initialValues={{ cardholderName }}
+            initialValues={{ cardholderName, discountCode }}
             validationSchema={Yup.object({
               cardholderName: Yup.string().required('Name on card is required.'),
+              discountCode: Yup.string(), // Optional for classifieds
             })}
             onSubmit={handleFormSubmit}
             enableReinitialize
           >
             {({ handleSubmit, values, errors, touched, setFieldValue }) => (
               <>
+                {!discountApplied && (
+                  <View style={styles.discountContainer}>
+                    <TextInput
+                      style={styles.discountInput}
+                      placeholder="Enter Discount Code"
+                      placeholderTextColor="#888"
+                      value={discountCode}
+                      onChangeText={(text) => {
+                        setDiscountCode(text);
+                        setFieldValue('discountCode', text);
+                      }}
+                      autoCapitalize="characters"
+                      editable={!loading}
+                      accessibilityLabel="Discount Code Input"
+                    />
+                    <TouchableOpacity
+                      onPress={applyDiscount}
+                      style={[
+                        styles.applyButton,
+                        (loading || discountApplied) && styles.applyButtonDisabled
+                      ]}
+                      disabled={loading || discountApplied}
+                      accessibilityLabel="Apply Discount"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.applyButtonText}>Apply</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {errorMessage !== '' && (
+                  <Text style={styles.errorText} accessibilityLiveRegion="polite">
+                    {errorMessage}
+                  </Text>
+                )}
                 <TextInput
                   style={styles.nameInput}
                   placeholder="Name on Card"
@@ -417,58 +514,21 @@ export default function CheckoutScreen() {
                 <TouchableOpacity
                   onPress={handleSubmit}
                   disabled={loading}
-                  style={[styles.payButton, loading && styles.payButtonDisabled]}
-                  accessibilityLabel={`Pay $${(totalAmount / 100).toFixed(2)}`}
+                  style={[styles.finalizeButton, loading && styles.finalizeButtonDisabled]}
+                  accessibilityLabel="Finalize Listing"
                   accessibilityRole="button"
                 >
                   {loading ? (
-                    <ActivityIndicator color="white" accessibilityLabel="Processing Payment" />
+                    <ActivityIndicator color="white" accessibilityLabel="Finalizing Listing" />
                   ) : (
-                    <Text style={styles.payButtonText}>{`Pay $${(totalAmount / 100).toFixed(2)}`}</Text>
+                    <Text style={styles.finalizeButtonText}>Finalize Listing</Text>
                   )}
                 </TouchableOpacity>
-                <View style={styles.securePaymentContainer}>
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={16}
-                    color="#555"
-                    accessibilityLabel="Secure Payment Lock Icon"
-                  />
-                  <Text style={styles.securePaymentText}>
-                    Your payment is secure and encrypted.
-                  </Text>
-                </View>
               </>
             )}
           </Formik>
         </View>
       </ScrollView>
-
-      <Modal
-        visible={showConfirmationModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowConfirmationModal(false)}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ width: '80%', backgroundColor: COLORS.white, padding: 20, borderRadius: 10, alignItems: 'center' }}>
-            <Ionicons name="checkmark-circle-outline" size={80} color={COLORS.green} />
-            <Text style={{ fontSize: 22, fontWeight: 'bold', marginVertical: 10 }}>Payment Successful</Text>
-            <Text style={{ fontSize: 16, textAlign: 'center' }}>
-              Your payment of ${displayTotal} has been processed successfully. A receipt has been sent to your registered email.
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                setShowConfirmationModal(false);
-                navigation.navigate('ConfirmationScreen', { rentalRequestId });
-              }}
-              style={[styles.payButton, { marginTop: 20 }]}
-            >
-              <Text style={styles.payButtonText}>Continue</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }

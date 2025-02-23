@@ -2,11 +2,20 @@
   "Category": {
     "fields": {
       "name": "string",
-      "icon": "string"
+      "icon": "string",
+      "Basic": "string",
+      "Enhanced": "string",
+      "Featured": "string"
     }
   },
   "Sliders": {
-    "fields": {}
+    "fields": {
+      "aircraft": "string",
+      "single engine": "string",
+      "twin engine": "string",
+      "helicopter": "string",
+      "jet": "string"
+    }
   },
   "aircraftDetails": {
     "fields": {
@@ -25,7 +34,9 @@
       "ownerId": "string",
       "createdAt": "object",
       "boosted": "string",
-      "boostedListing": "string"
+      "boostedListing": "string",
+      "selectedBy": "object",
+      "timestamp": "object"
     }
   },
   "airplanes": {
@@ -123,7 +134,21 @@
     }
   },
   "newListing": {
-    "fields": {}
+    "fields": {
+      "currentAnnualPdf": "string",
+      "insurancePdf": "string",
+      "description": "string",
+      "location": "string",
+      "ownerId": "string",
+      "airplaneModel": "string",
+      "minimumHours": "number",
+      "ratesPerHour": "number",
+      "createdAt": "object",
+      "boosted": "boolean",
+      "boostedListings": "boolean",
+      "images": "string",
+      "listing": "string"
+    }
   },
   "notifications": {
     "fields": {
@@ -149,10 +174,23 @@
     }
   },
   "orders": {
-    "fields": {}
+    "fields": {
+      "rentalRequestId": "string",
+      "ownerId": "string",
+      "renterId": "string",
+      "paymentStatus": "string",
+      "amount": "number",
+      "createdAt": "object",
+      "completedAt": "object",
+      "rating": "number"
+    }
   },
   "ownerId": {
-    "fields": {}
+    "fields": {
+      "ownerId": "string",
+      "aircraftDetails": "string",
+      "costData": "string"
+    }
   },
   "owners": {
     "fields": {
@@ -167,7 +205,9 @@
     }
   },
   "payment-sheet": {
-    "fields": {}
+    "fields": {
+      "payment": "string"
+    }
   },
   "posts": {
     "fields": {

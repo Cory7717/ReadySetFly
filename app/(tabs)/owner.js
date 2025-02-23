@@ -217,6 +217,8 @@ const OwnerProfile = ({ ownerId }) => {
     depreciationExpense: "",
   });
 
+  // At the top of your component's state definitions, add:
+  const [showCalculator, setShowCalculator] = useState(false);
   const [costSaved, setCostSaved] = useState(false);
   const [aircraftSaved, setAircraftSaved] = useState(false);
   const [isListedForRent, setIsListedForRent] = useState(false);
@@ -1815,237 +1817,260 @@ const OwnerProfile = ({ ownerId }) => {
         {/* End of Funds Button Placement */}
 
         {/* Cost of Ownership Calculator */}
-        <View style={{ paddingHorizontal: 16 }}>
-          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
-            Cost of Ownership Calculator
+<View style={{ paddingHorizontal: 16 }}>
+  <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+    Cost of Ownership Calculator
+  </Text>
+  
+  {/* Dropdown Toggle Button */}
+  <TouchableOpacity
+    onPress={() => setShowCalculator((prev) => !prev)}
+    style={{
+      backgroundColor: "#3182ce",
+      padding: 12,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    }}
+    accessibilityLabel="Toggle Cost Calculator"
+  >
+    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+      {showCalculator ? "Hide Calculator" : "Show Calculator"}
+    </Text>
+  </TouchableOpacity>
+
+  {showCalculator && (
+    <>
+      {costSaved ? (
+        <View
+          style={{
+            backgroundColor: "#f7fafc",
+            padding: 16,
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
+            Estimated Cost per Hour: ${costData.costPerHour}
           </Text>
-          {costSaved ? (
-            <View
-              style={{
-                backgroundColor: "#f7fafc",
-                padding: 16,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
-                Estimated Cost per Hour: ${costData.costPerHour}
-              </Text>
-              <Text style={{ fontSize: 16, marginBottom: 4 }}>
-                Total Fixed Costs per Year: $
-                {(
-                  parseFloat(costData.mortgageExpense) * 12 +
-                  parseFloat(costData.depreciationExpense) +
-                  parseFloat(costData.insuranceCost) +
-                  parseFloat(costData.hangarCost) +
-                  parseFloat(costData.maintenanceReserve) +
-                  parseFloat(costData.annualRegistrationFees)
-                ).toFixed(2)}
-              </Text>
-              <Text style={{ fontSize: 16, marginBottom: 16 }}>
-                Total Variable Costs per Year: $
-                {(
-                  (parseFloat(costData.fuelCostPerHour) +
-                    parseFloat(costData.oilCostPerHour) +
-                    parseFloat(costData.routineMaintenancePerHour) +
-                    parseFloat(costData.tiresPerHour) +
-                    parseFloat(costData.otherConsumablesPerHour)) *
-                  parseFloat(costData.rentalHoursPerYear)
-                ).toFixed(2)}
-              </Text>
-              <CustomButton
-                onPress={onEditCostData}
-                title="Edit Cost Data"
-                backgroundColor="#ecc94b"
-                accessibilityLabel="Edit Cost Data button"
-              />
-            </View>
-          ) : (
-            <View>
-              {/* Loan Details Section */}
-              <Section title="Loan Details">
-                <CustomTextInput
-                  placeholder="Purchase Price ($)"
-                  value={costData.purchasePrice}
-                  onChangeText={(value) =>
-                    handleInputChange("purchasePrice", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Purchase Price input"
-                />
-                <CustomTextInput
-                  placeholder="Loan Amount ($)"
-                  value={costData.loanAmount}
-                  onChangeText={(value) =>
-                    handleInputChange("loanAmount", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Loan Amount input"
-                />
-                <CustomTextInput
-                  placeholder="Interest Rate (%)"
-                  value={costData.interestRate}
-                  onChangeText={(value) =>
-                    handleInputChange("interestRate", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Interest Rate input"
-                />
-                <CustomTextInput
-                  placeholder="Loan Term (years)"
-                  value={costData.loanTerm}
-                  onChangeText={(value) =>
-                    handleInputChange("loanTerm", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Loan Term input"
-                />
-                <CustomTextInput
-                  placeholder="Depreciation Rate (%)"
-                  value={costData.depreciationRate}
-                  onChangeText={(value) =>
-                    handleInputChange("depreciationRate", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Depreciation Rate input"
-                />
-                <CustomTextInput
-                  placeholder="Useful Life (years)"
-                  value={costData.usefulLife}
-                  onChangeText={(value) =>
-                    handleInputChange("usefulLife", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Useful Life input"
-                />
-                <Text style={{ fontSize: 16, color: "#4a5568" }}>
-                  Mortgage Expense: ${costData.mortgageExpense}
-                </Text>
-                <Text style={{ fontSize: 16, color: "#4a5568" }}>
-                  Depreciation Expense: ${costData.depreciationExpense}
-                </Text>
-              </Section>
+          <Text style={{ fontSize: 16, marginBottom: 4 }}>
+            Total Fixed Costs per Year: $
+            {(
+              parseFloat(costData.mortgageExpense) * 12 +
+              parseFloat(costData.depreciationExpense) +
+              parseFloat(costData.insuranceCost) +
+              parseFloat(costData.hangarCost) +
+              parseFloat(costData.maintenanceReserve) +
+              parseFloat(costData.annualRegistrationFees)
+            ).toFixed(2)}
+          </Text>
+          <Text style={{ fontSize: 16, marginBottom: 16 }}>
+            Total Variable Costs per Year: $
+            {(
+              (parseFloat(costData.fuelCostPerHour) +
+                parseFloat(costData.oilCostPerHour) +
+                parseFloat(costData.routineMaintenancePerHour) +
+                parseFloat(costData.tiresPerHour) +
+                parseFloat(costData.otherConsumablesPerHour)) *
+              parseFloat(costData.rentalHoursPerYear)
+            ).toFixed(2)}
+          </Text>
+          <CustomButton
+            onPress={onEditCostData}
+            title="Edit Cost Data"
+            backgroundColor="#ecc94b"
+            accessibilityLabel="Edit Cost Data button"
+          />
+        </View>
+      ) : (
+        <View>
+          {/* Loan Details Section */}
+          <Section title="Loan Details">
+            <CustomTextInput
+              placeholder="Purchase Price ($)"
+              value={costData.purchasePrice}
+              onChangeText={(value) =>
+                handleInputChange("purchasePrice", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Purchase Price input"
+            />
+            <CustomTextInput
+              placeholder="Loan Amount ($)"
+              value={costData.loanAmount}
+              onChangeText={(value) =>
+                handleInputChange("loanAmount", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Loan Amount input"
+            />
+            <CustomTextInput
+              placeholder="Interest Rate (%)"
+              value={costData.interestRate}
+              onChangeText={(value) =>
+                handleInputChange("interestRate", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Interest Rate input"
+            />
+            <CustomTextInput
+              placeholder="Loan Term (years)"
+              value={costData.loanTerm}
+              onChangeText={(value) =>
+                handleInputChange("loanTerm", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Loan Term input"
+            />
+            <CustomTextInput
+              placeholder="Depreciation Rate (%)"
+              value={costData.depreciationRate}
+              onChangeText={(value) =>
+                handleInputChange("depreciationRate", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Depreciation Rate input"
+            />
+            <CustomTextInput
+              placeholder="Useful Life (years)"
+              value={costData.usefulLife}
+              onChangeText={(value) =>
+                handleInputChange("usefulLife", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Useful Life input"
+            />
+            <Text style={{ fontSize: 16, color: "#4a5568" }}>
+              Mortgage Expense: ${costData.mortgageExpense}
+            </Text>
+            <Text style={{ fontSize: 16, color: "#4a5568" }}>
+              Depreciation Expense: ${costData.depreciationExpense}
+            </Text>
+          </Section>
 
-              {/* Annual Costs Section */}
-              <Section title="Annual Costs">
-                <CustomTextInput
-                  placeholder="Estimated Annual Cost ($)"
-                  value={costData.estimatedAnnualCost}
-                  onChangeText={(value) =>
-                    handleInputChange("estimatedAnnualCost", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Estimated Annual Cost input"
-                />
-                <CustomTextInput
-                  placeholder="Insurance Cost ($)"
-                  value={costData.insuranceCost}
-                  onChangeText={(value) =>
-                    handleInputChange("insuranceCost", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Insurance Cost input"
-                />
-                <CustomTextInput
-                  placeholder="Hangar Cost ($)"
-                  value={costData.hangarCost}
-                  onChangeText={(value) => handleInputChange("hangarCost", value)}
-                  keyboardType="numeric"
-                  accessibilityLabel="Hangar Cost input"
-                />
-                <CustomTextInput
-                  placeholder="Annual Registration & Fees ($)"
-                  value={costData.annualRegistrationFees}
-                  onChangeText={(value) =>
-                    handleInputChange("annualRegistrationFees", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Annual Registration & Fees input"
-                />
-                <CustomTextInput
-                  placeholder="Maintenance Reserve ($)"
-                  value={costData.maintenanceReserve}
-                  onChangeText={(value) =>
-                    handleInputChange("maintenanceReserve", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Maintenance Reserve input"
-                />
-              </Section>
+          {/* Annual Costs Section */}
+          <Section title="Annual Costs">
+            <CustomTextInput
+              placeholder="Estimated Annual Cost ($)"
+              value={costData.estimatedAnnualCost}
+              onChangeText={(value) =>
+                handleInputChange("estimatedAnnualCost", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Estimated Annual Cost input"
+            />
+            <CustomTextInput
+              placeholder="Insurance Cost ($)"
+              value={costData.insuranceCost}
+              onChangeText={(value) =>
+                handleInputChange("insuranceCost", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Insurance Cost input"
+            />
+            <CustomTextInput
+              placeholder="Hangar Cost ($)"
+              value={costData.hangarCost}
+              onChangeText={(value) => handleInputChange("hangarCost", value)}
+              keyboardType="numeric"
+              accessibilityLabel="Hangar Cost input"
+            />
+            <CustomTextInput
+              placeholder="Annual Registration & Fees ($)"
+              value={costData.annualRegistrationFees}
+              onChangeText={(value) =>
+                handleInputChange("annualRegistrationFees", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Annual Registration & Fees input"
+            />
+            <CustomTextInput
+              placeholder="Maintenance Reserve ($)"
+              value={costData.maintenanceReserve}
+              onChangeText={(value) =>
+                handleInputChange("maintenanceReserve", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Maintenance Reserve input"
+            />
+          </Section>
 
-              {/* Operational Costs Section */}
-              <Section title="Operational Costs">
-                <CustomTextInput
-                  placeholder="Fuel Cost Per Hour ($)"
-                  value={costData.fuelCostPerHour}
-                  onChangeText={(value) =>
-                    handleInputChange("fuelCostPerHour", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Fuel Cost Per Hour input"
-                />
-                <CustomTextInput
-                  placeholder="Oil Cost Per Hour ($)"
-                  value={costData.oilCostPerHour}
-                  onChangeText={(value) =>
-                    handleInputChange("oilCostPerHour", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Oil Cost Per Hour input"
-                />
-                <CustomTextInput
-                  placeholder="Routine Maintenance Per Hour ($)"
-                  value={costData.routineMaintenancePerHour}
-                  onChangeText={(value) =>
-                    handleInputChange("routineMaintenancePerHour", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Routine Maintenance Per Hour input"
-                />
-                <CustomTextInput
-                  placeholder="Tires Per Hour ($)"
-                  value={costData.tiresPerHour}
-                  onChangeText={(value) =>
-                    handleInputChange("tiresPerHour", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Tires Per Hour input"
-                />
-                <CustomTextInput
-                  placeholder="Other Consumables Per Hour ($)"
-                  value={costData.otherConsumablesPerHour}
-                  onChangeText={(value) =>
-                    handleInputChange("otherConsumablesPerHour", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Other Consumables Per Hour input"
-                />
-                <CustomTextInput
-                  placeholder="Rental Hours Per Year"
-                  value={costData.rentalHoursPerYear}
-                  onChangeText={(value) =>
-                    handleInputChange("rentalHoursPerYear", value)
-                  }
-                  keyboardType="numeric"
-                  accessibilityLabel="Rental Hours Per Year input"
-                />
-              </Section>
+          {/* Operational Costs Section */}
+          <Section title="Operational Costs">
+            <CustomTextInput
+              placeholder="Fuel Cost Per Hour ($)"
+              value={costData.fuelCostPerHour}
+              onChangeText={(value) =>
+                handleInputChange("fuelCostPerHour", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Fuel Cost Per Hour input"
+            />
+            <CustomTextInput
+              placeholder="Oil Cost Per Hour ($)"
+              value={costData.oilCostPerHour}
+              onChangeText={(value) =>
+                handleInputChange("oilCostPerHour", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Oil Cost Per Hour input"
+            />
+            <CustomTextInput
+              placeholder="Routine Maintenance Per Hour ($)"
+              value={costData.routineMaintenancePerHour}
+              onChangeText={(value) =>
+                handleInputChange("routineMaintenancePerHour", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Routine Maintenance Per Hour input"
+            />
+            <CustomTextInput
+              placeholder="Tires Per Hour ($)"
+              value={costData.tiresPerHour}
+              onChangeText={(value) =>
+                handleInputChange("tiresPerHour", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Tires Per Hour input"
+            />
+            <CustomTextInput
+              placeholder="Other Consumables Per Hour ($)"
+              value={costData.otherConsumablesPerHour}
+              onChangeText={(value) =>
+                handleInputChange("otherConsumablesPerHour", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Other Consumables Per Hour input"
+            />
+            <CustomTextInput
+              placeholder="Rental Hours Per Year"
+              value={costData.rentalHoursPerYear}
+              onChangeText={(value) =>
+                handleInputChange("rentalHoursPerYear", value)
+              }
+              keyboardType="numeric"
+              accessibilityLabel="Rental Hours Per Year input"
+            />
+          </Section>
 
-              <CustomButton
-                onPress={saveCostData}
-                title="Save Cost Data"
-                accessibilityLabel="Save Cost Data button"
-              />
-              {loading && (
-                <ActivityIndicator
-                  size="large"
-                  color="#3182ce"
-                  style={{ marginTop: 16 }}
-                />
-              )}
-            </View>
+          <CustomButton
+            onPress={saveCostData}
+            title="Save Cost Data"
+            accessibilityLabel="Save Cost Data button"
+          />
+          {loading && (
+            <ActivityIndicator
+              size="large"
+              color="#3182ce"
+              style={{ marginTop: 16 }}
+            />
           )}
         </View>
-        {/* End of Cost of Ownership Calculator */}
+      )}
+    </>
+  )}
+</View>
+
 
         {/* Connect Stripe Account Section */}
         {!isStripeConnected && (
