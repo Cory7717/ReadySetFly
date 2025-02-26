@@ -19,12 +19,22 @@ import { CardField, useConfirmPayment } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getAuth } from 'firebase/auth';
-import { db } from '../../firebaseConfig'; 
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 
 // Configuration Constants
 const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api';
+
+// Pricing packages mapping for classifieds listings
+const PRICING_PACKAGES = { Basic: 25, Featured: 70, Enhanced: 150 };
+
+// Helper function: calculates total amount (in cents) based on the pricing tier
+const calculateAmount = (pricingTier) => {
+  if (pricingTier === 'FreeTrial') return 0;
+  const baseCost = PRICING_PACKAGES[pricingTier] || 0;
+  const totalWithTax = baseCost * 1.0825;
+  return Math.round(totalWithTax * 100);
+};
 
 // Colors Constants
 const COLORS = {
@@ -161,11 +171,11 @@ export default function ClassifiedsPaymentScreen() {
   const auth = getAuth();
   const user = auth.currentUser;
 
-  // Extract route parameters. Notice we now also extract listingId separately.
+  // Extract route parameters from classifieds.js
   const {
     listingDetails = {},
-    selectedPricing: initialSelectedPricing = '',
-    amount = 0,
+    selectedPricing: initialSelectedPricing = 'Basic',
+    // Note: amount is no longer passed from classifieds.js since we auto-calculate below.
     listingId: routeListingId = '',
   } = route.params || {};
 
@@ -178,7 +188,7 @@ export default function ClassifiedsPaymentScreen() {
   const [discountApplied, setDiscountApplied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [cardholderName, setCardholderName] = useState(user?.displayName || '');
-  const [totalAmount, setTotalAmount] = useState(amount);
+  const [totalAmount, setTotalAmount] = useState(0);
   const [selectedPricing, setSelectedPricing] = useState(initialSelectedPricing);
 
   // Animation
@@ -188,11 +198,10 @@ export default function ClassifiedsPaymentScreen() {
   useEffect(() => {
     console.log("ClassifiedsPaymentScreen useEffect triggered");
     startBouncing();
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Invalid Payment Amount', 'The listing cost is invalid.');
-      navigation.goBack();
-    }
-  }, [amount, navigation]);
+    // When the selected pricing changes, recalc the total amount.
+    const computedAmount = calculateAmount(selectedPricing);
+    setTotalAmount(computedAmount);
+  }, [selectedPricing]);
 
   const startBouncing = () => {
     Animated.loop(
@@ -229,7 +238,7 @@ export default function ClassifiedsPaymentScreen() {
     }
   };
 
-  // Apply discount code logic
+  // Discount code logic (optional)
   const applyDiscount = async () => {
     const code = discountCode.trim().toUpperCase();
     if (!code) {
@@ -262,7 +271,9 @@ export default function ClassifiedsPaymentScreen() {
         setDiscountApplied(true);
         setTotalAmount(data.adjustedAmount);
         setSelectedPricing(data.pricingTier);
-        Alert.alert('Discount Applied', data.message || 'Discount has been successfully applied.', 
+        Alert.alert(
+          'Discount Applied',
+          data.message || 'Discount has been successfully applied.',
           [{ text: 'OK' }],
           { cancelable: false }
         );
@@ -278,40 +289,78 @@ export default function ClassifiedsPaymentScreen() {
     }
   };
 
-  // Finalize the classified listing on the backend
-  const finalizeClassifiedListingOnBackend = async () => {
-    try {
-      const token = await getFirebaseIdToken();
-      if (!token) {
-        throw new Error('Failed to get user token for listing creation.');
-      }
-
-      const response = await fetch(`${API_URL}/createListing`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ listingDetails }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create classified listing.');
-      }
-
-      const result = await response.json();
-      console.log('Classified listing creation success:', result);
-      return true;
-    } catch (error) {
-      console.error('Classified listing creation error:', error);
-      Alert.alert('Error', error.message || 'Unable to finalize your listing.');
-      return false;
-    }
-  };
-
-  // Handle classifieds payment
+  // Handle classifieds payment (and listing creation if needed)
   const handleClassifiedPayment = async (values) => {
+    // === New block: Skip payment for Aviation Gear ===
+    if (listingDetails.category === 'Aviation Gear') {
+      try {
+        setLoading(true);
+        const token = await getFirebaseIdToken();
+        if (!token) {
+          throw new Error('Authentication token is missing for classifieds payment.');
+        }
+
+        let finalListingId = listingDetails.id || routeListingId;
+        if (!finalListingId) {
+          // Prepare listingDetails (perform any necessary transformations)
+          const preparedListing = {
+            ...listingDetails,
+          };
+          if (preparedListing.salePrice) {
+            preparedListing.salePrice = parseFloat(preparedListing.salePrice);
+          }
+          if (preparedListing.packageCost) {
+            preparedListing.packageCost = parseFloat(preparedListing.packageCost);
+          }
+
+          const createResponse = await fetch(`${API_URL}/createListing`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ listingDetails: preparedListing }),
+          });
+          if (!createResponse.ok) {
+            let errorData;
+            try {
+              errorData = await createResponse.json();
+            } catch (e) {
+              errorData = { error: 'Failed to create listing.' };
+            }
+            Alert.alert('Error', errorData.error || 'Failed to create listing.');
+            setLoading(false);
+            return;
+          }
+          const createData = await createResponse.json();
+          finalListingId = createData.listingId;
+          listingDetails.id = finalListingId;
+        }
+
+        Alert.alert(
+          'Success',
+          'Your Aviation Gear listing has been posted!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('Classifieds', { refresh: true });
+              },
+            },
+          ],
+          { cancelable: false }
+        );
+        setIsOperationSuccess(true);
+      } catch (error) {
+        console.error('Classified payment error for Aviation Gear:', error);
+        Alert.alert('Error', 'Failed to post your Aviation Gear listing.');
+      } finally {
+        setLoading(false);
+      }
+      return; // Skip the rest of the payment flow
+    }
+
+    // === Existing payment logic for other categories ===
     if (values.cardholderName.trim() === '') {
       Alert.alert('Validation Error', 'Please enter the name on the credit card.');
       return;
@@ -323,17 +372,51 @@ export default function ClassifiedsPaymentScreen() {
         throw new Error('Authentication token is missing for classifieds payment.');
       }
 
-      // Ensure we have a valid listing ID.
-      // If listingDetails.id is missing, fallback to the route parameter listingId.
-      const finalListingId = listingDetails.id || routeListingId || '';
+      // Check for a valid listing ID
+      let finalListingId = listingDetails.id || routeListingId;
       if (!finalListingId) {
-        Alert.alert('Error', 'Missing listing ID.');
-        setLoading(false);
-        return;
+        // Prepare listingDetails (perform any necessary transformations)
+        const preparedListing = {
+          ...listingDetails,
+        };
+        if (preparedListing.salePrice) {
+          preparedListing.salePrice = parseFloat(preparedListing.salePrice);
+        }
+        if (preparedListing.packageCost) {
+          preparedListing.packageCost = parseFloat(preparedListing.packageCost);
+        }
+        // Optionally, add location or other required fields here
+
+        const createResponse = await fetch(`${API_URL}/createListing`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ listingDetails: preparedListing }),
+        });
+        if (!createResponse.ok) {
+          let errorData;
+          try {
+            errorData = await createResponse.json();
+          } catch (e) {
+            errorData = { error: 'Failed to create listing.' };
+          }
+          Alert.alert('Error', errorData.error || 'Failed to create listing.');
+          setLoading(false);
+          return;
+        }
+        const createData = await createResponse.json();
+        finalListingId = createData.listingId;
+        listingDetails.id = finalListingId;
       }
 
+      // Auto-calculate the amount based on the selected pricing package.
+      const computedAmount = calculateAmount(selectedPricing);
+      setTotalAmount(computedAmount);
+
       const body = {
-        amount: totalAmount,    // in cents
+        amount: computedAmount, // in cents
         listingId: finalListingId,
       };
 
@@ -345,7 +428,7 @@ export default function ClassifiedsPaymentScreen() {
         },
         body: JSON.stringify(body),
       });
-
+      
       let data;
       try {
         data = await response.json();
@@ -356,13 +439,33 @@ export default function ClassifiedsPaymentScreen() {
         setLoading(false);
         return;
       }
-
+      
       if (!response.ok) {
         Alert.alert('Error', data.error || 'Failed to create payment intent.');
         setLoading(false);
         return;
       }
-
+      
+      // Handle free trial (zero-amount) listings
+      if (data.freeListing === true) {
+        Alert.alert(
+          'Success',
+          'Your listing has been finalized with a free trial period!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('Classifieds', { refresh: true });
+              },
+            },
+          ],
+          { cancelable: false }
+        );
+        setIsOperationSuccess(true);
+        setLoading(false);
+        return;
+      }
+      
       const clientSecret = data.clientSecret;
       if (!clientSecret) {
         console.error("Error: Client secret is missing for classified payment.");
@@ -370,34 +473,31 @@ export default function ClassifiedsPaymentScreen() {
         setLoading(false);
         return;
       }
-
+      
       const { error, paymentIntent } = await confirmPayment(clientSecret, {
         paymentMethodType: 'Card',
         billingDetails: { name: values.cardholderName.trim() },
-      });  
-
+      });
+      
       if (error) {
         Alert.alert('Payment failed', error.message);
-        setLoading(false);
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        const success = await finalizeClassifiedListingOnBackend();
-        if (success) {
-          Alert.alert(
-            'Success',
-            'Payment processed and your listing has been finalized!',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  navigation.navigate('Classifieds', { refresh: true });
-                },
+        Alert.alert(
+          'Success',
+          'Payment processed and your listing has been finalized!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('Classifieds', { refresh: true });
               },
-            ],
-            { cancelable: false }
-          );
-          setIsOperationSuccess(true);
-        }
+            },
+          ],
+          { cancelable: false }
+        );
+        setIsOperationSuccess(true);
       }
+      
     } catch (error) {
       console.error('Classified payment error:', error);
       Alert.alert('Error', 'Payment processing failed for your listing.');
@@ -429,6 +529,7 @@ export default function ClassifiedsPaymentScreen() {
         >
           <Ionicons name="close-outline" size={28} color={COLORS.red} />
         </TouchableOpacity>
+
         <View style={styles.content}>
           <Animated.View style={[styles.animatedContainer, { transform: [{ translateY: bounceValue }] }]}>
             <Ionicons
@@ -438,13 +539,17 @@ export default function ClassifiedsPaymentScreen() {
               accessibilityLabel={isOperationSuccess ? "Operation Successful" : "Operation Required"}
             />
           </Animated.View>
+
           <Text style={styles.title}>Finalize Your Listing</Text>
-          <Text style={styles.description}>Provide your payment details below to finalize your listing.</Text>
+          <Text style={styles.description}>
+            Provide your payment details below to finalize your listing.
+          </Text>
+
           <Formik
             initialValues={{ cardholderName, discountCode }}
             validationSchema={Yup.object({
               cardholderName: Yup.string().required('Name on card is required.'),
-              discountCode: Yup.string(), // Optional for classifieds
+              discountCode: Yup.string(), // Optional
             })}
             onSubmit={handleFormSubmit}
             enableReinitialize
@@ -470,7 +575,7 @@ export default function ClassifiedsPaymentScreen() {
                       onPress={applyDiscount}
                       style={[
                         styles.applyButton,
-                        (loading || discountApplied) && styles.applyButtonDisabled
+                        (loading || discountApplied) && styles.applyButtonDisabled,
                       ]}
                       disabled={loading || discountApplied}
                       accessibilityLabel="Apply Discount"
@@ -480,11 +585,13 @@ export default function ClassifiedsPaymentScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
+
                 {errorMessage !== '' && (
                   <Text style={styles.errorText} accessibilityLiveRegion="polite">
                     {errorMessage}
                   </Text>
                 )}
+
                 <TextInput
                   style={styles.nameInput}
                   placeholder="Name on Card"
@@ -501,6 +608,7 @@ export default function ClassifiedsPaymentScreen() {
                 {touched.cardholderName && errors.cardholderName && (
                   <Text style={styles.errorText}>{errors.cardholderName}</Text>
                 )}
+
                 <CardField
                   postalCodeEnabled={true}
                   placeholders={{ number: '**** **** **** ****' }}
@@ -511,6 +619,7 @@ export default function ClassifiedsPaymentScreen() {
                   editable={!loading}
                   accessibilityLabel="Credit Card Input"
                 />
+
                 <TouchableOpacity
                   onPress={handleSubmit}
                   disabled={loading}

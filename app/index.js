@@ -97,7 +97,7 @@ const App = () => {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.logoContainer}>
-          <Image source={images.logo} style={styles.logo} />
+          <Image source={images.logo1} style={styles.logo} />
         </View>
 
         {user ? (

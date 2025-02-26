@@ -22,10 +22,15 @@ admin.initializeApp({
 const db = admin.firestore();
 const storageBucket = admin.storage().bucket();
 
+// FIX: Define admin.logger if it is undefined.
+if (!admin.logger) {
+  admin.logger = console;
+}
+
 // =====================
 // Configuration Constants
 // =====================
-const ALLOWED_PACKAGES = ['Basic', 'Featured', 'Enhanced'];
+const ALLOWED_PACKAGES = ['Basic', 'Featured', 'Enhanced']; // Note: 'FreeTrial' is handled separately.
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY ||
   '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';
 const stripe = Stripe(stripeSecretKey);
@@ -56,56 +61,62 @@ app.post(
       return res.status(400).json({ error: `Webhook Error: ${err.message}` });
     }
 
-    // Handle Stripe events
-    switch (event.type) {
-      case 'payment_intent.succeeded': {
-        const paymentIntent = event.data.object;
-        admin.logger.info(`PaymentIntent succeeded: ${paymentIntent.id}`);
-        const { listingId, ownerId, rentalRequestId } = paymentIntent.metadata;
-        // Update classified listing if listingId and ownerId are present
-        if (listingId && ownerId) {
-          try {
+    try {
+      // Handle Stripe events
+      switch (event.type) {
+        case 'payment_intent.created': {
+          const paymentIntent = event.data.object;
+          admin.logger.info(`PaymentIntent created: ${paymentIntent.id}`);
+          // Additional handling for created events can be added here if needed.
+          break;
+        }
+        case 'payment_intent.succeeded': {
+          const paymentIntent = event.data.object;
+          admin.logger.info(`PaymentIntent succeeded: ${paymentIntent.id}`);
+          const { listingId, ownerId, rentalRequestId } = paymentIntent.metadata;
+
+          // Update classified listing if applicable.
+          if (listingId && ownerId) {
             const listingRef = db.collection('listings').doc(listingId);
             const listingDoc = await listingRef.get();
             if (!listingDoc.exists) {
               admin.logger.warn(`Listing not found for listingId: ${listingId}`);
-              break;
+            } else {
+              await listingRef.update({
+                status: 'active',
+                paymentStatus: 'succeeded',
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              admin.logger.info(`Listing ${listingId} updated to active.`);
             }
-            await listingRef.update({
-              status: 'active',
-              paymentStatus: 'succeeded',
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            admin.logger.info(`Listing ${listingId} updated to active.`);
-          } catch (error) {
-            admin.logger.error(`Error updating listing ${listingId}:`, error);
           }
-        }
-        // Update rental request if rentalRequestId and ownerId are present
-        if (rentalRequestId && ownerId) {
-          try {
-            // Look up rental request in top-level "rentalRequests" collection.
+
+          // Update rental request if applicable.
+          if (rentalRequestId && ownerId) {
             const rentalRequestRef = db.collection('rentalRequests').doc(rentalRequestId);
             const rentalRequestDoc = await rentalRequestRef.get();
             if (!rentalRequestDoc.exists) {
               admin.logger.warn(`Rental request not found: ${rentalRequestId}`);
-              break;
+            } else {
+              await rentalRequestRef.update({
+                paymentStatus: 'succeeded',
+                status: 'active',
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              admin.logger.info(`Rental request ${rentalRequestId} updated to active.`);
             }
-            await rentalRequestRef.update({
-              paymentStatus: 'succeeded',
-              status: 'active',
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-            admin.logger.info(`Rental request ${rentalRequestId} updated to active.`);
-          } catch (error) {
-            admin.logger.error(`Error updating rental request ${rentalRequestId}:`, error);
           }
+          break;
         }
-        break;
+        default:
+          admin.logger.warn(`Unhandled event type ${event.type}`);
       }
-      default:
-        admin.logger.warn(`Unhandled event type ${event.type}`);
+    } catch (err) {
+      // Log any error that occurs during processing but don't throw it.
+      admin.logger.error(`Error processing event ${event.id}: ${err.message}`, err);
     }
+
+    // Always respond with 200 to prevent Stripe from retrying the event.
     res.setHeader('Content-Type', 'application/json');
     res.json({ received: true });
   }
@@ -133,6 +144,7 @@ const authenticate = async (req, res, next) => {
     req.user = decodedToken;
     next();
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error verifying Firebase ID token:', error);
     res.setHeader('Content-Type', 'application/json');
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
@@ -166,6 +178,7 @@ const sendNotification = async (tokens, title, body, data = {}) => {
     const response = await admin.messaging().sendToDevice(tokens, payload);
     admin.logger.info('Notifications sent successfully:', response);
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error sending notifications:', error);
   }
 };
@@ -173,6 +186,16 @@ const sendNotification = async (tokens, title, body, data = {}) => {
 // ===================================================================
 // Routes: Listings
 // ===================================================================
+
+// Update categoryRequirements to include new categories
+const categoryRequirements = {
+  'Aircraft for Sale': ['title', 'description'],
+  'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
+  'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
+  'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocations'],
+  'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
+  'Aviation Gear': ['gearTitle', 'gearDescription', 'gearCity', 'gearState', 'gearEmail'],
+};
 
 // POST /createListing
 app.post('/createListing', authenticate, async (req, res) => {
@@ -195,33 +218,35 @@ app.post('/createListing', authenticate, async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: "Invalid JSON in 'listingDetails'" });
     }
-    // Destructure and (optionally) sanitize fields
     const {
       title, tailNumber, salePrice, description, city, state, email, phone,
       companyName, jobTitle, jobDescription, category, flightSchoolName,
       flightSchoolDetails, isFreeListing, selectedPricing, lat, lng, images,
     } = sanitizeData(listingDetails);
-    const categoryRequirements = {
-      'Aircraft for Sale': ['title', 'description'],
-      'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
-      'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
-    };
+
     const requiredFields = categoryRequirements[category];
     if (!requiredFields) {
       admin.logger.warn(`Invalid category: ${category}`);
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: `Invalid category: ${category}` });
     }
-    const isFree = isFreeListing === 'true' || isFreeListing === true;
-    if (!isFree) {
-      if (!selectedPricing || !ALLOWED_PACKAGES.includes(selectedPricing)) {
-        admin.logger.warn(`Invalid selectedPricing: ${selectedPricing}`);
-        res.setHeader('Content-Type', 'application/json');
-        return res.status(400).json({ error: 'Invalid or missing selectedPricing.' });
-      }
+
+    // ---- FIX: For Aviation Gear, always treat listing as free ----
+    let freeListing = (isFreeListing === 'true' || isFreeListing === true);
+    if (category === 'Aviation Gear') {
+      freeListing = true;
+    }
+    if (selectedPricing === 'FreeTrial') {
+      freeListing = true;
+    }
+
+    if (!freeListing && (!selectedPricing || (!ALLOWED_PACKAGES.includes(selectedPricing) && selectedPricing !== 'FreeTrial'))) {
+      admin.logger.warn(`Invalid selectedPricing: ${selectedPricing}`);
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(400).json({ error: 'Invalid or missing selectedPricing.' });
     }
     let finalRequiredFields = [...requiredFields];
-    if (category === 'Aircraft for Sale' && !isFree) {
+    if (category === 'Aircraft for Sale' && !freeListing) {
       finalRequiredFields.push('salePrice', 'selectedPricing');
     }
     const missingFields = finalRequiredFields.filter((field) => !listingDetails[field]);
@@ -242,9 +267,10 @@ app.post('/createListing', authenticate, async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: "Invalid location data. 'lat' and 'lng' must be numbers." });
     }
+
     let finalSalePrice = 0;
     let finalPackageCost = 0;
-    if (isFree) {
+    if (freeListing) {
       finalSalePrice = 0;
       finalPackageCost = 0;
     } else {
@@ -262,6 +288,7 @@ app.post('/createListing', authenticate, async (req, res) => {
       finalSalePrice = parsedSalePrice;
       finalPackageCost = calculateTotalCost(selectedPricing);
     }
+
     const imageUrls = Array.isArray(images) ? images : [];
     const listingData = {
       title: title || '',
@@ -278,25 +305,32 @@ app.post('/createListing', authenticate, async (req, res) => {
       category: category || '',
       flightSchoolName: flightSchoolName || '',
       flightSchoolDetails: flightSchoolDetails || '',
-      isFreeListing: isFree,
-      packageType: isFree ? null : selectedPricing,
-      packageCost: isFree ? 0 : finalPackageCost,
+      isFreeListing: freeListing,
+      packageType: freeListing ? null : selectedPricing,
+      packageCost: freeListing ? 0 : finalPackageCost,
       location: { lat: latitude, lng: longitude },
       images: imageUrls,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       ownerId: req.user.uid,
       status: 'pending',
     };
+
+    if (freeListing && selectedPricing === 'FreeTrial') {
+      listingData.trialExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
+    }
+
     const listingRef = await db.collection('listings').add(listingData);
     res.setHeader('Content-Type', 'application/json');
     res.status(201).json({ success: true, listingId: listingRef.id });
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error in /createListing:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
+// PUT /updateListing
 app.put('/updateListing', authenticate, async (req, res) => {
   try {
     const { listingId, listingDetails } = req.body;
@@ -323,23 +357,28 @@ app.put('/updateListing', authenticate, async (req, res) => {
     const { title, tailNumber, salePrice, description, city, state, email, phone,
       companyName, jobTitle, jobDescription, category, flightSchoolName,
       flightSchoolDetails, isFreeListing, selectedPricing, lat, lng, images } = sanitizedListingDetails;
-    const categoryRequirements = {
-      'Aircraft for Sale': ['title', 'description'],
-      'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
-      'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
-    };
-    const requiredFields = categoryRequirements[category];
-    if (!requiredFields) {
+
+    const reqCategoryRequirements = categoryRequirements[category];
+    if (!reqCategoryRequirements) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: `Invalid category: ${category}` });
     }
-    const isFree = isFreeListing === 'true' || isFreeListing === true;
-    if (!isFree && (!selectedPricing || !ALLOWED_PACKAGES.includes(selectedPricing))) {
+
+    // ---- FIX: For Aviation Gear, always treat listing as free ----
+    let freeListing = (isFreeListing === 'true' || isFreeListing === true);
+    if (category === 'Aviation Gear') {
+      freeListing = true;
+    }
+    if (selectedPricing === 'FreeTrial') {
+      freeListing = true;
+    }
+
+    if (!freeListing && (!selectedPricing || (!ALLOWED_PACKAGES.includes(selectedPricing) && selectedPricing !== 'FreeTrial'))) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: 'Invalid or missing selectedPricing.' });
     }
-    let finalRequiredFields = [...requiredFields];
-    if (category === 'Aircraft for Sale' && !isFree) {
+    let finalRequiredFields = [...reqCategoryRequirements];
+    if (category === 'Aircraft for Sale' && !freeListing) {
       finalRequiredFields.push('salePrice', 'selectedPricing');
     }
     const missingFields = finalRequiredFields.filter((field) => !sanitizedListingDetails[field]);
@@ -357,19 +396,17 @@ app.put('/updateListing', authenticate, async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: "Invalid location data. 'lat' and 'lng' must be numbers." });
     }
+
     let finalSalePrice = listingData.salePrice;
     let finalPackageCost = listingData.packageCost;
     let finalPackageType = listingData.packageType;
-    if (isFree) {
+    if (freeListing) {
       finalSalePrice = 0;
       finalPackageCost = 0;
       finalPackageType = null;
     } else {
-      if (salePrice) {
-        let salePriceString = salePrice;
-        if (typeof salePrice !== 'string') {
-          salePriceString = salePrice.toString();
-        }
+      if (salePrice && String(salePrice).trim().toLowerCase() !== 'n/a') {
+        const salePriceString = String(salePrice).trim();
         const sanitizedSalePrice = salePriceString.replace(/[^0-9.]/g, '');
         const parsedSalePrice = parseFloat(sanitizedSalePrice);
         if (isNaN(parsedSalePrice) || parsedSalePrice <= 0) {
@@ -399,22 +436,25 @@ app.put('/updateListing', authenticate, async (req, res) => {
       category: category || listingData.category,
       flightSchoolName: flightSchoolName || listingData.flightSchoolName,
       flightSchoolDetails: flightSchoolDetails || listingData.flightSchoolDetails,
-      isFreeListing: isFree,
-      packageType: finalPackageType,
-      packageCost: finalPackageCost,
+      isFreeListing: freeListing,
+      packageType: freeListing ? null : finalPackageType,
+      packageCost: freeListing ? 0 : finalPackageCost,
       location: { lat: latitude, lng: longitude },
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
+
     if (imageUrls.length > 0) {
       updateData.images = imageUrls;
     }
+
     await listingRef.update(updateData);
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ success: true, listingId });
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error in /updateListing:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -456,9 +496,10 @@ app.delete('/deleteListing', authenticate, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ success: true, message: 'Listing deleted successfully' });
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error in /deleteListing:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -466,12 +507,12 @@ app.delete('/deleteListing', authenticate, async (req, res) => {
 // Payment Endpoints
 // ===================================================================
 
-// Classified listing payment intent
+// === UPDATED create-classified-payment-intent TO REMOVE FREE-LISTING CHECK AND HANDLE ZERO AMOUNT ===
 app.post('/create-classified-payment-intent', authenticate, async (req, res) => {
   try {
     const { amount, currency = 'usd', listingId, listingDetails } = req.body;
     const finalListingId = listingId || (listingDetails && listingDetails.id);
-    if (!amount || !finalListingId) {
+    if (typeof amount !== 'number' || finalListingId === '') {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: 'Missing amount or listingId' });
     }
@@ -482,21 +523,34 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
       return res.status(404).json({ error: 'Listing not found' });
     }
     const listingData = listingDoc.data();
-    if (listingData.isFreeListing) {
+    if (amount === 0) {
+      await listingRef.update({
+        status: 'trial',
+        paymentStatus: 'free',
+        trialExpiry: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
       res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: 'Cannot create payment intent for a free listing.' });
+      return res.status(200).json({ clientSecret: null, freeListing: true });
     }
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
-      metadata: { listingId: finalListingId, ownerId: listingData.ownerId },
+      metadata: {
+        listingId: finalListingId,
+        ownerId: listingData.ownerId,
+      },
     });
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
+    if (!error) {
+      error = new Error('Unknown error occurred');
+    }
+    const errorMessage = error.message || 'Internal Server Error';
     admin.logger.error('Error in /create-classified-payment-intent:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -514,7 +568,6 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Invalid payment amount provided.' });
     }
     const amount = parsedAmount;
-    // Look up rental request from top-level "rentalRequests" collection.
     const rentalRequestRef = db.collection('rentalRequests').doc(rentalRequestId);
     const rentalRequestDoc = await rentalRequestRef.get();
     if (!rentalRequestDoc.exists) {
@@ -536,9 +589,10 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error in /create-rental-payment-intent:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -546,13 +600,12 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
 app.post('/validateDiscount', authenticate, async (req, res) => {
   try {
     const { discountCode, amount } = req.body;
-    if (!discountCode || typeof amount !== 'number' || amount <= 0) {
+    if (!discountCode || typeof amount !== 'number' || (amount <= 0 && discountCode.toUpperCase() !== "RSF2005")) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ valid: false, message: 'Invalid request parameters' });
     }
     const discountCodes = {
-      SUMMER20: { type: 'percentage', value: 20, message: '20% off your listing!' },
-      FLY50: { type: 'fixed', value: 5000, message: '$50 off your listing!' },
+      RSF2005: { type: 'free', value: 0, message: 'Free 2 week listing activated! Your listing will auto renew and you will be charged for renewal after 2 weeks.' },
     };
     const discount = discountCodes[discountCode.toUpperCase()];
     if (!discount) {
@@ -561,7 +614,10 @@ app.post('/validateDiscount', authenticate, async (req, res) => {
     }
     let adjustedAmount = amount;
     let pricingTier = 'Basic';
-    if (discount.type === 'percentage') {
+    if (discount.type === 'free') {
+      adjustedAmount = 0;
+      pricingTier = 'FreeTrial';
+    } else if (discount.type === 'percentage') {
       adjustedAmount = Math.round(amount * (1 - discount.value / 100));
       pricingTier = 'Featured';
     } else if (discount.type === 'fixed') {
@@ -577,16 +633,16 @@ app.post('/validateDiscount', authenticate, async (req, res) => {
       message: discount.message,
     });
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error in /validateDiscount:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ valid: false, message: error.message || 'Internal Server Error' });
+    res.status(500).json({ valid: false, message: errorMessage });
   }
 });
 
 // ===================================================================
 // Stripe & Bank Account Endpoints
 // ===================================================================
-
 app.post('/attach-bank-account', authenticate, async (req, res) => {
   try {
     const { ownerId, token, bankName } = req.body;
@@ -594,7 +650,8 @@ app.post('/attach-bank-account', authenticate, async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: 'Missing required fields: ownerId, token, bankName' });
     }
-    const ownerDoc = await db.collection('users').doc(ownerId).get();
+    const ownerRef = db.collection('users').doc(ownerId);
+    const ownerDoc = await ownerRef.get();
     if (!ownerDoc.exists) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(404).json({ error: 'Owner not found' });
@@ -613,9 +670,10 @@ app.post('/attach-bank-account', authenticate, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ message: 'Bank account attached successfully', bankAccount });
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error attaching bank account:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -647,9 +705,10 @@ app.post('/create-connected-account', authenticate, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ message: 'Connected account created', accountLinkUrl: accountLink.url });
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error creating connected account:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -678,16 +737,16 @@ app.post('/withdraw-funds', authenticate, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ message: 'Withdrawal processed successfully', payout });
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error processing withdrawal:', error);
     res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
 // ===================================================================
 // Firestore-Triggered Functions
 // ===================================================================
-
 exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapshot, context) => {
   const { messageId } = context.params;
   const messageData = snapshot.data();
@@ -727,6 +786,7 @@ exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapsho
     const response = await admin.messaging().sendToDevice(tokens, payload);
     admin.logger.info('Notifications sent:', response);
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error sending notifications:', error);
   }
   return null;
@@ -742,31 +802,12 @@ exports.onListingDeleted = onDocumentDeleted('listings/{listingId}', async (snap
     admin.logger.info(`Found ${rentalRequestsSnapshot.size} rental requests for listing ${listingId}.`);
     const rentalBatch = db.batch();
     rentalRequestsSnapshot.forEach((docSnap) => {
-      const requestData = docSnap.data();
-      const rentalRequestId = docSnap.id;
-      const ownerId = requestData.ownerId;
-      const renterId = requestData.renterId;
-      const chatThreadId = requestData.chatThreadId;
       rentalBatch.delete(docSnap.ref);
       totalDeletions++;
-      if (chatThreadId) {
-        const chatThreadRef = db.collection('messages').doc(chatThreadId);
-        rentalBatch.delete(chatThreadRef);
-        totalDeletions++;
-      }
-      if (renterId) {
-        const notificationsRef = db.collection('renters').doc(renterId)
-          .collection('notifications').where('rentalRequestId', '==', rentalRequestId);
-        notificationsRef.get().then((notifSnap) => {
-          notifSnap.forEach((notificationDoc) => {
-            rentalBatch.delete(notificationDoc.ref);
-            totalDeletions++;
-          });
-        });
-      }
     });
     await rentalBatch.commit();
-    admin.logger.info(`Deleted ${totalDeletions} associated documents for listing ${listingId}.`);
+    admin.logger.info(`Deleted ${totalDeletions} associated rental requests for listing ${listingId}.`);
+
     const imageUrls = deletedData.images || [];
     const deletePromises = imageUrls.map(async (imageUrl) => {
       const filePathMatch = imageUrl.match(/\/o\/(.+?)\?/);
@@ -784,6 +825,7 @@ exports.onListingDeleted = onDocumentDeleted('listings/{listingId}', async (snap
     });
     await Promise.all(deletePromises);
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error(`Error deleting data for listing ${listingId}:`, error);
   }
   return null;
@@ -804,6 +846,7 @@ exports.handleAircraftDetails = onDocumentCreated('aircraftDetails/{ownerId}', a
     await db.collection('aircraftDetails').doc(ownerId).set(updatedData, { merge: true });
     admin.logger.info(`Initialized aircraftDetails for ownerId: ${ownerId}`);
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error(`Error initializing aircraftDetails for ownerId ${ownerId}:`, error);
   }
   return null;
@@ -814,6 +857,7 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
   const beforeData = snapshot.before.data();
   const afterData = snapshot.after.data();
   admin.logger.info(`AircraftDetails updated for ownerId: ${ownerId}`);
+
   if (JSON.stringify(beforeData.profileData) !== JSON.stringify(afterData.profileData)) {
     admin.logger.info(`Profile data updated for ownerId: ${ownerId}`);
     if (beforeData.profileData.displayName !== afterData.profileData.displayName) {
@@ -823,13 +867,16 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
           await sendNotification([fcmToken], 'Profile Updated', 'Your profile has been updated.');
         }
       } catch (error) {
+        const errorMessage = error && error.message ? error.message : 'Internal Server Error';
         admin.logger.error(`Error sending profile update notification for ownerId ${ownerId}:`, error);
       }
     }
   }
+
   if (JSON.stringify(beforeData.aircraftDetails) !== JSON.stringify(afterData.aircraftDetails)) {
     admin.logger.info(`Aircraft details updated for ownerId: ${ownerId}`);
   }
+
   if (JSON.stringify(beforeData.costData) !== JSON.stringify(afterData.costData)) {
     admin.logger.info(`Cost data updated for ownerId: ${ownerId}`);
     const costData = afterData.costData;
@@ -854,10 +901,12 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
         });
         admin.logger.info(`Updated costPerHour for ownerId: ${ownerId}`);
       } catch (error) {
+        const errorMessage = error && error.message ? error.message : 'Internal Server Error';
         admin.logger.error(`Error updating costPerHour for ownerId ${ownerId}:`, error);
       }
     }
   }
+
   if (JSON.stringify(beforeData.selectedAircraftIds) !== JSON.stringify(afterData.selectedAircraftIds)) {
     admin.logger.info(`Selected aircraft IDs updated for ownerId: ${ownerId}`);
     const selectedIds = afterData.selectedAircraftIds || [];
@@ -870,6 +919,7 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
         await db.collection('aircraftDetails').doc(ownerId).update({ selectedAircraftIds: updatedSelectedIds });
         admin.logger.info(`Removed invalid selectedAircraftIds for ownerId: ${ownerId}`);
       } catch (error) {
+        const errorMessage = error && error.message ? error.message : 'Internal Server Error';
         admin.logger.error(`Error removing invalid selectedAircraftIds for ownerId ${ownerId}:`, error);
       }
     }
@@ -894,21 +944,6 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule('every 24 hours', as
         if (createdAt && createdAt.toDate() < thirtyDaysAgo.toDate() && requestData.status !== 'active') {
           rentalBatch.delete(requestDoc.ref);
           totalDeletions++;
-          if (requestData.chatThreadId) {
-            const chatThreadRef = db.collection('messages').doc(requestData.chatThreadId);
-            rentalBatch.delete(chatThreadRef);
-            totalDeletions++;
-          }
-          if (requestData.renterId) {
-            const notificationsRef = db.collection('renters').doc(requestData.renterId)
-              .collection('notifications').where('rentalRequestId', '==', requestDoc.id);
-            notificationsRef.get().then((notifSnap) => {
-              notifSnap.forEach((notificationDoc) => {
-                rentalBatch.delete(notificationDoc.ref);
-                totalDeletions++;
-              });
-            });
-          }
         }
       }
       if (totalDeletions > 0) {
@@ -919,6 +954,7 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule('every 24 hours', as
     admin.logger.info(`Scheduled cleanup complete. Total deletions: ${totalDeletions}`);
     return null;
   } catch (error) {
+    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Scheduled cleanup error:', error);
     throw new Error('Cleanup failed.');
   }
@@ -929,8 +965,12 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule('every 24 hours', as
 // =====================
 app.use((err, req, res, next) => {
   admin.logger.error('Unhandled error:', err);
-  res.setHeader('Content-Type', 'application/json');
-  res.status(500).json({ error: 'Internal Server Error' });
+  if (!res.headersSent) {
+    res.setHeader('Content-Type', 'application/json');
+    res.status(500).json({ error: 'Internal Server Error' });
+  } else {
+    next(err);
+  }
 });
 
 // Handle undefined routes

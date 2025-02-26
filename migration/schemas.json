@@ -247,7 +247,8 @@
       "flightHours": "number",
       "createdAt": "object",
       "id": "string",
-      "status": "string"
+      "status": "string",
+      "totalAmount": "number"
     }
   },
   "renters": {

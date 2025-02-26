@@ -42,7 +42,7 @@ import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { Picker } from "@react-native-picker/picker";
 import { CardField } from "@stripe/stripe-react-native";
-import { LinearGradient } from 'expo-linear-gradient'; // Import LinearGradient
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -53,8 +53,8 @@ const Home = ({ route, navigation }) => {
   const [selectedListing, setSelectedListing] = useState(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
-  const [zoomModalVisible, setZoomModalVisible] = useState(false); // New state for zoom modal
-  const [zoomImageUri, setZoomImageUri] = useState(null); // URI of the image to zoom
+  const [zoomModalVisible, setZoomModalVisible] = useState(false);
+  const [zoomImageUri, setZoomImageUri] = useState(null);
   const [filter, setFilter] = useState({
     make: "",
     location: "",
@@ -633,7 +633,7 @@ const Home = ({ route, navigation }) => {
 
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 150],
-    outputRange: [220, 0], // Adjusted to match padding
+    outputRange: [220, 0],
     extrapolate: "clamp",
   });
 
@@ -667,106 +667,87 @@ const Home = ({ route, navigation }) => {
     setZoomModalVisible(true);
   };
 
-  // Redesigned Render Item for Listing Cards
+  // ------------------------------------------------------------------------------
+  //  UPDATED RENDER ITEM: Redesigned Listing Cards (while still side-by-side)
+  // ------------------------------------------------------------------------------
   const renderItem = ({ item }) => {
     const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
     const makeDisplay = item.make || "Unknown Make";
     const yearDisplay = item.year || "Unknown Year";
 
     return (
-      <View style={styles.listingContainer}>
-        <TouchableOpacity
-          onPress={() => {
-            if (!item.ownerId) {
-              Alert.alert(
-                "Listing Unavailable",
-                "This listing does not have a valid owner and cannot be rented."
-              );
-              return;
-            }
-            setSelectedListing(item);
-            setImageIndex(0);
-            setFullScreenModalVisible(true);
-            setFullName(user?.displayName || fullName || "Anonymous");
-            setCityStateCombined("");
-            setHasMedicalCertificate(false);
-            setHasRentersInsurance(false);
-            setFlightHours("");
-          }}
-          style={styles.listingCard}
-          accessibilityLabel={`Select listing: ${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
-          accessibilityRole="button"
-        >
-          {/* Listing Image */}
-          <View style={styles.imageContainer}>
-            {item.images && item.images.length > 0 ? (
-              <ImageBackground
-                source={{ uri: item.images[0] }}
-                style={styles.listingImage}
-                imageStyle={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+      <TouchableOpacity
+        onPress={() => {
+          if (!item.ownerId) {
+            Alert.alert(
+              "Listing Unavailable",
+              "This listing does not have a valid owner and cannot be rented."
+            );
+            return;
+          }
+          setSelectedListing(item);
+          setImageIndex(0);
+          setFullScreenModalVisible(true);
+          setFullName(user?.displayName || fullName || "Anonymous");
+          setCityStateCombined("");
+          setHasMedicalCertificate(false);
+          setHasRentersInsurance(false);
+          setFlightHours("");
+        }}
+        style={styles.newListingCardWrapper}
+        accessibilityLabel={`Select listing: ${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
+        accessibilityRole="button"
+      >
+        {/* Image Section */}
+        <View style={styles.newListingImageContainer}>
+          {item.images && item.images.length > 0 ? (
+            <ImageBackground
+              source={{ uri: item.images[0] }}
+              style={styles.newListingImageBackground}
+              imageStyle={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+            >
+              {/* Gradient Overlay for location and rate */}
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.7)"]}
+                style={styles.newListingOverlay}
               >
-                {/* Overlay */}
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.7)']}
-                  style={styles.imageOverlay}
-                >
-                  <Text style={styles.listingLocation}>{item.location}</Text>
-                  <Text style={styles.listingRate}>
-                    ${parseFloat(item.costPerHour).toFixed(2)}/hr
-                  </Text>
-                </LinearGradient>
-              </ImageBackground>
-            ) : (
-              <View style={styles.noImageContainer}>
-                <Ionicons name="image" size={50} color="#A0AEC0" />
-                <Text style={styles.noImageText}>No Image Available</Text>
-              </View>
-            )}
-          </View>
+                <Text style={styles.newListingLocation}>{item.location}</Text>
+                <Text style={styles.newListingRate}>
+                  ${parseFloat(item.costPerHour).toFixed(2)}/hr
+                </Text>
+              </LinearGradient>
+            </ImageBackground>
+          ) : (
+            <View style={styles.noImageContainer}>
+              <Ionicons name="image" size={50} color="#A0AEC0" />
+              <Text style={styles.noImageText}>No Image</Text>
+            </View>
+          )}
+        </View>
 
-          {/* Listing Details */}
-          <View style={styles.listingDetails}>
-            <Text style={styles.listingTitle} numberOfLines={1}>
-              {`${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
-            </Text>
-            <Text style={styles.listingDescription} numberOfLines={2}>
-              {item.description}
-            </Text>
-          </View>
-
-          {/* Action Button */}
-          <TouchableOpacity
-            style={styles.rentButton}
-            onPress={() => {
-              if (!item.ownerId) {
-                Alert.alert(
-                  "Listing Unavailable",
-                  "This listing does not have a valid owner and cannot be rented."
-                );
-                return;
-              }
-              setSelectedListing(item);
-              setImageIndex(0);
-              setFullScreenModalVisible(true);
-              setFullName(user?.displayName || fullName || "Anonymous");
-              setCityStateCombined("");
-              setHasMedicalCertificate(false);
-              setHasRentersInsurance(false);
-              setFlightHours("");
-            }}
-            accessibilityLabel={`Rent ${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
-            accessibilityRole="button"
-          >
-            <Text style={styles.rentButtonText}>Rent Now</Text>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </View>
+        {/* Info Section */}
+        <View style={styles.newListingInfoContainer}>
+          <Text style={styles.newListingTitle} numberOfLines={1}>
+            {`${yearDisplay} ${makeDisplay}`}
+          </Text>
+          <Text style={styles.newListingModel} numberOfLines={1}>
+            {airplaneModelDisplay}
+          </Text>
+          <Text style={styles.newListingDescription} numberOfLines={1}>
+            {(() => {
+              const words = item.description.split(" ");
+              return words.slice(0, 5).join(" ") + (words.length > 5 ? "..." : "");
+            })()}
+          </Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
-  // Redesigned Filter Header
+  // Redesigned Filter Header with added Available Aircraft Rentals text
   const renderListHeader = () => (
     <>
+      <Text style={styles.availableAircraftHeader}>Available Aircraft Rentals</Text>
       <View style={styles.filterHeader}>
         <Text style={styles.filterTitle}>Filter Listings</Text>
         <TouchableOpacity
@@ -778,14 +759,9 @@ const Home = ({ route, navigation }) => {
           <Ionicons name="filter" size={24} color="#1E90FF" />
         </TouchableOpacity>
       </View>
-
-      <Text style={styles.availableListingsTitle}>
-        Available Listings
-      </Text>
     </>
   );
 
-  // Render the main component
   return (
     <SafeAreaView style={styles.safeArea}>
       <Animated.View
@@ -835,8 +811,8 @@ const Home = ({ route, navigation }) => {
                   setSelectedListing(listing);
                   setImageIndex(0);
                   setFullScreenModalVisible(true);
-                  setZoomImageUri(null); // Reset zoom image
-                  setZoomModalVisible(false); // Ensure zoom modal is closed
+                  setZoomImageUri(null);
+                  setZoomModalVisible(false);
                   setFullName(user?.displayName || fullName || "Anonymous");
                   setCityStateCombined("");
                   setHasMedicalCertificate(false);
@@ -877,7 +853,7 @@ const Home = ({ route, navigation }) => {
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={{ paddingTop: 180 }} // Adjusted paddingTop
+        contentContainerStyle={{ paddingTop: 180 }}
         ListHeaderComponent={renderListHeader}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -920,20 +896,19 @@ const Home = ({ route, navigation }) => {
                 <Ionicons name="close" size={30} color="black" />
               </TouchableOpacity>
 
-              {/* Image Carousel with Swipe Gestures */}
               <Animated.ScrollView
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onScroll={Animated.event(
                   [{ nativeEvent: { contentOffset: { x: scrollY } } }],
-                  { 
-                    useNativeDriver: false, 
+                  {
+                    useNativeDriver: false,
                     listener: (event) => {
                       const offsetX = event.nativeEvent.contentOffset.x;
                       const index = Math.round(offsetX / SCREEN_WIDTH);
                       setImageIndex(index);
-                    }
+                    },
                   }
                 )}
                 scrollEventThrottle={16}
@@ -949,14 +924,12 @@ const Home = ({ route, navigation }) => {
                       <Image
                         source={{ uri: image }}
                         style={styles.modalImage}
-                        resizeMode="contain" // Changed from 'cover' to 'contain'
+                        resizeMode="contain"
                       />
-                      {/* Gradient Overlay */}
                       <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.7)']}
+                        colors={["transparent", "rgba(0,0,0,0.7)"]}
                         style={styles.gradientOverlay}
                       />
-                      {/* Image Information */}
                       <View style={styles.imageInfoContainer}>
                         <Text style={styles.imageTitle}>
                           {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
@@ -973,7 +946,6 @@ const Home = ({ route, navigation }) => {
                 ))}
               </Animated.ScrollView>
 
-              {/* Pagination Dots */}
               {renderPaginationDots()}
 
               <ScrollView
@@ -1006,7 +978,6 @@ const Home = ({ route, navigation }) => {
                   {selectedListing.description}
                 </Text>
 
-                {/* Display Owner ID Check */}
                 {selectedListing.ownerId === user.uid && (
                   <View style={styles.modalOwnerActions}>
                     <TouchableOpacity
@@ -1028,7 +999,6 @@ const Home = ({ route, navigation }) => {
                   </View>
                 )}
 
-                {/* Developer Delete Button */}
                 <TouchableOpacity
                   onPress={() => handleDeleteListing(selectedListing.id)}
                   style={styles.modalDeleteButton}
@@ -1038,7 +1008,6 @@ const Home = ({ route, navigation }) => {
                   <Text style={styles.buttonText}>Developer Delete</Text>
                 </TouchableOpacity>
 
-                {/* Full Name Input */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Full Name</Text>
                   <TextInput
@@ -1051,7 +1020,6 @@ const Home = ({ route, navigation }) => {
                   />
                 </View>
 
-                {/* Combined City and State Input */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Current City & State</Text>
                   <TextInput
@@ -1064,7 +1032,6 @@ const Home = ({ route, navigation }) => {
                   />
                 </View>
 
-                {/* Medical Certificate Toggle */}
                 <View style={styles.toggleGroup}>
                   <Text style={styles.inputLabel}>
                     Do you have a current medical certificate?
@@ -1076,7 +1043,6 @@ const Home = ({ route, navigation }) => {
                   />
                 </View>
 
-                {/* Renters Insurance Toggle */}
                 <View style={styles.toggleGroup}>
                   <Text style={styles.inputLabel}>
                     Do you have current renter's insurance?
@@ -1088,7 +1054,6 @@ const Home = ({ route, navigation }) => {
                   />
                 </View>
 
-                {/* Flight Hours Input */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Flight Hours</Text>
                   <TextInput
@@ -1243,7 +1208,7 @@ const Home = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      {/* Redesigned Filter Modal */}
+      {/* Filter Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -1265,7 +1230,6 @@ const Home = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Filter by Location */}
             <Text style={styles.filterLabel}>Location</Text>
             <View style={styles.pickerContainer}>
               <Picker
@@ -1275,22 +1239,18 @@ const Home = ({ route, navigation }) => {
                 accessibilityLabel="Filter by location"
               >
                 <Picker.Item label="All Locations" value="" />
-                {/* Replace with dynamic location options if available */}
                 <Picker.Item label="New York, NY" value="new york, ny" />
                 <Picker.Item label="Los Angeles, CA" value="los angeles, ca" />
                 <Picker.Item label="Chicago, IL" value="chicago, il" />
-                {/* Add more locations as needed */}
               </Picker>
             </View>
 
-            {/* OR Separator */}
             <View style={styles.orSeparator}>
               <View style={styles.line} />
               <Text style={styles.orText}>OR</Text>
               <View style={styles.line} />
             </View>
 
-            {/* Filter by Make */}
             <Text style={styles.filterLabel}>Aircraft Make</Text>
             <View style={styles.pickerContainer}>
               <Picker
@@ -1300,15 +1260,12 @@ const Home = ({ route, navigation }) => {
                 accessibilityLabel="Filter by aircraft make"
               >
                 <Picker.Item label="All Makes" value="" />
-                {/* Replace with dynamic make options if available */}
                 <Picker.Item label="Cessna" value="cessna" />
                 <Picker.Item label="Boeing" value="boeing" />
                 <Picker.Item label="Airbus" value="airbus" />
-                {/* Add more makes as needed */}
               </Picker>
             </View>
 
-            {/* Filter Actions */}
             <View style={styles.filterActions}>
               <TouchableOpacity
                 onPress={clearFilter}
@@ -1332,7 +1289,6 @@ const Home = ({ route, navigation }) => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Loading Indicator */}
       {isLoading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#1E90FF" />
@@ -1342,7 +1298,9 @@ const Home = ({ route, navigation }) => {
   );
 };
 
-// Redesigned Styles
+// -------------------------------------------------------------------------------------------------
+//  UPDATED/NEW STYLES FOR THE LISTING CARDS (plus existing styles remain unchanged below).
+// -------------------------------------------------------------------------------------------------
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -1360,23 +1318,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   headerContent: {
-    backgroundColor: "rgba(0,0,0,0.6)", // Increased opacity
-    padding: 20, // Increased padding
-    borderRadius: 12, // More rounded
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 20,
+    borderRadius: 12,
   },
   welcomeText: {
-    fontSize: 18, // Increased font size
+    fontSize: 18,
     color: "#FFFFFF",
   },
   userName: {
-    fontSize: 28, // Increased font size
+    fontSize: 28,
     fontWeight: "700",
     color: "#FFFFFF",
-    marginTop: 4, // Added margin
+    marginTop: 4,
   },
   recommendedListingsContainer: {
     paddingHorizontal: 16,
-    paddingTop: 16, // Reduced paddingTop from 24 to 16
+    paddingTop: 16,
   },
   sectionTitle: {
     fontSize: 20,
@@ -1402,7 +1360,7 @@ const styles = StyleSheet.create({
   },
   noImageContainer: {
     width: "100%",
-    height: 120,
+    height: 100,
     backgroundColor: "#A0AEC0",
     justifyContent: "center",
     alignItems: "center",
@@ -1418,71 +1376,67 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2D3748",
   },
-  listingContainer: {
+  // --- BEGIN NEW LISTING CARD STYLES ---
+  newListingCardWrapper: {
     flex: 1,
-    margin: 8,
-    maxWidth: (SCREEN_WIDTH - 48) / 2, // Adjusted for padding and margins
-  },
-  listingCard: {
-    backgroundColor: "#FFFFFF",
+    margin: 6,
+    maxWidth: (SCREEN_WIDTH - 24) / 2, // increased width and reduced margin for a wider, more compact card
+    backgroundColor: "#fff",
     borderRadius: 12,
     overflow: "hidden",
-    elevation: 5, // Enhanced shadow
+    elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    height: 300, // Increased height for better content space
-    justifyContent: "space-between",
   },
-  imageContainer: {
+  newListingImageContainer: {
     width: "100%",
-    height: 150,
+    height: 100, // reduced height for a more compact image
+    backgroundColor: "#E2E8F0",
   },
-  listingImage: {
+  newListingImageBackground: {
     width: "100%",
     height: "100%",
     justifyContent: "flex-end",
   },
-  imageOverlay: {
-    backgroundColor: "rgba(0,0,0,0.6)",
-    padding: 8,
+  newListingOverlay: {
+    padding: 6,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
   },
-  listingLocation: {
+  newListingLocation: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
+    maxWidth: "60%",
   },
-  listingRate: {
+  newListingRate: {
     color: "#FFD700",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
-    marginTop: 2,
   },
-  listingDetails: {
-    padding: 12,
+  newListingInfoContainer: {
+    padding: 10,
   },
-  listingTitle: {
-    fontSize: 16,
+  newListingTitle: {
+    fontSize: 14,
     fontWeight: "700",
     color: "#2D3748",
-    marginBottom: 4,
   },
-  listingDescription: {
-    fontSize: 14,
+  newListingModel: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: "600",
     color: "#4A5568",
   },
-  rentButton: {
-    backgroundColor: "#1E90FF",
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
+  newListingDescription: {
+    fontSize: 12,
+    color: "#4A5568",
+    marginVertical: 6,
   },
-  rentButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  // --- END NEW LISTING CARD STYLES ---
   filterHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1505,6 +1459,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: "#2D3748",
   },
+  // New style for the added header text
+  availableAircraftHeader: {
+    fontSize: 28,
+    fontWeight: "700",
+    textAlign: "center",
+    color: "#2D3748",
+    marginVertical: 16,
+  },
   columnWrapper: {
     justifyContent: "space-between",
     paddingHorizontal: 16,
@@ -1522,7 +1484,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E90FF",
     width: 60,
     height: 60,
-    borderRadius: 30, // Fully rounded
+    borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
@@ -1545,13 +1507,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   carouselScrollView: {
-    height: 250, // Increased height for better image visibility
+    height: 250,
     borderRadius: 12,
     overflow: "hidden",
     marginBottom: 8,
   },
   carouselImageContainer: {
-    width: SCREEN_WIDTH - 32, // Slightly smaller than screen width for padding
+    width: SCREEN_WIDTH - 32,
     height: 250,
     marginRight: 16,
     borderRadius: 12,
@@ -1651,6 +1613,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     alignItems: "center",
+    marginBottom: 16,
   },
   buttonText: {
     color: "#FFFFFF",
