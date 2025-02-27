@@ -466,12 +466,24 @@ const Classifieds = () => {
     }
   };
 
-  // Re-added handleAskQuestion function to fix the ReferenceError.
+  // Updated handleAskQuestion to check gearEmail if it's an Aviation Gear listing
   const handleAskQuestion = () => {
-    if (selectedListing && selectedListing.email) {
-      const email = selectedListing.email;
-      const subject = encodeURIComponent(`Inquiry about ${selectedListing.title || 'Your Listing'}`);
-      const mailUrl = `mailto:${email}?subject=${subject}`;
+    if (!selectedListing) {
+      Alert.alert('Error', 'No listing selected.');
+      return;
+    }
+
+    // If it's Aviation Gear, use gearEmail if available
+    const contactEmail =
+      selectedListing.category === 'Aviation Gear'
+        ? selectedListing.gearEmail
+        : selectedListing.email;
+
+    if (contactEmail) {
+      const subject = encodeURIComponent(
+        `Inquiry about ${selectedListing.title || selectedListing.gearTitle || 'Your Listing'}`
+      );
+      const mailUrl = `mailto:${contactEmail}?subject=${subject}`;
       Linking.openURL(mailUrl).catch((error) => {
         console.error('Error opening mail app:', error);
         Alert.alert('Error', 'Unable to open mail app.');
@@ -479,6 +491,11 @@ const Classifieds = () => {
     } else {
       Alert.alert('Error', 'Contact email not available.');
     }
+  };
+
+  // Implement a delete function if needed
+  const handleDeleteListing = (listingId) => {
+    Alert.alert('Delete Listing', 'This feature is not yet implemented in the sample.');
   };
 
   // -----------------------
@@ -526,36 +543,39 @@ const Classifieds = () => {
           });
       });
     } else if (values.category === 'Aviation Gear') {
-      // Directly post the listing without requiring payment
-      fetch(`${API_URL}/createListing`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ listingDetails, selectedCategory: values.category, selectedPricing }),
-      })
-        .then((response) => {
-          if (response.ok) {
-            Alert.alert('Listing Posted', 'Your listing has been posted successfully.');
-            setModalVisible(false);
-            setEditingListing(null);
-            setImages([]);
-          } else {
-            response.text().then((text) => {
-              try {
-                const data = JSON.parse(text);
-                Alert.alert('Error', data.error || 'Failed to post listing.');
-              } catch (err) {
-                console.error('Error parsing createListing error data:', err);
-                Alert.alert('Error', 'Failed to post listing. ' + text);
-              }
-            });
-          }
+      // Directly post the listing without requiring payment.
+      getFirebaseIdToken().then((token) => {
+        fetch(`${API_URL}/createListing`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ listingDetails, selectedCategory: values.category, selectedPricing }),
         })
-        .catch((error) => {
-          console.error('Error posting listing:', error);
-          Alert.alert('Error', 'Failed to post listing.');
-        });
+          .then((response) => {
+            if (response.ok) {
+              Alert.alert('Listing Posted', 'Your listing has been posted successfully.');
+              setModalVisible(false);
+              setEditingListing(null);
+              setImages([]);
+            } else {
+              response.text().then((text) => {
+                try {
+                  const data = JSON.parse(text);
+                  Alert.alert('Error', data.error || 'Failed to post listing.');
+                } catch (err) {
+                  console.error('Error parsing createListing error data:', err);
+                  Alert.alert('Error', 'Failed to post listing. ' + text);
+                }
+              });
+            }
+          })
+          .catch((error) => {
+            console.error('Error posting listing:', error);
+            Alert.alert('Error', 'Failed to post listing.');
+          });
+      });
     } else {
       navigation.navigate('classifiedsPaymentScreen', {
         listingDetails,
@@ -661,7 +681,13 @@ const Classifieds = () => {
     return (
       <View style={styles.paginationDotsContainer}>
         {selectedListing.images.map((_, index) => (
-          <View key={index} style={[styles.paginationDot, index === imageIndex ? styles.activeDot : styles.inactiveDot]} />
+          <View
+            key={index}
+            style={[
+              styles.paginationDot,
+              index === imageIndex ? styles.activeDot : styles.inactiveDot,
+            ]}
+          />
         ))}
       </View>
     );
@@ -672,20 +698,29 @@ const Classifieds = () => {
       <Animated.View style={{ overflow: 'hidden', height: headerHeight, opacity: headerOpacity }}>
         <ImageBackground source={wingtipClouds} style={{ flex: 1, justifyContent: 'flex-end' }} resizeMode="cover">
           <Animated.View style={{ paddingHorizontal: 16, paddingTop: headerPaddingTop, paddingBottom: 20 }}>
-            <Animated.Text style={{ color: COLORS.white, fontWeight: 'bold', fontSize: headerFontSize }} accessibilityLabel="Greeting Text">
+            <Animated.Text
+              style={{ color: COLORS.white, fontWeight: 'bold', fontSize: headerFontSize }}
+              accessibilityLabel="Greeting Text"
+            >
               Good Morning
             </Animated.Text>
-            <Animated.Text style={{ color: COLORS.white, fontWeight: 'bold', fontSize: headerFontSize }} accessibilityLabel="User Name">
+            <Animated.Text
+              style={{ color: COLORS.white, fontWeight: 'bold', fontSize: headerFontSize }}
+              accessibilityLabel="User Name"
+            >
               {user?.displayName ? user.displayName : 'User'}
             </Animated.Text>
           </Animated.View>
         </ImageBackground>
       </Animated.View>
+
       <Animated.ScrollView
         ref={scrollViewRef}
         contentContainerStyle={{ padding: 16 }}
         scrollEventThrottle={16}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
           <Text style={{ fontSize: 18, color: COLORS.secondary }}>Filter by Location or Aircraft Make</Text>
@@ -698,6 +733,7 @@ const Classifieds = () => {
             <Ionicons name="filter" size={24} color="gray" />
           </TouchableOpacity>
         </View>
+
         <FlatList
           data={categories}
           renderItem={({ item }) => (
@@ -716,7 +752,13 @@ const Classifieds = () => {
               accessibilityLabel={`Select category ${item}`}
               accessibilityRole="button"
             >
-              <Text style={{ fontSize: 14, fontWeight: 'bold', color: selectedCategory === item ? COLORS.white : COLORS.black }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  color: selectedCategory === item ? COLORS.white : COLORS.black,
+                }}
+              >
                 {item}
               </Text>
             </TouchableOpacity>
@@ -726,9 +768,13 @@ const Classifieds = () => {
           showsHorizontalScrollIndicator={false}
           style={{ marginBottom: 16 }}
         />
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: COLORS.black }}>
+
+        <Text
+          style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: COLORS.black }}
+        >
           Aviation Marketplace
         </Text>
+
         <TouchableOpacity
           onPress={() => {
             setEditingListing(null);
@@ -741,6 +787,7 @@ const Classifieds = () => {
         >
           <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>Add Listing</Text>
         </TouchableOpacity>
+
         {filteredListings.length > 0 ? (
           filteredListings.map((item) => (
             <View
@@ -770,7 +817,15 @@ const Classifieds = () => {
                     No Images Available
                   </Text>
                 )}
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black, paddingHorizontal: 10, marginTop: 10 }}>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    color: COLORS.black,
+                    paddingHorizontal: 10,
+                    marginTop: 10,
+                  }}
+                >
                   {item.title ? item.title : 'No Title'}
                 </Text>
                 {renderListingDetails(item)}
@@ -782,6 +837,7 @@ const Classifieds = () => {
           <Text style={{ textAlign: 'center', color: COLORS.gray }}>No listings available</Text>
         )}
       </Animated.ScrollView>
+
       {showUpButton && (
         <TouchableOpacity
           onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
@@ -792,7 +848,8 @@ const Classifieds = () => {
           <Ionicons name="arrow-up" size={24} color={COLORS.white} />
         </TouchableOpacity>
       )}
-      {/* Modals */}
+
+      {/* Aviation Jobs - Details Modal */}
       <Modal
         visible={jobDetailsModalVisible}
         transparent={true}
@@ -836,6 +893,8 @@ const Classifieds = () => {
           </SafeAreaView>
         </View>
       </Modal>
+
+      {/* Details Modal (including fix for Aviation Gear) */}
       <Modal
         visible={detailsModalVisible}
         transparent={true}
@@ -853,6 +912,7 @@ const Classifieds = () => {
               >
                 <Ionicons name="close" size={30} color={COLORS.white} />
               </TouchableOpacity>
+
               {selectedListing?.images && selectedListing.images.length > 0 ? (
                 <View style={{ position: 'relative' }}>
                   <Animated.ScrollView
@@ -878,7 +938,10 @@ const Classifieds = () => {
                         accessibilityLabel={`View Image ${index + 1}`}
                         accessibilityRole="imagebutton"
                       >
-                        <Image source={{ uri: image }} style={{ width: SCREEN_WIDTH - 32, height: 250, resizeMode: 'cover' }} />
+                        <Image
+                          source={{ uri: image }}
+                          style={{ width: SCREEN_WIDTH - 32, height: 250, resizeMode: 'cover' }}
+                        />
                       </TouchableOpacity>
                     ))}
                   </Animated.ScrollView>
@@ -887,30 +950,100 @@ const Classifieds = () => {
               ) : (
                 <Text style={{ color: COLORS.white, marginTop: 20 }}>No Images Available</Text>
               )}
-              <Text style={{ color: COLORS.white, fontSize: 24, fontWeight: 'bold', marginTop: 20, textAlign: 'center' }}>
-                {selectedListing?.flightSchoolName || selectedListing?.title || 'No Title'}
-              </Text>
-              <View style={styles.centeredRow}>
-                <Ionicons name="location-outline" size={20} color={COLORS.gray} />
-                <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
-                  {selectedListing?.city || 'No City'}, {selectedListing?.state || 'No State'}
-                </Text>
-              </View>
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
-                Email: {selectedListing?.email || 'N/A'}
-              </Text>
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                Phone: {selectedListing?.phone || 'N/A'}
-              </Text>
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                Tail Number: {selectedListing?.tailNumber || 'N/A'}
-              </Text>
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                Price: ${selectedListing?.salePrice != null ? String(selectedListing.salePrice) : 'N/A'}
-              </Text>
-              <Text style={{ color: COLORS.white, fontSize: 18, marginTop: 20, textAlign: 'left', paddingHorizontal: 20 }}>
-                {selectedListing?.flightSchoolDetails || selectedListing?.description || 'No Description'}
-              </Text>
+
+              {selectedListing?.category === 'Aviation Gear' ? (
+                <>
+                  <Text
+                    style={{
+                      color: COLORS.white,
+                      fontSize: 24,
+                      fontWeight: 'bold',
+                      marginTop: 20,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {selectedListing?.gearTitle || 'No Title'}
+                  </Text>
+                  <View style={styles.centeredRow}>
+                    <Ionicons name="location-outline" size={20} color={COLORS.gray} />
+                    <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
+                      {selectedListing?.gearCity || 'No City'}, {selectedListing?.gearState || 'No State'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
+                    Email: {selectedListing?.gearEmail || 'N/A'}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Phone: {selectedListing?.gearPhone || 'N/A'}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Price: $
+                    {selectedListing?.gearPrice != null
+                      ? String(selectedListing.gearPrice)
+                      : 'N/A'}
+                  </Text>
+                  <Text
+                    style={{
+                      color: COLORS.white,
+                      fontSize: 18,
+                      marginTop: 20,
+                      textAlign: 'left',
+                      paddingHorizontal: 20,
+                    }}
+                  >
+                    {selectedListing?.gearDescription || 'No Description'}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text
+                    style={{
+                      color: COLORS.white,
+                      fontSize: 24,
+                      fontWeight: 'bold',
+                      marginTop: 20,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {selectedListing?.flightSchoolName || selectedListing?.title || 'No Title'}
+                  </Text>
+                  <View style={styles.centeredRow}>
+                    <Ionicons name="location-outline" size={20} color={COLORS.gray} />
+                    <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
+                      {selectedListing?.city || 'No City'}, {selectedListing?.state || 'No State'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
+                    Email: {selectedListing?.email || 'N/A'}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Phone: {selectedListing?.phone || 'N/A'}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Tail Number: {selectedListing?.tailNumber || 'N/A'}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Price: $
+                    {selectedListing?.salePrice != null
+                      ? String(selectedListing.salePrice)
+                      : 'N/A'}
+                  </Text>
+                  <Text
+                    style={{
+                      color: COLORS.white,
+                      fontSize: 18,
+                      marginTop: 20,
+                      textAlign: 'left',
+                      paddingHorizontal: 20,
+                    }}
+                  >
+                    {selectedListing?.flightSchoolDetails ||
+                      selectedListing?.description ||
+                      'No Description'}
+                  </Text>
+                </>
+              )}
+
               <TouchableOpacity
                 style={{ marginTop: 20, backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center' }}
                 onPress={handleAskQuestion}
@@ -924,6 +1057,8 @@ const Classifieds = () => {
           </SafeAreaView>
         </View>
       </Modal>
+
+      {/* Filter Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -931,10 +1066,15 @@ const Classifieds = () => {
         onRequestClose={() => setFilterModalVisible(false)}
       >
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '90%', maxHeight: '90%', backgroundColor: COLORS.white, borderRadius: 24, padding: 0 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '90%', maxHeight: '90%', backgroundColor: COLORS.white, borderRadius: 24, padding: 0 }}
+          >
             <ScrollView contentContainerStyle={{ padding: 24 }} style={{ width: '100%' }} nestedScrollEnabled={true}>
               <View style={{ width: '100%' }}>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+                <Text
+                  style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}
+                >
                   Filter Listings
                 </Text>
                 <TouchableOpacity
@@ -971,6 +1111,7 @@ const Classifieds = () => {
         </View>
       </Modal>
 
+      {/* Pricing Info Modals */}
       {Object.keys(pricingDescriptions).map((key) => (
         <Modal
           key={key}
@@ -998,6 +1139,7 @@ const Classifieds = () => {
         </Modal>
       ))}
 
+      {/* Add / Edit Listing Modal */}
       <Modal
         animationType="none"
         transparent={true}
@@ -1026,37 +1168,108 @@ const Classifieds = () => {
           >
             <ScrollView contentContainerStyle={{ padding: 24 }} style={{ width: '100%' }} nestedScrollEnabled={true}>
               <View style={{ width: '100%' }}>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}>
+                <Text
+                  style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: COLORS.black }}
+                >
                   {editingListing ? 'Edit Your Listing' : 'Submit Your Listing'}
                 </Text>
                 <Formik
                   initialValues={{
                     // New fields for Flight Instructors
-                    firstName: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.firstName || '' : '',
-                    lastName: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.lastName || '' : '',
-                    certifications: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.certifications || '' : '',
-                    flightHours: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.flightHours?.toString() || '' : '',
-                    fiEmail: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.email || '' : '',
-                    fiPhone: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.phone || '' : '',
-                    fiDescription: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.description || '' : '',
-                    serviceLocations: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.serviceLocations || '' : '',
-                    fiCostPerHour: editingListing && editingListing.category === 'Flight Instructors' ? editingListing.fiCostPerHour?.toString() || '' : '',
+                    firstName:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.firstName || ''
+                        : '',
+                    lastName:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.lastName || ''
+                        : '',
+                    certifications:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.certifications || ''
+                        : '',
+                    flightHours:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.flightHours?.toString() || ''
+                        : '',
+                    fiEmail:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.email || ''
+                        : '',
+                    fiPhone:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.phone || ''
+                        : '',
+                    fiDescription:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.description || ''
+                        : '',
+                    serviceLocations:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.serviceLocations || ''
+                        : '',
+                    fiCostPerHour:
+                      editingListing && editingListing.category === 'Flight Instructors'
+                        ? editingListing.fiCostPerHour?.toString() || ''
+                        : '',
                     // New fields for Aviation Mechanic
-                    amFirstName: editingListing && editingListing.category === 'Aviation Mechanic' ? editingListing.firstName || '' : '',
-                    amLastName: editingListing && editingListing.category === 'Aviation Mechanic' ? editingListing.lastName || '' : '',
-                    amCertifications: editingListing && editingListing.category === 'Aviation Mechanic' ? editingListing.certifications || '' : '',
-                    amEmail: editingListing && editingListing.category === 'Aviation Mechanic' ? editingListing.email || '' : '',
-                    amPhone: editingListing && editingListing.category === 'Aviation Mechanic' ? editingListing.phone || '' : '',
-                    amDescription: editingListing && editingListing.category === 'Aviation Mechanic' ? editingListing.description || '' : '',
-                    amServiceLocations: editingListing && editingListing.category === 'Aviation Mechanic' ? editingListing.serviceLocations || '' : '',
+                    amFirstName:
+                      editingListing && editingListing.category === 'Aviation Mechanic'
+                        ? editingListing.firstName || ''
+                        : '',
+                    amLastName:
+                      editingListing && editingListing.category === 'Aviation Mechanic'
+                        ? editingListing.lastName || ''
+                        : '',
+                    amCertifications:
+                      editingListing && editingListing.category === 'Aviation Mechanic'
+                        ? editingListing.certifications || ''
+                        : '',
+                    amEmail:
+                      editingListing && editingListing.category === 'Aviation Mechanic'
+                        ? editingListing.email || ''
+                        : '',
+                    amPhone:
+                      editingListing && editingListing.category === 'Aviation Mechanic'
+                        ? editingListing.phone || ''
+                        : '',
+                    amDescription:
+                      editingListing && editingListing.category === 'Aviation Mechanic'
+                        ? editingListing.description || ''
+                        : '',
+                    amServiceLocations:
+                      editingListing && editingListing.category === 'Aviation Mechanic'
+                        ? editingListing.serviceLocations || ''
+                        : '',
                     // New fields for Aviation Gear
-                    gearTitle: editingListing && editingListing.category === 'Aviation Gear' ? editingListing.title || '' : '',
-                    gearDescription: editingListing && editingListing.category === 'Aviation Gear' ? editingListing.description || '' : '',
-                    gearCity: editingListing && editingListing.category === 'Aviation Gear' ? editingListing.city || '' : '',
-                    gearState: editingListing && editingListing.category === 'Aviation Gear' ? editingListing.state || '' : '',
-                    gearEmail: editingListing && editingListing.category === 'Aviation Gear' ? editingListing.email || '' : '',
-                    gearPhone: editingListing && editingListing.category === 'Aviation Gear' ? editingListing.phone || '' : '',
-                    gearPrice: editingListing && editingListing.category === 'Aviation Gear' ? editingListing.gearPrice?.toString() || '' : '',
+                    gearTitle:
+                      editingListing && editingListing.category === 'Aviation Gear'
+                        ? editingListing.title || ''
+                        : '',
+                    gearDescription:
+                      editingListing && editingListing.category === 'Aviation Gear'
+                        ? editingListing.description || ''
+                        : '',
+                    gearCity:
+                      editingListing && editingListing.category === 'Aviation Gear'
+                        ? editingListing.city || ''
+                        : '',
+                    gearState:
+                      editingListing && editingListing.category === 'Aviation Gear'
+                        ? editingListing.state || ''
+                        : '',
+                    gearEmail:
+                      editingListing && editingListing.category === 'Aviation Gear'
+                        ? editingListing.email || ''
+                        : '',
+                    gearPhone:
+                      editingListing && editingListing.category === 'Aviation Gear'
+                        ? editingListing.phone || ''
+                        : '',
+                    gearPrice:
+                      editingListing && editingListing.category === 'Aviation Gear'
+                        ? editingListing.gearPrice?.toString() || ''
+                        : '',
                     // Original fields for Aircraft for Sale, Aviation Jobs, Flight Schools
                     title: editingListing ? editingListing.title || '' : '',
                     tailNumber: editingListing ? editingListing.tailNumber || '' : '',
@@ -1100,7 +1313,9 @@ const Classifieds = () => {
                       if (!values.fiDescription) errors.fiDescription = 'Description is required.';
                       if (!values.serviceLocations) errors.serviceLocations = 'Service locations are required.';
                       if (!values.fiCostPerHour) errors.fiCostPerHour = 'Cost per hour is required.';
-                      else if (isNaN(Number(values.fiCostPerHour))) errors.fiCostPerHour = 'Cost per hour must be a valid number.';
+                      else if (isNaN(Number(values.fiCostPerHour))) {
+                        errors.fiCostPerHour = 'Cost per hour must be a valid number.';
+                      }
                     } else if (category === 'Aviation Mechanic') {
                       if (!values.amFirstName) errors.amFirstName = 'First name is required.';
                       if (!values.amLastName) errors.amLastName = 'Last name is required.';
@@ -1123,7 +1338,9 @@ const Classifieds = () => {
                         errors.gearEmail = 'Invalid email address.';
                       }
                       if (!values.gearPrice) errors.gearPrice = 'Price is required.';
-                      else if (isNaN(Number(values.gearPrice))) errors.gearPrice = 'Price must be a valid number.';
+                      else if (isNaN(Number(values.gearPrice))) {
+                        errors.gearPrice = 'Price must be a valid number.';
+                      }
                     } else if (category === 'Aviation Jobs') {
                       if (!values.companyName) errors.companyName = 'Company Name is required.';
                       if (!values.jobTitle) errors.jobTitle = 'Job Title is required.';
@@ -1155,7 +1372,15 @@ const Classifieds = () => {
                   }}
                   onSubmit={onSubmitMethod}
                 >
-                  {({ handleChange, handleBlur, handleSubmit, values, errors, touched, setFieldValue }) => (
+                  {({
+                    handleChange,
+                    handleBlur,
+                    handleSubmit,
+                    values,
+                    errors,
+                    touched,
+                    setFieldValue,
+                  }) => (
                     <>
                       {/* Conditional Fields Based on Category */}
                       {values.category === 'Flight Instructors' ? (
@@ -1166,7 +1391,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('firstName')}
                             onBlur={handleBlur('firstName')}
                             value={values.firstName}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="First Name Input"
                           />
                           {touched.firstName && errors.firstName && (
@@ -1178,7 +1409,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('lastName')}
                             onBlur={handleBlur('lastName')}
                             value={values.lastName}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Last Name Input"
                           />
                           {touched.lastName && errors.lastName && (
@@ -1190,7 +1427,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('certifications')}
                             onBlur={handleBlur('certifications')}
                             value={values.certifications}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Certifications Input"
                           />
                           {touched.certifications && errors.certifications && (
@@ -1203,7 +1446,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('flightHours')}
                             value={values.flightHours}
                             keyboardType="numeric"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Current Flight Hours Input"
                           />
                           <TextInput
@@ -1213,7 +1462,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('fiEmail')}
                             value={values.fiEmail}
                             keyboardType="email-address"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Contact Email Input"
                           />
                           {touched.fiEmail && errors.fiEmail && (
@@ -1226,7 +1481,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('fiPhone')}
                             value={values.fiPhone}
                             keyboardType="phone-pad"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Phone Number Input"
                           />
                           <TextInput
@@ -1237,7 +1498,14 @@ const Classifieds = () => {
                             value={values.fiDescription}
                             multiline
                             numberOfLines={10}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black, textAlignVertical: 'top' }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                             accessibilityLabel="Description Input"
                           />
                           {touched.fiDescription && errors.fiDescription && (
@@ -1249,7 +1517,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('serviceLocations')}
                             onBlur={handleBlur('serviceLocations')}
                             value={values.serviceLocations}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Service Locations Input"
                           />
                           {touched.serviceLocations && errors.serviceLocations && (
@@ -1262,7 +1536,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('fiCostPerHour')}
                             value={values.fiCostPerHour}
                             keyboardType="numeric"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Cost per Hour Input"
                           />
                           {touched.fiCostPerHour && errors.fiCostPerHour && (
@@ -1277,7 +1557,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('amFirstName')}
                             onBlur={handleBlur('amFirstName')}
                             value={values.amFirstName}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="First Name Input"
                           />
                           {touched.amFirstName && errors.amFirstName && (
@@ -1289,7 +1575,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('amLastName')}
                             onBlur={handleBlur('amLastName')}
                             value={values.amLastName}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Last Name Input"
                           />
                           {touched.amLastName && errors.amLastName && (
@@ -1301,7 +1593,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('amCertifications')}
                             onBlur={handleBlur('amCertifications')}
                             value={values.amCertifications}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Certifications Input"
                           />
                           {touched.amCertifications && errors.amCertifications && (
@@ -1314,7 +1612,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('amEmail')}
                             value={values.amEmail}
                             keyboardType="email-address"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Contact Email Input"
                           />
                           {touched.amEmail && errors.amEmail && (
@@ -1327,7 +1631,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('amPhone')}
                             value={values.amPhone}
                             keyboardType="phone-pad"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Phone Number Input"
                           />
                           <TextInput
@@ -1338,7 +1648,14 @@ const Classifieds = () => {
                             value={values.amDescription}
                             multiline
                             numberOfLines={10}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black, textAlignVertical: 'top' }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                             accessibilityLabel="Description Input"
                           />
                           {touched.amDescription && errors.amDescription && (
@@ -1350,7 +1667,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('amServiceLocations')}
                             onBlur={handleBlur('amServiceLocations')}
                             value={values.amServiceLocations}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Service Locations Input"
                           />
                           {touched.amServiceLocations && errors.amServiceLocations && (
@@ -1365,7 +1688,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('gearTitle')}
                             onBlur={handleBlur('gearTitle')}
                             value={values.gearTitle}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Title Input"
                           />
                           {touched.gearTitle && errors.gearTitle && (
@@ -1379,7 +1708,14 @@ const Classifieds = () => {
                             value={values.gearDescription}
                             multiline
                             numberOfLines={4}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black, textAlignVertical: 'top' }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                             accessibilityLabel="Description Input"
                           />
                           {touched.gearDescription && errors.gearDescription && (
@@ -1391,7 +1727,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('gearCity')}
                             onBlur={handleBlur('gearCity')}
                             value={values.gearCity}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="City Input"
                           />
                           {touched.gearCity && errors.gearCity && (
@@ -1403,7 +1745,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('gearState')}
                             onBlur={handleBlur('gearState')}
                             value={values.gearState}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="State Input"
                           />
                           {touched.gearState && errors.gearState && (
@@ -1416,7 +1764,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('gearEmail')}
                             value={values.gearEmail}
                             keyboardType="email-address"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Contact Email Input"
                           />
                           {touched.gearEmail && errors.gearEmail && (
@@ -1429,7 +1783,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('gearPhone')}
                             value={values.gearPhone}
                             keyboardType="phone-pad"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Phone Number Input"
                           />
                           <TextInput
@@ -1439,7 +1799,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('gearPrice')}
                             value={values.gearPrice}
                             keyboardType="numeric"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Price Input"
                           />
                           {touched.gearPrice && errors.gearPrice && (
@@ -1454,7 +1820,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('companyName')}
                             onBlur={handleBlur('companyName')}
                             value={values.companyName}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Company Name Input"
                           />
                           {touched.companyName && errors.companyName && (
@@ -1466,7 +1838,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('jobTitle')}
                             onBlur={handleBlur('jobTitle')}
                             value={values.jobTitle}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Job Title Input"
                           />
                           {touched.jobTitle && errors.jobTitle && (
@@ -1480,7 +1858,14 @@ const Classifieds = () => {
                             value={values.jobDescription}
                             multiline
                             numberOfLines={4}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black, textAlignVertical: 'top' }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                             accessibilityLabel="Job Description Input"
                           />
                           {touched.jobDescription && errors.jobDescription && (
@@ -1495,7 +1880,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('flightSchoolName')}
                             onBlur={handleBlur('flightSchoolName')}
                             value={values.flightSchoolName}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Flight School Name Input"
                           />
                           {touched.flightSchoolName && errors.flightSchoolName && (
@@ -1509,7 +1900,14 @@ const Classifieds = () => {
                             value={values.flightSchoolDetails}
                             multiline
                             numberOfLines={4}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black, textAlignVertical: 'top' }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                             accessibilityLabel="Flight School Details Input"
                           />
                           {touched.flightSchoolDetails && errors.flightSchoolDetails && (
@@ -1525,7 +1923,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('title')}
                             onBlur={handleBlur('title')}
                             value={values.title}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Aircraft Year/Make/Model Input"
                           />
                           {touched.title && errors.title && (
@@ -1537,7 +1941,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('tailNumber')}
                             onBlur={handleBlur('tailNumber')}
                             value={values.tailNumber}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Aircraft Tail Number Input"
                           />
                           {touched.tailNumber && errors.tailNumber && (
@@ -1550,7 +1960,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('salePrice')}
                             value={values.salePrice}
                             keyboardType="numeric"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Sale Price Input"
                           />
                           {touched.salePrice && errors.salePrice && (
@@ -1564,7 +1980,14 @@ const Classifieds = () => {
                             value={values.description}
                             multiline
                             numberOfLines={4}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black, textAlignVertical: 'top' }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                              textAlignVertical: 'top',
+                            }}
                             accessibilityLabel="Description Input"
                           />
                           {touched.description && errors.description && (
@@ -1582,7 +2005,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('city')}
                             onBlur={handleBlur('city')}
                             value={values.city}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="City Input"
                           />
                           {touched.city && errors.city && (
@@ -1594,7 +2023,13 @@ const Classifieds = () => {
                             onChangeText={handleChange('state')}
                             onBlur={handleBlur('state')}
                             value={values.state}
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="State Input"
                           />
                           {touched.state && errors.state && (
@@ -1607,7 +2042,13 @@ const Classifieds = () => {
                             onBlur={handleBlur('email')}
                             value={values.email}
                             keyboardType="email-address"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Contact Email Input"
                           />
                           {touched.email && errors.email && (
@@ -1620,16 +2061,32 @@ const Classifieds = () => {
                             onBlur={handleBlur('phone')}
                             value={values.phone}
                             keyboardType="phone-pad"
-                            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
                             accessibilityLabel="Phone Number Input"
                           />
                         </>
                       )}
 
-                      {/* For Aviation Gear, also show image upload */}
-                      {['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale', 'Aviation Gear'].includes(values.category) && (
+                      {/* For Aviation Gear, also show image upload but skip pricing package selection */}
+                      {['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale', 'Aviation Gear'].includes(
+                        values.category
+                      ) && (
                         <>
-                          <Text style={{ marginBottom: 8, color: COLORS.black, fontWeight: 'bold', textAlign: 'center' }} accessibilityLabel="Upload Images Label">
+                          <Text
+                            style={{
+                              marginBottom: 8,
+                              color: COLORS.black,
+                              fontWeight: 'bold',
+                              textAlign: 'center',
+                            }}
+                            accessibilityLabel="Upload Images Label"
+                          >
                             Upload Images
                           </Text>
                           <FlatList
@@ -1669,119 +2126,98 @@ const Classifieds = () => {
                         </>
                       )}
 
-                      {/* Pricing Package Section */}
-                      <Text
-                        style={{
-                          marginBottom: 8,
-                          color: COLORS.black,
-                          fontWeight: 'bold',
-                          textAlign: 'center',
-                        }}
-                        accessibilityLabel="Select Pricing Package Label"
-                      >
-                        Select Pricing Package
-                      </Text>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 }}>
-                        {Object.keys(pricingPackages).map((packageType) => (
-                          <TouchableOpacity
-                            key={packageType}
-                            onPress={() => {
-                              setSelectedPricing(packageType);
-                              setFieldValue('selectedPricing', packageType);
-                              setFieldValue('packageCost', pricingPackages[packageType]);
-                            }}
+                      {/* Conditionally render Pricing Package Section only if category is NOT Aviation Gear */}
+                      {values.category !== 'Aviation Gear' && (
+                        <>
+                          <Text
                             style={{
-                              padding: 10,
-                              borderRadius: 8,
-                              backgroundColor:
-                                selectedPricing === packageType ? COLORS.primary : COLORS.lightGray,
-                              alignItems: 'center',
-                              width: '30%',
+                              marginBottom: 8,
+                              color: COLORS.black,
+                              fontWeight: 'bold',
+                              textAlign: 'center',
                             }}
-                            accessibilityLabel={`Select ${packageType} package`}
-                            accessibilityRole="button"
+                            accessibilityLabel="Select Pricing Package Label"
                           >
-                            <Text
-                              style={{
-                                color: selectedPricing === packageType ? COLORS.white : COLORS.black,
-                                fontWeight: 'bold',
-                              }}
-                            >
-                              {packageType}
-                            </Text>
-                            <Text
-                              style={{
-                                color: selectedPricing === packageType ? COLORS.white : COLORS.black,
-                              }}
-                            >
-                              ${pricingPackages[packageType]}
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() => setPricingModalVisible((prev) => ({ ...prev, [packageType]: true }))}
-                              style={{ marginTop: 4 }}
-                              accessibilityLabel={`View details for ${packageType} package`}
-                              accessibilityRole="button"
-                            >
-                              <Ionicons
-                                name="information-circle-outline"
-                                size={20}
-                                color={selectedPricing === packageType ? COLORS.white : COLORS.black}
-                              />
-                            </TouchableOpacity>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      {touched.category && errors.category && (
-                        <Text style={{ color: 'red', marginBottom: 8 }}>{errors.category}</Text>
+                            Select Pricing Package
+                          </Text>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 }}>
+                            {Object.keys(pricingPackages).map((packageType) => (
+                              <TouchableOpacity
+                                key={packageType}
+                                onPress={() => {
+                                  setSelectedPricing(packageType);
+                                  setFieldValue('selectedPricing', packageType);
+                                  setFieldValue('packageCost', pricingPackages[packageType]);
+                                }}
+                                style={{
+                                  padding: 10,
+                                  borderRadius: 8,
+                                  backgroundColor:
+                                    selectedPricing === packageType ? COLORS.primary : COLORS.lightGray,
+                                  alignItems: 'center',
+                                  width: '30%',
+                                }}
+                                accessibilityLabel={`Select ${packageType} package`}
+                                accessibilityRole="button"
+                              >
+                                <Text
+                                  style={{
+                                    color: selectedPricing === packageType ? COLORS.white : COLORS.black,
+                                    fontWeight: 'bold',
+                                  }}
+                                >
+                                  {packageType}
+                                </Text>
+                                <Text
+                                  style={{
+                                    color: selectedPricing === packageType ? COLORS.white : COLORS.black,
+                                  }}
+                                >
+                                  ${pricingPackages[packageType]}
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={() =>
+                                    setPricingModalVisible((prev) => ({ ...prev, [packageType]: true }))
+                                  }
+                                  style={{ marginTop: 4 }}
+                                  accessibilityLabel={`View details for ${packageType} package`}
+                                  accessibilityRole="button"
+                                >
+                                  <Ionicons
+                                    name="information-circle-outline"
+                                    size={20}
+                                    color={
+                                      selectedPricing === packageType ? COLORS.white : COLORS.black
+                                    }
+                                  />
+                                </TouchableOpacity>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </>
                       )}
-                      <FlatList
-                        data={categories}
-                        renderItem={({ item }) => (
-                          <TouchableOpacity
-                            key={item}
-                            onPress={() => {
-                              setFieldValue('category', item);
-                              setSelectedCategory(item);
-                            }}
-                            style={{
-                              padding: 8,
-                              borderRadius: 8,
-                              marginRight: 8,
-                              backgroundColor:
-                                values.category === item ? COLORS.primary : COLORS.lightGray,
-                            }}
-                            accessibilityLabel={`Select category ${item}`}
-                            accessibilityRole="button"
-                          >
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                fontWeight: 'bold',
-                                color: values.category === item ? COLORS.white : COLORS.black,
-                              }}
-                            >
-                              {item}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                        horizontal
-                        keyExtractor={(catItem) => catItem}
-                        showsHorizontalScrollIndicator={false}
-                        style={{ marginBottom: 16 }}
-                      />
 
-                      {/* Submit / Proceed Button */}
                       {loading ? (
                         <ActivityIndicator size="large" color={COLORS.red} accessibilityLabel="Submitting Listing" />
                       ) : (
                         <TouchableOpacity
                           onPress={handleSubmit}
                           style={{ backgroundColor: COLORS.red, paddingVertical: 12, borderRadius: 50 }}
-                          accessibilityLabel={values.category === 'Aviation Gear' ? "Post" : editingListing ? "Save" : "Proceed to pay"}
+                          accessibilityLabel={
+                            values.category === 'Aviation Gear'
+                              ? 'Post for Free'
+                              : editingListing
+                              ? 'Save'
+                              : 'Proceed to pay'
+                          }
                           accessibilityRole="button"
                         >
                           <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
-                            {values.category === 'Aviation Gear' ? "Post" : editingListing ? "Save" : "Proceed to pay"}
+                            {values.category === 'Aviation Gear'
+                              ? 'Post for Free'
+                              : editingListing
+                              ? 'Save'
+                              : 'Proceed to pay'}
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -1792,7 +2228,12 @@ const Classifieds = () => {
                           setEditingListing(null);
                           setImages([]);
                         }}
-                        style={{ marginTop: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: COLORS.lightGray }}
+                        style={{
+                          marginTop: 16,
+                          paddingVertical: 8,
+                          borderRadius: 50,
+                          backgroundColor: COLORS.lightGray,
+                        }}
                         accessibilityLabel="Cancel Submit Listing Modal"
                         accessibilityRole="button"
                       >
@@ -1806,6 +2247,8 @@ const Classifieds = () => {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Full-Screen Image Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -1846,7 +2289,11 @@ const AppNavigator = () => (
       {/* For rental payments */}
       {/* <Stack.Screen name="CheckoutScreen" component={CheckoutScreen} options={{ headerShown: false }} /> */}
       {/* New screen for classifieds payment */}
-      <Stack.Screen name="classifiedsPaymentScreen" component={classifiedsPaymentScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="classifiedsPaymentScreen"
+        component={classifiedsPaymentScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   </NavigationContainer>
 );
