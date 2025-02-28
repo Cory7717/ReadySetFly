@@ -323,10 +323,23 @@ const Classifieds = () => {
       quality: 1,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      const selectedImages = result.assets.map((asset) =>
-        asset.uri.startsWith('file://') ? asset.uri : `file://${asset.uri}`
-      );
-      setImages([...images, ...selectedImages].slice(0, maxImages));
+      const uploadedImageUrls = [];
+      for (const asset of result.assets) {
+        const uri = asset.uri;
+        try {
+          const response = await fetch(uri);
+          const blob = await response.blob();
+          const imageName = `${new Date().getTime()}-${Math.floor(Math.random() * 1000)}.jpg`;
+          const storageReference = storageRef(storage, `listingImages/${imageName}`);
+          await uploadBytes(storageReference, blob);
+          const downloadUrl = await getDownloadURL(storageReference);
+          uploadedImageUrls.push(downloadUrl);
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          Alert.alert("Upload Error", "Failed to upload image.");
+        }
+      }
+      setImages([...images, ...uploadedImageUrls].slice(0, maxImages));
     }
   };
 

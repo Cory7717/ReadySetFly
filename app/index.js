@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from "expo-status-bar";
+import { Alert, View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform, Linking as RNLinking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { Stack } from 'expo-router';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker'; // Import Picker for dropdowns
-import { onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { onAuthStateChanged, updateProfile, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from '../firebaseConfig';
 import { doc, setDoc } from 'firebase/firestore';
 import CustomButton from '../components/CustomButton';
+// IMPORTANT: Use the new transparent logo image (ensure your images constants exports logoTransparent)
 import { images } from '../constants';
 import { router } from 'expo-router';
 
@@ -25,6 +26,7 @@ const getStripePublishableKey = () => {
 const App = () => {
   const [user, setUser] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [profileData, setProfileData] = useState({
     firstName: '',
     lastName: '',
@@ -40,7 +42,6 @@ const App = () => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
-
     return () => unsubscribe(); // Cleanup the listener on unmount
   }, []);
 
@@ -52,18 +53,14 @@ const App = () => {
         if (!['renter', 'owner', 'both'].includes(role.toLowerCase())) {
           throw new Error("Invalid role selected. Please choose 'Renter', 'Owner', or 'Both'.");
         }
-
         await setDoc(userDoc, {
           ...profileData,
           role: role.toLowerCase()
         });
-
         await updateProfile(user, {
           displayName: `${profileData.firstName} ${profileData.lastName}`
         });
-
         setModalVisible(false);
-
         // Navigate to the correct screen based on the selected role and pass profile data
         if (role.toLowerCase() === 'owner') {
           router.push({
@@ -81,7 +78,6 @@ const App = () => {
             params: { profileData }
           });
         }
-
       } catch (error) {
         console.error("Error saving profile data: ", error);
       }
@@ -92,52 +88,112 @@ const App = () => {
     router.push('/home');
   };
 
+  const handleNeedHelp = () => {
+    const email = 'coryarmer@gmail.com';
+    const subject = 'Support - Ready, Set, Fly!';
+    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
+    RNLinking.openURL(url).catch(err => console.error('Failed to open email client', err));
+  };
+
+  // Attach the forgot password handler correctly
+  const handleForgotPassword = (email) => {
+    sendPasswordResetEmail(auth, email)
+      .then(() => {
+        console.log("Password reset email sent!");
+        Alert.alert(
+          "Password Reset",
+          "Password reset email sent! Please check your inbox.",
+          [{ text: "OK" }]
+        );
+      })
+      .catch((error) => {
+        console.error("Error sending password reset email: ", error);
+      });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/sign-in');
+    } catch (error) {
+      console.error("Error signing out: ", error);
+    }
+  };
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.logoContainer}>
-          <Image source={images.logo1} style={styles.logo} />
+        {/* Hero Section */}
+        <View style={styles.heroContainer}>
+          <Text style={styles.heroTitle}>A New Aircraft Marketplace</Text>
+          <Text style={styles.heroSubtitle}>
+            Your gateway to the skies. Discover top-rated aircraft rentals, connect with trusted owners, and experience the new way to rent aircraft. Plus, for owners—let your aircraft pay for itself by tapping into a dynamic rental marketplace.
+          </Text>
         </View>
 
         {user ? (
-          <>
-            <Text style={styles.greetingText}>Hello, {user.displayName || 'User'}</Text>
+          <View style={styles.contentWrapper}>
+            <View style={styles.logoContainer}>
+              <Image source={images.logo2} style={styles.logo} />
+            </View>
             <View style={styles.viewContentButtonContainer}>
               <CustomButton
-                title="View Content"
+                title="Explore Ready, Set, Fly!"
                 handlePress={handleViewContent}
                 containerStyles={styles.viewContentButton}
+                textStyles={styles.buttonText}
               />
-              <CustomButton
-                title="Complete Profile"
-                handlePress={() => setModalVisible(true)}
-                containerStyles={styles.viewContentButton}
-              />
+              <View style={styles.buttonSpacer} />
+              {/* Additional buttons can be added here */}
             </View>
-          </>
+            <View style={styles.helpLogoutContainer}>
+              <TouchableOpacity onPress={handleNeedHelp}>
+                <Text style={styles.helpText}>Need Help</Text>
+              </TouchableOpacity>
+              <Text style={styles.separator}> | </Text>
+              <TouchableOpacity onPress={handleLogout}>
+                <Text style={styles.logoutText}>Log out</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>© 2025 Austin Ready Set Fly, LLC</Text>
+            </View>
+          </View>
         ) : (
           <View style={styles.signInContainer}>
-            <TouchableOpacity
-              onPress={() => router.push('/sign-in')}
-              style={styles.signInButton}
-            >
+            <TouchableOpacity onPress={() => router.push('/sign-in')} style={styles.signInButton}>
               <Text style={styles.signInButtonText}>Sign In or Create Account</Text>
             </TouchableOpacity>
+            {/* Forgot Password Section */}
+            <TextInput
+              placeholder="Enter your email for password reset"
+              placeholderTextColor="#888"
+              style={styles.input}
+              value={forgotPasswordEmail}
+              onChangeText={setForgotPasswordEmail}
+            />
+            <CustomButton
+              title="Forgot Password"
+              handlePress={() => handleForgotPassword(forgotPasswordEmail)}
+              containerStyles={styles.saveButton}
+              textStyles={styles.buttonText}
+            />
+            {/* Footer for non-logged in state */}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>© 2025 Austin Ready Set Fly, LLC</Text>
+            </View>
           </View>
         )}
 
         {/* Profile Modal */}
         <Modal visible={isModalVisible} transparent={true} animationType="slide">
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.keyboardAvoidingView}
-          >
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoidingView}>
             <View style={styles.modalContainer}>
               <View style={styles.modalContent}>
                 <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
                   <Text style={styles.modalTitle}>Complete Your Profile</Text>
-
                   <TextInput
                     placeholder="First Name"
                     placeholderTextColor="#888"
@@ -152,22 +208,19 @@ const App = () => {
                     value={profileData.lastName}
                     onChangeText={(text) => setProfileData({ ...profileData, lastName: text })}
                   />
-
                   {/* Role Picker */}
                   <View style={styles.pickerContainer}>
                     <Picker
                       selectedValue={profileData.role}
                       style={styles.picker}
-                      onValueChange={(itemValue) =>
-                        setProfileData({ ...profileData, role: itemValue })
-                      }>
+                      onValueChange={(itemValue) => setProfileData({ ...profileData, role: itemValue })}
+                    >
                       <Picker.Item label="Select Role" value="" />
                       <Picker.Item label="Renter" value="renter" />
                       <Picker.Item label="Owner" value="owner" />
                       <Picker.Item label="Both" value="both" />
                     </Picker>
                   </View>
-
                   {/* Combined City and State */}
                   <TextInput
                     placeholder="City, State"
@@ -176,7 +229,6 @@ const App = () => {
                     value={profileData.location}
                     onChangeText={(text) => setProfileData({ ...profileData, location: text })}
                   />
-
                   {/* Year/Make/Model */}
                   <TextInput
                     placeholder="Year/Make/Model"
@@ -185,35 +237,30 @@ const App = () => {
                     value={profileData.aircraftType}
                     onChangeText={(text) => setProfileData({ ...profileData, aircraftType: text })}
                   />
-
                   {/* Medical Current Picker */}
                   <View style={styles.pickerContainer}>
                     <Picker
                       selectedValue={profileData.medicalStatus}
                       style={styles.picker}
-                      onValueChange={(itemValue) =>
-                        setProfileData({ ...profileData, medicalStatus: itemValue })}
-                      >
+                      onValueChange={(itemValue) => setProfileData({ ...profileData, medicalStatus: itemValue })}
+                    >
                       <Picker.Item label="Is Medical Current?" value="" />
                       <Picker.Item label="Yes" value="yes" />
                       <Picker.Item label="No" value="no" />
                     </Picker>
                   </View>
-
                   {/* Insurance Picker */}
                   <View style={styles.pickerContainer}>
                     <Picker
                       selectedValue={profileData.insuranceStatus}
                       style={styles.picker}
-                      onValueChange={(itemValue) =>
-                        setProfileData({ ...profileData, insuranceStatus: itemValue })}
-                      >
+                      onValueChange={(itemValue) => setProfileData({ ...profileData, insuranceStatus: itemValue })}
+                    >
                       <Picker.Item label="Is Insurance Current?" value="" />
                       <Picker.Item label="Yes" value="yes" />
                       <Picker.Item label="No" value="no" />
                     </Picker>
                   </View>
-
                   <TextInput
                     placeholder="Date of Last Annual"
                     placeholderTextColor="#888"
@@ -221,9 +268,18 @@ const App = () => {
                     value={profileData.annualDate}
                     onChangeText={(text) => setProfileData({ ...profileData, annualDate: text })}
                   />
-
-                  <CustomButton title="Save Profile" handlePress={handleSaveProfile} containerStyles={styles.saveButton} />
-                  <CustomButton title="Close" handlePress={() => setModalVisible(false)} containerStyles={styles.closeButton} />
+                  <CustomButton
+                    title="Save Profile"
+                    handlePress={handleSaveProfile}
+                    containerStyles={styles.saveButton}
+                    textStyles={styles.buttonText}
+                  />
+                  <CustomButton
+                    title="Close"
+                    handlePress={() => setModalVisible(false)}
+                    containerStyles={styles.closeButton}
+                    textStyles={styles.buttonText}
+                  />
                 </ScrollView>
               </View>
             </View>
@@ -236,7 +292,6 @@ const App = () => {
 
 const Index = () => {
   const stripePublishableKey = getStripePublishableKey();
-
   return (
     <StripeProvider publishableKey={stripePublishableKey}>
       <SafeAreaProvider>
@@ -259,54 +314,112 @@ const Index = () => {
   );
 };
 
+/**
+ * Color Scheme (Metallic Silver Look):
+ * - Primary buttons: Medium silver (#C0C0C0)
+ * - Button text: Dark gray (#1E1E1E)
+ * - Secondary/Close button: Slightly darker silver (#707070)
+ */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 20,
+    paddingTop: 40, // Reduced top padding to bring content closer to the top
+  },
+  contentWrapper: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  // Hero Section
+  heroContainer: {
+    marginBottom: 40,
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  heroTitle: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#C0C0C0',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  heroSubtitle: {
+    fontSize: 18,
+    color: '#1E1E1E',
+    textAlign: 'center',
     paddingHorizontal: 20,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 20,
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: 300,
+    height: 300,
+    borderRadius: 20,
+    marginTop: -50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  greetingText: {
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 20,
+  helpLogoutContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 5,
+    marginBottom: 10,
+  },
+  helpText: {
+    fontSize: 16,
+    color: '#007bff',
+    marginHorizontal: 5,
+  },
+  separator: {
+    fontSize: 16,
+    color: '#000',
+  },
+  logoutText: {
+    fontSize: 16,
+    color: '#007bff',
+    marginHorizontal: 5,
   },
   signInContainer: {
     marginBottom: 20,
   },
+  // Buttons
   signInButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#C0C0C0',
     paddingVertical: 15,
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 2,
   },
   signInButtonText: {
-    color: 'white',
+    color: '#1E1E1E',
     fontSize: 18,
     textAlign: 'center',
   },
   viewContentButtonContainer: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   viewContentButton: {
-    backgroundColor: 'black',
+    backgroundColor: '#C0C0C0',
     paddingVertical: 15,
     borderRadius: 8,
+  },
+  buttonText: {
+    color: '#1E1E1E',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  buttonSpacer: {
+    height: 10,
   },
   modalContainer: {
     flex: 1,
@@ -349,13 +462,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   saveButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#C0C0C0',
     paddingVertical: 15,
     borderRadius: 10,
     marginBottom: 10,
   },
   closeButton: {
-    backgroundColor: '#dc3545',
+    backgroundColor: '#707070',
     paddingVertical: 15,
     borderRadius: 10,
   },
@@ -365,6 +478,14 @@ const styles = StyleSheet.create({
   modalScroll: {
     flexGrow: 1,
     paddingBottom: 20,
+  },
+  footer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#1E1E1E',
   },
 });
 

@@ -288,7 +288,13 @@ const OwnerProfile = ({ ownerId }) => {
   const autoSaveDataToFirestore = async (field, data) => {
     try {
       const sanitizedData = sanitizeData(data); // Sanitize data before saving
-      const docRef = doc(db, "users", resolvedOwnerId, "owners", resolvedOwnerId);
+      const docRef = doc(
+        db,
+        "users",
+        resolvedOwnerId,
+        "owners",
+        resolvedOwnerId
+      );
       // Using setDoc with merge: true to create document if it doesn't exist
       await setDoc(docRef, { [field]: sanitizedData }, { merge: true });
       console.log(`${field} has been successfully saved to Firestore.`);
@@ -369,7 +375,10 @@ const OwnerProfile = ({ ownerId }) => {
         orderBy("createdAt", "desc")
       );
       const snapshot = await getDocs(q);
-      const aircrafts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const aircrafts = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
       setUserListings(aircrafts);
       setAllAircrafts(aircrafts);
     } catch (error) {
@@ -387,7 +396,13 @@ const OwnerProfile = ({ ownerId }) => {
 
       // Listen for real-time updates to availableBalance
       if (resolvedOwnerId) {
-        const profileDocRef = doc(db, "users", resolvedOwnerId, "owners", resolvedOwnerId);
+        const profileDocRef = doc(
+          db,
+          "users",
+          resolvedOwnerId,
+          "owners",
+          resolvedOwnerId
+        );
         const unsubscribeBalance = onSnapshot(
           profileDocRef,
           (docSnap) => {
@@ -397,7 +412,10 @@ const OwnerProfile = ({ ownerId }) => {
             }
           },
           (error) => {
-            console.error("Error listening to availableBalance updates:", error);
+            console.error(
+              "Error listening to availableBalance updates:",
+              error
+            );
           }
         );
 
@@ -473,7 +491,10 @@ const OwnerProfile = ({ ownerId }) => {
       }
     } catch (error) {
       console.error("Error connecting Stripe account:", error);
-      Alert.alert("Error", "There was an error connecting your Stripe account.");
+      Alert.alert(
+        "Error",
+        "There was an error connecting your Stripe account."
+      );
     }
   };
 
@@ -540,7 +561,10 @@ const OwnerProfile = ({ ownerId }) => {
       return;
     } else if (paymentMethod === "card") {
       if (!cardDetails || !cardDetails.complete) {
-        Alert.alert("Incomplete Details", "Please enter complete card details.");
+        Alert.alert(
+          "Incomplete Details",
+          "Please enter complete card details."
+        );
         return;
       }
     }
@@ -620,7 +644,9 @@ const OwnerProfile = ({ ownerId }) => {
    */
   const toggleSelectAircraft = (aircraftId) => {
     if (selectedAircraftIds.includes(aircraftId)) {
-      setSelectedAircraftIds(selectedAircraftIds.filter((id) => id !== aircraftId));
+      setSelectedAircraftIds(
+        selectedAircraftIds.filter((id) => id !== aircraftId)
+      );
     } else {
       setSelectedAircraftIds([...selectedAircraftIds, aircraftId]);
     }
@@ -683,7 +709,9 @@ const OwnerProfile = ({ ownerId }) => {
               let renterName = "Anonymous";
               let renterCityState = "N/A";
               let rentalHours =
-                requestData.rentalHours != null ? requestData.rentalHours : "N/A";
+                requestData.rentalHours != null
+                  ? requestData.rentalHours
+                  : "N/A";
               let currentMedical = requestData.currentMedical ? "Yes" : "No";
               let currentRentersInsurance = requestData.currentRentersInsurance
                 ? "Yes"
@@ -859,7 +887,9 @@ const OwnerProfile = ({ ownerId }) => {
       // Calculate baseCost, commission, and totalCost
       const baseCost = (parseFloat(rentalHours) * costPerHour).toFixed(2);
       const commission = (baseCost * 0.06).toFixed(2); // 6% commission
-      const totalCost = (parseFloat(baseCost) - parseFloat(commission)).toFixed(2);
+      const totalCost = (parseFloat(baseCost) - parseFloat(commission)).toFixed(
+        2
+      );
 
       // Start a batch write to ensure atomicity
       const batch = writeBatch(db);
@@ -1050,7 +1080,9 @@ const OwnerProfile = ({ ownerId }) => {
       await deleteDoc(rentalRequestRef);
 
       // Remove the rental from the activeRentals state
-      setActiveRentals(activeRentals.filter((rental) => rental.id !== rentalId));
+      setActiveRentals(
+        activeRentals.filter((rental) => rental.id !== rentalId)
+      );
 
       // Remove the rental from the activeRentalsPage state
       setActiveRentalsPage(
@@ -1058,7 +1090,9 @@ const OwnerProfile = ({ ownerId }) => {
       );
 
       // Remove from selectedAircraftIds if selected
-      setSelectedAircraftIds(selectedAircraftIds.filter((id) => id !== rentalId));
+      setSelectedAircraftIds(
+        selectedAircraftIds.filter((id) => id !== rentalId)
+      );
 
       Alert.alert("Deleted", "The active rental has been deleted.");
     } catch (error) {
@@ -1349,7 +1383,8 @@ const OwnerProfile = ({ ownerId }) => {
 
       // Calculate Depreciation Expense
       const depreciationExpense = (
-        (parseFloat(costData.purchasePrice) * parseFloat(costData.depreciationRate)) /
+        (parseFloat(costData.purchasePrice) *
+          parseFloat(costData.depreciationRate)) /
         100
       ).toFixed(2);
 
@@ -1698,7 +1733,10 @@ const OwnerProfile = ({ ownerId }) => {
    */
   const handleListForRentToggle = async () => {
     if (selectedAircraftIds.length === 0) {
-      Alert.alert("No Selection", "Please select at least one aircraft to list.");
+      Alert.alert(
+        "No Selection",
+        "Please select at least one aircraft to list."
+      );
       return;
     }
 
@@ -1817,265 +1855,274 @@ const OwnerProfile = ({ ownerId }) => {
         {/* End of Funds Button Placement */}
 
         {/* Cost of Ownership Calculator */}
-<View style={{ paddingHorizontal: 16 }}>
-  <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
-    Cost of Ownership Calculator
-  </Text>
-  
-  {/* Dropdown Toggle Button */}
-  <TouchableOpacity
-    onPress={() => setShowCalculator((prev) => !prev)}
-    style={{
-      backgroundColor: "#3182ce",
-      padding: 12,
-      borderRadius: 8,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 16,
-    }}
-    accessibilityLabel="Toggle Cost Calculator"
-  >
-    <Text style={{ color: "#fff", fontWeight: "bold" }}>
-      {showCalculator ? "Hide Calculator" : "Show Calculator"}
-    </Text>
-  </TouchableOpacity>
+        <View style={{ paddingHorizontal: 16 }}>
+          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+            Cost of Ownership Calculator
+          </Text>
 
-  {showCalculator && (
-    <>
-      {costSaved ? (
-        <View
-          style={{
-            backgroundColor: "#f7fafc",
-            padding: 16,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
-            Estimated Cost per Hour: ${costData.costPerHour}
-          </Text>
-          <Text style={{ fontSize: 16, marginBottom: 4 }}>
-            Total Fixed Costs per Year: $
-            {(
-              parseFloat(costData.mortgageExpense) * 12 +
-              parseFloat(costData.depreciationExpense) +
-              parseFloat(costData.insuranceCost) +
-              parseFloat(costData.hangarCost) +
-              parseFloat(costData.maintenanceReserve) +
-              parseFloat(costData.annualRegistrationFees)
-            ).toFixed(2)}
-          </Text>
-          <Text style={{ fontSize: 16, marginBottom: 16 }}>
-            Total Variable Costs per Year: $
-            {(
-              (parseFloat(costData.fuelCostPerHour) +
-                parseFloat(costData.oilCostPerHour) +
-                parseFloat(costData.routineMaintenancePerHour) +
-                parseFloat(costData.tiresPerHour) +
-                parseFloat(costData.otherConsumablesPerHour)) *
-              parseFloat(costData.rentalHoursPerYear)
-            ).toFixed(2)}
-          </Text>
-          <CustomButton
-            onPress={onEditCostData}
-            title="Edit Cost Data"
-            backgroundColor="#ecc94b"
-            accessibilityLabel="Edit Cost Data button"
-          />
-        </View>
-      ) : (
-        <View>
-          {/* Loan Details Section */}
-          <Section title="Loan Details">
-            <CustomTextInput
-              placeholder="Purchase Price ($)"
-              value={costData.purchasePrice}
-              onChangeText={(value) =>
-                handleInputChange("purchasePrice", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Purchase Price input"
-            />
-            <CustomTextInput
-              placeholder="Loan Amount ($)"
-              value={costData.loanAmount}
-              onChangeText={(value) =>
-                handleInputChange("loanAmount", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Loan Amount input"
-            />
-            <CustomTextInput
-              placeholder="Interest Rate (%)"
-              value={costData.interestRate}
-              onChangeText={(value) =>
-                handleInputChange("interestRate", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Interest Rate input"
-            />
-            <CustomTextInput
-              placeholder="Loan Term (years)"
-              value={costData.loanTerm}
-              onChangeText={(value) =>
-                handleInputChange("loanTerm", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Loan Term input"
-            />
-            <CustomTextInput
-              placeholder="Depreciation Rate (%)"
-              value={costData.depreciationRate}
-              onChangeText={(value) =>
-                handleInputChange("depreciationRate", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Depreciation Rate input"
-            />
-            <CustomTextInput
-              placeholder="Useful Life (years)"
-              value={costData.usefulLife}
-              onChangeText={(value) =>
-                handleInputChange("usefulLife", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Useful Life input"
-            />
-            <Text style={{ fontSize: 16, color: "#4a5568" }}>
-              Mortgage Expense: ${costData.mortgageExpense}
+          {/* Dropdown Toggle Button */}
+          <TouchableOpacity
+            onPress={() => setShowCalculator((prev) => !prev)}
+            style={{
+              backgroundColor: "#3182ce",
+              padding: 12,
+              borderRadius: 8,
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 16,
+            }}
+            accessibilityLabel="Toggle Cost Calculator"
+          >
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>
+              {showCalculator ? "Hide Calculator" : "Show Calculator"}
             </Text>
-            <Text style={{ fontSize: 16, color: "#4a5568" }}>
-              Depreciation Expense: ${costData.depreciationExpense}
-            </Text>
-          </Section>
+          </TouchableOpacity>
 
-          {/* Annual Costs Section */}
-          <Section title="Annual Costs">
-            <CustomTextInput
-              placeholder="Estimated Annual Cost ($)"
-              value={costData.estimatedAnnualCost}
-              onChangeText={(value) =>
-                handleInputChange("estimatedAnnualCost", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Estimated Annual Cost input"
-            />
-            <CustomTextInput
-              placeholder="Insurance Cost ($)"
-              value={costData.insuranceCost}
-              onChangeText={(value) =>
-                handleInputChange("insuranceCost", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Insurance Cost input"
-            />
-            <CustomTextInput
-              placeholder="Hangar Cost ($)"
-              value={costData.hangarCost}
-              onChangeText={(value) => handleInputChange("hangarCost", value)}
-              keyboardType="numeric"
-              accessibilityLabel="Hangar Cost input"
-            />
-            <CustomTextInput
-              placeholder="Annual Registration & Fees ($)"
-              value={costData.annualRegistrationFees}
-              onChangeText={(value) =>
-                handleInputChange("annualRegistrationFees", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Annual Registration & Fees input"
-            />
-            <CustomTextInput
-              placeholder="Maintenance Reserve ($)"
-              value={costData.maintenanceReserve}
-              onChangeText={(value) =>
-                handleInputChange("maintenanceReserve", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Maintenance Reserve input"
-            />
-          </Section>
+          {showCalculator && (
+            <>
+              {costSaved ? (
+                <View
+                  style={{
+                    backgroundColor: "#f7fafc",
+                    padding: 16,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      fontWeight: "bold",
+                      marginBottom: 8,
+                    }}
+                  >
+                    Estimated Cost per Hour: ${costData.costPerHour}
+                  </Text>
+                  <Text style={{ fontSize: 16, marginBottom: 4 }}>
+                    Total Fixed Costs per Year: $
+                    {(
+                      parseFloat(costData.mortgageExpense) * 12 +
+                      parseFloat(costData.depreciationExpense) +
+                      parseFloat(costData.insuranceCost) +
+                      parseFloat(costData.hangarCost) +
+                      parseFloat(costData.maintenanceReserve) +
+                      parseFloat(costData.annualRegistrationFees)
+                    ).toFixed(2)}
+                  </Text>
+                  <Text style={{ fontSize: 16, marginBottom: 16 }}>
+                    Total Variable Costs per Year: $
+                    {(
+                      (parseFloat(costData.fuelCostPerHour) +
+                        parseFloat(costData.oilCostPerHour) +
+                        parseFloat(costData.routineMaintenancePerHour) +
+                        parseFloat(costData.tiresPerHour) +
+                        parseFloat(costData.otherConsumablesPerHour)) *
+                      parseFloat(costData.rentalHoursPerYear)
+                    ).toFixed(2)}
+                  </Text>
+                  <CustomButton
+                    onPress={onEditCostData}
+                    title="Edit Cost Data"
+                    backgroundColor="#ecc94b"
+                    accessibilityLabel="Edit Cost Data button"
+                  />
+                </View>
+              ) : (
+                <View>
+                  {/* Loan Details Section */}
+                  <Section title="Loan Details">
+                    <CustomTextInput
+                      placeholder="Purchase Price ($)"
+                      value={costData.purchasePrice}
+                      onChangeText={(value) =>
+                        handleInputChange("purchasePrice", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Purchase Price input"
+                    />
+                    <CustomTextInput
+                      placeholder="Loan Amount ($)"
+                      value={costData.loanAmount}
+                      onChangeText={(value) =>
+                        handleInputChange("loanAmount", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Loan Amount input"
+                    />
+                    <CustomTextInput
+                      placeholder="Interest Rate (%)"
+                      value={costData.interestRate}
+                      onChangeText={(value) =>
+                        handleInputChange("interestRate", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Interest Rate input"
+                    />
+                    <CustomTextInput
+                      placeholder="Loan Term (years)"
+                      value={costData.loanTerm}
+                      onChangeText={(value) =>
+                        handleInputChange("loanTerm", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Loan Term input"
+                    />
+                    <CustomTextInput
+                      placeholder="Depreciation Rate (%)"
+                      value={costData.depreciationRate}
+                      onChangeText={(value) =>
+                        handleInputChange("depreciationRate", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Depreciation Rate input"
+                    />
+                    <CustomTextInput
+                      placeholder="Useful Life (years)"
+                      value={costData.usefulLife}
+                      onChangeText={(value) =>
+                        handleInputChange("usefulLife", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Useful Life input"
+                    />
+                    <Text style={{ fontSize: 16, color: "#4a5568" }}>
+                      Mortgage Expense: ${costData.mortgageExpense}
+                    </Text>
+                    <Text style={{ fontSize: 16, color: "#4a5568" }}>
+                      Depreciation Expense: ${costData.depreciationExpense}
+                    </Text>
+                  </Section>
 
-          {/* Operational Costs Section */}
-          <Section title="Operational Costs">
-            <CustomTextInput
-              placeholder="Fuel Cost Per Hour ($)"
-              value={costData.fuelCostPerHour}
-              onChangeText={(value) =>
-                handleInputChange("fuelCostPerHour", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Fuel Cost Per Hour input"
-            />
-            <CustomTextInput
-              placeholder="Oil Cost Per Hour ($)"
-              value={costData.oilCostPerHour}
-              onChangeText={(value) =>
-                handleInputChange("oilCostPerHour", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Oil Cost Per Hour input"
-            />
-            <CustomTextInput
-              placeholder="Routine Maintenance Per Hour ($)"
-              value={costData.routineMaintenancePerHour}
-              onChangeText={(value) =>
-                handleInputChange("routineMaintenancePerHour", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Routine Maintenance Per Hour input"
-            />
-            <CustomTextInput
-              placeholder="Tires Per Hour ($)"
-              value={costData.tiresPerHour}
-              onChangeText={(value) =>
-                handleInputChange("tiresPerHour", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Tires Per Hour input"
-            />
-            <CustomTextInput
-              placeholder="Other Consumables Per Hour ($)"
-              value={costData.otherConsumablesPerHour}
-              onChangeText={(value) =>
-                handleInputChange("otherConsumablesPerHour", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Other Consumables Per Hour input"
-            />
-            <CustomTextInput
-              placeholder="Rental Hours Per Year"
-              value={costData.rentalHoursPerYear}
-              onChangeText={(value) =>
-                handleInputChange("rentalHoursPerYear", value)
-              }
-              keyboardType="numeric"
-              accessibilityLabel="Rental Hours Per Year input"
-            />
-          </Section>
+                  {/* Annual Costs Section */}
+                  <Section title="Annual Costs">
+                    <CustomTextInput
+                      placeholder="Estimated Annual Cost ($)"
+                      value={costData.estimatedAnnualCost}
+                      onChangeText={(value) =>
+                        handleInputChange("estimatedAnnualCost", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Estimated Annual Cost input"
+                    />
+                    <CustomTextInput
+                      placeholder="Insurance Cost ($)"
+                      value={costData.insuranceCost}
+                      onChangeText={(value) =>
+                        handleInputChange("insuranceCost", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Insurance Cost input"
+                    />
+                    <CustomTextInput
+                      placeholder="Hangar Cost ($)"
+                      value={costData.hangarCost}
+                      onChangeText={(value) =>
+                        handleInputChange("hangarCost", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Hangar Cost input"
+                    />
+                    <CustomTextInput
+                      placeholder="Annual Registration & Fees ($)"
+                      value={costData.annualRegistrationFees}
+                      onChangeText={(value) =>
+                        handleInputChange("annualRegistrationFees", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Annual Registration & Fees input"
+                    />
+                    <CustomTextInput
+                      placeholder="Maintenance Reserve ($)"
+                      value={costData.maintenanceReserve}
+                      onChangeText={(value) =>
+                        handleInputChange("maintenanceReserve", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Maintenance Reserve input"
+                    />
+                  </Section>
 
-          <CustomButton
-            onPress={saveCostData}
-            title="Save Cost Data"
-            accessibilityLabel="Save Cost Data button"
-          />
-          {loading && (
-            <ActivityIndicator
-              size="large"
-              color="#3182ce"
-              style={{ marginTop: 16 }}
-            />
+                  {/* Operational Costs Section */}
+                  <Section title="Operational Costs">
+                    <CustomTextInput
+                      placeholder="Fuel Cost Per Hour ($)"
+                      value={costData.fuelCostPerHour}
+                      onChangeText={(value) =>
+                        handleInputChange("fuelCostPerHour", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Fuel Cost Per Hour input"
+                    />
+                    <CustomTextInput
+                      placeholder="Oil Cost Per Hour ($)"
+                      value={costData.oilCostPerHour}
+                      onChangeText={(value) =>
+                        handleInputChange("oilCostPerHour", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Oil Cost Per Hour input"
+                    />
+                    <CustomTextInput
+                      placeholder="Routine Maintenance Per Hour ($)"
+                      value={costData.routineMaintenancePerHour}
+                      onChangeText={(value) =>
+                        handleInputChange("routineMaintenancePerHour", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Routine Maintenance Per Hour input"
+                    />
+                    <CustomTextInput
+                      placeholder="Tires Per Hour ($)"
+                      value={costData.tiresPerHour}
+                      onChangeText={(value) =>
+                        handleInputChange("tiresPerHour", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Tires Per Hour input"
+                    />
+                    <CustomTextInput
+                      placeholder="Other Consumables Per Hour ($)"
+                      value={costData.otherConsumablesPerHour}
+                      onChangeText={(value) =>
+                        handleInputChange("otherConsumablesPerHour", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Other Consumables Per Hour input"
+                    />
+                    <CustomTextInput
+                      placeholder="Rental Hours Per Year"
+                      value={costData.rentalHoursPerYear}
+                      onChangeText={(value) =>
+                        handleInputChange("rentalHoursPerYear", value)
+                      }
+                      keyboardType="numeric"
+                      accessibilityLabel="Rental Hours Per Year input"
+                    />
+                  </Section>
+
+                  <CustomButton
+                    onPress={saveCostData}
+                    title="Save Cost Data"
+                    accessibilityLabel="Save Cost Data button"
+                  />
+                  {loading && (
+                    <ActivityIndicator
+                      size="large"
+                      color="#3182ce"
+                      style={{ marginTop: 16 }}
+                    />
+                  )}
+                </View>
+              )}
+            </>
           )}
         </View>
-      )}
-    </>
-  )}
-</View>
-
 
         {/* Connect Stripe Account Section */}
         {!isStripeConnected && (
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+            <Text
+              style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}
+            >
               Connect Your Stripe Account
             </Text>
             <Text style={{ marginBottom: 16 }}>
@@ -2203,8 +2250,12 @@ const OwnerProfile = ({ ownerId }) => {
                     <Text style={{ fontWeight: "bold", fontSize: 16 }}>
                       {item.aircraftModel}
                     </Text>
-                    <Text style={{ fontSize: 14 }}>Tail Number: {item.tailNumber}</Text>
-                    <Text style={{ fontSize: 14 }}>Engine: {item.engineType}</Text>
+                    <Text style={{ fontSize: 14 }}>
+                      Tail Number: {item.tailNumber}
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      Engine: {item.engineType}
+                    </Text>
                     <Text style={{ fontSize: 14 }}>
                       Total Time: {item.totalTimeOnFrame} hours
                     </Text>
@@ -2239,7 +2290,9 @@ const OwnerProfile = ({ ownerId }) => {
                                   allAircrafts.filter((a) => a.id !== item.id)
                                 );
                                 setSelectedAircraftIds(
-                                  selectedAircraftIds.filter((id) => id !== item.id)
+                                  selectedAircraftIds.filter(
+                                    (id) => id !== item.id
+                                  )
                                 );
 
                                 Alert.alert(
@@ -2247,7 +2300,10 @@ const OwnerProfile = ({ ownerId }) => {
                                   "The aircraft has been removed."
                                 );
                               } catch (error) {
-                                console.error("Error removing aircraft:", error);
+                                console.error(
+                                  "Error removing aircraft:",
+                                  error
+                                );
                                 Alert.alert(
                                   "Error",
                                   "Failed to remove the aircraft."
@@ -2322,7 +2378,9 @@ const OwnerProfile = ({ ownerId }) => {
         {/* Show only for admin users */}
         {user?.email === "admin@example.com" && ( // Replace with your admin condition
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+            <Text
+              style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}
+            >
               Admin Tools
             </Text>
             <CustomButton
@@ -2416,7 +2474,9 @@ const OwnerProfile = ({ ownerId }) => {
                               onPress: async () => {
                                 try {
                                   // Remove the aircraft from 'airplanes' collection
-                                  await deleteDoc(doc(db, "airplanes", item.id));
+                                  await deleteDoc(
+                                    doc(db, "airplanes", item.id)
+                                  );
 
                                   setUserListings(
                                     userListings.filter((a) => a.id !== item.id)
@@ -2425,7 +2485,9 @@ const OwnerProfile = ({ ownerId }) => {
                                     allAircrafts.filter((a) => a.id !== item.id)
                                   );
                                   setSelectedAircraftIds(
-                                    selectedAircraftIds.filter((id) => id !== item.id)
+                                    selectedAircraftIds.filter(
+                                      (id) => id !== item.id
+                                    )
                                   );
 
                                   Alert.alert(
@@ -2433,7 +2495,10 @@ const OwnerProfile = ({ ownerId }) => {
                                     "The listing has been removed."
                                   );
                                 } catch (error) {
-                                  console.error("Error removing listing:", error);
+                                  console.error(
+                                    "Error removing listing:",
+                                    error
+                                  );
                                   Alert.alert(
                                     "Error",
                                     "Failed to remove the listing."
@@ -2530,7 +2595,9 @@ const OwnerProfile = ({ ownerId }) => {
               )}
             />
           ) : (
-            <Text style={{ color: "#a0aec0" }}>No incoming rental requests.</Text>
+            <Text style={{ color: "#a0aec0" }}>
+              No incoming rental requests.
+            </Text>
           )}
         </View>
         {/* ************* End of Incoming Rental Requests ************* */}
@@ -2693,7 +2760,9 @@ const OwnerProfile = ({ ownerId }) => {
                     {selectedRequest.rentalHours}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: "bold" }}>Current Medical: </Text>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Current Medical:{" "}
+                    </Text>
                     {selectedRequest.currentMedical}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
@@ -2715,7 +2784,9 @@ const OwnerProfile = ({ ownerId }) => {
                     {selectedListingDetails.costPerHour}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: "bold" }}>Number of Hours: </Text>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Number of Hours:{" "}
+                    </Text>
                     {selectedRequest.rentalHours}
                   </Text>
                   {/* Display Base Cost */}
@@ -2842,7 +2913,8 @@ const OwnerProfile = ({ ownerId }) => {
                       borderRadius: 8,
                       marginBottom: 8,
                       maxWidth: "75%",
-                      alignSelf: item.senderId === user.uid ? "flex-end" : "flex-start",
+                      alignSelf:
+                        item.senderId === user.uid ? "flex-end" : "flex-start",
                       backgroundColor:
                         item.senderId === user.uid ? "#3182ce" : "#e2e8f0",
                     }}
@@ -2855,10 +2927,16 @@ const OwnerProfile = ({ ownerId }) => {
                     >
                       {item.senderName}:
                     </Text>
-                    <Text style={{ color: item.senderId === user.uid ? "#fff" : "#000" }}>
+                    <Text
+                      style={{
+                        color: item.senderId === user.uid ? "#fff" : "#000",
+                      }}
+                    >
                       {item.text}
                     </Text>
-                    <Text style={{ fontSize: 10, color: "#a0aec0", marginTop: 4 }}>
+                    <Text
+                      style={{ fontSize: 10, color: "#a0aec0", marginTop: 4 }}
+                    >
                       {item.createdAt
                         ? item.createdAt.toDate
                           ? item.createdAt.toDate().toLocaleString()
@@ -2875,7 +2953,13 @@ const OwnerProfile = ({ ownerId }) => {
               </Text>
             )}
 
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 16 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginTop: 16,
+              }}
+            >
               <TextInput
                 placeholder="Type your message..."
                 value={messageInput}
@@ -2987,7 +3071,13 @@ const OwnerProfile = ({ ownerId }) => {
                       style={{ marginVertical: 16 }}
                     />
                   ) : (
-                    <Text style={{ textAlign: "center", color: "#a0aec0", marginTop: 16 }}>
+                    <Text
+                      style={{
+                        textAlign: "center",
+                        color: "#a0aec0",
+                        marginTop: 16,
+                      }}
+                    >
                       No more active rentals to load.
                     </Text>
                   )
@@ -3019,7 +3109,9 @@ const OwnerProfile = ({ ownerId }) => {
             <CustomTextInput
               placeholder="Aircraft Model (Year/Make/Model)"
               value={aircraftDetails.aircraftModel}
-              onChangeText={(value) => handleInputChange("aircraftModel", value)}
+              onChangeText={(value) =>
+                handleInputChange("aircraftModel", value)
+              }
               editable={isEditing}
               accessibilityLabel="Aircraft model input"
             />
@@ -3123,7 +3215,9 @@ const OwnerProfile = ({ ownerId }) => {
                         accessibilityLabel="Set as main image"
                         accessibilityRole="button"
                       >
-                        <Text style={{ color: "#fff", fontSize: 12 }}>Set Main</Text>
+                        <Text style={{ color: "#fff", fontSize: 12 }}>
+                          Set Main
+                        </Text>
                       </TouchableOpacity>
                       {/* Remove Image Button */}
                       <TouchableOpacity
@@ -3144,9 +3238,7 @@ const OwnerProfile = ({ ownerId }) => {
               )}
               style={{ marginBottom: 8 }}
             />
-            <Text style={{ color: "#a0aec0" }}>
-              {images.length}/7 images
-            </Text>
+            <Text style={{ color: "#a0aec0" }}>{images.length}/7 images</Text>
           </Section>
 
           {/* Upload Images Button */}
@@ -3170,7 +3262,9 @@ const OwnerProfile = ({ ownerId }) => {
           {/* Main Image Display */}
           {selectedAircraft && selectedAircraft.mainImage && (
             <View style={{ marginTop: 16, alignItems: "center" }}>
-              <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>
+              <Text
+                style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}
+              >
                 Main Image:
               </Text>
               <Image
@@ -3269,153 +3363,166 @@ const OwnerProfile = ({ ownerId }) => {
       </Modal>
 
       {/* ************* Updated Withdraw Funds Modal ************* */}
-      <Modal
-        visible={withdrawModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setWithdrawModalVisible(false)}
+<Modal
+  visible={withdrawModalVisible}
+  animationType="slide"
+  transparent={true}
+  onRequestClose={() => setWithdrawModalVisible(false)}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    style={{ flex: 1 }}
+    keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+  >
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <View
+        style={{
+          width: "88%",
+          maxHeight: "90%",
+          backgroundColor: "#fff",
+          borderRadius: 8,
+          padding: 24,
+        }}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0} // Adjust offset as needed
-        >
-          <View
+        <ModalHeader
+          title="Withdraw Funds"
+          onClose={() => setWithdrawModalVisible(false)}
+        />
+
+        <Text style={{ fontSize: 16, marginBottom: 16 }}>
+          Available Balance: ${availableBalance.toFixed(2)}
+        </Text>
+
+        {/* Payment Method Selection as Two Buttons */}
+        <View style={{ flexDirection: "row", justifyContent: "space-around", marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={() => setPaymentMethod("bank")}
             style={{
               flex: 1,
-              backgroundColor: "rgba(0,0,0,0.5)",
-              justifyContent: "center",
+              marginRight: 8,
+              padding: 12,
+              backgroundColor: paymentMethod === "bank" ? "#e2e8f0" : "#fff",
+              borderColor: "#ccc",
+              borderWidth: 1,
+              borderRadius: 8,
               alignItems: "center",
             }}
+            accessibilityLabel="Select Bank Account"
           >
-            <View
-              style={{
-                width: "88%",
-                maxHeight: "90%",
-                backgroundColor: "#fff",
-                borderRadius: 8,
-                padding: 24,
-              }}
-            >
-              <ScrollView
-                contentContainerStyle={{ flexGrow: 1, paddingBottom: 16 }}
-                keyboardShouldPersistTaps="handled"
-                showsHorizontalScrollIndicator={false}
-              >
-                <ModalHeader
-                  title="Withdraw Funds"
-                  onClose={() => setWithdrawModalVisible(false)}
-                />
-                <Text style={{ fontSize: 16, marginBottom: 16 }}>
-                  Available Balance: ${availableBalance.toFixed(2)}
-                </Text>
+            <Text style={{ color: "#000", fontWeight: "bold" }}>Bank Account</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setPaymentMethod("card")}
+            style={{
+              flex: 1,
+              marginLeft: 8,
+              padding: 12,
+              backgroundColor: paymentMethod === "card" ? "#e2e8f0" : "#fff",
+              borderColor: "#ccc",
+              borderWidth: 1,
+              borderRadius: 8,
+              alignItems: "center",
+            }}
+            accessibilityLabel="Select Debit Card"
+          >
+            <Text style={{ color: "#000", fontWeight: "bold" }}>Debit Card</Text>
+          </TouchableOpacity>
+        </View>
 
-                {/* Payment Method Selection */}
-                <Section title="Payment Method">
-                  <View
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "#ccc",
-                      borderRadius: 8,
-                      marginBottom: 16,
-                    }}
-                  >
-                    <Picker
-                      selectedValue={paymentMethod}
-                      onValueChange={(itemValue, itemIndex) =>
-                        setPaymentMethod(itemValue)
-                      }
-                      style={{ height: 48, width: "100%" }}
-                      accessibilityLabel="Select payment method"
-                    >
-                      <Picker.Item label="Bank Account" value="bank" />
-                      <Picker.Item label="Debit Card" value="card" />
-                    </Picker>
-                  </View>
-                </Section>
+        {/* Wrap remaining fields in a ScrollView */}
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 16 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Payment Method Details */}
+          {paymentMethod === "bank" && (
+            <BankDetailsForm
+              bankDetails={bankDetails}
+              setBankDetails={setBankDetails}
+            />
+          )}
 
-                {/* Payment Method Details */}
-                {paymentMethod === "bank" && (
-                  <BankDetailsForm
-                    bankDetails={bankDetails}
-                    setBankDetails={setBankDetails}
-                  />
-                )}
+          {paymentMethod === "card" && (
+            <Section title="Debit Card Details">
+              <CardField
+                postalCodeEnabled={false}
+                placeholder={{
+                  number: "4242 4242 4242 4242",
+                  placeholderTextColor: "#888",
+                }}
+                cardStyle={{
+                  backgroundColor: "#FFFFFF",
+                  textColor: "#000000",
+                }}
+                style={{
+                  width: "100%",
+                  height: 50,
+                  marginVertical: 24,
+                }}
+                onCardChange={(details) => setCardDetails(details)}
+                accessibilityLabel="Debit card details input"
+              />
+            </Section>
+          )}
 
-                {paymentMethod === "card" && (
-                  <Section title="Debit Card Details">
-                    {/* Using Stripe's CardField without ref for secure card input */}
-                    <CardField
-                      postalCodeEnabled={false}
-                      placeholder={{
-                        number: "4242 4242 4242 4242",
-                        placeholderTextColor: "#888",
-                      }}
-                      cardStyle={{
-                        backgroundColor: "#FFFFFF",
-                        textColor: "#000000",
-                      }}
-                      style={{
-                        width: "100%",
-                        height: 50,
-                        marginVertical: 24,
-                      }}
-                      onCardChange={(details) => {
-                        setCardDetails(details); // Update cardDetails state
-                      }}
-                      accessibilityLabel="Debit card details input"
-                    />
-                  </Section>
-                )}
+          {/* Withdrawal Email Field */}
+          <Section title="Withdrawal Email">
+            <CustomTextInput
+              placeholder="Email Address"
+              value={withdrawalEmail}
+              onChangeText={(value) => setWithdrawalEmail(value)}
+              keyboardType="email-address"
+              accessibilityLabel="Withdrawal email input"
+            />
+          </Section>
 
-                {/* Withdrawal Email Field */}
-                <Section title="Withdrawal Email">
-                  <CustomTextInput
-                    placeholder="Email Address"
-                    value={withdrawalEmail}
-                    onChangeText={(value) => setWithdrawalEmail(value)}
-                    keyboardType="email-address"
-                    accessibilityLabel="Withdrawal email input"
-                  />
-                </Section>
+          {/* Withdrawal Amount Field */}
+          <Section title="Withdrawal Amount">
+            <CustomTextInput
+              placeholder="Amount to Withdraw ($)"
+              value={withdrawalAmount}
+              onChangeText={(value) => setWithdrawalAmount(value)}
+              keyboardType="numeric"
+              accessibilityLabel="Withdrawal amount input"
+            />
+          </Section>
 
-                {/* Withdrawal Amount Field */}
-                <Section title="Withdrawal Amount">
-                  <CustomTextInput
-                    placeholder="Amount to Withdraw ($)"
-                    value={withdrawalAmount}
-                    onChangeText={(value) => setWithdrawalAmount(value)}
-                    keyboardType="numeric"
-                    accessibilityLabel="Withdrawal amount input"
-                  />
-                </Section>
+          <CustomButton
+            onPress={handleWithdraw}
+            title="Withdraw"
+            backgroundColor="#48bb78"
+            style={{ marginTop: 16, marginBottom: 8 }}
+            accessibilityLabel="Withdraw funds"
+          />
+          <CustomButton
+            onPress={() => setWithdrawModalVisible(false)}
+            title="Cancel"
+            backgroundColor="#f56565"
+            accessibilityLabel="Cancel withdrawal"
+          />
 
-                <CustomButton
-                  onPress={handleWithdraw}
-                  title="Withdraw"
-                  backgroundColor="#48bb78"
-                  style={{ marginTop: 16, marginBottom: 8 }}
-                  accessibilityLabel="Withdraw funds"
-                />
-                <CustomButton
-                  onPress={() => setWithdrawModalVisible(false)}
-                  title="Cancel"
-                  backgroundColor="#f56565"
-                  accessibilityLabel="Cancel withdrawal"
-                />
-                {loading && (
-                  <ActivityIndicator
-                    size="large"
-                    color="#3182ce"
-                    style={{ marginTop: 16 }}
-                  />
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-      {/* ************* End of Updated Withdraw Funds Modal ************* */}
+          {loading && (
+            <ActivityIndicator
+              size="large"
+              color="#3182ce"
+              style={{ marginTop: 16 }}
+            />
+          )}
+        </ScrollView>
+      </View>
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
+{/* ************* End of Updated Withdraw Funds Modal ************* */}
+
     </View>
   );
 };

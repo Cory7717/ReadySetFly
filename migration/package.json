@@ -10,6 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@react-native-picker/picker": "^2.11.0",
     "firebase-admin": "^13.0.0"
   }
 }
