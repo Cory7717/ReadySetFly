@@ -1,4 +1,4 @@
-// src/components/renter.js (originally BookingCalendar.js)
+// src/components/renter.js
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -37,6 +37,7 @@ import {
   limit,
   startAfter,
   setDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
 import * as ImagePicker from "expo-image-picker";
@@ -52,51 +53,56 @@ import {
   Fontisto,
 } from "@expo/vector-icons";
 
-import { useRouter } from "expo-router"; // Use Expo Router's useRouter
+import { useRouter } from "expo-router";
 
-// Removed direct import of CheckoutScreen
 import ConfirmationScreen from "../payment/ConfirmationScreen";
 import MessagesScreen from "../screens/MessagesScreen";
 
-// Define API_URL directly
+import * as Notifications from "expo-notifications";
+
 const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
 
-// Import Firebase configuration
-import { db, auth } from "../../firebaseConfig"; // Adjust the path as necessary
+import { db, auth } from "../../firebaseConfig";
 
 const renter = () => {
-  const router = useRouter(); // Initialize Expo Router
+  const router = useRouter();
+
+  // Request notification permissions on component mount
+  useEffect(() => {
+    (async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Push notifications need permission to be enabled.");
+      }
+    })();
+  }, []);
 
   // -------------------------
   // State Variables
   // -------------------------
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] =
-    useState(false);
+  const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] = useState(false);
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
-  const [allNotificationsModalVisible, setAllNotificationsModalVisible] =
-    useState(false);
+  const [allNotificationsModalVisible, setAllNotificationsModalVisible] = useState(false);
 
-  const [profileSaved, setProfileSaved] = useState(false);
   const [profileData, setProfileData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
+    insurance: null,
+    pilotLicense: null,
+    medical: null,
     aircraftType: "",
     certifications: "",
-    contact: "",
-    address: "",
-    logBooks: null,
-    medical: null,
-    insurance: null,
     image: null,
   });
 
+  const [profileSaved, setProfileSaved] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
   const [rentals, setRentals] = useState([]);
+  const [pastRentals, setPastRentals] = useState([]);
   const [ratings, setRatings] = useState({});
-
   const [rentalDate, setRentalDate] = useState("");
   const [rentalHours, setRentalHours] = useState("");
   const [preferredLocation, setPreferredLocation] = useState("");
@@ -106,14 +112,11 @@ const renter = () => {
   const [numGallons, setNumGallons] = useState("");
   const [baseCost, setBaseCost] = useState(0);
   const [hours, setHours] = useState(0);
-
   const [notifications, setNotifications] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
-
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [selectedRentalRequest, setSelectedRentalRequest] = useState(null);
   const [isRentalRequestLoading, setIsRentalRequestLoading] = useState(false);
-
   const [selectedListing, setSelectedListing] = useState(null);
   const [selectedListingId, setSelectedListingId] = useState(null);
   const [selectedListingName, setSelectedListingName] = useState(null);
@@ -124,40 +127,24 @@ const renter = () => {
     salesTax: "0.00",
     total: "0.00",
   });
-
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
-
-  const [processedRentals, setProcessedRentals] = useState([]);
-
   const [rentalsLastDoc, setRentalsLastDoc] = useState(null);
   const [hasMoreRentals, setHasMoreRentals] = useState(true);
   const RENTALS_PAGE_SIZE = 20;
-
   const [allNotifications, setAllNotifications] = useState([]);
   const [notificationsLastDoc, setNotificationsLastDoc] = useState(null);
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const NOTIFICATIONS_PAGE_SIZE = 20;
-
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [renter, setRenter] = useState(null);
-
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
-
   const [isMapModalVisible, setMapModalVisible] = useState(false);
   const [initialLocation, setInitialLocation] = useState(null);
-
-  // Even though owner info is no longer required, we still keep currentChatOwnerId for messaging if needed.
   const [currentChatOwnerId, setCurrentChatOwnerId] = useState(null);
-
-  // New States for Payment
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-
-  // NEW: State for Active Rental Modal
   const [activeRentalModalVisible, setActiveRentalModalVisible] = useState(false);
-
-  // Refs
   const processedRentalsRef = useRef([]);
   const rentalRequestListenerRef = useRef(null);
 
@@ -180,15 +167,6 @@ const renter = () => {
     return "N/A";
   };
 
-  /**
-   * Calculate total cost (bookingFee 6%, transactionFee 3%, tax 8.25%)
-   * For example, for a $100 rental:
-   *   - Base: $100
-   *   - Booking Fee: $6
-   *   - Transaction Fee: $3
-   *   - Sales Tax: $8.25
-   *   => Total: $117.25
-   */
   const calculateTotalCost = (rentalCostPerHour, rentalHours) => {
     const rentalTotalCost = rentalCostPerHour * rentalHours;
     const bookingFee = rentalTotalCost * 0.06;
@@ -288,6 +266,85 @@ const renter = () => {
   }, [isAuthChecked, renterId]);
 
   // ----------------------------------------------------------------
+  // NEW: Listen for Rental Request Status Changes for Notifications
+  // ----------------------------------------------------------------
+  useEffect(() => {
+    if (!renterId) return;
+    const rentalRequestsRef = collection(db, "rentalRequests");
+    const statusQuery = query(
+      rentalRequestsRef,
+      where("renterId", "==", renterId),
+      where("rentalStatus", "in", ["approved", "denied"])
+    );
+    const unsubscribeStatus = onSnapshot(statusQuery, (snapshot) => {
+      snapshot.docs.forEach(async (docSnap) => {
+        const data = docSnap.data();
+        if (!data.notified) {
+          const title =
+            data.rentalStatus === "approved" ? "Rental Approved" : "Rental Denied";
+          const body =
+            data.rentalStatus === "approved"
+              ? "Your rental request has been approved."
+              : "Your rental request has been denied.";
+          try {
+            await Notifications.scheduleNotificationAsync({
+              content: { title, body },
+              trigger: null,
+            });
+            await updateDoc(docSnap.ref, { notified: true });
+          } catch (error) {
+            console.error("Error sending notification:", error);
+          }
+        }
+      });
+    }, (error) => {
+      console.error("Error listening for rental status changes:", error);
+    });
+    return () => unsubscribeStatus();
+  }, [renterId]);
+
+  // ----------------------------------------------------------------
+  // NEW: Fetch Past Rentals (Completed Rentals)
+  // ----------------------------------------------------------------
+  useEffect(() => {
+    if (!isAuthChecked || !renterId) return;
+    const pastRentalsRef = collection(db, "rentalRequests");
+    const pastRentalsQuery = query(
+      pastRentalsRef,
+      where("renterId", "==", renterId),
+      where("rentalStatus", "==", "completed"),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribePastRentals = onSnapshot(
+      pastRentalsQuery,
+      (snapshot) => {
+        const fetchListings = async () => {
+          const past = await Promise.all(
+            snapshot.docs.map(async (docSnap) => {
+              let rentalData = { id: docSnap.id, ...docSnap.data() };
+              if (rentalData.listingId) {
+                const listingRef = doc(db, "airplanes", rentalData.listingId);
+                const listingSnap = await getDoc(listingRef);
+                if (listingSnap.exists()) {
+                  rentalData.listing = listingSnap.data();
+                }
+              }
+              return rentalData;
+            })
+          );
+          setPastRentals(past);
+        };
+        fetchListings();
+      },
+      (error) => {
+        console.error("Error fetching past rentals:", error);
+        Alert.alert("Error", "Failed to fetch past rentals.");
+      }
+    );
+    return () => unsubscribePastRentals();
+  }, [isAuthChecked, renterId]);
+
+  // ----------------------------------------------------------------
   // 4) Fetch Rentals & Notifications
   // ----------------------------------------------------------------
   useEffect(() => {
@@ -382,7 +439,9 @@ const renter = () => {
     };
   }, [renterId, isAuthChecked]);
 
+  // ----------------------------------------------------------------
   // NEW: Function to fetch more rentals (pagination)
+  // ----------------------------------------------------------------
   const fetchMoreRentals = async () => {
     if (!hasMoreRentals || !rentalsLastDoc) return;
     try {
@@ -419,9 +478,8 @@ const renter = () => {
     }
   };
 
- 
   // ----------------------------------------------------------------
-  // 5) Payment Navigation (Owner info is no longer required)
+  // 5) Payment Navigation
   // ----------------------------------------------------------------
   const navigateToCheckout = async (rentalRequestId, costPerHour, rentalHours) => {
     if (isProcessingPayment) {
@@ -519,9 +577,20 @@ const renter = () => {
           (docSnap) => {
             if (docSnap.exists()) {
               const data = docSnap.data();
-              if (data.paymentStatus === "completed") {
-                setPaymentComplete(true);
-                Alert.alert("Payment Complete", "Your payment has been processed.");
+              if (data.paymentStatus === "completed" && data.rentalStatus !== "active") {
+                updateDoc(rentalRequestRef, { rentalStatus: "active" })
+                  .then(() => {
+                    setPaymentComplete(true);
+                    Alert.alert("Payment Complete", "Your payment has been processed.");
+                    deleteDoc(doc(db, "renters", renterId, "notifications", notification.id))
+                      .catch((error) =>
+                        console.error("Error deleting notification:", error)
+                      );
+                    closeModal();
+                  })
+                  .catch((error) => {
+                    console.error("Error updating rental request:", error);
+                  });
               }
             }
           },
@@ -554,7 +623,7 @@ const renter = () => {
   };
 
   // ----------------------------------------------------------------
-  // 7) NEW: Handling Active Rental Card Press
+  // 7) Handling Active Rental Card Press
   // ----------------------------------------------------------------
   const handleActiveRentalPress = async (rental) => {
     try {
@@ -658,7 +727,7 @@ const renter = () => {
   };
 
   // ----------------------------------------------------------------
-  // 10) NEW: fetchMoreNotifications function (unchanged)
+  // 10) Fetch More Notifications (pagination)
   // ----------------------------------------------------------------
   const fetchMoreNotifications = async () => {
     if (!hasMoreNotifications || !notificationsLastDoc) return;
@@ -857,6 +926,26 @@ const renter = () => {
   );
 
   // ----------------------------------------------------------------
+  // NEW: Render Past Rental Item
+  // ----------------------------------------------------------------
+  const renderPastRentalItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.rentalBox}
+      onPress={() => handlePastRentalPress(item)}
+      accessibilityLabel={`Access past rental: ${item.listing?.aircraftModel || "Listing"}`}
+      accessibilityRole="button"
+    >
+      <Text style={styles.rentalAircraftModel}>
+        {item.listing?.aircraftModel || "Listing"}
+      </Text>
+      <Text style={styles.rentalStatus}>Completed</Text>
+      <Text style={styles.rentalTotalCost}>
+        Total Cost: ${safeToFixed(item.totalCost)}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // ----------------------------------------------------------------
   // 19) Navigation by Filter (Optional)
   // ----------------------------------------------------------------
   const handleNavigationInternal = (filter) => {
@@ -903,49 +992,26 @@ const renter = () => {
           >
             <View style={styles.headerOverlay}>
               <SafeAreaView style={styles.headerContent}>
-                <Text style={styles.greetingText}>
-                  Good afternoon, {renter?.displayName || "User"}
-                </Text>
-                <View style={styles.headerRow}>
+                <View style={styles.headerTopRow}>
+                  <Text style={styles.greetingText}>
+                    Good afternoon, {renter?.displayName || "User"}
+                  </Text>
                   <TouchableOpacity
-                    onPress={showDatePicker}
-                    style={styles.datePickerButton}
-                    accessibilityLabel="Select rental date"
+                    onPress={() => setProfileModalVisible(true)}
+                    style={styles.profileImageButton}
+                    accessibilityLabel="Edit profile"
                     accessibilityRole="button"
                   >
-                    <Text style={styles.datePickerText}>
-                      {rentalDate || "Select Date"}
-                    </Text>
+                    {profileData.image ? (
+                      <Image source={{ uri: profileData.image }} style={styles.profileImage} />
+                    ) : (
+                      <Ionicons name="person-circle-outline" size={48} color="#fff" />
+                    )}
                   </TouchableOpacity>
-                  <TextInput
-                    placeholder="Hours"
-                    placeholderTextColor="#fff"
-                    keyboardType="numeric"
-                    style={styles.hoursInput}
-                    onChangeText={(text) => {
-                      const sanitizedText = text.replace(/[^0-9.]/g, "");
-                      setRentalHours(sanitizedText);
-                    }}
-                    value={rentalHours}
-                    accessibilityLabel="Enter estimated rental hours"
-                  />
                 </View>
-                <TouchableOpacity
-                  onPress={() => setMapModalVisible(true)}
-                  style={styles.locationButton}
-                  accessibilityLabel="Select preferred rental location"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.locationText}>
-                    {preferredLocation || "Preferred Location"}
-                  </Text>
-                </TouchableOpacity>
               </SafeAreaView>
             </View>
           </ImageBackground>
-
-          {/* Date Picker */}
-          {/* (Assumed to be implemented with DateTimePickerModal similarly as in CheckoutScreen) */}
 
           {/* Navigation Buttons */}
           <View style={styles.navigationButtonsContainer}>
@@ -1002,27 +1068,20 @@ const renter = () => {
             </View>
           </View>
 
-          {/* Aircraft Types */}
+          {/* Past Rentals */}
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Aircraft Types</Text>
-            <View style={styles.aircraftTypesRow}>
-              <TouchableOpacity
-                style={[styles.aircraftTypeButton, { marginRight: 8 }]}
-                onPress={() => handleNavigationInternal("single-piston")}
-                accessibilityLabel="View single engine piston aircraft"
-                accessibilityRole="button"
-              >
-                <Text style={styles.aircraftTypeText}>Single Engine Piston</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.aircraftTypeButton}
-                onPress={() => handleNavigationInternal("twin-piston")}
-                accessibilityLabel="View twin engine piston aircraft"
-                accessibilityRole="button"
-              >
-                <Text style={styles.aircraftTypeText}>Twin Engine Piston</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.sectionTitle}>Past Rentals</Text>
+            {pastRentals.length > 0 ? (
+              <FlatList
+                data={pastRentals}
+                keyExtractor={(item, index) => `${item.id}_${index}`}
+                renderItem={renderPastRentalItem}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              />
+            ) : (
+              <Text style={styles.noActiveRentalsText}>No past rentals available.</Text>
+            )}
           </View>
 
           {/* Recommended for You */}
@@ -1218,13 +1277,107 @@ const renter = () => {
           <Text style={styles.profileTitle}>Profile Information</Text>
           <View style={styles.profileRow}>
             <Text style={styles.profileLabel}>Name:</Text>
-            <Text style={styles.profileValue}>{profileData.name}</Text>
+            <Text style={styles.profileValue}>
+              {profileData.firstName} {profileData.lastName}
+            </Text>
           </View>
           {profileData.image && (
             <Image source={{ uri: profileData.image }} style={styles.profileImage} />
           )}
         </View>
       )}
+
+      {/* --- Profile Modal --- */}
+      <Modal
+        visible={profileModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <TouchableOpacity
+              onPress={pickImage}
+              style={styles.profileImageUpload}
+              accessibilityLabel="Upload profile image"
+              accessibilityRole="button"
+            >
+              {profileData.image ? (
+                <Image source={{ uri: profileData.image }} style={styles.profileImagePreview} />
+              ) : (
+                <Ionicons name="person-circle-outline" size={100} color="#ccc" />
+              )}
+              <Text style={styles.uploadText}>Upload Profile Image</Text>
+            </TouchableOpacity>
+            <TextInput
+              placeholder="First Name"
+              value={profileData.firstName}
+              onChangeText={(text) => setProfileData({ ...profileData, firstName: text })}
+              style={styles.modalInput}
+            />
+            <TextInput
+              placeholder="Last Name"
+              value={profileData.lastName}
+              onChangeText={(text) => setProfileData({ ...profileData, lastName: text })}
+              style={styles.modalInput}
+            />
+            <TouchableOpacity
+              onPress={() => pickDocument("insurance")}
+              style={styles.uploadButton}
+              accessibilityLabel="Upload renters insurance"
+              accessibilityRole="button"
+            >
+              <Text>
+                {profileData.insurance ? "Renters Insurance Uploaded" : "Upload Renters Insurance"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => pickDocument("pilotLicense")}
+              style={styles.uploadButton}
+              accessibilityLabel="Upload pilots license"
+              accessibilityRole="button"
+            >
+              <Text>
+                {profileData.pilotLicense ? "Pilots License Uploaded" : "Upload Pilots License"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => pickDocument("medical")}
+              style={styles.uploadButton}
+              accessibilityLabel="Upload current medical"
+              accessibilityRole="button"
+            >
+              <Text>
+                {profileData.medical ? "Medical Document Uploaded" : "Upload Current Medical"}
+              </Text>
+            </TouchableOpacity>
+            <TextInput
+              placeholder="Type of aircraft certified in"
+              value={profileData.aircraftType}
+              onChangeText={(text) => setProfileData({ ...profileData, aircraftType: text })}
+              style={styles.modalInput}
+            />
+            <TextInput
+              placeholder="Certifications (e.g., IFR)"
+              value={profileData.certifications}
+              onChangeText={(text) => setProfileData({ ...profileData, certifications: text })}
+              style={styles.modalInput}
+            />
+            <TouchableOpacity
+              onPress={() => handleProfileSubmit(profileData)}
+              style={styles.saveButton}
+              accessibilityLabel="Save profile"
+              accessibilityRole="button"
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Messages Modal */}
       <Modal
@@ -1531,7 +1684,7 @@ const renter = () => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* NEW: Active Rental Modal */}
+      {/* Active Rental Modal */}
       <Modal
         visible={activeRentalModalVisible}
         animationType="slide"
@@ -1587,7 +1740,9 @@ const renter = () => {
 
 export default renter;
 
-// Styles (Assuming you have a StyleSheet defined below)
+// -------------------
+// Styles
+// -------------------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1615,43 +1770,23 @@ const styles = StyleSheet.create({
   headerContent: {
     padding: 16,
   },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   greetingText: {
     color: "#fff",
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 8,
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
+  profileImageButton: {
+    padding: 4,
   },
-  datePickerButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  datePickerText: {
-    color: "#fff",
-    fontSize: 16,
-  },
-  hoursInput: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    padding: 8,
-    borderRadius: 8,
-    color: "#fff",
-    width: 80,
-    textAlign: "center",
-  },
-  locationButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    padding: 8,
-    borderRadius: 8,
-  },
-  locationText: {
-    color: "#fff",
-    fontSize: 16,
+  profileImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   navigationButtonsContainer: {
     flexDirection: "row",
@@ -1683,36 +1818,6 @@ const styles = StyleSheet.create({
   recentSearchDetails: {
     color: "#a0aec0",
     marginTop: 4,
-  },
-  aircraftTypesRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  aircraftTypeButton: {
-    backgroundColor: "#3182ce",
-    padding: 12,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: "center",
-  },
-  aircraftTypeText: {
-    color: "#fff",
-    fontSize: 16,
-  },
-  recommendedBox: {
-    marginRight: 16,
-    alignItems: "center",
-    width: 120,
-  },
-  recommendedImage: {
-    width: 100,
-    height: 80,
-    borderRadius: 8,
-  },
-  recommendedText: {
-    marginTop: 8,
-    textAlign: "center",
-    fontSize: 14,
   },
   rentalBox: {
     backgroundColor: "#fff",
@@ -1844,12 +1949,6 @@ const styles = StyleSheet.create({
   },
   profileValue: {
     color: "#4a5568",
-  },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginTop: 8,
   },
   messageModalContainer: {
     flex: 1,
@@ -2011,6 +2110,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
   },
+  recommendedBox: {
+    marginRight: 16,
+    alignItems: "center",
+    width: 120,
+  },
+  recommendedImage: {
+    width: 100,
+    height: 80,
+    borderRadius: 8,
+  },
+  recommendedText: {
+    marginTop: 8,
+    textAlign: "center",
+    fontSize: 14,
+  },
   chatBubbleIcon: {
     position: "absolute",
     bottom: 32,
@@ -2025,5 +2139,66 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    margin: 16,
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 20,
+  },
+  profileImageUpload: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  profileImagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  uploadText: {
+    marginTop: 8,
+    fontSize: 16,
+    color: "#3182ce",
+  },
+  modalInput: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  uploadButton: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  saveButton: {
+    width: "100%",
+    backgroundColor: "#38a169",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

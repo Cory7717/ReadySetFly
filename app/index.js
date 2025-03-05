@@ -149,7 +149,7 @@ const App = () => {
             </View>
             <View style={styles.helpLogoutContainer}>
               <TouchableOpacity onPress={handleNeedHelp}>
-                <Text style={styles.helpText}>Need Help</Text>
+                <Text style={styles.helpText}>Need Help?</Text>
               </TouchableOpacity>
               <Text style={styles.separator}> | </Text>
               <TouchableOpacity onPress={handleLogout}>

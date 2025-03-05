@@ -107,7 +107,14 @@
       "salePrice": "number",
       "packageType": "object",
       "packageCost": "number",
-      "updatedAt": "object"
+      "updatedAt": "object",
+      "gearCity": "string",
+      "gearPhone": "string",
+      "gearDescription": "string",
+      "gearPrice": "number",
+      "gearTitle": "string",
+      "gearEmail": "string",
+      "gearState": "string"
     }
   },
   "messages": {
@@ -248,7 +255,8 @@
       "createdAt": "object",
       "id": "string",
       "status": "string",
-      "totalAmount": "number"
+      "totalAmount": "number",
+      "messagingClosed": "boolean"
     }
   },
   "renters": {
@@ -286,7 +294,8 @@
       "costData": "object",
       "aircraftDetails": "object",
       "userEmail": "string",
-      "userID": "string"
+      "userID": "string",
+      "stripeAccountId": "string"
     }
   },
   "your-collection": {

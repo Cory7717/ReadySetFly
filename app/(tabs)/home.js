@@ -49,7 +49,6 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const Home = ({ route, navigation }) => {
   const [user, setUser] = useState(null);
   const [listings, setListings] = useState([]);
-  const [recommendedListings, setRecommendedListings] = useState([]);
   const [selectedListing, setSelectedListing] = useState(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
@@ -85,9 +84,6 @@ const Home = ({ route, navigation }) => {
 
   // Loading Indicator State
   const [isLoading, setIsLoading] = useState(false);
-
-  // State for Recommended Listings Loading
-  const [isRecommendedLoading, setIsRecommendedLoading] = useState(false);
 
   // Notification Listener References
   const notificationListener = useRef();
@@ -179,10 +175,7 @@ const Home = ({ route, navigation }) => {
         console.log("Notification Data:", data);
 
         if (data && data.listingId) {
-          const listing =
-            listings.find((item) => item.id === data.listingId) ||
-            recommendedListings.find((item) => item.id === data.listingId);
-
+          const listing = listings.find((item) => item.id === data.listingId);
           if (listing) {
             if (!listing.ownerId) {
               Alert.alert(
@@ -220,7 +213,7 @@ const Home = ({ route, navigation }) => {
         Notifications.removeNotificationSubscription(responseListener.current);
       }
     };
-  }, [listings, recommendedListings, user]);
+  }, [listings, user]);
 
   // Auth State Change Listener
   useEffect(() => {
@@ -314,13 +307,11 @@ const Home = ({ route, navigation }) => {
           })
           .filter((listing) => listing.ownerId);
 
-        // Apply location filter via substring search (case-insensitive)
         if (filter.location) {
           listingsData = listingsData.filter((listing) =>
             listing.location.toLowerCase().includes(filter.location)
           );
         }
-        // Apply aircraft make/model filter via substring search on both fields
         if (filter.make) {
           listingsData = listingsData.filter(
             (listing) =>
@@ -352,51 +343,6 @@ const Home = ({ route, navigation }) => {
       }
     );
   };
-
-  // Fetch Recommended Listings from Firestore
-  const fetchRecommendedListings = async () => {
-    setIsRecommendedLoading(true);
-    try {
-      const recommendedRef = collection(db, "airplanes");
-      const recommendedQuery = query(
-        recommendedRef,
-        where("isRecommended", "==", true),
-        limit(10)
-      );
-      const snapshot = await getDocs(recommendedQuery);
-      const recommendedData = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        const parsedAircraft = parseAircraft(data.aircraftModel);
-        const { year, make, airplaneModel } = parsedAircraft;
-        return {
-          id: doc.id,
-          year: year || "Unknown Year",
-          make: make || "Unknown Make",
-          airplaneModel: airplaneModel || "Unknown Model",
-          ownerId: data.ownerId || null,
-          costPerHour: data.costPerHour || "0.00",
-          location: data.location || "Unknown Location",
-          description: data.description || "No description available.",
-          images: Array.isArray(data.images) ? data.images : [data.images],
-          createdAt: data.createdAt || serverTimestamp(),
-        };
-      });
-      const validRecommended = recommendedData.filter(
-        (listing) => listing.ownerId
-      );
-      setRecommendedListings(validRecommended);
-      console.log(`Fetched ${validRecommended.length} recommended listings.`);
-    } catch (error) {
-      console.error("Error fetching recommended listings: ", error);
-      Alert.alert("Error", "Failed to fetch recommended listings.");
-    } finally {
-      setIsRecommendedLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRecommendedListings();
-  }, [filter]);
 
   // Calculate the total cost based on rental hours
   const calculateTotalCost = (hours) => {
@@ -479,7 +425,7 @@ const Home = ({ route, navigation }) => {
     const ownerPayout = rentalCost * 0.94;
     let rentalRequestData = {};
     try {
-      const renterFullName = fullName.trim() || user?.displayName || "Anonymous";
+      const renterFullName = fullName.trim();
       rentalRequestData = {
         renterId: user.uid,
         renterName: renterFullName,
@@ -513,7 +459,7 @@ const Home = ({ route, navigation }) => {
         "Rental request created successfully. You will be notified once the owner reviews your request."
       );
       setFullScreenModalVisible(false);
-      setFullName(user?.displayName || fullName || "Anonymous");
+      setFullName(fullName.trim());
       setCityStateCombined("");
       setHasMedicalCertificate(false);
       setHasRentersInsurance(false);
@@ -539,6 +485,7 @@ const Home = ({ route, navigation }) => {
       );
     }
   };
+  
 
   const handleDateSelection = (day) => {
     setRentalDate(day.dateString);
@@ -585,9 +532,10 @@ const Home = ({ route, navigation }) => {
     setFilterModalVisible(false);
   };
 
+  // Updated headerHeight interpolation: Reduced by 25% from 180 to 135
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 150],
-    outputRange: [180, 0],
+    outputRange: [135, 0],
     extrapolate: "clamp",
   });
 
@@ -618,6 +566,9 @@ const Home = ({ route, navigation }) => {
     setZoomImageUri(uri);
     setZoomModalVisible(true);
   };
+
+  // NEW: Use a separate animated value for the modal carousel
+  const modalScrollX = useRef(new Animated.Value(0)).current;
 
   const renderItem = ({ item }) => {
     const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
@@ -718,99 +669,34 @@ const Home = ({ route, navigation }) => {
           },
         ]}
       >
-        <ImageBackground source={wingtipClouds} style={styles.headerImage} resizeMode="cover">
-          <View style={styles.headerContentRow}>
-            <TouchableOpacity
-              style={styles.imageUploadContainer}
-              onPress={handleUploadImage}
-              accessibilityLabel="Upload profile image"
-              accessibilityRole="button"
-            >
-              {uploadedImage ? (
-                <Image source={{ uri: uploadedImage }} style={styles.uploadedImage} />
-              ) : (
-                <Ionicons name="camera" size={30} color="#2D3748" />
-              )}
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.welcomeText}>Welcome</Text>
-              <Text style={[styles.userName, { fontSize: 22 }]}>{user?.displayName || "User"}</Text>
-            </View>
-          </View>
+        <ImageBackground
+          source={wingtipClouds}
+          style={styles.headerImage}
+          resizeMode="cover"
+        >
+          {/* Header content removed for Home.js; saved for later use in owner.js and renter.js */}
         </ImageBackground>
       </Animated.View>
 
-      <View style={styles.recommendedListingsContainer}>
-        <Text style={styles.sectionTitle}>Recommended for You</Text>
-        {isRecommendedLoading ? (
-          <ActivityIndicator size="large" color="#1E90FF" />
-        ) : recommendedListings.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {recommendedListings.map((listing) => (
-              <TouchableOpacity
-                key={listing.id}
-                style={[styles.recommendedCard, { width: 180, marginRight: 12 }]}
-                onPress={() => {
-                  if (!listing.ownerId) {
-                    Alert.alert(
-                      "Listing Unavailable",
-                      "This recommended listing does not have a valid owner and cannot be rented."
-                    );
-                    return;
-                  }
-                  setSelectedListing(listing);
-                  setImageIndex(0);
-                  setFullScreenModalVisible(true);
-                  setZoomImageUri(null);
-                  setZoomModalVisible(false);
-                  setFullName(user?.displayName || fullName || "Anonymous");
-                  setCityStateCombined("");
-                  setHasMedicalCertificate(false);
-                  setHasRentersInsurance(false);
-                  setFlightHours("");
-                }}
-                accessibilityLabel={`Select recommended aircraft: ${listing.year} ${listing.make} ${listing.airplaneModel}`}
-                accessibilityRole="button"
-              >
-                {listing.images && listing.images.length > 0 ? (
-                  <Image
-                    source={{ uri: listing.images[0] }}
-                    style={[styles.recommendedImage, { height: undefined, aspectRatio: 16 / 9 }]}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.noImageContainer}>
-                    <Ionicons name="image" size={50} color="#FFFFFF" />
-                    <Text style={styles.noImageText}>No Image</Text>
-                  </View>
-                )}
-                <Text style={styles.recommendedTitle}>
-                  {`${listing.year} ${listing.make} ${listing.airplaneModel}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        ) : (
-          <Text style={styles.emptyListText}>No recommended listings available.</Text>
-        )}
+      {/* Main container without additional top border radii */}
+      <View style={styles.mainContainer}>
+        <FlatList
+          data={listings}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
+          contentContainerStyle={{ paddingTop: 135 }}
+          ListHeaderComponent={renderListHeader}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<Text style={styles.emptyListText}>No listings available</Text>}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false, listener: handleScroll }
+          )}
+          ref={scrollViewRef}
+        />
       </View>
-
-      <FlatList
-        data={listings}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={{ paddingTop: 120 }}
-        ListHeaderComponent={renderListHeader}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<Text style={styles.emptyListText}>No listings available</Text>}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: false,
-          listener: handleScroll,
-        })}
-        ref={scrollViewRef}
-      />
 
       {showScrollToTop && (
         <TouchableOpacity
@@ -823,7 +709,7 @@ const Home = ({ route, navigation }) => {
         </TouchableOpacity>
       )}
 
-      {/* Full Screen Listing Modal with Transparent Black Background and White Text */}
+      {/* Full Screen Listing Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -846,7 +732,7 @@ const Home = ({ route, navigation }) => {
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onScroll={Animated.event(
-                  [{ nativeEvent: { contentOffset: { x: scrollY } } }],
+                  [{ nativeEvent: { contentOffset: { x: modalScrollX } } }],
                   {
                     useNativeDriver: false,
                     listener: (event) => {
@@ -860,21 +746,10 @@ const Home = ({ route, navigation }) => {
                 style={styles.carouselScrollView}
               >
                 {selectedListing.images.map((image, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    activeOpacity={0.9}
-                    onPress={() => handleImagePress(image)}
-                  >
+                  <TouchableOpacity key={index} activeOpacity={0.9} onPress={() => handleImagePress(image)}>
                     <View style={styles.carouselImageContainer}>
-                      <Image
-                        source={{ uri: image }}
-                        style={styles.modalImage}
-                        resizeMode="cover"
-                      />
-                      <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.7)"]}
-                        style={styles.gradientOverlay}
-                      />
+                      <Image source={{ uri: image }} style={styles.modalImage} resizeMode="cover" />
+                      <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={styles.gradientOverlay} />
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -924,7 +799,7 @@ const Home = ({ route, navigation }) => {
                     onChangeText={setFullName}
                     placeholder="Enter your full name"
                     placeholderTextColor="#FFFFFF"
-                    style={styles.textInput}
+                    style={[styles.textInput, { color: "#FFFFFF" }]}
                     accessibilityLabel="Full name input"
                   />
                 </View>
@@ -935,7 +810,7 @@ const Home = ({ route, navigation }) => {
                     onChangeText={setCityStateCombined}
                     placeholder="e.g., New York, NY"
                     placeholderTextColor="#FFFFFF"
-                    style={styles.textInput}
+                    style={[styles.textInput, { color: "#FFFFFF" }]}
                     accessibilityLabel="Current city and state input"
                   />
                 </View>
@@ -967,7 +842,7 @@ const Home = ({ route, navigation }) => {
                     placeholder="Enter hours"
                     placeholderTextColor="#FFFFFF"
                     keyboardType="numeric"
-                    style={styles.textInputSmall}
+                    style={[styles.textInputSmall, { color: "#FFFFFF" }]}
                     accessibilityLabel="Flight hours input"
                   />
                 </View>
@@ -985,7 +860,7 @@ const Home = ({ route, navigation }) => {
                       }
                     }}
                     keyboardType="numeric"
-                    style={styles.textInputSmall}
+                    style={[styles.textInputSmall, { color: "#FFFFFF" }]}
                     accessibilityLabel="Rental hours input"
                   />
                 </View>
@@ -1168,11 +1043,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F7FAFC",
   },
+  // HEADER STYLES - the header now has bottom left/right curves
   header: {
     position: "absolute",
     top: 0,
     width: "100%",
     zIndex: 1,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: "hidden",
   },
   headerImage: {
     flex: 1,
@@ -1208,49 +1087,10 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
   },
-  recommendedListingsContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 16,
-    color: "#2D3748",
-  },
-  recommendedCard: {
-    width: 200,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    marginRight: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-    overflow: "hidden",
-  },
-  recommendedImage: {
-    width: "100%",
-    height: 120,
-  },
-  noImageContainer: {
-    width: "100%",
-    height: 100,
-    backgroundColor: "#A0AEC0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  noImageText: {
-    color: "#FFFFFF",
-    marginTop: 8,
-    fontSize: 14,
-  },
-  recommendedTitle: {
-    padding: 12,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2D3748",
+  // Main container below header without border radii
+  mainContainer: {
+    flex: 1,
+    backgroundColor: "#F7FAFC",
   },
   newListingCardWrapper: {
     flex: 1,

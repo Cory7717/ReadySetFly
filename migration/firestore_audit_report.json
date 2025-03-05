@@ -186,37 +186,65 @@
         {
           "id": "5uWFZV3qeAhgm8NC1XVS",
           "path": "5uWFZV3qeAhgm8NC1XVS",
-          "issues": []
+          "issues": [
+            "❗ Missing field 'gearCity'",
+            "❗ Missing field 'gearPhone'",
+            "❗ Missing field 'gearDescription'",
+            "❗ Missing field 'gearPrice'",
+            "❗ Missing field 'gearTitle'",
+            "❗ Missing field 'gearEmail'",
+            "❗ Missing field 'gearState'"
+          ]
         },
         {
           "id": "CM9Wl4zSMczpEsZf1NZd",
           "path": "CM9Wl4zSMczpEsZf1NZd",
-          "issues": []
+          "issues": [
+            "❗ Missing field 'gearCity'",
+            "❗ Missing field 'gearPhone'",
+            "❗ Missing field 'gearDescription'",
+            "❗ Missing field 'gearPrice'",
+            "❗ Missing field 'gearTitle'",
+            "❗ Missing field 'gearEmail'",
+            "❗ Missing field 'gearState'"
+          ]
         },
         {
           "id": "D35nByouuq4tDcMiPA2v",
           "path": "D35nByouuq4tDcMiPA2v",
-          "issues": []
-        },
-        {
-          "id": "Dq6qIiutCHcaxXGZ6fcn",
-          "path": "Dq6qIiutCHcaxXGZ6fcn",
           "issues": [
-            "❗ Missing field 'price'"
+            "❗ Missing field 'gearCity'",
+            "❗ Missing field 'gearPhone'",
+            "❗ Missing field 'gearDescription'",
+            "❗ Missing field 'gearPrice'",
+            "❗ Missing field 'gearTitle'",
+            "❗ Missing field 'gearEmail'",
+            "❗ Missing field 'gearState'"
           ]
         },
         {
           "id": "TnMzh68G8k47SP6IPQuz",
           "path": "TnMzh68G8k47SP6IPQuz",
           "issues": [
-            "❗ Field 'packageType' has type 'string', expected 'object'"
+            "❗ Field 'packageType' has type 'string', expected 'object'",
+            "❗ Missing field 'gearCity'",
+            "❗ Missing field 'gearPhone'",
+            "❗ Missing field 'gearDescription'",
+            "❗ Missing field 'gearPrice'",
+            "❗ Missing field 'gearTitle'",
+            "❗ Missing field 'gearEmail'",
+            "❗ Missing field 'gearState'"
           ]
+        },
+        {
+          "id": "X7FEVJa25aEBb9HZ1xO0",
+          "path": "X7FEVJa25aEBb9HZ1xO0",
+          "issues": []
         },
         {
           "id": "jpqwwRkXU9csi69QFV2K",
           "path": "jpqwwRkXU9csi69QFV2K",
           "issues": [
-            "❗ Missing field 'price'",
             "❗ Field 'packageType' has type 'string', expected 'object'"
           ]
         },
@@ -249,14 +277,7 @@
           "id": "901BKVa4OsjxuBKnZEi9",
           "path": "901BKVa4OsjxuBKnZEi9",
           "issues": [
-            "❗ Missing field 'createdAt'",
-            "❗ Missing field 'ownerId'",
-            "❗ Missing field 'receiverId'",
-            "❗ Field 'rentalRequestId' has type 'object', expected 'string'",
-            "❗ Missing field 'listingId'",
-            "❗ Missing field 'status'",
-            "❗ Missing field 'timeStamp'",
-            "❗ Missing field 'messages'"
+            "❗ Field 'rentalRequestId' has type 'object', expected 'string'"
           ]
         },
         {
@@ -844,14 +865,6 @@
           ]
         },
         {
-          "id": "LPghsyHldy6u5gHl5keL",
-          "path": "LPghsyHldy6u5gHl5keL",
-          "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'",
-            "❗ Field 'totalCost' has type 'string', expected 'number'"
-          ]
-        },
-        {
           "id": "PvMYBNTTPgQqaCYV6Zf9",
           "path": "PvMYBNTTPgQqaCYV6Zf9",
           "issues": [
@@ -913,6 +926,14 @@
           ]
         },
         {
+          "id": "uBrpLMaAPDilKgRsxwVF",
+          "path": "uBrpLMaAPDilKgRsxwVF",
+          "issues": [
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
+        },
+        {
           "id": "ylqYZ7eC6vYyTrdfdGRc",
           "path": "ylqYZ7eC6vYyTrdfdGRc",
           "issues": [
@@ -947,27 +968,37 @@
         {
           "id": "08O5m7x11kG7lgPITLLs",
           "path": "08O5m7x11kG7lgPITLLs",
-          "issues": []
+          "issues": [
+            "❗ Missing field 'stripeAccountId'"
+          ]
         },
         {
           "id": "1kTTh0QKU7Y9FhA3f6D4axZOa6L2",
           "path": "1kTTh0QKU7Y9FhA3f6D4axZOa6L2",
-          "issues": []
+          "issues": [
+            "❗ Missing field 'stripeAccountId'"
+          ]
         },
         {
           "id": "2lIXc8K9s4M6iPmQ8E4v",
           "path": "2lIXc8K9s4M6iPmQ8E4v",
-          "issues": []
+          "issues": [
+            "❗ Missing field 'stripeAccountId'"
+          ]
         },
         {
           "id": "fqp5kbzrLrbA8jRsKTka",
           "path": "fqp5kbzrLrbA8jRsKTka",
-          "issues": []
+          "issues": [
+            "❗ Missing field 'stripeAccountId'"
+          ]
         },
         {
           "id": "iy3xZaoaxo1bt2KkVy3W",
           "path": "iy3xZaoaxo1bt2KkVy3W",
-          "issues": []
+          "issues": [
+            "❗ Missing field 'stripeAccountId'"
+          ]
         },
         {
           "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
@@ -1005,7 +1036,7 @@
   "summary": {
     "totalCollections": 19,
     "totalDocuments": 164,
-    "totalIssues": 52,
+    "totalIssues": 76,
     "issuesByType": {
       "❗ Field 'aircraftDetails' has type 'string', expected 'object'": 1,
       "❗ Field 'costPerHour' has type 'string', expected 'number'": 2,
@@ -1015,20 +1046,20 @@
       "❗ Field 'currentAnnualPdf' has type 'string', expected 'object'": 1,
       "❗ Field 'insurancePdf' has type 'string', expected 'object'": 1,
       "❗ Field 'ratesPerHour' has type 'number', expected 'string'": 1,
-      "❗ Missing field 'price'": 2,
+      "❗ Missing field 'gearCity'": 4,
+      "❗ Missing field 'gearPhone'": 4,
+      "❗ Missing field 'gearDescription'": 4,
+      "❗ Missing field 'gearPrice'": 4,
+      "❗ Missing field 'gearTitle'": 4,
+      "❗ Missing field 'gearEmail'": 4,
+      "❗ Missing field 'gearState'": 4,
       "❗ Field 'packageType' has type 'string', expected 'object'": 2,
-      "❗ Missing field 'createdAt'": 1,
-      "❗ Missing field 'ownerId'": 1,
-      "❗ Missing field 'receiverId'": 1,
       "❗ Field 'rentalRequestId' has type 'object', expected 'string'": 2,
-      "❗ Missing field 'listingId'": 1,
-      "❗ Missing field 'status'": 1,
-      "❗ Missing field 'timeStamp'": 1,
-      "❗ Missing field 'messages'": 1,
       "❗ Field 'image' has type 'string', expected 'object'": 8,
       "❗ Field 'userName' has type 'object', expected 'string'": 1,
       "❗ Field 'renterName' has type 'string', expected 'object'": 16,
-      "❗ Field 'totalCost' has type 'string', expected 'number'": 3
+      "❗ Field 'totalCost' has type 'string', expected 'number'": 3,
+      "❗ Missing field 'stripeAccountId'": 5
     }
   }
 }

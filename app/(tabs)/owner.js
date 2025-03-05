@@ -20,6 +20,7 @@ import {
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { db, storage, auth } from "../../firebaseConfig";
 import * as ImagePicker from "expo-image-picker";
+import * as Notifications from "expo-notifications";
 import {
   collection,
   addDoc,
@@ -229,7 +230,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [userListings, setUserListings] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
   const [ratings, setRatings] = useState({});
-  const [availableBalance, setAvailableBalance] = useState(0); // Available balance state
+  const [availableBalance, setAvailableBalance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
   const [activeRentals, setActiveRentals] = useState([]);
@@ -249,7 +250,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [rentalRequestModalVisible, setRentalRequestModalVisible] =
     useState(false);
 
-  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false); // Withdraw modal
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalEmail, setWithdrawalEmail] = useState("");
 
@@ -261,14 +262,14 @@ const OwnerProfile = ({ ownerId }) => {
     routingNumber: "",
     accountNumber: "",
   });
-  const [cardDetails, setCardDetails] = useState({}); // State for CardField details
+  const [cardDetails, setCardDetails] = useState({});
 
   // State for "View More" Active Rentals Modal with Pagination
   const [viewMoreModalVisible, setViewMoreModalVisible] = useState(false);
   const [activeRentalsPage, setActiveRentalsPage] = useState([]);
   const [lastActiveRentalDoc, setLastActiveRentalDoc] = useState(null);
   const [hasMoreActiveRentals, setHasMoreActiveRentals] = useState(true);
-  const ACTIVE_RENTALS_PAGE_SIZE = 10; // Number of rentals to fetch per page
+  const ACTIVE_RENTALS_PAGE_SIZE = 10;
 
   // State for Cleanup Loading
   const [cleanupLoading, setCleanupLoading] = useState(false);
@@ -283,11 +284,10 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Helper function to automatically send state data to Firestore.
-   * Ensures that every update is correctly persisted.
    */
   const autoSaveDataToFirestore = async (field, data) => {
     try {
-      const sanitizedData = sanitizeData(data); // Sanitize data before saving
+      const sanitizedData = sanitizeData(data);
       const docRef = doc(
         db,
         "users",
@@ -295,18 +295,15 @@ const OwnerProfile = ({ ownerId }) => {
         "owners",
         resolvedOwnerId
       );
-      // Using setDoc with merge: true to create document if it doesn't exist
       await setDoc(docRef, { [field]: sanitizedData }, { merge: true });
       console.log(`${field} has been successfully saved to Firestore.`);
     } catch (error) {
       console.error(`Error saving ${field} to Firestore:`, error);
-      // Optionally, notify the user about the error
     }
   };
 
   /**
    * Sanitize data by removing undefined and null values.
-   * Ensures data consistency in Firestore.
    */
   const sanitizeData = (data) => {
     const sanitizedData = {};
@@ -322,7 +319,6 @@ const OwnerProfile = ({ ownerId }) => {
     return sanitizedData;
   };
 
-  // UseCallback to memoize fetchOwnerData for use in useEffect and onRefresh
   const fetchOwnerData = useCallback(async () => {
     if (!resolvedOwnerId) {
       console.error("No owner ID or user ID available.");
@@ -331,7 +327,6 @@ const OwnerProfile = ({ ownerId }) => {
     }
 
     try {
-      // Fetch Owner Profile Data from 'users/{uid}/owners/{ownerId}'
       const profileDocRef = doc(
         db,
         "users",
@@ -347,27 +342,22 @@ const OwnerProfile = ({ ownerId }) => {
           fullName: profile.fullName || "",
           contact: profile.contact || "",
           address: profile.address || "",
-          email: profile.email || user.email || "", // Include email from Firestore or Firebase Auth
-          // Add more fields as necessary
+          email: profile.email || user.email || "",
         });
-        setStripeAccountId(profile.stripeAccountId || null); // Set Stripe Account ID
-        setIsStripeConnected(!!profile.stripeAccountId); // Update connection status
-
-        // Set Available Balance
+        setStripeAccountId(profile.stripeAccountId || null);
+        setIsStripeConnected(!!profile.stripeAccountId);
         setAvailableBalance(profile.availableBalance || 0);
       } else {
         console.log("No owner profile data found.");
-        setIsStripeConnected(false); // Owner not connected
-        // Initialize profileData with user's email
+        setIsStripeConnected(false);
         setProfileData((prev) => ({
           ...prev,
           email: user.email || "",
           fullName: user.displayName || "",
         }));
-        setAvailableBalance(0); // Initialize balance
+        setAvailableBalance(0);
       }
 
-      // Fetch Aircrafts from 'airplanes' collection where ownerId == resolvedOwnerId
       const airplanesRef = collection(db, "airplanes");
       const q = query(
         airplanesRef,
@@ -387,14 +377,10 @@ const OwnerProfile = ({ ownerId }) => {
     }
   }, [resolvedOwnerId, user]);
 
-  /**
-   * UseEffect to fetch owner data on component mount and when resolvedOwnerId changes.
-   */
   useFocusEffect(
     useCallback(() => {
       fetchOwnerData();
 
-      // Listen for real-time updates to availableBalance
       if (resolvedOwnerId) {
         const profileDocRef = doc(
           db,
@@ -426,9 +412,6 @@ const OwnerProfile = ({ ownerId }) => {
     }, [fetchOwnerData, resolvedOwnerId])
   );
 
-  /**
-   * UseEffect to watch and auto-save changes in profileData, aircraftDetails, costData
-   */
   useEffect(() => {
     if (resolvedOwnerId) {
       autoSaveDataToFirestore("profileData", profileData);
@@ -451,19 +434,17 @@ const OwnerProfile = ({ ownerId }) => {
    * Function to handle connecting Stripe account.
    */
   const handleConnectStripe = async () => {
-    // Ensure that both email and fullName are present before proceeding
     if (!profileData.email || !profileData.fullName) {
       Alert.alert(
         "Incomplete Profile",
         "Please provide your full name and email address."
       );
-      setConnectStripeModalVisible(true); // Open the modal to collect data
+      setConnectStripeModalVisible(true);
       return;
     }
 
     try {
-      const token = await user.getIdToken(); // Get Firebase ID token for authentication
-
+      const token = await user.getIdToken();
       const response = await fetch(`${API_URL}/create-connected-account`, {
         method: "POST",
         headers: {
@@ -471,7 +452,7 @@ const OwnerProfile = ({ ownerId }) => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          ownerId: resolvedOwnerId, // Ensure ownerId is included
+          ownerId: resolvedOwnerId,
           email: profileData.email,
           fullName: profileData.fullName,
         }),
@@ -481,7 +462,6 @@ const OwnerProfile = ({ ownerId }) => {
 
       if (response.ok) {
         const { accountLinkUrl } = data;
-        // Open the account link in a web browser
         Linking.openURL(accountLinkUrl);
       } else {
         Alert.alert(
@@ -515,10 +495,8 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Function to handle withdrawal.
-   * Ensures all necessary fields are validated and included.
    */
   const handleWithdraw = async () => {
-    // Validate Withdrawal Amount
     if (
       !withdrawalAmount ||
       isNaN(withdrawalAmount) ||
@@ -528,7 +506,6 @@ const OwnerProfile = ({ ownerId }) => {
       return;
     }
 
-    // Validate Email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!withdrawalEmail || !emailRegex.test(withdrawalEmail)) {
       Alert.alert("Invalid Email", "Please enter a valid email address.");
@@ -545,7 +522,6 @@ const OwnerProfile = ({ ownerId }) => {
       return;
     }
 
-    // Validate Payment Method
     if (paymentMethod === "bank") {
       const { accountHolderName, bankName, routingNumber, accountNumber } =
         bankDetails;
@@ -553,7 +529,6 @@ const OwnerProfile = ({ ownerId }) => {
         Alert.alert("Incomplete Details", "Please fill in all bank details.");
         return;
       }
-      // Note: Implement bank account withdrawal functionality here
       Alert.alert(
         "Info",
         "Bank withdrawal functionality is currently under development."
@@ -574,7 +549,6 @@ const OwnerProfile = ({ ownerId }) => {
       let paymentMethodId = "";
 
       if (paymentMethod === "card") {
-        // Create a Stripe payment method using the CardField
         const { error, paymentMethod: stripePaymentMethod } =
           await stripe.createPaymentMethod({
             type: "Card",
@@ -593,8 +567,7 @@ const OwnerProfile = ({ ownerId }) => {
         paymentMethodId = stripePaymentMethod.id;
       }
 
-      // Proceed with withdrawal via backend
-      const token = await user.getIdToken(); // Get Firebase ID token for authentication
+      const token = await user.getIdToken();
 
       const response = await fetch(`${API_URL}/withdraw-funds`, {
         method: "POST",
@@ -603,10 +576,10 @@ const OwnerProfile = ({ ownerId }) => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          ownerId: resolvedOwnerId, // Ensure ownerId is included
-          amount: Math.round(amount * 100), // Convert to cents if required by backend
+          ownerId: resolvedOwnerId,
+          amount: Math.round(amount * 100),
           paymentMethodId,
-          email: withdrawalEmail, // Include email in the request
+          email: withdrawalEmail,
         }),
       });
 
@@ -620,9 +593,8 @@ const OwnerProfile = ({ ownerId }) => {
           )}. An email confirmation has been sent to ${withdrawalEmail}.`
         );
         setWithdrawalAmount("");
-        setWithdrawalEmail(""); // Reset email field
+        setWithdrawalEmail("");
         setWithdrawModalVisible(false);
-        // The availableBalance will update automatically via Firestore snapshot
       } else {
         Alert.alert(
           "Error",
@@ -640,7 +612,6 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Function to toggle the selection of an aircraft.
-   * Adds or removes the aircraft ID from the selectedAircraftIds array.
    */
   const toggleSelectAircraft = (aircraftId) => {
     if (selectedAircraftIds.includes(aircraftId)) {
@@ -700,6 +671,24 @@ const OwnerProfile = ({ ownerId }) => {
       const unsubscribeRentalRequests = onSnapshot(
         q,
         async (snapshot) => {
+          // NEW: Check for newly added rental requests and schedule a local notification
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+              const newRequest = change.doc.data();
+              if (newRequest.status === "pending") {
+                Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: "New Rental Request",
+                    body:
+                      "You have received a new rental request. Check your Incoming Rental Requests for details.",
+                    data: { rentalRequestId: change.doc.id },
+                  },
+                  trigger: null,
+                });
+              }
+            }
+          });
+
           const requestsWithDetails = await Promise.all(
             snapshot.docs.map(async (docSnap) => {
               const requestData = docSnap.data();
@@ -729,19 +718,18 @@ const OwnerProfile = ({ ownerId }) => {
                 const renterDocSnap = await getDoc(renterDocRef);
                 if (renterDocSnap.exists()) {
                   const renterData = renterDocSnap.data();
-                  console.log("Renter Data:", renterData); // Debugging line
+                  console.log("Renter Data:", renterData);
                   renterName = renterData.fullName || "Anonymous";
                   renterCityState = renterData.currentLocation || "N/A";
                 }
               }
 
-              // Calculate baseCost, commission, and totalCost if not already calculated
               let baseCost = requestData.baseCost;
               let commission = requestData.commission;
               if (!baseCost && listingDetails) {
                 const costPerHour = parseFloat(listingDetails.costPerHour);
                 baseCost = (parseFloat(rentalHours) * costPerHour).toFixed(2);
-                commission = (baseCost * 0.06).toFixed(2); // 6% commission
+                commission = (baseCost * 0.06).toFixed(2);
               }
 
               return {
@@ -760,7 +748,6 @@ const OwnerProfile = ({ ownerId }) => {
             })
           );
 
-          // Separate rental requests into pending and active
           const pendingRequests = requestsWithDetails.filter(
             (req) => req.status === "pending"
           );
@@ -870,7 +857,6 @@ const OwnerProfile = ({ ownerId }) => {
 
       const ownerName = user.displayName || "Unknown Owner";
 
-      // Ensure rentalHours and costPerHour are available
       const rentalHours = request.rentalHours;
       const costPerHour = request.listingDetails
         ? parseFloat(request.listingDetails.costPerHour)
@@ -884,27 +870,24 @@ const OwnerProfile = ({ ownerId }) => {
         return;
       }
 
-      // Calculate baseCost, commission, and totalCost
       const baseCost = (parseFloat(rentalHours) * costPerHour).toFixed(2);
-      const commission = (baseCost * 0.06).toFixed(2); // 6% commission
+      const commission = (baseCost * 0.06).toFixed(2);
       const totalCost = (parseFloat(baseCost) - parseFloat(commission)).toFixed(
         2
       );
 
-      // Start a batch write to ensure atomicity
       const batch = writeBatch(db);
 
-      // Update the rental request status to 'active' in 'rentalRequests' collection
       const rentalRequestRef = doc(db, "rentalRequests", request.id);
       batch.update(rentalRequestRef, {
         status: "active",
-        rentalDate: request.rentalDate, // Use the date from the request
+        rentalDate: request.rentalDate,
         baseCost,
         commission,
         totalCost,
+        renterName: request.renterName,
       });
 
-      // Notify the renter with rentalRequestId
       const notificationRef = collection(
         db,
         "renters",
@@ -915,20 +898,19 @@ const OwnerProfile = ({ ownerId }) => {
         type: "rentalApproved",
         message:
           "Your rental request has been approved. Please complete the payment.",
-        rentalRequestId: request.id, // Include rentalRequestId
+        rentalRequestId: request.id,
         listingId: request.listingId,
         ownerId: resolvedOwnerId,
-        ownerName: ownerName, // Include owner name
+        ownerName: ownerName,
         rentalDate: request.rentalDate,
         createdAt: serverTimestamp(),
+        renterName: request.renterName,
       };
-      const notificationDoc = doc(notificationRef); // Auto-generated ID
+      const notificationDoc = doc(notificationRef);
       batch.set(notificationDoc, notificationData);
 
-      // Commit the batch
       await batch.commit();
 
-      // Handle Chat Threads
       const chatThreadsQuery = query(
         collection(db, "messages"),
         where("participants", "array-contains", resolvedOwnerId)
@@ -968,7 +950,6 @@ const OwnerProfile = ({ ownerId }) => {
         )} has been approved.`
       );
 
-      // Open the message modal for the chat thread
       openMessageModal(chatThreadId);
       setRentalRequestModalVisible(false);
     } catch (error) {
@@ -1000,16 +981,13 @@ const OwnerProfile = ({ ownerId }) => {
         return;
       }
 
-      // Start a batch write to ensure atomicity
       const batch = writeBatch(db);
 
-      // Update the rental request status to 'denied' in 'rentalRequests' collection
       const rentalRequestRef = doc(db, "rentalRequests", request.id);
       batch.update(rentalRequestRef, {
         status: "denied",
       });
 
-      // Notify the renter with rentalRequestId
       const notificationRef = collection(
         db,
         "renters",
@@ -1019,15 +997,14 @@ const OwnerProfile = ({ ownerId }) => {
       const notificationData = {
         type: "rentalDenied",
         message: "Your rental request has been denied by the owner.",
-        rentalRequestId: request.id, // Include rentalRequestId
+        rentalRequestId: request.id,
         listingId: request.listingId,
         ownerId: resolvedOwnerId,
         createdAt: serverTimestamp(),
       };
-      const notificationDoc = doc(notificationRef); // Auto-generated ID
+      const notificationDoc = doc(notificationRef);
       batch.set(notificationDoc, notificationData);
 
-      // Commit the batch
       await batch.commit();
 
       Alert.alert("Request Denied", "The rental request has been denied.");
@@ -1071,25 +1048,18 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Function to handle deleting an active rental.
-   * Removes the rental request from the 'rentalRequests' collection.
    */
   const handleDeleteActiveRental = async (rentalId) => {
     try {
-      // Delete the rental request document from Firestore
       const rentalRequestRef = doc(db, "rentalRequests", rentalId);
       await deleteDoc(rentalRequestRef);
 
-      // Remove the rental from the activeRentals state
       setActiveRentals(
         activeRentals.filter((rental) => rental.id !== rentalId)
       );
-
-      // Remove the rental from the activeRentalsPage state
       setActiveRentalsPage(
         activeRentalsPage.filter((rental) => rental.id !== rentalId)
       );
-
-      // Remove from selectedAircraftIds if selected
       setSelectedAircraftIds(
         selectedAircraftIds.filter((id) => id !== rentalId)
       );
@@ -1103,9 +1073,7 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Cleanup Functions
-   * These functions ensure data integrity by removing orphaned rental requests and listings.
    */
-  // Function to clean up orphaned rental requests
   const cleanupOrphanedRentalRequests = async () => {
     const BATCH_SIZE = 500;
     try {
@@ -1126,28 +1094,24 @@ const OwnerProfile = ({ ownerId }) => {
         const renterId = requestData.renterId;
 
         if (!renterId) {
-          // If renterId is missing, delete the rental request
           batch.delete(docSnap.ref);
           deletions += 1;
         } else {
           const renterDocRef = doc(db, "renters", renterId);
           const renterDocSnap = await getDoc(renterDocRef);
           if (!renterDocSnap.exists()) {
-            // If renter document does not exist, delete the rental request
             batch.delete(docSnap.ref);
             deletions += 1;
           }
         }
 
-        // Commit the batch every BATCH_SIZE deletions
         if (deletions % BATCH_SIZE === 0 && deletions > 0) {
           await batch.commit();
           console.log(`${deletions} rental requests deleted so far...`);
-          batch = writeBatch(db); // Reset the batch
+          batch = writeBatch(db);
         }
       }
 
-      // Commit any remaining deletions
       if (deletions % BATCH_SIZE !== 0) {
         await batch.commit();
       }
@@ -1166,7 +1130,6 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  // Function to clean up orphaned listings
   const cleanupOrphanedListings = async () => {
     const BATCH_SIZE = 500;
     try {
@@ -1187,28 +1150,24 @@ const OwnerProfile = ({ ownerId }) => {
         const ownerId = listingData.ownerId;
 
         if (!ownerId) {
-          // If ownerId is missing, delete the listing
           batch.delete(docSnap.ref);
           deletions += 1;
         } else {
           const ownerDocRef = doc(db, "users", ownerId, "owners", ownerId);
           const ownerDocSnap = await getDoc(ownerDocRef);
           if (!ownerDocSnap.exists()) {
-            // If owner document does not exist, delete the listing
             batch.delete(docSnap.ref);
             deletions += 1;
           }
         }
 
-        // Commit the batch every BATCH_SIZE deletions
         if (deletions % BATCH_SIZE === 0 && deletions > 0) {
           await batch.commit();
           console.log(`${deletions} listings deleted so far...`);
-          batch = writeBatch(db); // Reset the batch
+          batch = writeBatch(db);
         }
       }
 
-      // Commit any remaining deletions
       if (deletions % BATCH_SIZE !== 0) {
         await batch.commit();
       }
@@ -1227,13 +1186,11 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  // General cleanup function
   const performCleanup = async () => {
     setCleanupLoading(true);
     try {
       await cleanupOrphanedRentalRequests();
       await cleanupOrphanedListings();
-      // Add more cleanup functions here if needed
       Alert.alert("Cleanup Success", "All cleanup operations completed.");
     } catch (error) {
       console.error("Error performing cleanup:", error);
@@ -1250,7 +1207,6 @@ const OwnerProfile = ({ ownerId }) => {
     if (viewMoreModalVisible) {
       fetchFirstPageActiveRentals();
     } else {
-      // Reset pagination when modal is closed
       setActiveRentalsPage([]);
       setLastActiveRentalDoc(null);
       setHasMoreActiveRentals(true);
@@ -1350,14 +1306,9 @@ const OwnerProfile = ({ ownerId }) => {
    * Utility Functions
    */
 
-  /**
-   * Function to save cost data.
-   * Calculates and persists cost-related information.
-   */
   const saveCostData = async () => {
     setLoading(true);
     try {
-      // Validate Inputs
       const requiredFields = Object.values(costData).filter(
         (field) => field === ""
       );
@@ -1370,7 +1321,6 @@ const OwnerProfile = ({ ownerId }) => {
         return;
       }
 
-      // Calculate Monthly Mortgage Expense
       const monthlyInterestRate = parseFloat(costData.interestRate) / 100 / 12;
       const numberOfPayments = parseFloat(costData.loanTerm) * 12;
       const principal = parseFloat(costData.loanAmount);
@@ -1381,14 +1331,12 @@ const OwnerProfile = ({ ownerId }) => {
           ).toFixed(2)
         : 0;
 
-      // Calculate Depreciation Expense
       const depreciationExpense = (
         (parseFloat(costData.purchasePrice) *
           parseFloat(costData.depreciationRate)) /
         100
       ).toFixed(2);
 
-      // Total Fixed Costs per Year
       const totalFixedCosts =
         parseFloat(mortgageExpense) * 12 +
         parseFloat(depreciationExpense) +
@@ -1397,7 +1345,6 @@ const OwnerProfile = ({ ownerId }) => {
         parseFloat(costData.maintenanceReserve) +
         parseFloat(costData.annualRegistrationFees);
 
-      // Total Variable Costs per Year
       const totalVariableCosts =
         (parseFloat(costData.fuelCostPerHour) +
           parseFloat(costData.oilCostPerHour) +
@@ -1406,10 +1353,8 @@ const OwnerProfile = ({ ownerId }) => {
           parseFloat(costData.otherConsumablesPerHour)) *
         parseFloat(costData.rentalHoursPerYear);
 
-      // Total Cost per Year
       const totalCostPerYear = totalFixedCosts + totalVariableCosts;
 
-      // Cost per Hour
       const costPerHour = (
         totalCostPerYear / parseFloat(costData.rentalHoursPerYear)
       ).toFixed(2);
@@ -1423,7 +1368,6 @@ const OwnerProfile = ({ ownerId }) => {
       setCostSaved(true);
       setLoading(false);
 
-      // Persist cost data to Firestore using setDoc with merge: true
       await setDoc(
         doc(db, "users", resolvedOwnerId, "owners", resolvedOwnerId),
         {
@@ -1446,10 +1390,6 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to handle input changes in various sections.
-   * Ensures that all changes are correctly reflected in the state.
-   */
   const handleInputChange = (name, value) => {
     if (name in aircraftDetails) {
       setAircraftDetails((prev) => ({ ...prev, [name]: value }));
@@ -1464,24 +1404,19 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to pick images using Expo ImagePicker.
-   * Ensures that the maximum number of images is not exceeded.
-   */
   const pickImage = async () => {
     if (images.length >= 7) {
       Alert.alert("Limit Reached", "You can only upload up to 7 images.");
       return;
     }
 
-    // Disable allowsEditing when allowsMultipleSelection is enabled
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       allowsEditing: false,
       aspect: [4, 3],
       quality: 1,
-      selectionLimit: 7 - images.length, // Allow selecting multiple images up to the limit
+      selectionLimit: 7 - images.length,
     });
 
     if (!result.canceled) {
@@ -1490,10 +1425,6 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to remove an image from the list.
-   * Ensures that the main image is updated if necessary.
-   */
   const removeImage = (uri) => {
     setImages(images.filter((image) => image !== uri));
     if (aircraftDetails.mainImage === uri) {
@@ -1504,10 +1435,6 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to upload a file (image or PDF) to Firebase Storage.
-   * Returns the download URL of the uploaded file.
-   */
   const uploadFile = async (uri, folder) => {
     try {
       const response = await fetch(uri);
@@ -1530,12 +1457,7 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to handle saving aircraft details.
-   * Ensures that `ownerId` is included and correctly set.
-   */
   const onSaveAircraftDetails = async () => {
-    // Debugging: Log current location value
     console.log("Saving Aircraft Details. Location:", aircraftDetails.location);
 
     if (!aircraftDetails.location || aircraftDetails.location.trim() === "") {
@@ -1545,10 +1467,8 @@ const OwnerProfile = ({ ownerId }) => {
 
     setLoading(true);
     try {
-      // **Step 1: Upload images to Firebase Storage and get download URLs**
       const uploadedImages = await uploadImages(images, "aircraftImages");
 
-      // **Step 2: Determine the main image URL based on the original selection**
       let mainImageURL = uploadedImages.length > 0 ? uploadedImages[0] : "";
 
       if (aircraftDetails.mainImage) {
@@ -1558,29 +1478,24 @@ const OwnerProfile = ({ ownerId }) => {
         }
       }
 
-      // **Step 3: Update aircraftDetails with uploaded images and mainImage URL**
       const updatedAircraftDetails = {
         ...aircraftDetails,
         images: uploadedImages,
         mainImage: mainImageURL,
       };
 
-      // **Step 4: Update state**
       setImages(uploadedImages);
       setAircraftDetails(updatedAircraftDetails);
       setAircraftSaved(true);
 
-      // **Step 5: Update Firestore using setDoc**
       const airplanesRef = collection(db, "airplanes");
       if (selectedAircraft) {
-        // Editing an existing aircraft
         const aircraftDocRef = doc(db, "airplanes", selectedAircraft.id);
         await updateDoc(aircraftDocRef, {
           ...updatedAircraftDetails,
           updatedAt: serverTimestamp(),
         });
 
-        // Update local state
         setUserListings((prev) =>
           prev.map((aircraft) =>
             aircraft.id === selectedAircraft.id
@@ -1596,22 +1511,20 @@ const OwnerProfile = ({ ownerId }) => {
           )
         );
       } else {
-        // Adding a new aircraft
         const newAircraft = {
           ...updatedAircraftDetails,
-          ownerId: resolvedOwnerId, // Ensure ownerId is included
+          ownerId: resolvedOwnerId,
           createdAt: serverTimestamp(),
         };
         const docRef = await addDoc(airplanesRef, newAircraft);
         newAircraft.id = docRef.id;
 
-        // **Step 7: Update State**
         setUserListings((prev) => [...prev, newAircraft]);
         setAllAircrafts((prev) => [...prev, newAircraft]);
       }
 
       Alert.alert("Success", "Your aircraft details have been saved.");
-      setAircraftModalVisible(false); // Close the modal after saving
+      setAircraftModalVisible(false);
     } catch (error) {
       console.error("Error saving aircraft details:", error);
       Alert.alert("Error", "Failed to save aircraft details.");
@@ -1620,28 +1533,16 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to initiate editing of aircraft details.
-   */
   const onEditAircraftDetails = () => {
     setIsEditing(true);
   };
 
-  /**
-   * Function to handle closing the aircraft modal.
-   * Saves the aircraft details before closing.
-   */
   const handleCloseAircraftModal = async () => {
     await onSaveAircraftDetails();
     setAircraftModalVisible(false);
   };
 
-  /**
-   * Handles the submission of aircraft listings.
-   * Updated to align with the 'airplanes' collection structure.
-   */
   const onSubmitMethod = async (aircraft, additional = false) => {
-    // Validate necessary fields from the passed aircraft
     if (!aircraft.location || aircraft.location.trim() === "") {
       Alert.alert("Error", "Location is required for the selected aircraft.");
       return;
@@ -1659,13 +1560,11 @@ const OwnerProfile = ({ ownerId }) => {
 
     setLoading(true);
     try {
-      // **Step 1: Upload Images**
       const uploadedImages = await uploadImages(
         aircraft.images || [],
         "aircraftImages"
       );
 
-      // **Step 2: Upload PDFs (if any)**
       const annualProofURL = aircraft.currentAnnualPdf
         ? await uploadFile(aircraft.currentAnnualPdf, "documents")
         : "";
@@ -1673,7 +1572,6 @@ const OwnerProfile = ({ ownerId }) => {
         ? await uploadFile(aircraft.insurancePdf, "documents")
         : "";
 
-      // **Step 3: Determine Main Image**
       let mainImageURL = uploadedImages.length > 0 ? uploadedImages[0] : "";
       if (aircraft.mainImage) {
         const mainImageIndex = aircraft.images.indexOf(aircraft.mainImage);
@@ -1682,7 +1580,6 @@ const OwnerProfile = ({ ownerId }) => {
         }
       }
 
-      // **Step 4: Prepare New Listing Data**
       const newListing = sanitizeData({
         aircraftModel: aircraft.aircraftModel || "",
         tailNumber: aircraft.tailNumber || "",
@@ -1696,17 +1593,15 @@ const OwnerProfile = ({ ownerId }) => {
         mainImage: mainImageURL,
         currentAnnualPdf: annualProofURL || "",
         insurancePdf: insuranceProofURL || "",
-        ownerId: resolvedOwnerId, // **Ensure ownerId is included**
+        ownerId: resolvedOwnerId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      // **Step 5: Add Listing to Firestore**
       const airplanesRef = collection(db, "airplanes");
       const docRef = await addDoc(airplanesRef, newListing);
-      newListing.id = docRef.id; // Assign listingId
+      newListing.id = docRef.id;
 
-      // **Step 6: Update State**
       setUserListings((prev) => [...prev, newListing]);
       setAllAircrafts((prev) => [...prev, newListing]);
 
@@ -1727,10 +1622,6 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to toggle the listing of selected aircraft.
-   * Ensures that only selected aircraft are listed for rent.
-   */
   const handleListForRentToggle = async () => {
     if (selectedAircraftIds.length === 0) {
       Alert.alert(
@@ -1742,20 +1633,16 @@ const OwnerProfile = ({ ownerId }) => {
 
     setLoading(true);
     try {
-      // Fetch the selected aircraft details
       const selectedAircrafts = allAircrafts.filter((aircraft) =>
         selectedAircraftIds.includes(aircraft.id)
       );
 
       console.log("Selected Aircrafts for Listing:", selectedAircrafts);
 
-      // List each selected aircraft
       for (const aircraft of selectedAircrafts) {
-        // Implement additional logic here if needed
-        // For now, we're assuming the aircraft is already listed in 'airplanes' collection
+        // Additional logic can be added here if needed
       }
 
-      // Reset selection after listing
       setSelectedAircraftIds([]);
       Alert.alert("Success", "Selected aircraft have been listed for rent.");
     } catch (error) {
@@ -1766,10 +1653,6 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to handle deleting all active rentals.
-   * Ensures that rentals are removed from the 'rentalRequests' collection.
-   */
   const handleDeleteAllActiveRentals = async () => {
     try {
       for (const rental of activeRentals) {
@@ -1782,10 +1665,6 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
-  /**
-   * Function to upload multiple images concurrently.
-   * Enhances performance by uploading all images in parallel.
-   */
   const uploadImages = async (uris, folder) => {
     try {
       const uploadPromises = uris.map((uri) => uploadFile(uri, folder));
@@ -1832,11 +1711,9 @@ const OwnerProfile = ({ ownerId }) => {
                 {user?.displayName || "User"}
               </Text>
             </View>
-            {/* Removed Funds Button from Header */}
           </View>
         </ImageBackground>
 
-        {/* Funds Button Above Cost of Ownership */}
         <View
           style={{
             alignItems: "center",
@@ -1845,22 +1722,19 @@ const OwnerProfile = ({ ownerId }) => {
           }}
         >
           <CustomButton
-            onPress={() => setWithdrawModalVisible(true)} // Open withdraw modal
+            onPress={() => setWithdrawModalVisible(true)}
             title={`$${availableBalance.toFixed(2)}`}
             backgroundColor="#000"
             style={{ width: 96, height: 48, borderRadius: 24 }}
             textStyle={{ fontSize: 18, fontWeight: "bold" }}
           />
         </View>
-        {/* End of Funds Button Placement */}
 
-        {/* Cost of Ownership Calculator */}
         <View style={{ paddingHorizontal: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Cost of Ownership Calculator
           </Text>
 
-          {/* Dropdown Toggle Button */}
           <TouchableOpacity
             onPress={() => setShowCalculator((prev) => !prev)}
             style={{
@@ -1928,7 +1802,6 @@ const OwnerProfile = ({ ownerId }) => {
                 </View>
               ) : (
                 <View>
-                  {/* Loan Details Section */}
                   <Section title="Loan Details">
                     <CustomTextInput
                       placeholder="Purchase Price ($)"
@@ -1992,7 +1865,6 @@ const OwnerProfile = ({ ownerId }) => {
                     </Text>
                   </Section>
 
-                  {/* Annual Costs Section */}
                   <Section title="Annual Costs">
                     <CustomTextInput
                       placeholder="Estimated Annual Cost ($)"
@@ -2041,7 +1913,6 @@ const OwnerProfile = ({ ownerId }) => {
                     />
                   </Section>
 
-                  {/* Operational Costs Section */}
                   <Section title="Operational Costs">
                     <CustomTextInput
                       placeholder="Fuel Cost Per Hour ($)"
@@ -2136,20 +2007,20 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </View>
         )}
-        {/* ************* Updated Section: Your Aircraft ************* */}
+
+        {/* Your Aircraft Section */}
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Your Aircraft
           </Text>
 
-          {/* Add Aircraft Button */}
           <CustomButton
             onPress={() => {
               setSelectedAircraft(null);
               setIsEditing(true);
               setAircraftDetails({
                 aircraftModel: "",
-                tailNumber: "", // New field
+                tailNumber: "",
                 engineType: "",
                 totalTimeOnFrame: "",
                 location: "",
@@ -2168,11 +2039,10 @@ const OwnerProfile = ({ ownerId }) => {
             accessibilityLabel="Add Aircraft button"
           />
 
-          {/* Horizontal ScrollView for Aircraft Cards */}
           {allAircrafts.length > 0 ? (
             <FlatList
               data={allAircrafts}
-              keyExtractor={(item) => item.id} // Ensure unique keys
+              keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
               renderItem={({ item }) => (
@@ -2196,7 +2066,6 @@ const OwnerProfile = ({ ownerId }) => {
                   accessibilityLabel={`View details for aircraft ${item.aircraftModel}`}
                   accessibilityRole="button"
                 >
-                  {/* Circle Selection Button */}
                   <TouchableOpacity
                     onPress={() => toggleSelectAircraft(item.id)}
                     style={{
@@ -2224,7 +2093,6 @@ const OwnerProfile = ({ ownerId }) => {
                     )}
                   </TouchableOpacity>
 
-                  {/* Aircraft Image */}
                   {item.mainImage ? (
                     <Image
                       source={{ uri: item.mainImage }}
@@ -2245,7 +2113,6 @@ const OwnerProfile = ({ ownerId }) => {
                     </View>
                   )}
 
-                  {/* Aircraft Info */}
                   <View style={{ marginTop: 8 }}>
                     <Text style={{ fontWeight: "bold", fontSize: 16 }}>
                       {item.aircraftModel}
@@ -2267,7 +2134,6 @@ const OwnerProfile = ({ ownerId }) => {
                     </Text>
                   </View>
 
-                  {/* Remove Button */}
                   <TouchableOpacity
                     onPress={() => {
                       Alert.alert(
@@ -2280,7 +2146,6 @@ const OwnerProfile = ({ ownerId }) => {
                             style: "destructive",
                             onPress: async () => {
                               try {
-                                // Remove the aircraft from 'airplanes' collection
                                 await deleteDoc(doc(db, "airplanes", item.id));
 
                                 setUserListings(
@@ -2331,14 +2196,13 @@ const OwnerProfile = ({ ownerId }) => {
             <Text style={{ color: "#a0aec0" }}>No aircraft added yet.</Text>
           )}
 
-          {/* ************* Big Plus Sign to Add Additional Aircraft ************* */}
           <TouchableOpacity
             onPress={() => {
               setSelectedAircraft(null);
               setIsEditing(true);
               setAircraftDetails({
                 aircraftModel: "",
-                tailNumber: "", // New field
+                tailNumber: "",
                 engineType: "",
                 totalTimeOnFrame: "",
                 location: "",
@@ -2361,9 +2225,6 @@ const OwnerProfile = ({ ownerId }) => {
           >
             <Ionicons name="add-circle" size={60} color="#3182ce" />
           </TouchableOpacity>
-          {/* ************* End of Big Plus Sign ************* */}
-
-          {/* List Selected Aircraft Button */}
           <CustomButton
             onPress={handleListForRentToggle}
             title="List Selected Aircraft"
@@ -2372,11 +2233,8 @@ const OwnerProfile = ({ ownerId }) => {
             accessibilityLabel="List selected aircraft for rent"
           />
         </View>
-        {/* ************* End of Updated Section: Your Aircraft ************* */}
 
-        {/* ************* Admin Tools Section ************* */}
-        {/* Show only for admin users */}
-        {user?.email === "admin@example.com" && ( // Replace with your admin condition
+        {user?.email === "admin@example.com" && (
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
             <Text
               style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}
@@ -2412,9 +2270,7 @@ const OwnerProfile = ({ ownerId }) => {
             )}
           </View>
         )}
-        {/* ************* End of Admin Tools Section ************* */}
 
-        {/* Current Listings */}
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Current Listings
@@ -2422,9 +2278,9 @@ const OwnerProfile = ({ ownerId }) => {
           {userListings.length > 0 ? (
             <FlatList
               data={userListings}
-              keyExtractor={(item, index) => `${item.id}_${index}`} // Ensures unique keys
+              keyExtractor={(item, index) => `${item.id}_${index}`}
               nestedScrollEnabled={true}
-              scrollEnabled={false} // Disable scrolling to prevent nesting issues
+              scrollEnabled={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   onPress={() => {
@@ -2452,7 +2308,6 @@ const OwnerProfile = ({ ownerId }) => {
                       justifyContent: "space-between",
                     }}
                   >
-                    {/* Pressable Area */}
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 20, fontWeight: "bold" }}>
                         {item.aircraftModel}
@@ -2460,7 +2315,6 @@ const OwnerProfile = ({ ownerId }) => {
                       <Text>{item.description}</Text>
                       <Text>Rate per Hour: ${item.costPerHour}</Text>
                     </View>
-                    {/* Remove Button */}
                     <TouchableOpacity
                       onPress={() => {
                         Alert.alert(
@@ -2473,7 +2327,6 @@ const OwnerProfile = ({ ownerId }) => {
                               style: "destructive",
                               onPress: async () => {
                                 try {
-                                  // Remove the aircraft from 'airplanes' collection
                                   await deleteDoc(
                                     doc(db, "airplanes", item.id)
                                   );
@@ -2520,9 +2373,9 @@ const OwnerProfile = ({ ownerId }) => {
                     <FlatList
                       data={item.images}
                       horizontal
-                      keyExtractor={(image, idx) => `${image}_${idx}`} // Ensures unique keys
+                      keyExtractor={(image, idx) => `${image}_${idx}`}
                       nestedScrollEnabled={true}
-                      scrollEnabled={false} // Disable scrolling to prevent nesting issues
+                      scrollEnabled={false}
                       renderItem={({ item: image }) => (
                         <Image
                           source={{ uri: image }}
@@ -2546,7 +2399,6 @@ const OwnerProfile = ({ ownerId }) => {
           )}
         </View>
 
-        {/* ************* New Section: Incoming Rental Requests ************* */}
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Incoming Rental Requests
@@ -2554,9 +2406,9 @@ const OwnerProfile = ({ ownerId }) => {
           {rentalRequests.length > 0 ? (
             <FlatList
               data={rentalRequests}
-              keyExtractor={(item, index) => `${item.id}_${index}`} // Ensures unique keys
+              keyExtractor={(item, index) => `${item.id}_${index}`}
               nestedScrollEnabled={true}
-              scrollEnabled={false} // Disable scrolling to prevent nesting issues
+              scrollEnabled={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   key={item.id}
@@ -2580,14 +2432,12 @@ const OwnerProfile = ({ ownerId }) => {
                   <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                     Renter: {item.renterName}
                   </Text>
-                  {/* Display Aircraft */}
                   <Text>
                     Listing:{" "}
                     {item.listingDetails
                       ? `${item.listingDetails.aircraftModel}`
                       : "Listing details not available"}
                   </Text>
-                  {/* Display Base Cost */}
                   <Text>Total Cost: ${item.baseCost}</Text>
                   <Text>Requested Date: {formatDate(item.rentalDate)}</Text>
                   <Text>Status: {item.status}</Text>
@@ -2600,16 +2450,13 @@ const OwnerProfile = ({ ownerId }) => {
             </Text>
           )}
         </View>
-        {/* ************* End of Incoming Rental Requests ************* */}
 
-        {/* ************* New Section: Active Rentals ************* */}
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Active Rentals
           </Text>
           {activeRentals.length > 0 ? (
             <>
-              {/* Display only first 3 active rentals */}
               {activeRentals.slice(0, 3).map((item, index) => (
                 <View
                   key={item.id}
@@ -2627,24 +2474,21 @@ const OwnerProfile = ({ ownerId }) => {
                     onPress={() => {
                       setSelectedRequest(item);
                       setSelectedListingDetails(item.listingDetails);
-                      setRentalRequestModalVisible(true); // Reuse the same modal for Active Rentals
+                      setRentalRequestModalVisible(true);
                     }}
                     accessibilityLabel={`View details for active rental of ${item.listingDetails?.aircraftModel}`}
                     accessibilityRole="button"
                   >
-                    {/* Display rental details */}
                     <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                       {item.listingDetails
                         ? `${item.listingDetails.aircraftModel}`
                         : "Listing details not available"}
                     </Text>
                     <Text>Renter: {item.renterName}</Text>
-                    {/* Display Base Cost */}
                     <Text>Total Cost: ${item.baseCost}</Text>
                     <Text>Rental Date: {formatDate(item.rentalDate)}</Text>
                     <Text>Status: {item.status}</Text>
                   </TouchableOpacity>
-                  {/* Remove Button */}
                   <TouchableOpacity
                     onPress={() => handleDeleteActiveRental(item.id)}
                     style={{
@@ -2660,7 +2504,6 @@ const OwnerProfile = ({ ownerId }) => {
                 </View>
               ))}
 
-              {/* View More Button */}
               {activeRentals.length > 3 && (
                 <CustomButton
                   onPress={() => setViewMoreModalVisible(true)}
@@ -2671,7 +2514,6 @@ const OwnerProfile = ({ ownerId }) => {
                 />
               )}
 
-              {/* Delete All Button */}
               <CustomButton
                 onPress={() =>
                   Alert.alert(
@@ -2710,10 +2552,7 @@ const OwnerProfile = ({ ownerId }) => {
             <Text style={{ color: "#a0aec0" }}>No active rentals.</Text>
           )}
         </View>
-        {/* ************* End of Active Rentals ************* */}
       </ScrollView>
-
-      {/* ************* Modals Outside ScrollView ************* */}
 
       {/* Rental Request Details Modal */}
       <Modal
@@ -2746,7 +2585,6 @@ const OwnerProfile = ({ ownerId }) => {
                   onClose={() => setRentalRequestModalVisible(false)}
                 />
                 <View style={{ marginBottom: 16 }}>
-                  {/* Renter's Additional Information */}
                   <Text style={{ fontSize: 16 }}>
                     <Text style={{ fontWeight: "bold" }}>Renter Name: </Text>
                     {selectedRequest.renterName}
@@ -2772,7 +2610,6 @@ const OwnerProfile = ({ ownerId }) => {
                     {selectedRequest.currentRentersInsurance}
                   </Text>
 
-                  {/* Existing Rental Request Details */}
                   <Text style={{ fontSize: 16 }}>
                     <Text style={{ fontWeight: "bold" }}>Listing: </Text>
                     {selectedListingDetails
@@ -2789,17 +2626,14 @@ const OwnerProfile = ({ ownerId }) => {
                     </Text>
                     {selectedRequest.rentalHours}
                   </Text>
-                  {/* Display Base Cost */}
                   <Text style={{ fontSize: 16 }}>
                     <Text style={{ fontWeight: "bold" }}>Base Cost: </Text>$
                     {selectedRequest.baseCost}
                   </Text>
-                  {/* Display Commission */}
                   <Text style={{ fontSize: 16 }}>
                     <Text style={{ fontWeight: "bold" }}>6% Commission: </Text>$
                     {selectedRequest.commission}
                   </Text>
-                  {/* Display Owner's Total */}
                   <Text style={{ fontSize: 16 }}>
                     <Text style={{ fontWeight: "bold" }}>Owner's Total: </Text>$
                     {(
@@ -2826,7 +2660,6 @@ const OwnerProfile = ({ ownerId }) => {
                   >
                     <CustomButton
                       onPress={() => {
-                        // Handle approving rental request
                         handleApproveRentalRequest(selectedRequest);
                       }}
                       title="Approve"
@@ -2847,7 +2680,6 @@ const OwnerProfile = ({ ownerId }) => {
                 {selectedRequest.status === "active" && (
                   <CustomButton
                     onPress={() => {
-                      // Implement any actions for active rentals if needed
                       Alert.alert(
                         "Info",
                         "Active rentals details can be managed here."
@@ -2905,7 +2737,7 @@ const OwnerProfile = ({ ownerId }) => {
                 data={messages}
                 keyExtractor={(item, index) =>
                   `${item.senderId}_${item.createdAt?.seconds}_${item.createdAt?.nanoseconds}_${index}`
-                } // Ensures unique keys by including index
+                }
                 renderItem={({ item }) => (
                   <View
                     style={{
@@ -2995,7 +2827,7 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* ************* New Modal: View More Active Rentals with Pagination ************* */}
+      {/* View More Active Rentals Modal */}
       <Modal
         visible={viewMoreModalVisible}
         animationType="slide"
@@ -3004,7 +2836,7 @@ const OwnerProfile = ({ ownerId }) => {
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0} // Adjust offset as needed
+          keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
         >
           <View
             style={{
@@ -3029,7 +2861,7 @@ const OwnerProfile = ({ ownerId }) => {
               />
               <FlatList
                 data={activeRentalsPage}
-                keyExtractor={(item, index) => `${item.id}_${index}`} // Ensures unique keys
+                keyExtractor={(item, index) => `${item.id}_${index}`}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     key={`activeRental_${item.id}`}
@@ -3050,14 +2882,12 @@ const OwnerProfile = ({ ownerId }) => {
                     accessibilityLabel={`View details for active rental of ${item.listingDetails?.aircraftModel}`}
                     accessibilityRole="button"
                   >
-                    {/* Display rental details */}
                     <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                       {item.listingDetails
                         ? `${item.listingDetails.aircraftModel}`
                         : "Listing details not available"}
                     </Text>
                     <Text>Renter: {item.renterName}</Text>
-                    {/* Display Base Cost */}
                     <Text>Total Cost: ${item.baseCost}</Text>
                     <Text>Rental Date: {formatDate(item.rentalDate)}</Text>
                     <Text>Status: {item.status}</Text>
@@ -3090,7 +2920,6 @@ const OwnerProfile = ({ ownerId }) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-      {/* ************* End of New Modal: View More Active Rentals ************* */}
 
       {/* Aircraft Details Modal */}
       <Modal
@@ -3104,7 +2933,6 @@ const OwnerProfile = ({ ownerId }) => {
             onClose={() => setAircraftModalVisible(false)}
           />
 
-          {/* General Information Section */}
           <Section title="General Information">
             <CustomTextInput
               placeholder="Aircraft Model (Year/Make/Model)"
@@ -3141,7 +2969,6 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </Section>
 
-          {/* Location Information Section */}
           <Section title="Location Information">
             <CustomTextInput
               placeholder="Location"
@@ -3161,7 +2988,6 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </Section>
 
-          {/* Cost Information Section */}
           <Section title="Cost Information">
             <CustomTextInput
               placeholder="Cost Per Hour ($)"
@@ -3173,7 +2999,6 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </Section>
 
-          {/* Description Section */}
           <Section title="Description">
             <CustomTextInput
               placeholder="Description"
@@ -3186,12 +3011,11 @@ const OwnerProfile = ({ ownerId }) => {
             />
           </Section>
 
-          {/* Images Section */}
           <Section title="Images">
             <FlatList
               data={images}
               horizontal
-              keyExtractor={(item, index) => `${item}_${index}`} // Ensures unique keys by combining URI with index
+              keyExtractor={(item, index) => `${item}_${index}`}
               renderItem={({ item }) => (
                 <View style={{ position: "relative", marginRight: 8 }}>
                   <Image
@@ -3200,7 +3024,6 @@ const OwnerProfile = ({ ownerId }) => {
                   />
                   {isEditing && (
                     <>
-                      {/* Set Main Image Button */}
                       <TouchableOpacity
                         onPress={() => selectMainImage(item)}
                         style={{
@@ -3219,7 +3042,6 @@ const OwnerProfile = ({ ownerId }) => {
                           Set Main
                         </Text>
                       </TouchableOpacity>
-                      {/* Remove Image Button */}
                       <TouchableOpacity
                         onPress={() => removeImage(item)}
                         style={{
@@ -3241,7 +3063,6 @@ const OwnerProfile = ({ ownerId }) => {
             <Text style={{ color: "#a0aec0" }}>{images.length}/7 images</Text>
           </Section>
 
-          {/* Upload Images Button */}
           {isEditing && (
             <>
               <CustomButton
@@ -3259,7 +3080,6 @@ const OwnerProfile = ({ ownerId }) => {
             </>
           )}
 
-          {/* Main Image Display */}
           {selectedAircraft && selectedAircraft.mainImage && (
             <View style={{ marginTop: 16, alignItems: "center" }}>
               <Text
@@ -3274,7 +3094,6 @@ const OwnerProfile = ({ ownerId }) => {
             </View>
           )}
 
-          {/* Buttons */}
           <View style={{ marginTop: 24 }}>
             {isEditing ? (
               <>
@@ -3304,7 +3123,6 @@ const OwnerProfile = ({ ownerId }) => {
           </View>
         </ScrollView>
       </Modal>
-      {/* ************* End of Aircraft Details Modal ************* */}
 
       {/* Connect Stripe Modal */}
       <Modal
@@ -3362,167 +3180,160 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* ************* Updated Withdraw Funds Modal ************* */}
-<Modal
-  visible={withdrawModalVisible}
-  animationType="slide"
-  transparent={true}
-  onRequestClose={() => setWithdrawModalVisible(false)}
->
-  <KeyboardAvoidingView
-    behavior={Platform.OS === "ios" ? "padding" : "height"}
-    style={{ flex: 1 }}
-    keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
-  >
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <View
-        style={{
-          width: "88%",
-          maxHeight: "90%",
-          backgroundColor: "#fff",
-          borderRadius: 8,
-          padding: 24,
-        }}
+      {/* Updated Withdraw Funds Modal */}
+      <Modal
+        visible={withdrawModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setWithdrawModalVisible(false)}
       >
-        <ModalHeader
-          title="Withdraw Funds"
-          onClose={() => setWithdrawModalVisible(false)}
-        />
-
-        <Text style={{ fontSize: 16, marginBottom: 16 }}>
-          Available Balance: ${availableBalance.toFixed(2)}
-        </Text>
-
-        {/* Payment Method Selection as Two Buttons */}
-        <View style={{ flexDirection: "row", justifyContent: "space-around", marginBottom: 16 }}>
-          <TouchableOpacity
-            onPress={() => setPaymentMethod("bank")}
-            style={{
-              flex: 1,
-              marginRight: 8,
-              padding: 12,
-              backgroundColor: paymentMethod === "bank" ? "#e2e8f0" : "#fff",
-              borderColor: "#ccc",
-              borderWidth: 1,
-              borderRadius: 8,
-              alignItems: "center",
-            }}
-            accessibilityLabel="Select Bank Account"
-          >
-            <Text style={{ color: "#000", fontWeight: "bold" }}>Bank Account</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPaymentMethod("card")}
-            style={{
-              flex: 1,
-              marginLeft: 8,
-              padding: 12,
-              backgroundColor: paymentMethod === "card" ? "#e2e8f0" : "#fff",
-              borderColor: "#ccc",
-              borderWidth: 1,
-              borderRadius: 8,
-              alignItems: "center",
-            }}
-            accessibilityLabel="Select Debit Card"
-          >
-            <Text style={{ color: "#000", fontWeight: "bold" }}>Debit Card</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Wrap remaining fields in a ScrollView */}
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: 16 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
         >
-          {/* Payment Method Details */}
-          {paymentMethod === "bank" && (
-            <BankDetailsForm
-              bankDetails={bankDetails}
-              setBankDetails={setBankDetails}
-            />
-          )}
-
-          {paymentMethod === "card" && (
-            <Section title="Debit Card Details">
-              <CardField
-                postalCodeEnabled={false}
-                placeholder={{
-                  number: "4242 4242 4242 4242",
-                  placeholderTextColor: "#888",
-                }}
-                cardStyle={{
-                  backgroundColor: "#FFFFFF",
-                  textColor: "#000000",
-                }}
-                style={{
-                  width: "100%",
-                  height: 50,
-                  marginVertical: 24,
-                }}
-                onCardChange={(details) => setCardDetails(details)}
-                accessibilityLabel="Debit card details input"
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                width: "88%",
+                maxHeight: "90%",
+                backgroundColor: "#fff",
+                borderRadius: 8,
+                padding: 24,
+              }}
+            >
+              <ModalHeader
+                title="Withdraw Funds"
+                onClose={() => setWithdrawModalVisible(false)}
               />
-            </Section>
-          )}
 
-          {/* Withdrawal Email Field */}
-          <Section title="Withdrawal Email">
-            <CustomTextInput
-              placeholder="Email Address"
-              value={withdrawalEmail}
-              onChangeText={(value) => setWithdrawalEmail(value)}
-              keyboardType="email-address"
-              accessibilityLabel="Withdrawal email input"
-            />
-          </Section>
+              <Text style={{ fontSize: 16, marginBottom: 16 }}>
+                Available Balance: ${availableBalance.toFixed(2)}
+              </Text>
 
-          {/* Withdrawal Amount Field */}
-          <Section title="Withdrawal Amount">
-            <CustomTextInput
-              placeholder="Amount to Withdraw ($)"
-              value={withdrawalAmount}
-              onChangeText={(value) => setWithdrawalAmount(value)}
-              keyboardType="numeric"
-              accessibilityLabel="Withdrawal amount input"
-            />
-          </Section>
+              <View style={{ flexDirection: "row", justifyContent: "space-around", marginBottom: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setPaymentMethod("bank")}
+                  style={{
+                    flex: 1,
+                    marginRight: 8,
+                    padding: 12,
+                    backgroundColor: paymentMethod === "bank" ? "#e2e8f0" : "#fff",
+                    borderColor: "#ccc",
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    alignItems: "center",
+                  }}
+                  accessibilityLabel="Select Bank Account"
+                >
+                  <Text style={{ color: "#000", fontWeight: "bold" }}>Bank Account</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setPaymentMethod("card")}
+                  style={{
+                    flex: 1,
+                    marginLeft: 8,
+                    padding: 12,
+                    backgroundColor: paymentMethod === "card" ? "#e2e8f0" : "#fff",
+                    borderColor: "#ccc",
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    alignItems: "center",
+                  }}
+                  accessibilityLabel="Select Debit Card"
+                >
+                  <Text style={{ color: "#000", fontWeight: "bold" }}>Debit Card</Text>
+                </TouchableOpacity>
+              </View>
 
-          <CustomButton
-            onPress={handleWithdraw}
-            title="Withdraw"
-            backgroundColor="#48bb78"
-            style={{ marginTop: 16, marginBottom: 8 }}
-            accessibilityLabel="Withdraw funds"
-          />
-          <CustomButton
-            onPress={() => setWithdrawModalVisible(false)}
-            title="Cancel"
-            backgroundColor="#f56565"
-            accessibilityLabel="Cancel withdrawal"
-          />
+              <ScrollView
+                contentContainerStyle={{ paddingBottom: 16 }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {paymentMethod === "bank" && (
+                  <BankDetailsForm
+                    bankDetails={bankDetails}
+                    setBankDetails={setBankDetails}
+                  />
+                )}
 
-          {loading && (
-            <ActivityIndicator
-              size="large"
-              color="#3182ce"
-              style={{ marginTop: 16 }}
-            />
-          )}
-        </ScrollView>
-      </View>
-    </View>
-  </KeyboardAvoidingView>
-</Modal>
-{/* ************* End of Updated Withdraw Funds Modal ************* */}
+                {paymentMethod === "card" && (
+                  <Section title="Debit Card Details">
+                    <CardField
+                      postalCodeEnabled={false}
+                      placeholder={{
+                        number: "4242 4242 4242 4242",
+                        placeholderTextColor: "#888",
+                      }}
+                      cardStyle={{
+                        backgroundColor: "#FFFFFF",
+                        textColor: "#000000",
+                      }}
+                      style={{
+                        width: "100%",
+                        height: 50,
+                        marginVertical: 24,
+                      }}
+                      onCardChange={(details) => setCardDetails(details)}
+                      accessibilityLabel="Debit card details input"
+                    />
+                  </Section>
+                )}
 
+                <Section title="Withdrawal Email">
+                  <CustomTextInput
+                    placeholder="Email Address"
+                    value={withdrawalEmail}
+                    onChangeText={(value) => setWithdrawalEmail(value)}
+                    keyboardType="email-address"
+                    accessibilityLabel="Withdrawal email input"
+                  />
+                </Section>
+
+                <Section title="Withdrawal Amount">
+                  <CustomTextInput
+                    placeholder="Amount to Withdraw ($)"
+                    value={withdrawalAmount}
+                    onChangeText={(value) => setWithdrawalAmount(value)}
+                    keyboardType="numeric"
+                    accessibilityLabel="Withdrawal amount input"
+                  />
+                </Section>
+
+                <CustomButton
+                  onPress={handleWithdraw}
+                  title="Withdraw"
+                  backgroundColor="#48bb78"
+                  style={{ marginTop: 16, marginBottom: 8 }}
+                  accessibilityLabel="Withdraw funds"
+                />
+                <CustomButton
+                  onPress={() => setWithdrawModalVisible(false)}
+                  title="Cancel"
+                  backgroundColor="#f56565"
+                  accessibilityLabel="Cancel withdrawal"
+                />
+
+                {loading && (
+                  <ActivityIndicator
+                    size="large"
+                    color="#3182ce"
+                    style={{ marginTop: 16 }}
+                  />
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };

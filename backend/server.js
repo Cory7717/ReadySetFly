@@ -1,4 +1,4 @@
-// =====================
+// ===================== 
 // Imports
 // =====================
 const express = require('express');
@@ -144,7 +144,6 @@ const authenticate = async (req, res, next) => {
     req.user = decodedToken;
     next();
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error verifying Firebase ID token:', error);
     res.setHeader('Content-Type', 'application/json');
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
@@ -178,7 +177,6 @@ const sendNotification = async (tokens, title, body, data = {}) => {
     const response = await admin.messaging().sendToDevice(tokens, payload);
     admin.logger.info('Notifications sent successfully:', response);
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error sending notifications:', error);
   }
 };
@@ -186,16 +184,6 @@ const sendNotification = async (tokens, title, body, data = {}) => {
 // ===================================================================
 // Routes: Listings
 // ===================================================================
-
-// Update categoryRequirements to include new categories
-const categoryRequirements = {
-  'Aircraft for Sale': ['title', 'description'],
-  'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
-  'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
-  'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocations'],
-  'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
-  'Aviation Gear': ['gearTitle', 'gearDescription', 'gearCity', 'gearState', 'gearEmail'],
-};
 
 // POST /createListing
 app.post('/createListing', authenticate, async (req, res) => {
@@ -218,11 +206,25 @@ app.post('/createListing', authenticate, async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: "Invalid JSON in 'listingDetails'" });
     }
+    // Destructure common fields
     const {
       title, tailNumber, salePrice, description, city, state, email, phone,
       companyName, jobTitle, jobDescription, category, flightSchoolName,
       flightSchoolDetails, isFreeListing, selectedPricing, lat, lng, images,
     } = sanitizeData(listingDetails);
+    // Destructure Aviation Gear fields
+    const {
+      gearTitle, gearDescription, gearCity, gearState, gearEmail, gearPhone, gearPrice,
+    } = sanitizeData(listingDetails);
+
+    const categoryRequirements = {
+      'Aircraft for Sale': ['title', 'description'],
+      'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
+      'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
+      'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocations'],
+      'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
+      'Aviation Gear': ['gearTitle', 'gearDescription', 'gearCity', 'gearState', 'gearEmail'],
+    };
 
     const requiredFields = categoryRequirements[category];
     if (!requiredFields) {
@@ -315,6 +317,17 @@ app.post('/createListing', authenticate, async (req, res) => {
       status: 'pending',
     };
 
+    // For Aviation Gear, add gear-specific fields
+    if (category === 'Aviation Gear') {
+      listingData.gearTitle = gearTitle || '';
+      listingData.gearDescription = gearDescription || '';
+      listingData.gearCity = gearCity || '';
+      listingData.gearState = gearState || '';
+      listingData.gearEmail = gearEmail || '';
+      listingData.gearPhone = gearPhone || '';
+      listingData.gearPrice = gearPrice != null ? parseFloat(gearPrice) : 0;
+    }
+
     if (freeListing && selectedPricing === 'FreeTrial') {
       listingData.trialExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
     }
@@ -354,9 +367,21 @@ app.put('/updateListing', authenticate, async (req, res) => {
       ? JSON.parse(listingDetails)
       : listingDetails;
     const sanitizedListingDetails = sanitizeData(parsedListingDetails);
+    // Destructure common fields
     const { title, tailNumber, salePrice, description, city, state, email, phone,
       companyName, jobTitle, jobDescription, category, flightSchoolName,
       flightSchoolDetails, isFreeListing, selectedPricing, lat, lng, images } = sanitizedListingDetails;
+    // Destructure Aviation Gear fields
+    const { gearTitle, gearDescription, gearCity, gearState, gearEmail, gearPhone, gearPrice } = sanitizedListingDetails;
+
+    const categoryRequirements = {
+      'Aircraft for Sale': ['title', 'description'],
+      'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
+      'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
+      'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocations'],
+      'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
+      'Aviation Gear': ['gearTitle', 'gearDescription', 'gearCity', 'gearState', 'gearEmail'],
+    };
 
     const reqCategoryRequirements = categoryRequirements[category];
     if (!reqCategoryRequirements) {
@@ -443,8 +468,20 @@ app.put('/updateListing', authenticate, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
+    // If there are new images, update them
     if (imageUrls.length > 0) {
       updateData.images = imageUrls;
+    }
+
+    // For Aviation Gear, update gear-specific fields
+    if (category === 'Aviation Gear') {
+      updateData.gearTitle = gearTitle || listingData.gearTitle || '';
+      updateData.gearDescription = gearDescription || listingData.gearDescription || '';
+      updateData.gearCity = gearCity || listingData.gearCity || '';
+      updateData.gearState = gearState || listingData.gearState || '';
+      updateData.gearEmail = gearEmail || listingData.gearEmail || '';
+      updateData.gearPhone = gearPhone || listingData.gearPhone || '';
+      updateData.gearPrice = gearPrice != null ? parseFloat(gearPrice) : (listingData.gearPrice || 0);
     }
 
     await listingRef.update(updateData);
@@ -458,6 +495,7 @@ app.put('/updateListing', authenticate, async (req, res) => {
   }
 });
 
+// DELETE /deleteListing
 app.delete('/deleteListing', authenticate, async (req, res) => {
   try {
     const { listingId } = req.body;
@@ -507,7 +545,7 @@ app.delete('/deleteListing', authenticate, async (req, res) => {
 // Payment Endpoints
 // ===================================================================
 
-// === UPDATED create-classified-payment-intent TO REMOVE FREE-LISTING CHECK AND HANDLE ZERO AMOUNT ===
+// /create-classified-payment-intent remains largely unchanged
 app.post('/create-classified-payment-intent', authenticate, async (req, res) => {
   try {
     const { amount, currency = 'usd', listingId, listingDetails } = req.body;
@@ -544,9 +582,6 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
-    if (!error) {
-      error = new Error('Unknown error occurred');
-    }
     const errorMessage = error.message || 'Internal Server Error';
     admin.logger.error('Error in /create-classified-payment-intent:', error);
     res.setHeader('Content-Type', 'application/json');
@@ -554,7 +589,7 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
   }
 });
 
-// Rental payment intent
+// Rental payment intent endpoint updated to use destination charges
 app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
   try {
     const { rentalRequestId, ownerId, amount: clientAmount, renterId } = req.body;
@@ -580,16 +615,36 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized to pay for this rental request' });
     }
     await rentalRequestRef.update({ totalAmount: amount });
+
+    // Fetch the owner's connected account ID from Firestore
+    const ownerDoc = await db.collection('users').doc(ownerId).get();
+    if (!ownerDoc.exists) {
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(404).json({ error: 'Owner not found' });
+    }
+    const ownerData = ownerDoc.data();
+    const connectedAccountId = ownerData.stripeAccountId;
+    if (!connectedAccountId) {
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(400).json({ error: 'Owner does not have a connected Stripe account' });
+    }
+
+    // Create a PaymentIntent using destination charges so that the connected account
+    // automatically receives 94% of the payment and your platform retains a 6% fee.
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: 'usd',
       payment_method_types: ["card"],
+      transfer_data: {
+        destination: connectedAccountId,
+      },
+      application_fee_amount: Math.round(amount * 0.06),
       metadata: { rentalRequestId, ownerId, renterId: req.user.uid },
     });
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
+    const errorMessage = error.message || 'Internal Server Error';
     admin.logger.error('Error in /create-rental-payment-intent:', error);
     res.setHeader('Content-Type', 'application/json');
     res.status(500).json({ error: errorMessage });
@@ -633,7 +688,7 @@ app.post('/validateDiscount', authenticate, async (req, res) => {
       message: discount.message,
     });
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
+    const errorMessage = error.message || 'Internal Server Error';
     admin.logger.error('Error in /validateDiscount:', error);
     res.setHeader('Content-Type', 'application/json');
     res.status(500).json({ valid: false, message: errorMessage });
@@ -643,6 +698,7 @@ app.post('/validateDiscount', authenticate, async (req, res) => {
 // ===================================================================
 // Stripe & Bank Account Endpoints
 // ===================================================================
+
 app.post('/attach-bank-account', authenticate, async (req, res) => {
   try {
     const { ownerId, token, bankName } = req.body;
@@ -670,7 +726,7 @@ app.post('/attach-bank-account', authenticate, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ message: 'Bank account attached successfully', bankAccount });
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
+    const errorMessage = error.message || 'Internal Server Error';
     admin.logger.error('Error attaching bank account:', error);
     res.setHeader('Content-Type', 'application/json');
     res.status(500).json({ error: errorMessage });
@@ -693,7 +749,10 @@ app.post('/create-connected-account', authenticate, async (req, res) => {
         first_name: fullName.split(' ')[0],
         last_name: fullName.split(' ').slice(1).join(' ') || '',
       },
-      capabilities: { transfers: { requested: true } },
+      capabilities: { 
+        transfers: { requested: true },
+        card_payments: { requested: true }
+      },
     });
     await db.collection('users').doc(ownerId).set({ stripeAccountId: account.id }, { merge: true });
     const accountLink = await stripe.accountLinks.create({
@@ -705,7 +764,7 @@ app.post('/create-connected-account', authenticate, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ message: 'Connected account created', accountLinkUrl: accountLink.url });
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
+    const errorMessage = error.message || 'Internal Server Error';
     admin.logger.error('Error creating connected account:', error);
     res.setHeader('Content-Type', 'application/json');
     res.status(500).json({ error: errorMessage });
@@ -737,7 +796,7 @@ app.post('/withdraw-funds', authenticate, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ message: 'Withdrawal processed successfully', payout });
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
+    const errorMessage = error.message || 'Internal Server Error';
     admin.logger.error('Error processing withdrawal:', error);
     res.setHeader('Content-Type', 'application/json');
     res.status(500).json({ error: errorMessage });
@@ -747,6 +806,7 @@ app.post('/withdraw-funds', authenticate, async (req, res) => {
 // ===================================================================
 // Firestore-Triggered Functions
 // ===================================================================
+
 exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapshot, context) => {
   const { messageId } = context.params;
   const messageData = snapshot.data();
@@ -765,7 +825,7 @@ exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapsho
         if (ownerData.fcmToken) tokens.push(ownerData.fcmToken);
       }
       const renterRef = db.collection('renters').doc(recipientId);
-      const renterDoc = await renterRef.get();
+      const renterDoc = await getDoc(renterRef);
       if (renterDoc.exists) {
         const renterData = renterDoc.data();
         if (renterData.fcmToken) tokens.push(renterData.fcmToken);
@@ -786,7 +846,6 @@ exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapsho
     const response = await admin.messaging().sendToDevice(tokens, payload);
     admin.logger.info('Notifications sent:', response);
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Error sending notifications:', error);
   }
   return null;
@@ -825,7 +884,6 @@ exports.onListingDeleted = onDocumentDeleted('listings/{listingId}', async (snap
     });
     await Promise.all(deletePromises);
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error(`Error deleting data for listing ${listingId}:`, error);
   }
   return null;
@@ -846,7 +904,6 @@ exports.handleAircraftDetails = onDocumentCreated('aircraftDetails/{ownerId}', a
     await db.collection('aircraftDetails').doc(ownerId).set(updatedData, { merge: true });
     admin.logger.info(`Initialized aircraftDetails for ownerId: ${ownerId}`);
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error(`Error initializing aircraftDetails for ownerId ${ownerId}:`, error);
   }
   return null;
@@ -867,7 +924,6 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
           await sendNotification([fcmToken], 'Profile Updated', 'Your profile has been updated.');
         }
       } catch (error) {
-        const errorMessage = error && error.message ? error.message : 'Internal Server Error';
         admin.logger.error(`Error sending profile update notification for ownerId ${ownerId}:`, error);
       }
     }
@@ -901,7 +957,6 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
         });
         admin.logger.info(`Updated costPerHour for ownerId: ${ownerId}`);
       } catch (error) {
-        const errorMessage = error && error.message ? error.message : 'Internal Server Error';
         admin.logger.error(`Error updating costPerHour for ownerId ${ownerId}:`, error);
       }
     }
@@ -919,7 +974,6 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
         await db.collection('aircraftDetails').doc(ownerId).update({ selectedAircraftIds: updatedSelectedIds });
         admin.logger.info(`Removed invalid selectedAircraftIds for ownerId: ${ownerId}`);
       } catch (error) {
-        const errorMessage = error && error.message ? error.message : 'Internal Server Error';
         admin.logger.error(`Error removing invalid selectedAircraftIds for ownerId ${ownerId}:`, error);
       }
     }
@@ -954,15 +1008,125 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule('every 24 hours', as
     admin.logger.info(`Scheduled cleanup complete. Total deletions: ${totalDeletions}`);
     return null;
   } catch (error) {
-    const errorMessage = error && error.message ? error.message : 'Internal Server Error';
     admin.logger.error('Scheduled cleanup error:', error);
     throw new Error('Cleanup failed.');
   }
 });
 
-// =====================
+exports.closeExpiredMessaging = onSchedule('every 1 hours', async (event) => {
+  try {
+    const now = new Date();
+    const rentalRequestsSnapshot = await db.collection('rentalRequests').get();
+    let batch = db.batch();
+    let updateCount = 0;
+    rentalRequestsSnapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      if (data.rentalDate && !data.messagingClosed) {
+        // Assume rentalDate is stored as a string (MM/DD/YYYY) – adjust parsing as needed
+        const rentalDate = new Date(data.rentalDate);
+        if (rentalDate < now) {
+          batch.update(docSnap.ref, { messagingClosed: true });
+          updateCount++;
+        }
+      }
+    });
+    if (updateCount > 0) {
+      await batch.commit();
+      admin.logger.info(`Closed messaging for ${updateCount} rental requests.`);
+    } else {
+      admin.logger.info('No rental requests required messaging closure.');
+    }
+    return null;
+  } catch (error) {
+    admin.logger.error('Error in closeExpiredMessaging:', error);
+    throw new Error('closeExpiredMessaging failed');
+  }
+});
+
+// ===================================================================
+// NEW: Scheduled Function to Refresh Listings
+// ===================================================================
+exports.refreshListings = onSchedule('every 1 hours', async (event) => {
+  try {
+    const nowMillis = Date.now();
+    // Query listings with packageType Enhanced or Featured and order by createdAt descending
+    const listingsQuery = db.collection('listings')
+      .where('packageType', 'in', ['Enhanced', 'Featured'])
+      .orderBy('createdAt', 'desc');
+    const listingsSnapshot = await listingsQuery.get();
+    if (listingsSnapshot.empty) {
+      admin.logger.info('No Enhanced or Featured listings found for refresh.');
+      return null;
+    }
+    const listings = [];
+    listingsSnapshot.forEach(doc => {
+      const data = doc.data();
+      data.id = doc.id;
+      listings.push(data);
+    });
+    // Helper function to generate a random integer between min and max (inclusive)
+    const randomBetween = (min, max) => {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    };
+
+    for (const listing of listings) {
+      let refreshInterval = 0;
+      if (listing.packageType === 'Enhanced') {
+        refreshInterval = 24 * 3600 * 1000;
+      } else if (listing.packageType === 'Featured') {
+        refreshInterval = 48 * 3600 * 1000;
+      }
+      let lastRefreshMillis;
+      if (listing.lastRefreshAt && listing.lastRefreshAt.toMillis) {
+        lastRefreshMillis = listing.lastRefreshAt.toMillis();
+      } else if (listing.createdAt && listing.createdAt.toMillis) {
+        lastRefreshMillis = listing.createdAt.toMillis();
+      } else {
+        continue;
+      }
+      if (nowMillis - lastRefreshMillis >= refreshInterval) {
+        let newCreatedAtMillis = nowMillis;
+        if (listing.packageType === 'Enhanced') {
+          // For Enhanced, if at least 30 listings exist, use the createdAt of the 30th listing as lower bound.
+          if (listings.length >= 30) {
+            const listing30 = listings[29];
+            const index30Millis = listing30.createdAt && listing30.createdAt.toMillis ? listing30.createdAt.toMillis() : listing30.createdAt;
+            newCreatedAtMillis = randomBetween(index30Millis, nowMillis);
+          }
+        } else if (listing.packageType === 'Featured') {
+          // For Featured, use the 15th listing as top bound and 50th as bottom bound if available.
+          let topBound = nowMillis;
+          let bottomBound = nowMillis - 3600 * 1000; // fallback: 1 hour ago
+          if (listings.length >= 15) {
+            const listing15 = listings[14];
+            topBound = listing15.createdAt && listing15.createdAt.toMillis ? listing15.createdAt.toMillis() : listing15.createdAt;
+          }
+          if (listings.length >= 50) {
+            const listing50 = listings[49];
+            bottomBound = listing50.createdAt && listing50.createdAt.toMillis ? listing50.createdAt.toMillis() : listing50.createdAt;
+          }
+          newCreatedAtMillis = randomBetween(bottomBound, topBound);
+        }
+        const newNextRefreshAtMillis = nowMillis + refreshInterval;
+        await db.collection('listings').doc(listing.id).update({
+          createdAt: admin.firestore.Timestamp.fromMillis(newCreatedAtMillis),
+          lastRefreshAt: admin.firestore.Timestamp.fromMillis(newCreatedAtMillis),
+          nextRefreshAt: admin.firestore.Timestamp.fromMillis(newNextRefreshAtMillis),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        admin.logger.info(`Listing ${listing.id} refreshed. New createdAt: ${newCreatedAtMillis}`);
+      }
+    }
+    return null;
+  } catch (error) {
+    admin.logger.error('Error in refreshListings scheduled function:', error);
+    throw new Error('refreshListings failed');
+  }
+});
+
+// ===================================================================
 // Error-Handling Middleware
-// =====================
+// ===================================================================
 app.use((err, req, res, next) => {
   admin.logger.error('Unhandled error:', err);
   if (!res.headersSent) {

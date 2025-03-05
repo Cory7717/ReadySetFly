@@ -49,7 +49,6 @@ const COLORS = {
   red: '#EF4444',
 };
 
-// Stylesheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -338,11 +337,11 @@ export default function ClassifiedsPaymentScreen() {
         }
 
         Alert.alert(
-          'Success',
+          'Payment was Successful',
           'Your Aviation Gear listing has been posted!',
           [
             {
-              text: 'OK',
+              text: 'Close',
               onPress: () => {
                 navigation.navigate('Classifieds', { refresh: true });
               },
@@ -385,7 +384,6 @@ export default function ClassifiedsPaymentScreen() {
         if (preparedListing.packageCost) {
           preparedListing.packageCost = parseFloat(preparedListing.packageCost);
         }
-        // Optionally, add location or other required fields here
 
         const createResponse = await fetch(`${API_URL}/createListing`, {
           method: 'POST',
@@ -449,11 +447,11 @@ export default function ClassifiedsPaymentScreen() {
       // Handle free trial (zero-amount) listings
       if (data.freeListing === true) {
         Alert.alert(
-          'Success',
+          'Payment was Successful',
           'Your listing has been finalized with a free trial period!',
           [
             {
-              text: 'OK',
+              text: 'Close',
               onPress: () => {
                 navigation.navigate('Classifieds', { refresh: true });
               },
@@ -480,14 +478,26 @@ export default function ClassifiedsPaymentScreen() {
       });
       
       if (error) {
-        Alert.alert('Payment failed', error.message);
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
         Alert.alert(
-          'Success',
-          'Payment processed and your listing has been finalized!',
+          'Payment was Unsuccessful',
+          error.message,
           [
             {
-              text: 'OK',
+              text: 'Close',
+              onPress: () => {
+                navigation.navigate('Classifieds', { refresh: true });
+              },
+            },
+          ],
+          { cancelable: false }
+        );
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        Alert.alert(
+          'Payment was Successful',
+          'Your listing has been finalized!',
+          [
+            {
+              text: 'Close',
               onPress: () => {
                 navigation.navigate('Classifieds', { refresh: true });
               },
