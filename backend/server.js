@@ -771,12 +771,43 @@ app.post('/create-connected-account', authenticate, async (req, res) => {
   }
 });
 
+// NEW: Retrieve Existing Connected Account Endpoint
+app.post('/retrieve-connected-account', authenticate, async (req, res) => {
+  try {
+    const { ownerId, email, fullName } = req.body;
+    if (!ownerId || !email || !fullName) {
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(400).json({ error: 'Missing required fields: ownerId, email, fullName' });
+    }
+    const ownerDoc = await db.collection('users').doc(ownerId).get();
+    if (!ownerDoc.exists) {
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(404).json({ error: 'Owner not found' });
+    }
+    const ownerData = ownerDoc.data();
+    const stripeAccountId = ownerData.stripeAccountId;
+    if (!stripeAccountId) {
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(400).json({ error: 'No connected Stripe account found' });
+    }
+    // Optionally, retrieve additional details from Stripe
+    const account = await stripe.accounts.retrieve(stripeAccountId);
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).json({ stripeAccountId: account.id, account });
+  } catch (error) {
+    const errorMessage = error.message || 'Internal Server Error';
+    admin.logger.error('Error retrieving connected account:', error);
+    res.setHeader('Content-Type', 'application/json');
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
 app.post('/withdraw-funds', authenticate, async (req, res) => {
   try {
-    const { ownerId, amount, paymentMethodId, email } = req.body;
-    if (!ownerId || !amount || !paymentMethodId || !email) {
+    const { ownerId, amount, email } = req.body;
+    if (!ownerId || !amount || !email) {
       res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: 'Missing required fields: ownerId, amount, paymentMethodId, email' });
+      return res.status(400).json({ error: 'Missing required fields: ownerId, amount, email' });
     }
     const ownerDoc = await db.collection('users').doc(ownerId).get();
     if (!ownerDoc.exists) {

@@ -141,6 +141,7 @@ const renter = () => {
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [isMapModalVisible, setMapModalVisible] = useState(false);
   const [initialLocation, setInitialLocation] = useState(null);
+  // New state: currentChatOwnerId will be set after payment completes.
   const [currentChatOwnerId, setCurrentChatOwnerId] = useState(null);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -581,12 +582,17 @@ const renter = () => {
                 updateDoc(rentalRequestRef, { rentalStatus: "active" })
                   .then(() => {
                     setPaymentComplete(true);
+                    // --- Messaging Update: Set the currentChatOwnerId so the messaging modal connects to the owner ---
+                    if (selectedListing && selectedListing.ownerId) {
+                      setCurrentChatOwnerId(selectedListing.ownerId);
+                    }
                     Alert.alert("Payment Complete", "Your payment has been processed.");
                     deleteDoc(doc(db, "renters", renterId, "notifications", notification.id))
                       .catch((error) =>
                         console.error("Error deleting notification:", error)
                       );
-                    closeModal();
+                    // Automatically open the messaging modal now that payment is complete
+                    setMessagesModalVisible(true);
                   })
                   .catch((error) => {
                     console.error("Error updating rental request:", error);

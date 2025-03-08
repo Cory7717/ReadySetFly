@@ -124,6 +124,46 @@ const renderListingDetails = (item) => {
         <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
           Price: ${item.gearPrice != null ? Number(item.gearPrice).toLocaleString() : 'N/A'}
         </Text>
+        <Text style={{ fontSize: 18, color: COLORS.black, marginTop: 10 }}>
+          {item.gearDescription || 'No Description'}
+        </Text>
+      </View>
+    );
+  } else if (item.category === 'Flight Instructors') {
+    return (
+      <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}>
+          {item.firstName || 'No First Name'} {item.lastName || 'No Last Name'} - Flight Instructor
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+          CFI Certification Number: {item.certifications || 'N/A'}
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+          Flight Hours: {item.flightHours || 'N/A'}
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+          Cost per Hour: ${item.fiCostPerHour || 'N/A'}
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+          Aircraft Provided: {item.aircraftProvided ? 'Yes' : 'No'}
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+          Contact Email: {item.fiEmail || 'N/A'}
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+          Phone: {formatPhoneNumber(item.fiPhone)}
+        </Text>
+        <Text style={{ fontSize: 14, color: COLORS.gray }}>
+          {item.fiDescription || 'No Description Provided'}
+        </Text>
+        {item.serviceLocationsList && item.serviceLocationsList.length > 0 && (
+          <View style={{ marginTop: 8 }}>
+            <Text style={{ fontSize: 16, color: COLORS.black }}>Service Locations:</Text>
+            {item.serviceLocationsList.map((loc, index) => (
+              <Text key={index} style={{ fontSize: 14, color: COLORS.gray }}>{loc}</Text>
+            ))}
+          </View>
+        )}
       </View>
     );
   } else {
@@ -259,7 +299,7 @@ const FullScreenImageModal = ({ visible, onRequestClose, imageUri }) => {
           onGestureEvent={onPinchGestureEvent}
           onHandlerStateChange={onPinchHandlerStateChange}
         >
-          <Animated.View style={[styles.zoomScrollView, { transform: [{ scale: pinchScale }] }]}>
+          <Animated.View style={[styles.zoomScrollView, { transform: [{ scale: pinchScale }] }]} >
             {imageUri && (
               <Image source={{ uri: imageUri }} style={styles.zoomImage} resizeMode="contain" />
             )}
@@ -298,6 +338,10 @@ const Classifieds = () => {
   const scrollViewRef = useRef(null);
   const [showUpButton, setShowUpButton] = useState(false);
 
+  // New state for preview listing modal
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+
   // New filter state and text inputs for filtering (like home.js)
   const [filter, setFilter] = useState({ location: "", make: "" });
   const [cityState, setCityState] = useState("");
@@ -306,6 +350,9 @@ const Classifieds = () => {
   // Pricing packages state (overrides defaultPricingPackages for specific categories)
   const [pricingPackages, setPricingPackages] = useState(defaultPricingPackages);
   const [pricingModalVisible, setPricingModalVisible] = useState(initialPricingModalState);
+
+  // NEW: State for Broker Services Modal
+  const [brokerModalVisible, setBrokerModalVisible] = useState(false);
 
   // Helper function to close all modals
   const closeAllModals = () => {
@@ -885,7 +932,6 @@ const Classifieds = () => {
       </SafeAreaView>
     );
   }
-
   const renderEditAndDeleteButtons = (listing) => {
     if (user && listing?.ownerId === user.uid) {
       return (
@@ -911,7 +957,7 @@ const Classifieds = () => {
     }
     return null;
   };
-
+  
   const renderPaginationDots = () => {
     if (!selectedListing || !selectedListing.images) return null;
     return (
@@ -928,7 +974,7 @@ const Classifieds = () => {
       </View>
     );
   };
-
+  
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
       <Animated.ScrollView
@@ -958,7 +1004,7 @@ const Classifieds = () => {
             </Animated.View>
           </ImageBackground>
         </Animated.View>
-
+  
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
           <Text style={{ fontSize: 18, color: COLORS.secondary }}>
             Filter by Location{selectedCategory === 'Aircraft for Sale' ? ' or Aircraft Make' : ''}
@@ -972,7 +1018,7 @@ const Classifieds = () => {
             <Ionicons name="filter" size={24} color="gray" />
           </TouchableOpacity>
         </View>
-
+  
         <FlatList
           data={categories}
           renderItem={({ item }) => (
@@ -1008,13 +1054,13 @@ const Classifieds = () => {
           showsHorizontalScrollIndicator={false}
           style={{ marginBottom: 16 }}
         />
-
+  
         <Text
           style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: COLORS.black }}
         >
           Aviation Marketplace
         </Text>
-
+  
         <TouchableOpacity
           onPress={() => {
             closeAllModals();
@@ -1028,17 +1074,17 @@ const Classifieds = () => {
         >
           <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>Add Listing</Text>
         </TouchableOpacity>
-
-        {/* Contact Us block placed below the Add Listing button and centered */}
+  
+        {/* Broker Services Information Block */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-          <TouchableOpacity onPress={handleContactUs} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => setBrokerModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Ionicons name="mail-outline" size={24} color={COLORS.primary} />
             <Text style={{ fontSize: 16, color: COLORS.primary, marginLeft: 8 }}>
-              Contact us for broker services
+              Information About Aircraft Broker Services
             </Text>
           </TouchableOpacity>
         </View>
-
+  
         {filteredListings.length > 0 ? (
           filteredListings.map((item, index) => (
             <React.Fragment key={item.id}>
@@ -1098,7 +1144,7 @@ const Classifieds = () => {
           <Text style={{ textAlign: 'center', color: COLORS.gray }}>No listings available</Text>
         )}
       </Animated.ScrollView>
-
+  
       {showUpButton && (
         <TouchableOpacity
           onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
@@ -1109,7 +1155,7 @@ const Classifieds = () => {
           <Ionicons name="arrow-up" size={24} color={COLORS.white} />
         </TouchableOpacity>
       )}
-
+  
       {/* Filter Modal */}
       <Modal
         animationType="slide"
@@ -1203,7 +1249,48 @@ const Classifieds = () => {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-
+  
+      {/* Broker Services Modal */}
+      <Modal
+        visible={brokerModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setBrokerModalVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ width: '80%', backgroundColor: COLORS.white, borderRadius: 20, padding: 20, alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Aircraft Broker Services</Text>
+            <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+              Ready, Set, Fly! also offers personalized and professional aircraft broker services.  We can assist you in selling or buying your first or next aircraft.  For more information, tap the Contact a sales rep button below.
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setBrokerModalVisible(false);
+                const subject = encodeURIComponent("Aircraft Broker Services");
+                const mailtoUrl = `mailto:coryarmer@gmail.com?subject=${subject}`;
+                Linking.openURL(mailtoUrl).catch((error) => {
+                  console.error("Error opening mail app:", error);
+                  Alert.alert("Error", "Unable to open mail app.");
+                });
+              }}
+              style={{ backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center', marginBottom: 10 }}
+              accessibilityLabel="Contact a Sales Rep"
+              accessibilityRole="button"
+            >
+              <Text style={{ color: COLORS.white }}>Contact a Sales Rep</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setBrokerModalVisible(false)}
+              style={{ backgroundColor: COLORS.lightGray, padding: 10, borderRadius: 10, alignItems: 'center' }}
+              accessibilityLabel="Close Broker Services Modal"
+              accessibilityRole="button"
+            >
+              <Text style={{ color: COLORS.black }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+  
       {/* Aviation Jobs - Details Modal */}
       <Modal
         visible={jobDetailsModalVisible}
@@ -1248,7 +1335,7 @@ const Classifieds = () => {
           </SafeAreaView>
         </View>
       </Modal>
-
+  
       {/* Details Modal (including fix for Aviation Gear) */}
       <Modal
         visible={detailsModalVisible}
@@ -1403,7 +1490,7 @@ const Classifieds = () => {
           </SafeAreaView>
         </View>
       </Modal>
-
+  
       {/* Pricing Info Modals */}
       {Object.keys(pricingDescriptions).map((key) => (
         <Modal
@@ -1431,7 +1518,6 @@ const Classifieds = () => {
           </View>
         </Modal>
       ))}
-
       {/* Add / Edit Listing Modal */}
       <Modal
         animationType="none"
@@ -1601,7 +1687,7 @@ const Classifieds = () => {
                     if (category === 'Flight Instructors') {
                       if (!values.firstName) errors.firstName = 'First name is required.';
                       if (!values.lastName) errors.lastName = 'Last name is required.';
-                      if (!values.certifications) errors.certifications = 'CFI Certificate Number is required.';
+                      if (!values.certifications) errors.certifications = 'CFI Certification Number is required.';
                       if (!values.fiEmail) {
                         errors.fiEmail = 'Contact email is required.';
                       } else if (!/\S+@\S+\.\S+/.test(values.fiEmail)) {
@@ -1729,7 +1815,7 @@ const Classifieds = () => {
                             <Text style={{ color: 'red', marginBottom: 8 }}>{errors.lastName}</Text>
                           )}
                           <TextInput
-                            placeholder="CFI Certificate Number"
+                            placeholder="CFI Certification Number"
                             placeholderTextColor={COLORS.gray}
                             onChangeText={handleChange('certifications')}
                             onBlur={handleBlur('certifications')}
@@ -1741,7 +1827,7 @@ const Classifieds = () => {
                               padding: 8,
                               color: COLORS.black,
                             }}
-                            accessibilityLabel="CFI Certificate Number Input"
+                            accessibilityLabel="CFI Certification Number Input"
                           />
                           {touched.certifications && errors.certifications && (
                             <Text style={{ color: 'red', marginBottom: 8 }}>{errors.certifications}</Text>
@@ -1805,6 +1891,7 @@ const Classifieds = () => {
                             value={values.fiDescription}
                             multiline
                             numberOfLines={10}
+                            maxLength={3000}
                             style={{
                               borderBottomWidth: 1,
                               borderBottomColor: COLORS.lightGray,
@@ -2004,6 +2091,7 @@ const Classifieds = () => {
                             value={values.amDescription}
                             multiline
                             numberOfLines={10}
+                            maxLength={3000}
                             style={{
                               borderBottomWidth: 1,
                               borderBottomColor: COLORS.lightGray,
@@ -2064,6 +2152,7 @@ const Classifieds = () => {
                             value={values.gearDescription}
                             multiline
                             numberOfLines={4}
+                            maxLength={3000}
                             style={{
                               borderBottomWidth: 1,
                               borderBottomColor: COLORS.lightGray,
@@ -2214,6 +2303,7 @@ const Classifieds = () => {
                             value={values.jobDescription}
                             multiline
                             numberOfLines={4}
+                            maxLength={3000}
                             style={{
                               borderBottomWidth: 1,
                               borderBottomColor: COLORS.lightGray,
@@ -2228,84 +2318,6 @@ const Classifieds = () => {
                             <Text style={{ color: 'red', marginBottom: 8 }}>{errors.jobDescription}</Text>
                           )}
                           {/* Added Contact Email and Phone fields for Aviation Jobs */}
-                          <TextInput
-                            placeholder="Contact Email"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('email')}
-                            onBlur={handleBlur('email')}
-                            value={values.email}
-                            keyboardType="email-address"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Contact Email Input"
-                          />
-                          {touched.email && errors.email && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.email}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Phone Number (Optional)"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('phone')}
-                            onBlur={handleBlur('phone')}
-                            value={values.phone}
-                            keyboardType="phone-pad"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Phone Number Input"
-                          />
-                        </>
-                      ) : values.category === 'Flight Schools' ? (
-                        <>
-                          <TextInput
-                            placeholder="Flight School Name"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('flightSchoolName')}
-                            onBlur={handleBlur('flightSchoolName')}
-                            value={values.flightSchoolName}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Flight School Name Input"
-                          />
-                          {touched.flightSchoolName && errors.flightSchoolName && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.flightSchoolName}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Flight School Details"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('flightSchoolDetails')}
-                            onBlur={handleBlur('flightSchoolDetails')}
-                            value={values.flightSchoolDetails}
-                            multiline
-                            numberOfLines={4}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                              textAlignVertical: 'top',
-                            }}
-                            accessibilityLabel="Flight School Details Input"
-                          />
-                          {touched.flightSchoolDetails && errors.flightSchoolDetails && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.flightSchoolDetails}</Text>
-                          )}
-                          {/* Added Contact Email and Phone fields for Flight Schools */}
                           <TextInput
                             placeholder="Contact Email"
                             placeholderTextColor={COLORS.gray}
@@ -2407,6 +2419,7 @@ const Classifieds = () => {
                             value={values.description}
                             multiline
                             numberOfLines={4}
+                            maxLength={3000}
                             style={{
                               borderBottomWidth: 1,
                               borderBottomColor: COLORS.lightGray,
@@ -2458,7 +2471,7 @@ const Classifieds = () => {
                           />
                         </>
                       )}
-
+  
                       {['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale'].includes(values.category) && (
                         <>
                           <Text
@@ -2508,7 +2521,7 @@ const Classifieds = () => {
                           {renderImageUploadButton()}
                         </>
                       )}
-
+  
                       {/* Restore Select Pricing Package block for non-Aviation Gear listings */}
                       {values.category !== 'Aviation Gear' && (
                         <>
@@ -2577,7 +2590,22 @@ const Classifieds = () => {
                           </View>
                         </>
                       )}
-
+  
+                      {/* Preview Listing Button */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setPreviewData(values);
+                          setPreviewModalVisible(true);
+                        }}
+                        style={{ backgroundColor: COLORS.secondary, paddingVertical: 12, borderRadius: 50, marginBottom: 16 }}
+                        accessibilityLabel="Preview Listing"
+                        accessibilityRole="button"
+                      >
+                        <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
+                          Preview Listing
+                        </Text>
+                      </TouchableOpacity>
+  
                       {loading ? (
                         <ActivityIndicator size="large" color={COLORS.red} accessibilityLabel="Submitting Listing" />
                       ) : (
@@ -2602,7 +2630,7 @@ const Classifieds = () => {
                           </Text>
                         </TouchableOpacity>
                       )}
-
+  
                       <TouchableOpacity
                         onPress={() => {
                           closeAllModals();
@@ -2628,7 +2656,38 @@ const Classifieds = () => {
           </Animated.View>
         </View>
       </Modal>
-
+  
+      {/* Preview Listing Modal (Full Screen) */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={previewModalVisible}
+        onRequestClose={() => setPreviewModalVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
+          <ScrollView contentContainerStyle={{ padding: 20 }}>
+            <TouchableOpacity
+              onPress={() => setPreviewModalVisible(false)}
+              style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}
+              accessibilityLabel="Close Preview Listing"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close" size={30} color={COLORS.black} />
+            </TouchableOpacity>
+            {previewData ? (
+              <>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 }}>
+                  Listing Preview
+                </Text>
+                {renderListingDetails(previewData)}
+              </>
+            ) : (
+              <Text style={{ textAlign: 'center' }}>No preview data available.</Text>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+  
       {/* Full-Screen Image Modal as a separate component */}
       <FullScreenImageModal
         visible={fullScreenModalVisible}
@@ -2637,158 +2696,158 @@ const Classifieds = () => {
       />
     </SafeAreaView>
   );
-};
-
-const AppNavigator = () => (
-  <NavigationContainer independent={true}>
-    <Stack.Navigator initialRouteName="Classifieds">
-      <Stack.Screen name="Classifieds" component={Classifieds} options={{ headerShown: false }} />
-      {/* For rental payments */}
-      {/* <Stack.Screen name="CheckoutScreen" component={CheckoutScreen} options={{ headerShown: false }} /> */}
-      {/* New screen for classifieds payment */}
-      <Stack.Screen
-        name="classifiedsPaymentScreen"
-        component={classifiedsPaymentScreen}
-        options={{ headerShown: false }}
-      />
-    </Stack.Navigator>
-  </NavigationContainer>
-);
-
-export default AppNavigator;
-
-const styles = StyleSheet.create({
-  paginationDotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: COLORS.primary,
-  },
-  inactiveDot: {
-    backgroundColor: COLORS.lightGray,
-  },
-  zoomModalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  zoomCloseButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 30,
-    right: 20,
-    zIndex: 1,
-  },
-  zoomScrollView: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  zoomImage: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  priceLocationOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  priceText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationText: {
-    color: COLORS.white,
-    fontSize: 16,
-    marginLeft: 5,
-  },
-  centeredRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  editDeleteContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 10,
-  },
-  editButton: {
-    backgroundColor: COLORS.primary,
-    padding: 8,
-    borderRadius: 20,
-    marginRight: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteButton: {
-    backgroundColor: COLORS.red,
-    padding: 8,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  upButton: {
-    position: 'absolute',
-    bottom: 30,
-    right: 20,
-    backgroundColor: COLORS.primary,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-    zIndex: 1000,
-  },
-  featuredTag: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    zIndex: 10,
-  },
-  featuredTagText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-});
+  };
+  
+  const AppNavigator = () => (
+    <NavigationContainer independent={true}>
+      <Stack.Navigator initialRouteName="Classifieds">
+        <Stack.Screen name="Classifieds" component={Classifieds} options={{ headerShown: false }} />
+        {/* For rental payments */}
+        {/* <Stack.Screen name="CheckoutScreen" component={CheckoutScreen} options={{ headerShown: false }} /> */}
+        {/* New screen for classifieds payment */}
+        <Stack.Screen
+          name="classifiedsPaymentScreen"
+          component={classifiedsPaymentScreen}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+  
+  export default AppNavigator;
+  
+  const styles = StyleSheet.create({
+    paginationDotsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    paginationDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginHorizontal: 4,
+    },
+    activeDot: {
+      backgroundColor: COLORS.primary,
+    },
+    inactiveDot: {
+      backgroundColor: COLORS.lightGray,
+    },
+    zoomModalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.9)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    zoomCloseButton: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 60 : 30,
+      right: 20,
+      zIndex: 1,
+    },
+    zoomScrollView: {
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    zoomImage: {
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 5,
+    },
+    rowBetween: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 5,
+    },
+    priceLocationOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      padding: 10,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    priceText: {
+      color: COLORS.white,
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    locationContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    locationText: {
+      color: COLORS.white,
+      fontSize: 16,
+      marginLeft: 5,
+    },
+    centeredRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    editDeleteContainer: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      padding: 10,
+    },
+    editButton: {
+      backgroundColor: COLORS.primary,
+      padding: 8,
+      borderRadius: 20,
+      marginRight: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deleteButton: {
+      backgroundColor: COLORS.red,
+      padding: 8,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    upButton: {
+      position: 'absolute',
+      bottom: 30,
+      right: 20,
+      backgroundColor: COLORS.primary,
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: COLORS.black,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 5,
+      zIndex: 1000,
+    },
+    featuredTag: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      backgroundColor: COLORS.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 4,
+      zIndex: 10,
+    },
+    featuredTagText: {
+      color: COLORS.white,
+      fontSize: 10,
+      fontWeight: 'bold',
+    },
+  });

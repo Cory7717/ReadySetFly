@@ -38,10 +38,11 @@ import {
   limit,
   startAfter,
   getDocs,
+  increment,
 } from "firebase/firestore";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
-import { useStripe, CardField } from "@stripe/stripe-react-native";
+import { useStripe } from "@stripe/stripe-react-native";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Picker } from "@react-native-picker/picker";
 import BankDetailsForm from "../payment/BankDetailsForm";
@@ -49,6 +50,16 @@ import BankDetailsForm from "../payment/BankDetailsForm";
 // Define the API URL constant
 const API_URL =
   "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
+
+// Helper function to format numbers into US locale
+const formatNumber = (value) => {
+  const number = parseFloat(value.toString().replace(/,/g, ""));
+  if (isNaN(number)) return "";
+  return number.toLocaleString("en-US", { maximumFractionDigits: 2 });
+};
+
+// Helper function to remove commas from a value
+const removeCommas = (value) => value.toString().replace(/,/g, "");
 
 /**
  * Reusable Input Component
@@ -170,18 +181,20 @@ const OwnerProfile = ({ ownerId }) => {
   const stripe = useStripe();
   const resolvedOwnerId = ownerId || user?.uid; // Resolve ownerId or default to Firebase user ID
 
-  // State Definitions
+  // New state for Manage Rental Modal
+  const [manageRentalModalVisible, setManageRentalModalVisible] = useState(false);
+
+  // ... (other state definitions remain unchanged)
   const [profileData, setProfileData] = useState({
     fullName: user?.displayName || "",
     contact: "",
     address: "",
-    email: user?.email || "", // Include email from Firebase Auth
-    // Add more owner-specific fields as needed
+    email: user?.email || "",
   });
 
   const [aircraftDetails, setAircraftDetails] = useState({
-    aircraftModel: "", // Year/Make/Model
-    tailNumber: "", // New field
+    aircraftModel: "",
+    tailNumber: "",
     engineType: "",
     totalTimeOnFrame: "",
     location: "",
@@ -190,35 +203,27 @@ const OwnerProfile = ({ ownerId }) => {
     description: "",
     images: [],
     mainImage: "",
-    // Add more aircraft-specific fields as needed
   });
 
   const [initialAircraftDetails, setInitialAircraftDetails] = useState(null);
-  const [allAircrafts, setAllAircrafts] = useState([]); // List of all aircraft
+  const [allAircrafts, setAllAircrafts] = useState([]);
+  // Updated costData state without oilCostPerHour and routineMaintenancePerHour
   const [costData, setCostData] = useState({
-    purchasePrice: "",
     loanAmount: "",
     interestRate: "",
     loanTerm: "",
-    depreciationRate: "",
-    usefulLife: "",
-    estimatedAnnualCost: "",
     insuranceCost: "",
     hangarCost: "",
     annualRegistrationFees: "",
     maintenanceReserve: "",
-    oilCostPerHour: "",
-    routineMaintenancePerHour: "",
-    tiresPerHour: "",
-    otherConsumablesPerHour: "",
     fuelCostPerHour: "",
+    // Removed oilCostPerHour and routineMaintenancePerHour
+    consumablesCostPerHour: "",
     rentalHoursPerYear: "",
     costPerHour: "",
-    mortgageExpense: "",
-    depreciationExpense: "",
+    financingExpense: "",
   });
 
-  // At the top of your component's state definitions, add:
   const [showCalculator, setShowCalculator] = useState(false);
   const [costSaved, setCostSaved] = useState(false);
   const [aircraftSaved, setAircraftSaved] = useState(false);
@@ -254,16 +259,6 @@ const OwnerProfile = ({ ownerId }) => {
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalEmail, setWithdrawalEmail] = useState("");
 
-  // Payment Method State
-  const [paymentMethod, setPaymentMethod] = useState("bank"); // 'bank' or 'card'
-  const [bankDetails, setBankDetails] = useState({
-    accountHolderName: "",
-    bankName: "",
-    routingNumber: "",
-    accountNumber: "",
-  });
-  const [cardDetails, setCardDetails] = useState({});
-
   // State for "View More" Active Rentals Modal with Pagination
   const [viewMoreModalVisible, setViewMoreModalVisible] = useState(false);
   const [activeRentalsPage, setActiveRentalsPage] = useState([]);
@@ -282,19 +277,17 @@ const OwnerProfile = ({ ownerId }) => {
   const [connectStripeModalVisible, setConnectStripeModalVisible] =
     useState(false);
 
+  // NEW: State for Existing Stripe Account Modal
+  const [existingStripeModalVisible, setExistingStripeModalVisible] = useState(false);
+
   /**
    * Helper function to automatically send state data to Firestore.
    */
   const autoSaveDataToFirestore = async (field, data) => {
     try {
       const sanitizedData = sanitizeData(data);
-      const docRef = doc(
-        db,
-        "users",
-        resolvedOwnerId,
-        "owners",
-        resolvedOwnerId
-      );
+      // Save to the root user document instead of a subcollection
+      const docRef = doc(db, "users", resolvedOwnerId);
       await setDoc(docRef, { [field]: sanitizedData }, { merge: true });
       console.log(`${field} has been successfully saved to Firestore.`);
     } catch (error) {
@@ -327,13 +320,8 @@ const OwnerProfile = ({ ownerId }) => {
     }
 
     try {
-      const profileDocRef = doc(
-        db,
-        "users",
-        resolvedOwnerId,
-        "owners",
-        resolvedOwnerId
-      );
+      // Read from the root user document now
+      const profileDocRef = doc(db, "users", resolvedOwnerId);
       const profileDocSnap = await getDoc(profileDocRef);
 
       if (profileDocSnap.exists()) {
@@ -382,13 +370,8 @@ const OwnerProfile = ({ ownerId }) => {
       fetchOwnerData();
 
       if (resolvedOwnerId) {
-        const profileDocRef = doc(
-          db,
-          "users",
-          resolvedOwnerId,
-          "owners",
-          resolvedOwnerId
-        );
+        // Listen to changes on the root user document now
+        const profileDocRef = doc(db, "users", resolvedOwnerId);
         const unsubscribeBalance = onSnapshot(
           profileDocRef,
           (docSnap) => {
@@ -429,7 +412,6 @@ const OwnerProfile = ({ ownerId }) => {
       autoSaveDataToFirestore("costData", costData);
     }
   }, [costData, resolvedOwnerId]);
-
   /**
    * Function to handle connecting Stripe account.
    */
@@ -494,6 +476,55 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   /**
+   * NEW: Function to handle retrieving an existing Stripe account.
+   */
+  const handleRetrieveExistingStripeAccount = async () => {
+    if (!profileData.email || !profileData.fullName) {
+      Alert.alert(
+        "Incomplete Information",
+        "Please provide both your full name and email address."
+      );
+      return;
+    }
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`${API_URL}/retrieve-connected-account`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ownerId: resolvedOwnerId,
+          email: profileData.email,
+          fullName: profileData.fullName,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Assume that the response returns stripeAccountId
+        setStripeAccountId(data.stripeAccountId);
+        setIsStripeConnected(true);
+        Alert.alert("Success", "Stripe account data retrieved and saved.");
+        setExistingStripeModalVisible(false);
+      } else {
+        Alert.alert(
+          "Error",
+          data.error || "Failed to retrieve Stripe account data."
+        );
+      }
+    } catch (error) {
+      console.error("Error retrieving existing Stripe account:", error);
+      Alert.alert(
+        "Error",
+        "There was an error retrieving your Stripe account data."
+      );
+    }
+  };
+
+  /**
    * Function to handle withdrawal.
    */
   const handleWithdraw = async () => {
@@ -522,51 +553,8 @@ const OwnerProfile = ({ ownerId }) => {
       return;
     }
 
-    if (paymentMethod === "bank") {
-      const { accountHolderName, bankName, routingNumber, accountNumber } =
-        bankDetails;
-      if (!accountHolderName || !bankName || !routingNumber || !accountNumber) {
-        Alert.alert("Incomplete Details", "Please fill in all bank details.");
-        return;
-      }
-      Alert.alert(
-        "Info",
-        "Bank withdrawal functionality is currently under development."
-      );
-      return;
-    } else if (paymentMethod === "card") {
-      if (!cardDetails || !cardDetails.complete) {
-        Alert.alert(
-          "Incomplete Details",
-          "Please enter complete card details."
-        );
-        return;
-      }
-    }
-
     setLoading(true);
     try {
-      let paymentMethodId = "";
-
-      if (paymentMethod === "card") {
-        const { error, paymentMethod: stripePaymentMethod } =
-          await stripe.createPaymentMethod({
-            type: "Card",
-            card: cardDetails,
-            billingDetails: {
-              name: user.displayName || "Owner",
-            },
-          });
-
-        if (error) {
-          Alert.alert("Card Error", error.message);
-          setLoading(false);
-          return;
-        }
-
-        paymentMethodId = stripePaymentMethod.id;
-      }
-
       const token = await user.getIdToken();
 
       const response = await fetch(`${API_URL}/withdraw-funds`, {
@@ -578,7 +566,6 @@ const OwnerProfile = ({ ownerId }) => {
         body: JSON.stringify({
           ownerId: resolvedOwnerId,
           amount: Math.round(amount * 100),
-          paymentMethodId,
           email: withdrawalEmail,
         }),
       });
@@ -657,7 +644,6 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Fetch rental requests and process them to include necessary details.
-   * Updated to use centralized 'rentalRequests' collection.
    */
   useEffect(() => {
     if (resolvedOwnerId) {
@@ -671,7 +657,6 @@ const OwnerProfile = ({ ownerId }) => {
       const unsubscribeRentalRequests = onSnapshot(
         q,
         async (snapshot) => {
-          // NEW: Check for newly added rental requests and schedule a local notification
           snapshot.docChanges().forEach((change) => {
             if (change.type === "added") {
               const newRequest = change.doc.data();
@@ -692,11 +677,10 @@ const OwnerProfile = ({ ownerId }) => {
           const requestsWithDetails = await Promise.all(
             snapshot.docs.map(async (docSnap) => {
               const requestData = docSnap.data();
-
-              // Extract renter's info
               const renterId = requestData.renterId;
-              let renterName = "Anonymous";
-              let renterCityState = "N/A";
+              let renterName = requestData.renterName || "Anonymous";
+              let renterCityState = requestData.currentLocation || "N/A";
+
               let rentalHours =
                 requestData.rentalHours != null
                   ? requestData.rentalHours
@@ -707,28 +691,17 @@ const OwnerProfile = ({ ownerId }) => {
                 : "No";
               let rentalDate = requestData.rentalDate || null;
 
-              // Fetch listing details
               const listingDetails = requestData.listingId
                 ? await fetchListingDetails(requestData.listingId)
                 : null;
-
-              // Fetch renter's name and location
-              if (renterId) {
-                const renterDocRef = doc(db, "renters", renterId);
-                const renterDocSnap = await getDoc(renterDocRef);
-                if (renterDocSnap.exists()) {
-                  const renterData = renterDocSnap.data();
-                  console.log("Renter Data:", renterData);
-                  renterName = renterData.fullName || "Anonymous";
-                  renterCityState = renterData.currentLocation || "N/A";
-                }
-              }
 
               let baseCost = requestData.baseCost;
               let commission = requestData.commission;
               if (!baseCost && listingDetails) {
                 const costPerHour = parseFloat(listingDetails.costPerHour);
-                baseCost = (parseFloat(rentalHours) * costPerHour).toFixed(2);
+                baseCost = (
+                  parseFloat(rentalHours) * costPerHour
+                ).toFixed(2);
                 commission = (baseCost * 0.06).toFixed(2);
               }
 
@@ -836,6 +809,9 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Function to handle approving a rental request.
+   * 
+   * Updated: After approving, instead of automatically opening the chat modal,
+   * the owner receives an alert indicating that a notification was sent to the renter.
    */
   const handleApproveRentalRequest = async (request) => {
     try {
@@ -872,9 +848,9 @@ const OwnerProfile = ({ ownerId }) => {
 
       const baseCost = (parseFloat(rentalHours) * costPerHour).toFixed(2);
       const commission = (baseCost * 0.06).toFixed(2);
-      const totalCost = (parseFloat(baseCost) - parseFloat(commission)).toFixed(
-        2
-      );
+      const totalCost = (
+        parseFloat(baseCost) - parseFloat(commission)
+      ).toFixed(2);
 
       const batch = writeBatch(db);
 
@@ -911,46 +887,12 @@ const OwnerProfile = ({ ownerId }) => {
 
       await batch.commit();
 
-      const chatThreadsQuery = query(
-        collection(db, "messages"),
-        where("participants", "array-contains", resolvedOwnerId)
-      );
-      const chatSnapshot = await getDocs(chatThreadsQuery);
-      let existingChatThread = null;
-
-      chatSnapshot.forEach((docSnap) => {
-        const chatData = docSnap.data();
-        if (
-          chatData.participants.includes(resolvedOwnerId) &&
-          chatData.participants.includes(renterId)
-        ) {
-          existingChatThread = { id: docSnap.id, ...chatData };
-        }
-      });
-
-      let chatThreadId = existingChatThread ? existingChatThread.id : null;
-
-      if (!chatThreadId) {
-        const chatThread = {
-          participants: [resolvedOwnerId, renterId],
-          messages: [],
-          rentalRequestId: request.id,
-          createdAt: serverTimestamp(),
-        };
-        const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
-        chatThread.id = chatDocRef.id;
-        setChatThreads([...chatThreads, chatThread]);
-        chatThreadId = chatDocRef.id;
-      }
-
+      // Remove the automatic opening of the chat modal.
       Alert.alert(
         "Request Approved",
-        `The rental request for ${formatDate(
-          request.rentalDate
-        )} has been approved.`
+        `The rental request for ${formatDate(request.rentalDate)} has been approved. A notification has been sent to the renter to complete the payment.`
       );
 
-      openMessageModal(chatThreadId);
       setRentalRequestModalVisible(false);
     } catch (error) {
       console.error("Error approving rental request: ", error);
@@ -1303,79 +1245,140 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   /**
+   * NEW: Function to handle opening chat for an active rental.
+   * 
+   * Updated: Now explicitly includes ownerId and renterId fields in the created chat thread.
+   */
+  const handleOpenChatForRental = async () => {
+    try {
+      const renterId = selectedRequest?.renterId;
+      if (!renterId) {
+        Alert.alert("Error", "No renter ID available.");
+        return;
+      }
+      const chatThreadsQuery = query(
+        collection(db, "messages"),
+        where("participants", "array-contains", resolvedOwnerId)
+      );
+      const chatSnapshot = await getDocs(chatThreadsQuery);
+      let existingChatThread = null;
+      chatSnapshot.forEach((docSnap) => {
+        const chatData = docSnap.data();
+        if (
+          chatData.participants.includes(resolvedOwnerId) &&
+          chatData.participants.includes(renterId)
+        ) {
+          existingChatThread = { id: docSnap.id, ...chatData };
+        }
+      });
+      let chatThreadId = existingChatThread ? existingChatThread.id : null;
+      if (!chatThreadId) {
+        const chatThread = {
+          participants: [resolvedOwnerId, renterId],
+          ownerId: resolvedOwnerId,      // <-- Added field for owner
+          renterId: renterId,            // <-- Added field for renter
+          rentalRequestId: selectedRequest.id,
+          messages: [],
+          createdAt: serverTimestamp(),
+        };
+        const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
+        chatThreadId = chatDocRef.id;
+      }
+      setManageRentalModalVisible(false);
+      setRentalRequestModalVisible(false);
+      openMessageModal(chatThreadId);
+    } catch (error) {
+      console.error("Error opening chat:", error);
+      Alert.alert("Error", "Failed to open chat.");
+    }
+  };
+
+  /**
    * Utility Functions
    */
 
   const saveCostData = async () => {
     setLoading(true);
     try {
-      const requiredFields = Object.values(costData).filter(
-        (field) => field === ""
-      );
-      if (requiredFields.length > 0) {
-        Alert.alert(
-          "Error",
-          "Please fill in all fields for accurate calculation."
-        );
-        setLoading(false);
-        return;
+      // Only require specific cost input fields (ignore computed fields)
+      const requiredFieldKeys = [
+        "loanAmount",
+        "interestRate",
+        "loanTerm",
+        "insuranceCost",
+        "hangarCost",
+        "annualRegistrationFees",
+        "maintenanceReserve",
+        "fuelCostPerHour",
+        "consumablesCostPerHour",
+        "rentalHoursPerYear",
+      ];
+      for (const key of requiredFieldKeys) {
+        if (costData[key].toString().trim() === "") {
+          Alert.alert(
+            "Error",
+            "Please fill in all fields for accurate calculation."
+          );
+          setLoading(false);
+          return;
+        }
       }
 
-      const monthlyInterestRate = parseFloat(costData.interestRate) / 100 / 12;
-      const numberOfPayments = parseFloat(costData.loanTerm) * 12;
-      const principal = parseFloat(costData.loanAmount);
-      const mortgageExpense = principal
-        ? (
-            (principal * monthlyInterestRate) /
-            (1 - Math.pow(1 + monthlyInterestRate, -numberOfPayments))
-          ).toFixed(2)
-        : 0;
+      // Remove commas before parsing
+      const loanAmount = parseFloat(removeCommas(costData.loanAmount));
+      const interestRate = parseFloat(removeCommas(costData.interestRate));
+      const loanTerm = parseFloat(removeCommas(costData.loanTerm));
+      const insuranceCost = parseFloat(removeCommas(costData.insuranceCost));
+      const hangarCost = parseFloat(removeCommas(costData.hangarCost));
+      const annualRegistrationFees = parseFloat(removeCommas(costData.annualRegistrationFees));
+      const maintenanceReserve = parseFloat(removeCommas(costData.maintenanceReserve));
+      const fuelCostPerHour = parseFloat(removeCommas(costData.fuelCostPerHour));
+      const consumablesCostPerHour = parseFloat(removeCommas(costData.consumablesCostPerHour));
+      const rentalHoursPerYear = parseFloat(removeCommas(costData.rentalHoursPerYear));
 
-      const depreciationExpense = (
-        (parseFloat(costData.purchasePrice) *
-          parseFloat(costData.depreciationRate)) /
-        100
-      ).toFixed(2);
+      const monthlyInterestRate = interestRate / 100 / 12;
+      const numberOfPayments = loanTerm * 12;
+      let financingExpense = 0;
+      if (loanAmount) {
+        if (monthlyInterestRate === 0) {
+          financingExpense = loanAmount / numberOfPayments;
+        } else {
+          financingExpense =
+            (loanAmount * monthlyInterestRate) /
+            (1 - Math.pow(1 + monthlyInterestRate, -numberOfPayments));
+        }
+      }
 
       const totalFixedCosts =
-        parseFloat(mortgageExpense) * 12 +
-        parseFloat(depreciationExpense) +
-        parseFloat(costData.insuranceCost) +
-        parseFloat(costData.hangarCost) +
-        parseFloat(costData.maintenanceReserve) +
-        parseFloat(costData.annualRegistrationFees);
+        financingExpense * 12 +
+        insuranceCost +
+        hangarCost +
+        annualRegistrationFees +
+        maintenanceReserve;
 
       const totalVariableCosts =
-        (parseFloat(costData.fuelCostPerHour) +
-          parseFloat(costData.oilCostPerHour) +
-          parseFloat(costData.routineMaintenancePerHour) +
-          parseFloat(costData.tiresPerHour) +
-          parseFloat(costData.otherConsumablesPerHour)) *
-        parseFloat(costData.rentalHoursPerYear);
+        (fuelCostPerHour + consumablesCostPerHour) * rentalHoursPerYear;
 
       const totalCostPerYear = totalFixedCosts + totalVariableCosts;
 
-      const costPerHour = (
-        totalCostPerYear / parseFloat(costData.rentalHoursPerYear)
-      ).toFixed(2);
+      const costPerHour = (totalCostPerYear / rentalHoursPerYear).toFixed(2);
 
       setCostData((prev) => ({
         ...prev,
         costPerHour,
-        mortgageExpense,
-        depreciationExpense,
+        financingExpense,
       }));
       setCostSaved(true);
       setLoading(false);
 
       await setDoc(
-        doc(db, "users", resolvedOwnerId, "owners", resolvedOwnerId),
+        // Save costData to the root user document
+        doc(db, "users", resolvedOwnerId),
         {
           costData: sanitizeData({
             ...costData,
             costPerHour,
-            mortgageExpense,
-            depreciationExpense,
+            financingExpense,
           }),
         },
         { merge: true }
@@ -1388,6 +1391,18 @@ const OwnerProfile = ({ ownerId }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // For numeric cost fields, onChange removes commas and onBlur formats the value.
+  const handleNumericChange = (field, value) => {
+    // Remove commas during input
+    handleInputChange(field, value.replace(/,/g, ""));
+  };
+
+  const handleNumericBlur = (field) => {
+    // Format the value when editing is complete
+    const currentValue = costData[field];
+    handleInputChange(field, formatNumber(currentValue));
   };
 
   const handleInputChange = (name, value) => {
@@ -1524,7 +1539,8 @@ const OwnerProfile = ({ ownerId }) => {
       }
 
       Alert.alert("Success", "Your aircraft details have been saved.");
-      setAircraftModalVisible(false);
+      setFullScreenModalVisible(false);
+      setIsListedForRent(true);
     } catch (error) {
       console.error("Error saving aircraft details:", error);
       Alert.alert("Error", "Failed to save aircraft details.");
@@ -1772,26 +1788,35 @@ const OwnerProfile = ({ ownerId }) => {
                     Estimated Cost per Hour: ${costData.costPerHour}
                   </Text>
                   <Text style={{ fontSize: 16, marginBottom: 4 }}>
+                    Recommended Rental Cost Per Hour: $
+                    {Number(parseFloat(costData.costPerHour) * 1.15).toLocaleString(
+                      "en-US",
+                      { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                    )}
+                  </Text>
+                  <Text style={{ fontSize: 16, marginBottom: 4 }}>
                     Total Fixed Costs per Year: $
-                    {(
-                      parseFloat(costData.mortgageExpense) * 12 +
-                      parseFloat(costData.depreciationExpense) +
-                      parseFloat(costData.insuranceCost) +
-                      parseFloat(costData.hangarCost) +
-                      parseFloat(costData.maintenanceReserve) +
-                      parseFloat(costData.annualRegistrationFees)
-                    ).toFixed(2)}
+                    {Number(
+                      parseFloat(costData.financingExpense) * 12 +
+                        parseFloat(costData.insuranceCost) +
+                        parseFloat(costData.hangarCost) +
+                        parseFloat(costData.annualRegistrationFees) +
+                        parseFloat(costData.maintenanceReserve)
+                    ).toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </Text>
                   <Text style={{ fontSize: 16, marginBottom: 16 }}>
                     Total Variable Costs per Year: $
-                    {(
+                    {Number(
                       (parseFloat(costData.fuelCostPerHour) +
-                        parseFloat(costData.oilCostPerHour) +
-                        parseFloat(costData.routineMaintenancePerHour) +
-                        parseFloat(costData.tiresPerHour) +
-                        parseFloat(costData.otherConsumablesPerHour)) *
-                      parseFloat(costData.rentalHoursPerYear)
-                    ).toFixed(2)}
+                        parseFloat(costData.consumablesCostPerHour)) *
+                        parseFloat(costData.rentalHoursPerYear)
+                    ).toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </Text>
                   <CustomButton
                     onPress={onEditCostData}
@@ -1804,110 +1829,86 @@ const OwnerProfile = ({ ownerId }) => {
                 <View>
                   <Section title="Loan Details">
                     <CustomTextInput
-                      placeholder="Purchase Price ($)"
-                      value={costData.purchasePrice}
-                      onChangeText={(value) =>
-                        handleInputChange("purchasePrice", value)
-                      }
-                      keyboardType="numeric"
-                      accessibilityLabel="Purchase Price input"
-                    />
-                    <CustomTextInput
                       placeholder="Loan Amount ($)"
-                      value={costData.loanAmount}
+                      value={costData.loanAmount ? formatNumber(costData.loanAmount) : ""}
                       onChangeText={(value) =>
-                        handleInputChange("loanAmount", value)
+                        handleNumericChange("loanAmount", value)
                       }
+                      onBlur={() => handleNumericBlur("loanAmount")}
                       keyboardType="numeric"
                       accessibilityLabel="Loan Amount input"
                     />
                     <CustomTextInput
                       placeholder="Interest Rate (%)"
-                      value={costData.interestRate}
+                      value={costData.interestRate ? formatNumber(costData.interestRate) : ""}
                       onChangeText={(value) =>
-                        handleInputChange("interestRate", value)
+                        handleNumericChange("interestRate", value)
                       }
+                      onBlur={() => handleNumericBlur("interestRate")}
                       keyboardType="numeric"
                       accessibilityLabel="Interest Rate input"
                     />
                     <CustomTextInput
                       placeholder="Loan Term (years)"
-                      value={costData.loanTerm}
+                      value={costData.loanTerm ? formatNumber(costData.loanTerm) : ""}
                       onChangeText={(value) =>
-                        handleInputChange("loanTerm", value)
+                        handleNumericChange("loanTerm", value)
                       }
+                      onBlur={() => handleNumericBlur("loanTerm")}
                       keyboardType="numeric"
                       accessibilityLabel="Loan Term input"
                     />
-                    <CustomTextInput
-                      placeholder="Depreciation Rate (%)"
-                      value={costData.depreciationRate}
-                      onChangeText={(value) =>
-                        handleInputChange("depreciationRate", value)
-                      }
-                      keyboardType="numeric"
-                      accessibilityLabel="Depreciation Rate input"
-                    />
-                    <CustomTextInput
-                      placeholder="Useful Life (years)"
-                      value={costData.usefulLife}
-                      onChangeText={(value) =>
-                        handleInputChange("usefulLife", value)
-                      }
-                      keyboardType="numeric"
-                      accessibilityLabel="Useful Life input"
-                    />
                     <Text style={{ fontSize: 16, color: "#4a5568" }}>
-                      Mortgage Expense: ${costData.mortgageExpense}
-                    </Text>
-                    <Text style={{ fontSize: 16, color: "#4a5568" }}>
-                      Depreciation Expense: ${costData.depreciationExpense}
+                      Financing Expense: ${parseFloat(costData.financingExpense || 0).toFixed(2)}
                     </Text>
                   </Section>
 
                   <Section title="Annual Costs">
                     <CustomTextInput
-                      placeholder="Estimated Annual Cost ($)"
-                      value={costData.estimatedAnnualCost}
-                      onChangeText={(value) =>
-                        handleInputChange("estimatedAnnualCost", value)
-                      }
-                      keyboardType="numeric"
-                      accessibilityLabel="Estimated Annual Cost input"
-                    />
-                    <CustomTextInput
                       placeholder="Insurance Cost ($)"
-                      value={costData.insuranceCost}
+                      value={costData.insuranceCost ? formatNumber(costData.insuranceCost) : ""}
                       onChangeText={(value) =>
-                        handleInputChange("insuranceCost", value)
+                        handleNumericChange("insuranceCost", value)
                       }
+                      onBlur={() => handleNumericBlur("insuranceCost")}
                       keyboardType="numeric"
                       accessibilityLabel="Insurance Cost input"
                     />
                     <CustomTextInput
                       placeholder="Hangar Cost ($)"
-                      value={costData.hangarCost}
+                      value={costData.hangarCost ? formatNumber(costData.hangarCost) : ""}
                       onChangeText={(value) =>
-                        handleInputChange("hangarCost", value)
+                        handleNumericChange("hangarCost", value)
                       }
+                      onBlur={() => handleNumericBlur("hangarCost")}
                       keyboardType="numeric"
                       accessibilityLabel="Hangar Cost input"
                     />
                     <CustomTextInput
                       placeholder="Annual Registration & Fees ($)"
-                      value={costData.annualRegistrationFees}
-                      onChangeText={(value) =>
-                        handleInputChange("annualRegistrationFees", value)
+                      value={
+                        costData.annualRegistrationFees
+                          ? formatNumber(costData.annualRegistrationFees)
+                          : ""
                       }
+                      onChangeText={(value) =>
+                        handleNumericChange("annualRegistrationFees", value)
+                      }
+                      onBlur={() => handleNumericBlur("annualRegistrationFees")}
                       keyboardType="numeric"
                       accessibilityLabel="Annual Registration & Fees input"
                     />
                     <CustomTextInput
                       placeholder="Maintenance Reserve ($)"
-                      value={costData.maintenanceReserve}
-                      onChangeText={(value) =>
-                        handleInputChange("maintenanceReserve", value)
+                      value={
+                        costData.maintenanceReserve
+                          ? formatNumber(costData.maintenanceReserve)
+                          : ""
                       }
+                      onChangeText={(value) =>
+                        handleNumericChange("maintenanceReserve", value)
+                      }
+                      onBlur={() => handleNumericBlur("maintenanceReserve")}
                       keyboardType="numeric"
                       accessibilityLabel="Maintenance Reserve input"
                     />
@@ -1916,55 +1917,39 @@ const OwnerProfile = ({ ownerId }) => {
                   <Section title="Operational Costs">
                     <CustomTextInput
                       placeholder="Fuel Cost Per Hour ($)"
-                      value={costData.fuelCostPerHour}
+                      value={costData.fuelCostPerHour ? formatNumber(costData.fuelCostPerHour) : ""}
                       onChangeText={(value) =>
-                        handleInputChange("fuelCostPerHour", value)
+                        handleNumericChange("fuelCostPerHour", value)
                       }
+                      onBlur={() => handleNumericBlur("fuelCostPerHour")}
                       keyboardType="numeric"
                       accessibilityLabel="Fuel Cost Per Hour input"
                     />
                     <CustomTextInput
-                      placeholder="Oil Cost Per Hour ($)"
-                      value={costData.oilCostPerHour}
-                      onChangeText={(value) =>
-                        handleInputChange("oilCostPerHour", value)
+                      placeholder="Consumables Cost Per Hour (e.g. tires, brake pads, etc.)"
+                      value={
+                        costData.consumablesCostPerHour
+                          ? formatNumber(costData.consumablesCostPerHour)
+                          : ""
                       }
-                      keyboardType="numeric"
-                      accessibilityLabel="Oil Cost Per Hour input"
-                    />
-                    <CustomTextInput
-                      placeholder="Routine Maintenance Per Hour ($)"
-                      value={costData.routineMaintenancePerHour}
                       onChangeText={(value) =>
-                        handleInputChange("routineMaintenancePerHour", value)
+                        handleNumericChange("consumablesCostPerHour", value)
                       }
+                      onBlur={() => handleNumericBlur("consumablesCostPerHour")}
                       keyboardType="numeric"
-                      accessibilityLabel="Routine Maintenance Per Hour input"
-                    />
-                    <CustomTextInput
-                      placeholder="Tires Per Hour ($)"
-                      value={costData.tiresPerHour}
-                      onChangeText={(value) =>
-                        handleInputChange("tiresPerHour", value)
-                      }
-                      keyboardType="numeric"
-                      accessibilityLabel="Tires Per Hour input"
-                    />
-                    <CustomTextInput
-                      placeholder="Other Consumables Per Hour ($)"
-                      value={costData.otherConsumablesPerHour}
-                      onChangeText={(value) =>
-                        handleInputChange("otherConsumablesPerHour", value)
-                      }
-                      keyboardType="numeric"
-                      accessibilityLabel="Other Consumables Per Hour input"
+                      accessibilityLabel="Consumables Cost Per Hour input"
                     />
                     <CustomTextInput
                       placeholder="Rental Hours Per Year"
-                      value={costData.rentalHoursPerYear}
-                      onChangeText={(value) =>
-                        handleInputChange("rentalHoursPerYear", value)
+                      value={
+                        costData.rentalHoursPerYear
+                          ? formatNumber(costData.rentalHoursPerYear)
+                          : ""
                       }
+                      onChangeText={(value) =>
+                        handleNumericChange("rentalHoursPerYear", value)
+                      }
+                      onBlur={() => handleNumericBlur("rentalHoursPerYear")}
                       keyboardType="numeric"
                       accessibilityLabel="Rental Hours Per Year input"
                     />
@@ -1989,11 +1974,21 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
 
         {/* Connect Stripe Account Section */}
-        {!isStripeConnected && (
+        {isStripeConnected ? (
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-            <Text
-              style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}
-            >
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+              Connected Stripe Account
+            </Text>
+            <CustomButton
+              onPress={() => navigation.navigate("ConnectedAccountDetails")}
+              title="View Connected Account"
+              backgroundColor="#3182ce"
+              accessibilityLabel="View your connected Stripe account details"
+            />
+          </View>
+        ) : (
+          <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
               Connect Your Stripe Account
             </Text>
             <Text style={{ marginBottom: 16 }}>
@@ -2132,13 +2127,38 @@ const OwnerProfile = ({ ownerId }) => {
                     <Text style={{ fontSize: 14 }}>
                       Cost Per Hour: ${item.costPerHour}
                     </Text>
+                    <View style={{ flexDirection: "row", marginTop: 4 }}>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: "#4a5568",
+                          marginRight: 8,
+                        }}
+                      >
+                        Views: {item.viewCount || 0}
+                      </Text>
+                      {item.liveViews > 0 && (
+                        <View
+                          style={{
+                            backgroundColor: "red",
+                            paddingHorizontal: 4,
+                            paddingVertical: 2,
+                            borderRadius: 4,
+                          }}
+                        >
+                          <Text style={{ color: "white", fontSize: 12 }}>
+                            LIVE
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
 
                   <TouchableOpacity
                     onPress={() => {
                       Alert.alert(
-                        "Remove Aircraft",
-                        "Are you sure you want to remove this aircraft?",
+                        "Remove Listing",
+                        "Are you sure you want to remove this listing?",
                         [
                           { text: "Cancel", style: "cancel" },
                           {
@@ -2162,16 +2182,16 @@ const OwnerProfile = ({ ownerId }) => {
 
                                 Alert.alert(
                                   "Removed",
-                                  "The aircraft has been removed."
+                                  "The listing has been removed."
                                 );
                               } catch (error) {
                                 console.error(
-                                  "Error removing aircraft:",
+                                  "Error removing listing:",
                                   error
                                 );
                                 Alert.alert(
                                   "Error",
-                                  "Failed to remove the aircraft."
+                                  "Failed to remove the listing."
                                 );
                               }
                             },
@@ -2179,11 +2199,7 @@ const OwnerProfile = ({ ownerId }) => {
                         ]
                       );
                     }}
-                    style={{
-                      position: "absolute",
-                      top: 8,
-                      right: 8,
-                    }}
+                    style={{ marginLeft: 16 }}
                     accessibilityLabel={`Remove listing for aircraft ${item.aircraftModel}`}
                     accessibilityRole="button"
                   >
@@ -2193,7 +2209,7 @@ const OwnerProfile = ({ ownerId }) => {
               )}
             />
           ) : (
-            <Text style={{ color: "#a0aec0" }}>No aircraft added yet.</Text>
+            <Text style={{ color: "#a0aec0" }}>No current listings.</Text>
           )}
 
           <TouchableOpacity
@@ -2273,134 +2289,6 @@ const OwnerProfile = ({ ownerId }) => {
 
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
-            Current Listings
-          </Text>
-          {userListings.length > 0 ? (
-            <FlatList
-              data={userListings}
-              keyExtractor={(item, index) => `${item.id}_${index}`}
-              nestedScrollEnabled={true}
-              scrollEnabled={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedAircraft(item);
-                    setIsEditing(true);
-                    setAircraftDetails(item);
-                    setImages(item.images || []);
-                    setAircraftModalVisible(true);
-                  }}
-                  style={{
-                    borderWidth: 1,
-                    borderColor: "#ccc",
-                    borderRadius: 8,
-                    padding: 16,
-                    marginBottom: 16,
-                    backgroundColor: "#fff",
-                  }}
-                  accessibilityLabel={`View details for listing ${item.aircraftModel}`}
-                  accessibilityRole="button"
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 20, fontWeight: "bold" }}>
-                        {item.aircraftModel}
-                      </Text>
-                      <Text>{item.description}</Text>
-                      <Text>Rate per Hour: ${item.costPerHour}</Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => {
-                        Alert.alert(
-                          "Remove Listing",
-                          "Are you sure you want to remove this listing?",
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                              text: "Remove",
-                              style: "destructive",
-                              onPress: async () => {
-                                try {
-                                  await deleteDoc(
-                                    doc(db, "airplanes", item.id)
-                                  );
-
-                                  setUserListings(
-                                    userListings.filter((a) => a.id !== item.id)
-                                  );
-                                  setAllAircrafts(
-                                    allAircrafts.filter((a) => a.id !== item.id)
-                                  );
-                                  setSelectedAircraftIds(
-                                    selectedAircraftIds.filter(
-                                      (id) => id !== item.id
-                                    )
-                                  );
-
-                                  Alert.alert(
-                                    "Removed",
-                                    "The listing has been removed."
-                                  );
-                                } catch (error) {
-                                  console.error(
-                                    "Error removing listing:",
-                                    error
-                                  );
-                                  Alert.alert(
-                                    "Error",
-                                    "Failed to remove the listing."
-                                  );
-                                }
-                              },
-                            },
-                          ]
-                        );
-                      }}
-                      style={{ marginLeft: 16 }}
-                      accessibilityLabel={`Remove listing for aircraft ${item.aircraftModel}`}
-                      accessibilityRole="button"
-                    >
-                      <Ionicons name="close-circle" size={24} color="red" />
-                    </TouchableOpacity>
-                  </View>
-                  {item.images.length > 0 && (
-                    <FlatList
-                      data={item.images}
-                      horizontal
-                      keyExtractor={(image, idx) => `${image}_${idx}`}
-                      nestedScrollEnabled={true}
-                      scrollEnabled={false}
-                      renderItem={({ item: image }) => (
-                        <Image
-                          source={{ uri: image }}
-                          style={{
-                            width: 96,
-                            height: 96,
-                            borderRadius: 8,
-                            marginTop: 8,
-                            marginRight: 8,
-                          }}
-                        />
-                      )}
-                      style={{ marginTop: 8 }}
-                    />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          ) : (
-            <Text style={{ color: "#a0aec0" }}>No current listings.</Text>
-          )}
-        </View>
-
-        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-          <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
             Incoming Rental Requests
           </Text>
           {rentalRequests.length > 0 ? (
@@ -2432,15 +2320,19 @@ const OwnerProfile = ({ ownerId }) => {
                   <Text style={{ fontSize: 18, fontWeight: "bold" }}>
                     Renter: {item.renterName}
                   </Text>
-                  <Text>
+                  <Text style={{ fontSize: 16 }}>
                     Listing:{" "}
                     {item.listingDetails
                       ? `${item.listingDetails.aircraftModel}`
                       : "Listing details not available"}
                   </Text>
-                  <Text>Total Cost: ${item.baseCost}</Text>
-                  <Text>Requested Date: {formatDate(item.rentalDate)}</Text>
-                  <Text>Status: {item.status}</Text>
+                  <Text style={{ fontSize: 16 }}>
+                    Total Cost: ${item.baseCost}
+                  </Text>
+                  <Text style={{ fontSize: 16 }}>
+                    Requested Date: {formatDate(item.rentalDate)}
+                  </Text>
+                  <Text style={{ fontSize: 16 }}>Status: {item.status}</Text>
                 </TouchableOpacity>
               )}
             />
@@ -2598,15 +2490,11 @@ const OwnerProfile = ({ ownerId }) => {
                     {selectedRequest.rentalHours}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      Current Medical:{" "}
-                    </Text>
+                    <Text style={{ fontWeight: "bold" }}>Current Medical: </Text>
                     {selectedRequest.currentMedical}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      Current Renter's Insurance:{" "}
-                    </Text>
+                    <Text style={{ fontWeight: "bold" }}>Current Renter's Insurance: </Text>
                     {selectedRequest.currentRentersInsurance}
                   </Text>
 
@@ -2621,9 +2509,7 @@ const OwnerProfile = ({ ownerId }) => {
                     {selectedListingDetails.costPerHour}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: "bold" }}>
-                      Number of Hours:{" "}
-                    </Text>
+                    <Text style={{ fontWeight: "bold" }}>Number of Hours: </Text>
                     {selectedRequest.rentalHours}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
@@ -2679,12 +2565,7 @@ const OwnerProfile = ({ ownerId }) => {
 
                 {selectedRequest.status === "active" && (
                   <CustomButton
-                    onPress={() => {
-                      Alert.alert(
-                        "Info",
-                        "Active rentals details can be managed here."
-                      );
-                    }}
+                    onPress={() => setManageRentalModalVisible(true)}
                     title="Manage Rental"
                     backgroundColor="#4299e1"
                     style={{ marginTop: 16 }}
@@ -2695,6 +2576,58 @@ const OwnerProfile = ({ ownerId }) => {
             ) : (
               <ActivityIndicator size="large" color="#3182ce" />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* New Manage Rental Modal */}
+      <Modal
+        visible={manageRentalModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setManageRentalModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "80%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader
+              title="Manage Rental"
+              onClose={() => setManageRentalModalVisible(false)}
+            />
+            <TouchableOpacity
+              onPress={() => {
+                Linking.openURL("mailto:coryarmer@gmail.com");
+                setManageRentalModalVisible(false);
+              }}
+              style={{ paddingVertical: 12 }}
+              accessibilityLabel="Contact Support"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 18, color: "#3182ce" }}>
+                Contact Support
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleOpenChatForRental}
+              style={{ paddingVertical: 12, marginTop: 16 }}
+              accessibilityLabel="Open Chat"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 18, color: "#3182ce" }}>Open Chat</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -3176,6 +3109,76 @@ const OwnerProfile = ({ ownerId }) => {
               style={{ marginTop: 16 }}
               accessibilityLabel="Proceed to connect Stripe account"
             />
+            {/* NEW: Pressable text to use an existing account */}
+            <TouchableOpacity
+              onPress={() => {
+                setConnectStripeModalVisible(false);
+                setExistingStripeModalVisible(true);
+              }}
+              style={{ marginTop: 12 }}
+              accessibilityLabel="Already have an account?"
+              accessibilityRole="button"
+            >
+              <Text style={{ color: "#3182ce", textAlign: "center" }}>
+                Already have an account?
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* NEW: Existing Stripe Account Modal */}
+      <Modal
+        visible={existingStripeModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setExistingStripeModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              maxHeight: "90%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader
+              title="Retrieve Existing Stripe Account"
+              onClose={() => setExistingStripeModalVisible(false)}
+            />
+            <Text style={{ marginBottom: 16 }}>
+              Enter your full name and email address to retrieve your existing
+              Stripe account data.
+            </Text>
+            <CustomTextInput
+              placeholder="Full Name"
+              value={profileData.fullName}
+              onChangeText={(value) => handleInputChange("fullName", value)}
+              accessibilityLabel="Full Name input for existing account"
+            />
+            <CustomTextInput
+              placeholder="Email Address"
+              value={profileData.email}
+              onChangeText={(value) => handleInputChange("email", value)}
+              keyboardType="email-address"
+              accessibilityLabel="Email Address input for existing account"
+            />
+            <CustomButton
+              onPress={handleRetrieveExistingStripeAccount}
+              title="Retrieve Account"
+              backgroundColor="#3182ce"
+              style={{ marginTop: 16 }}
+              accessibilityLabel="Retrieve existing Stripe account"
+            />
           </View>
         </View>
       </Modal>
@@ -3218,118 +3221,51 @@ const OwnerProfile = ({ ownerId }) => {
                 Available Balance: ${availableBalance.toFixed(2)}
               </Text>
 
-              <View style={{ flexDirection: "row", justifyContent: "space-around", marginBottom: 16 }}>
-                <TouchableOpacity
-                  onPress={() => setPaymentMethod("bank")}
-                  style={{
-                    flex: 1,
-                    marginRight: 8,
-                    padding: 12,
-                    backgroundColor: paymentMethod === "bank" ? "#e2e8f0" : "#fff",
-                    borderColor: "#ccc",
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    alignItems: "center",
-                  }}
-                  accessibilityLabel="Select Bank Account"
-                >
-                  <Text style={{ color: "#000", fontWeight: "bold" }}>Bank Account</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setPaymentMethod("card")}
-                  style={{
-                    flex: 1,
-                    marginLeft: 8,
-                    padding: 12,
-                    backgroundColor: paymentMethod === "card" ? "#e2e8f0" : "#fff",
-                    borderColor: "#ccc",
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    alignItems: "center",
-                  }}
-                  accessibilityLabel="Select Debit Card"
-                >
-                  <Text style={{ color: "#000", fontWeight: "bold" }}>Debit Card</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}>
+                Withdrawals will be processed to your connected bank account via Stripe.
+              </Text>
 
-              <ScrollView
-                contentContainerStyle={{ paddingBottom: 16 }}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                {paymentMethod === "bank" && (
-                  <BankDetailsForm
-                    bankDetails={bankDetails}
-                    setBankDetails={setBankDetails}
-                  />
-                )}
-
-                {paymentMethod === "card" && (
-                  <Section title="Debit Card Details">
-                    <CardField
-                      postalCodeEnabled={false}
-                      placeholder={{
-                        number: "4242 4242 4242 4242",
-                        placeholderTextColor: "#888",
-                      }}
-                      cardStyle={{
-                        backgroundColor: "#FFFFFF",
-                        textColor: "#000000",
-                      }}
-                      style={{
-                        width: "100%",
-                        height: 50,
-                        marginVertical: 24,
-                      }}
-                      onCardChange={(details) => setCardDetails(details)}
-                      accessibilityLabel="Debit card details input"
-                    />
-                  </Section>
-                )}
-
-                <Section title="Withdrawal Email">
-                  <CustomTextInput
-                    placeholder="Email Address"
-                    value={withdrawalEmail}
-                    onChangeText={(value) => setWithdrawalEmail(value)}
-                    keyboardType="email-address"
-                    accessibilityLabel="Withdrawal email input"
-                  />
-                </Section>
-
-                <Section title="Withdrawal Amount">
-                  <CustomTextInput
-                    placeholder="Amount to Withdraw ($)"
-                    value={withdrawalAmount}
-                    onChangeText={(value) => setWithdrawalAmount(value)}
-                    keyboardType="numeric"
-                    accessibilityLabel="Withdrawal amount input"
-                  />
-                </Section>
-
-                <CustomButton
-                  onPress={handleWithdraw}
-                  title="Withdraw"
-                  backgroundColor="#48bb78"
-                  style={{ marginTop: 16, marginBottom: 8 }}
-                  accessibilityLabel="Withdraw funds"
+              <Section title="Withdrawal Email">
+                <CustomTextInput
+                  placeholder="Email Address"
+                  value={withdrawalEmail}
+                  onChangeText={(value) => setWithdrawalEmail(value)}
+                  keyboardType="email-address"
+                  accessibilityLabel="Withdrawal email input"
                 />
-                <CustomButton
-                  onPress={() => setWithdrawModalVisible(false)}
-                  title="Cancel"
-                  backgroundColor="#f56565"
-                  accessibilityLabel="Cancel withdrawal"
-                />
+              </Section>
 
-                {loading && (
-                  <ActivityIndicator
-                    size="large"
-                    color="#3182ce"
-                    style={{ marginTop: 16 }}
-                  />
-                )}
-              </ScrollView>
+              <Section title="Withdrawal Amount">
+                <CustomTextInput
+                  placeholder="Amount to Withdraw ($)"
+                  value={withdrawalAmount}
+                  onChangeText={(value) => setWithdrawalAmount(value)}
+                  keyboardType="numeric"
+                  accessibilityLabel="Withdrawal amount input"
+                />
+              </Section>
+
+              <CustomButton
+                onPress={handleWithdraw}
+                title="Withdraw"
+                backgroundColor="#48bb78"
+                style={{ marginTop: 16, marginBottom: 8 }}
+                accessibilityLabel="Withdraw funds"
+              />
+              <CustomButton
+                onPress={() => setWithdrawModalVisible(false)}
+                title="Cancel"
+                backgroundColor="#f56565"
+                accessibilityLabel="Cancel withdrawal"
+              />
+
+              {loading && (
+                <ActivityIndicator
+                  size="large"
+                  color="#3182ce"
+                  style={{ marginTop: 16 }}
+                />
+              )}
             </View>
           </View>
         </KeyboardAvoidingView>

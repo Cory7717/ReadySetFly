@@ -384,7 +384,9 @@ const Home = ({ route, navigation }) => {
         "Listing Error",
         "The selected listing does not have a valid owner. Please select a different listing."
       );
-      console.error(`Selected listing ID: ${selectedListing.id} is missing 'ownerId'.`);
+      console.error(
+        `Selected listing ID: ${selectedListing.id} is missing 'ownerId'.`
+      );
       return;
     }
     if (!rentalDate) {
@@ -426,6 +428,17 @@ const Home = ({ route, navigation }) => {
     let rentalRequestData = {};
     try {
       const renterFullName = fullName.trim();
+
+      // Update the renter's document in Firestore with both full name and current location
+      await setDoc(
+        doc(db, "renters", user.uid),
+        {
+          fullName: renterFullName,
+          currentLocation: cityStateCombined
+        },
+        { merge: true }
+      );
+
       rentalRequestData = {
         renterId: user.uid,
         renterName: renterFullName,
@@ -485,7 +498,6 @@ const Home = ({ route, navigation }) => {
       );
     }
   };
-  
 
   const handleDateSelection = (day) => {
     setRentalDate(day.dateString);

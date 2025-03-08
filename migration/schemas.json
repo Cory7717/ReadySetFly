@@ -273,7 +273,9 @@
       "address": "string",
       "aircraftType": "string",
       "certifications": "string",
-      "fcmToken": "string"
+      "fcmToken": "string",
+      "fullName": "string",
+      "currentLocation": "string"
     }
   },
   "users": {

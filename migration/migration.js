@@ -692,6 +692,32 @@ const generateAuditReportAndFix = async () => {
  * Description: Identifies and deletes listings in the 'UserPost' collection where the 'ownerId' does not correspond to any existing user in the 'owners' collection.
  * Optionally deletes associated images from Firebase Storage.
  */
+
+const updateSpecificOwnerStripeAccount = async () => {
+  const ownerId = "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2"; // Replace with the correct owner document ID
+  const ownerRef = db.collection("owners").doc(ownerId);
+  const ownerDoc = await ownerRef.get();
+  
+  if (!ownerDoc.exists) {
+    console.error("Owner not found.");
+    return;
+  }
+  
+  const ownerData = ownerDoc.data();
+  if (!ownerData.stripeAccountId) {
+    // If the connected account already exists in Stripe, replace this with the actual ID.
+    const knownStripeAccountId = "acct_1234567890abcdef"; 
+    await ownerRef.update({
+      stripeAccountId: knownStripeAccountId,
+      stripeAccountStatus: "active",
+    });
+    console.log(`Updated owner ${ownerId} with stripeAccountId ${knownStripeAccountId}`);
+  } else {
+    console.log("Owner already has stripeAccountId:", ownerData.stripeAccountId);
+  }
+};
+
+
 const cleanupOrphanedListings = async () => {
   console.log('🔄 Starting cleanup of orphaned listings in UserPost collection...');
   try {
