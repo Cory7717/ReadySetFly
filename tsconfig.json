@@ -7,12 +7,14 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts", "**/*.tsx"]
-,
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
   "exclude": [
     "node_modules",
     "dist",
     "**/*.spec.ts"
   ],
-  // "extends": "expo/tsconfig.base"
+  "extends": "expo/tsconfig.base"
 }
