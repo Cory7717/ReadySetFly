@@ -183,6 +183,10 @@ const OwnerProfile = ({ ownerId }) => {
 
   // New state for Manage Rental Modal
   const [manageRentalModalVisible, setManageRentalModalVisible] = useState(false);
+  // NEW: State for Connected Account Modal (to be opened when "View Connected Account" is pressed)
+  const [connectedAccountModalVisible, setConnectedAccountModalVisible] = useState(false);
+  // NEW: State for live balance retrieved from Stripe
+  const [liveBalance, setLiveBalance] = useState(null);
 
   // ... (other state definitions remain unchanged)
   const [profileData, setProfileData] = useState({
@@ -207,7 +211,6 @@ const OwnerProfile = ({ ownerId }) => {
 
   const [initialAircraftDetails, setInitialAircraftDetails] = useState(null);
   const [allAircrafts, setAllAircrafts] = useState([]);
-  // Updated costData state without oilCostPerHour and routineMaintenancePerHour
   const [costData, setCostData] = useState({
     loanAmount: "",
     interestRate: "",
@@ -217,7 +220,6 @@ const OwnerProfile = ({ ownerId }) => {
     annualRegistrationFees: "",
     maintenanceReserve: "",
     fuelCostPerHour: "",
-    // Removed oilCostPerHour and routineMaintenancePerHour
     consumablesCostPerHour: "",
     rentalHoursPerYear: "",
     costPerHour: "",
@@ -235,7 +237,10 @@ const OwnerProfile = ({ ownerId }) => {
   const [userListings, setUserListings] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
   const [ratings, setRatings] = useState({});
+  // availableBalance is stored in cents, but we display in dollars.
   const [availableBalance, setAvailableBalance] = useState(0);
+  // NEW: totalWithdrawn is stored in cents as well.
+  const [totalWithdrawn, setTotalWithdrawn] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
   const [activeRentals, setActiveRentals] = useState([]);
@@ -255,9 +260,8 @@ const OwnerProfile = ({ ownerId }) => {
   const [rentalRequestModalVisible, setRentalRequestModalVisible] =
     useState(false);
 
+  // Updated Withdraw Funds modal state remains for showing info only
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
-  const [withdrawalAmount, setWithdrawalAmount] = useState("");
-  const [withdrawalEmail, setWithdrawalEmail] = useState("");
 
   // State for "View More" Active Rentals Modal with Pagination
   const [viewMoreModalVisible, setViewMoreModalVisible] = useState(false);
@@ -274,11 +278,16 @@ const OwnerProfile = ({ ownerId }) => {
   const [isStripeConnected, setIsStripeConnected] = useState(false);
 
   // New state for Connect Stripe Modal
-  const [connectStripeModalVisible, setConnectStripeModalVisible] =
-    useState(false);
+  const [connectStripeModalVisible, setConnectStripeModalVisible] = useState(false);
 
   // NEW: State for Existing Stripe Account Modal
   const [existingStripeModalVisible, setExistingStripeModalVisible] = useState(false);
+
+  // NEW: State for Stripe Info Modal
+  const [stripeInfoModalVisible, setStripeInfoModalVisible] = useState(false);
+
+  // NEW: State for an optional input of a Stripe Account ID when retrieving an existing account.
+  const [existingStripeAccountId, setExistingStripeAccountId] = useState("");
 
   /**
    * Helper function to automatically send state data to Firestore.
@@ -335,6 +344,24 @@ const OwnerProfile = ({ ownerId }) => {
         setStripeAccountId(profile.stripeAccountId || null);
         setIsStripeConnected(!!profile.stripeAccountId);
         setAvailableBalance(profile.availableBalance || 0);
+        setTotalWithdrawn(profile.totalWithdrawn || 0);
+        // Retrieve saved costData from Firestore (or use default values)
+        setCostData(
+          profile.costData || {
+            loanAmount: "",
+            interestRate: "",
+            loanTerm: "",
+            insuranceCost: "",
+            hangarCost: "",
+            annualRegistrationFees: "",
+            maintenanceReserve: "",
+            fuelCostPerHour: "",
+            consumablesCostPerHour: "",
+            rentalHoursPerYear: "",
+            costPerHour: "",
+            financingExpense: "",
+          }
+        );
       } else {
         console.log("No owner profile data found.");
         setIsStripeConnected(false);
@@ -344,6 +371,7 @@ const OwnerProfile = ({ ownerId }) => {
           fullName: user.displayName || "",
         }));
         setAvailableBalance(0);
+        setTotalWithdrawn(0);
       }
 
       const airplanesRef = collection(db, "airplanes");
@@ -378,6 +406,7 @@ const OwnerProfile = ({ ownerId }) => {
             if (docSnap.exists()) {
               const profile = docSnap.data();
               setAvailableBalance(profile.availableBalance || 0);
+              setTotalWithdrawn(profile.totalWithdrawn || 0);
             }
           },
           (error) => {
@@ -412,6 +441,35 @@ const OwnerProfile = ({ ownerId }) => {
       autoSaveDataToFirestore("costData", costData);
     }
   }, [costData, resolvedOwnerId]);
+
+  // NEW: Fetch live Stripe balance when Payment Information modal opens
+  useEffect(() => {
+    const fetchStripeBalance = async () => {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch(`${API_URL}/get-stripe-balance`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setLiveBalance(data.balance);
+        } else {
+          console.error("Error fetching live balance:", data.error);
+        }
+      } catch (e) {
+        console.error("Error fetching live balance:", e);
+      }
+    };
+
+    if (withdrawModalVisible) {
+      fetchStripeBalance();
+    }
+  }, [withdrawModalVisible, user]);
+
   /**
    * Function to handle connecting Stripe account.
    */
@@ -446,10 +504,16 @@ const OwnerProfile = ({ ownerId }) => {
         const { accountLinkUrl } = data;
         Linking.openURL(accountLinkUrl);
       } else {
-        Alert.alert(
-          "Error",
-          data.error || "Failed to connect Stripe account. Please try again."
-        );
+        let errMsg = data.error || "Failed to connect Stripe account. Please try again.";
+        if (
+          errMsg.includes(
+            "destination account needs to have at least one of the following capabilities enabled"
+          )
+        ) {
+          errMsg =
+            "Your connected Stripe account is missing required capabilities (e.g. transfers). Please contact support for assistance.";
+        }
+        Alert.alert("Error", errMsg);
       }
     } catch (error) {
       console.error("Error connecting Stripe account:", error);
@@ -477,8 +541,25 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * NEW: Function to handle retrieving an existing Stripe account.
+   * Now allows the user to provide a Stripe Account ID (in the format acct_XXXXXX)
+   * OR to supply their full name and email address.
    */
   const handleRetrieveExistingStripeAccount = async () => {
+    if (existingStripeAccountId.trim() !== "") {
+      const stripeAccountIdRegex = /^acct_[a-zA-Z0-9]+$/;
+      if (!stripeAccountIdRegex.test(existingStripeAccountId.trim())) {
+        Alert.alert(
+          "Invalid Stripe Account ID",
+          "Please enter a valid Stripe Account ID in the format acct_XXXXXXXXXXXX."
+        );
+        return;
+      }
+      setStripeAccountId(existingStripeAccountId.trim());
+      setIsStripeConnected(true);
+      Alert.alert("Success", "Stripe account ID saved successfully.");
+      setExistingStripeModalVisible(false);
+      return;
+    }
     if (!profileData.email || !profileData.fullName) {
       Alert.alert(
         "Incomplete Information",
@@ -510,10 +591,16 @@ const OwnerProfile = ({ ownerId }) => {
         Alert.alert("Success", "Stripe account data retrieved and saved.");
         setExistingStripeModalVisible(false);
       } else {
-        Alert.alert(
-          "Error",
-          data.error || "Failed to retrieve Stripe account data."
-        );
+        let errMsg = data.error || "Failed to retrieve Stripe account data.";
+        if (
+          errMsg.includes(
+            "destination account needs to have at least one of the following capabilities enabled"
+          )
+        ) {
+          errMsg =
+            "Your connected Stripe account is missing required capabilities (e.g. transfers). Please contact support for assistance.";
+        }
+        Alert.alert("Error", errMsg);
       }
     } catch (error) {
       console.error("Error retrieving existing Stripe account:", error);
@@ -526,75 +613,12 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Function to handle withdrawal.
+   * 
+   * Note: availableBalance and totalWithdrawn are stored in cents.
+   * When displaying, we convert them to dollars.
    */
   const handleWithdraw = async () => {
-    if (
-      !withdrawalAmount ||
-      isNaN(withdrawalAmount) ||
-      parseFloat(withdrawalAmount) <= 0
-    ) {
-      Alert.alert("Invalid Amount", "Please enter a valid withdrawal amount.");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!withdrawalEmail || !emailRegex.test(withdrawalEmail)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
-      return;
-    }
-
-    const amount = parseFloat(withdrawalAmount);
-
-    if (amount > availableBalance) {
-      Alert.alert(
-        "Insufficient Funds",
-        "The withdrawal amount exceeds your available balance."
-      );
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const token = await user.getIdToken();
-
-      const response = await fetch(`${API_URL}/withdraw-funds`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ownerId: resolvedOwnerId,
-          amount: Math.round(amount * 100),
-          email: withdrawalEmail,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        Alert.alert(
-          "Success",
-          `You have successfully withdrawn $${amount.toFixed(
-            2
-          )}. An email confirmation has been sent to ${withdrawalEmail}.`
-        );
-        setWithdrawalAmount("");
-        setWithdrawalEmail("");
-        setWithdrawModalVisible(false);
-      } else {
-        Alert.alert(
-          "Error",
-          data.error ||
-            "Failed to process withdrawal. Please try again or contact support."
-        );
-      }
-    } catch (error) {
-      console.error("Error processing withdrawal:", error);
-      Alert.alert("Error", "There was an error processing your withdrawal.");
-    } finally {
-      setLoading(false);
-    }
+    // This function is no longer used since withdrawal is now informational only.
   };
 
   /**
@@ -809,9 +833,6 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Function to handle approving a rental request.
-   * 
-   * Updated: After approving, instead of automatically opening the chat modal,
-   * the owner receives an alert indicating that a notification was sent to the renter.
    */
   const handleApproveRentalRequest = async (request) => {
     try {
@@ -887,7 +908,6 @@ const OwnerProfile = ({ ownerId }) => {
 
       await batch.commit();
 
-      // Remove the automatic opening of the chat modal.
       Alert.alert(
         "Request Approved",
         `The rental request for ${formatDate(request.rentalDate)} has been approved. A notification has been sent to the renter to complete the payment.`
@@ -1014,149 +1034,100 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   /**
-   * Cleanup Functions
+   * Function to handle ending (closing) a rental.
+   * This function updates the rental status to "ended", effectively closing it and moving it to Past Rentals.
    */
-  const cleanupOrphanedRentalRequests = async () => {
-    const BATCH_SIZE = 500;
-    try {
-      const rentalRequestsRef = collection(db, "rentalRequests");
-      const snapshot = await getDocs(rentalRequestsRef);
-
-      if (snapshot.empty) {
-        Alert.alert("Cleanup", "No rental requests found to clean up.");
-        return;
-      }
-
-      let batch = writeBatch(db);
-      let deletions = 0;
-
-      for (let i = 0; i < snapshot.docs.length; i++) {
-        const docSnap = snapshot.docs[i];
-        const requestData = docSnap.data();
-        const renterId = requestData.renterId;
-
-        if (!renterId) {
-          batch.delete(docSnap.ref);
-          deletions += 1;
-        } else {
-          const renterDocRef = doc(db, "renters", renterId);
-          const renterDocSnap = await getDoc(renterDocRef);
-          if (!renterDocSnap.exists()) {
-            batch.delete(docSnap.ref);
-            deletions += 1;
-          }
-        }
-
-        if (deletions % BATCH_SIZE === 0 && deletions > 0) {
-          await batch.commit();
-          console.log(`${deletions} rental requests deleted so far...`);
-          batch = writeBatch(db);
-        }
-      }
-
-      if (deletions % BATCH_SIZE !== 0) {
-        await batch.commit();
-      }
-
-      if (deletions > 0) {
-        Alert.alert(
-          "Cleanup Complete",
-          `${deletions} orphaned rental request(s) have been deleted.`
-        );
-      } else {
-        Alert.alert("Cleanup Complete", "No orphaned rental requests found.");
-      }
-    } catch (error) {
-      console.error("Error cleaning up rental requests:", error);
-      Alert.alert("Error", "Failed to clean up rental requests.");
+  const handleEndRental = async () => {
+    if (!selectedRequest) {
+      Alert.alert("Error", "No active rental selected.");
+      return;
     }
-  };
-
-  const cleanupOrphanedListings = async () => {
-    const BATCH_SIZE = 500;
     try {
-      const listingsRef = collection(db, "airplanes");
-      const snapshot = await getDocs(listingsRef);
-
-      if (snapshot.empty) {
-        Alert.alert("Cleanup", "No listings found to clean up.");
-        return;
-      }
-
-      let batch = writeBatch(db);
-      let deletions = 0;
-
-      for (let i = 0; i < snapshot.docs.length; i++) {
-        const docSnap = snapshot.docs[i];
-        const listingData = docSnap.data();
-        const ownerId = listingData.ownerId;
-
-        if (!ownerId) {
-          batch.delete(docSnap.ref);
-          deletions += 1;
-        } else {
-          const ownerDocRef = doc(db, "users", ownerId, "owners", ownerId);
-          const ownerDocSnap = await getDoc(ownerDocRef);
-          if (!ownerDocSnap.exists()) {
-            batch.delete(docSnap.ref);
-            deletions += 1;
-          }
-        }
-
-        if (deletions % BATCH_SIZE === 0 && deletions > 0) {
-          await batch.commit();
-          console.log(`${deletions} listings deleted so far...`);
-          batch = writeBatch(db);
-        }
-      }
-
-      if (deletions % BATCH_SIZE !== 0) {
-        await batch.commit();
-      }
-
-      if (deletions > 0) {
-        Alert.alert(
-          "Cleanup Complete",
-          `${deletions} orphaned listing(s) have been deleted.`
-        );
-      } else {
-        Alert.alert("Cleanup Complete", "No orphaned listings found.");
-      }
+      await updateDoc(doc(db, "rentalRequests", selectedRequest.id), { status: "ended" });
+      Alert.alert("Rental Ended", "The rental has been ended and moved to Past Rentals.");
+      setManageRentalModalVisible(false);
+      setRentalRequestModalVisible(false);
     } catch (error) {
-      console.error("Error cleaning up listings:", error);
-      Alert.alert("Error", "Failed to clean up listings.");
-    }
-  };
-
-  const performCleanup = async () => {
-    setCleanupLoading(true);
-    try {
-      await cleanupOrphanedRentalRequests();
-      await cleanupOrphanedListings();
-      Alert.alert("Cleanup Success", "All cleanup operations completed.");
-    } catch (error) {
-      console.error("Error performing cleanup:", error);
-      Alert.alert("Error", "An error occurred during cleanup.");
-    } finally {
-      setCleanupLoading(false);
+      console.error("Error ending rental:", error);
+      Alert.alert("Error", "Failed to end the rental.");
     }
   };
 
   /**
-   * Function to fetch the first page of active rentals when 'View More' modal is opened
+   * useEffect to automatically close rentals that have not been ended by the end of the day.
    */
   useEffect(() => {
-    if (viewMoreModalVisible) {
-      fetchFirstPageActiveRentals();
-    } else {
-      setActiveRentalsPage([]);
-      setLastActiveRentalDoc(null);
-      setHasMoreActiveRentals(true);
-    }
-  }, [viewMoreModalVisible, fetchOwnerData]);
+    const autoCloseRentals = async () => {
+      const now = new Date();
+      for (const rental of activeRentals) {
+        if (!rental.rentalDate) continue;
+        const rentalDateObj = rental.rentalDate.toDate ? rental.rentalDate.toDate() : new Date(rental.rentalDate);
+        const rentalDay = new Date(rentalDateObj.getFullYear(), rentalDateObj.getMonth(), rentalDateObj.getDate());
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (today > rentalDay) {
+          try {
+            const rentalRef = doc(db, "rentalRequests", rental.id);
+            await updateDoc(rentalRef, { status: "ended" });
+            console.log(`Auto-closed rental ${rental.id}`);
+          } catch (error) {
+            console.error("Error auto-closing rental:", error);
+          }
+        }
+      }
+    };
+
+    autoCloseRentals();
+  }, [activeRentals]);
 
   /**
-   * Function to fetch the first page of active rentals
+   * Function to handle opening chat for an active rental.
+   */
+  const handleOpenChatForRental = async () => {
+    try {
+      const renterId = selectedRequest?.renterId;
+      if (!renterId) {
+        Alert.alert("Error", "No renter ID available.");
+        return;
+      }
+      const chatThreadsQuery = query(
+        collection(db, "messages"),
+        where("participants", "array-contains", resolvedOwnerId)
+      );
+      const chatSnapshot = await getDocs(chatThreadsQuery);
+      let existingChatThread = null;
+      chatSnapshot.forEach((docSnap) => {
+        const chatData = docSnap.data();
+        if (
+          chatData.participants.includes(resolvedOwnerId) &&
+          chatData.participants.includes(renterId)
+        ) {
+          existingChatThread = { id: docSnap.id, ...chatData };
+        }
+      });
+      let chatThreadId = existingChatThread ? existingChatThread.id : null;
+      if (!chatThreadId) {
+        const chatThread = {
+          participants: [resolvedOwnerId, renterId],
+          ownerId: resolvedOwnerId,
+          renterId: renterId,
+          rentalRequestId: selectedRequest.id,
+          messages: [],
+          createdAt: serverTimestamp(),
+        };
+        const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
+        chatThreadId = chatDocRef.id;
+      }
+      setManageRentalModalVisible(false);
+      setRentalRequestModalVisible(false);
+      openMessageModal(chatThreadId);
+    } catch (error) {
+      console.error("Error opening chat:", error);
+      Alert.alert("Error", "Failed to open chat.");
+    }
+  };
+
+  /**
+   * Function to fetch the first page of active rentals.
    */
   const fetchFirstPageActiveRentals = async () => {
     setLoading(true);
@@ -1200,7 +1171,7 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   /**
-   * Function to handle loading more active rentals
+   * Function to handle loading more active rentals.
    */
   const handleLoadMoreActiveRentals = async () => {
     if (!hasMoreActiveRentals || loading) return;
@@ -1241,55 +1212,6 @@ const OwnerProfile = ({ ownerId }) => {
       Alert.alert("Error", "Failed to load more active rentals.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  /**
-   * NEW: Function to handle opening chat for an active rental.
-   * 
-   * Updated: Now explicitly includes ownerId and renterId fields in the created chat thread.
-   */
-  const handleOpenChatForRental = async () => {
-    try {
-      const renterId = selectedRequest?.renterId;
-      if (!renterId) {
-        Alert.alert("Error", "No renter ID available.");
-        return;
-      }
-      const chatThreadsQuery = query(
-        collection(db, "messages"),
-        where("participants", "array-contains", resolvedOwnerId)
-      );
-      const chatSnapshot = await getDocs(chatThreadsQuery);
-      let existingChatThread = null;
-      chatSnapshot.forEach((docSnap) => {
-        const chatData = docSnap.data();
-        if (
-          chatData.participants.includes(resolvedOwnerId) &&
-          chatData.participants.includes(renterId)
-        ) {
-          existingChatThread = { id: docSnap.id, ...chatData };
-        }
-      });
-      let chatThreadId = existingChatThread ? existingChatThread.id : null;
-      if (!chatThreadId) {
-        const chatThread = {
-          participants: [resolvedOwnerId, renterId],
-          ownerId: resolvedOwnerId,      // <-- Added field for owner
-          renterId: renterId,            // <-- Added field for renter
-          rentalRequestId: selectedRequest.id,
-          messages: [],
-          createdAt: serverTimestamp(),
-        };
-        const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
-        chatThreadId = chatDocRef.id;
-      }
-      setManageRentalModalVisible(false);
-      setRentalRequestModalVisible(false);
-      openMessageModal(chatThreadId);
-    } catch (error) {
-      console.error("Error opening chat:", error);
-      Alert.alert("Error", "Failed to open chat.");
     }
   };
 
@@ -1395,12 +1317,10 @@ const OwnerProfile = ({ ownerId }) => {
 
   // For numeric cost fields, onChange removes commas and onBlur formats the value.
   const handleNumericChange = (field, value) => {
-    // Remove commas during input
     handleInputChange(field, value.replace(/,/g, ""));
   };
 
   const handleNumericBlur = (field) => {
-    // Format the value when editing is complete
     const currentValue = costData[field];
     handleInputChange(field, formatNumber(currentValue));
   };
@@ -1412,10 +1332,6 @@ const OwnerProfile = ({ ownerId }) => {
       setCostData((prev) => ({ ...prev, [name]: value }));
     } else if (name in profileData) {
       setProfileData((prev) => ({ ...prev, [name]: value }));
-    } else if (name === "withdrawalAmount") {
-      setWithdrawalAmount(value);
-    } else if (name === "withdrawalEmail") {
-      setWithdrawalEmail(value);
     }
   };
 
@@ -1739,10 +1655,10 @@ const OwnerProfile = ({ ownerId }) => {
         >
           <CustomButton
             onPress={() => setWithdrawModalVisible(true)}
-            title={`$${availableBalance.toFixed(2)}`}
+            title={`Most Recent Payment: $${liveBalance && liveBalance.available && liveBalance.available[0] ? (liveBalance.available[0].amount / 100).toFixed(2) : (availableBalance / 100).toFixed(2)}`}
             backgroundColor="#000"
-            style={{ width: 96, height: 48, borderRadius: 24 }}
-            textStyle={{ fontSize: 18, fontWeight: "bold" }}
+            style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 24 }}
+            textStyle={{ fontSize: 16, fontWeight: "bold" }}
           />
         </View>
 
@@ -1976,11 +1892,8 @@ const OwnerProfile = ({ ownerId }) => {
         {/* Connect Stripe Account Section */}
         {isStripeConnected ? (
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
-              Connected Stripe Account
-            </Text>
             <CustomButton
-              onPress={() => navigation.navigate("ConnectedAccountDetails")}
+              onPress={() => setConnectedAccountModalVisible(true)}
               title="View Connected Account"
               backgroundColor="#3182ce"
               accessibilityLabel="View your connected Stripe account details"
@@ -1994,6 +1907,14 @@ const OwnerProfile = ({ ownerId }) => {
             <Text style={{ marginBottom: 16 }}>
               To receive payments, you need to connect your Stripe account.
             </Text>
+            <TouchableOpacity
+              onPress={() => setStripeInfoModalVisible(true)}
+              style={{ alignSelf: "flex-end", marginBottom: 16 }}
+              accessibilityLabel="What is Stripe?"
+              accessibilityRole="button"
+            >
+              <Ionicons name="information-circle-outline" size={36} color="#3182ce" />
+            </TouchableOpacity>
             <CustomButton
               onPress={() => setConnectStripeModalVisible(true)}
               title="Connect Stripe Account"
@@ -2037,7 +1958,7 @@ const OwnerProfile = ({ ownerId }) => {
           {allAircrafts.length > 0 ? (
             <FlatList
               data={allAircrafts}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item, index) => `${item.id}_${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               renderItem={({ item }) => (
@@ -2628,6 +2549,14 @@ const OwnerProfile = ({ ownerId }) => {
             >
               <Text style={{ fontSize: 18, color: "#3182ce" }}>Open Chat</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleEndRental}
+              style={{ paddingVertical: 12, marginTop: 16 }}
+              accessibilityLabel="End Rental"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 18, color: "#3182ce" }}>End Rental</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -3085,6 +3014,14 @@ const OwnerProfile = ({ ownerId }) => {
               title="Connect Stripe Account"
               onClose={() => setConnectStripeModalVisible(false)}
             />
+            <TouchableOpacity
+              onPress={() => setStripeInfoModalVisible(true)}
+              style={{ alignSelf: "flex-end", marginBottom: 16 }}
+              accessibilityLabel="What is Stripe?"
+              accessibilityRole="button"
+            >
+              <Ionicons name="information-circle-outline" size={24} color="#3182ce" />
+            </TouchableOpacity>
             <Text style={{ marginBottom: 16 }}>
               Please provide your full name and email address to connect your
               Stripe account.
@@ -3109,7 +3046,6 @@ const OwnerProfile = ({ ownerId }) => {
               style={{ marginTop: 16 }}
               accessibilityLabel="Proceed to connect Stripe account"
             />
-            {/* NEW: Pressable text to use an existing account */}
             <TouchableOpacity
               onPress={() => {
                 setConnectStripeModalVisible(false);
@@ -3127,7 +3063,7 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* NEW: Existing Stripe Account Modal */}
+      {/* Existing Stripe Account Modal */}
       <Modal
         visible={existingStripeModalVisible}
         animationType="slide"
@@ -3156,8 +3092,7 @@ const OwnerProfile = ({ ownerId }) => {
               onClose={() => setExistingStripeModalVisible(false)}
             />
             <Text style={{ marginBottom: 16 }}>
-              Enter your full name and email address to retrieve your existing
-              Stripe account data.
+              Enter your full name and email address OR your Stripe Account ID (e.g. acct_1QybOf00DkRxUhnr) to retrieve your existing Stripe account data.
             </Text>
             <CustomTextInput
               placeholder="Full Name"
@@ -3171,6 +3106,12 @@ const OwnerProfile = ({ ownerId }) => {
               onChangeText={(value) => handleInputChange("email", value)}
               keyboardType="email-address"
               accessibilityLabel="Email Address input for existing account"
+            />
+            <CustomTextInput
+              placeholder="Stripe Account ID (e.g. acct_1QybOf00DkRxUhnr)"
+              value={existingStripeAccountId}
+              onChangeText={(value) => setExistingStripeAccountId(value)}
+              accessibilityLabel="Stripe Account ID input for existing account (optional)"
             />
             <CustomButton
               onPress={handleRetrieveExistingStripeAccount}
@@ -3213,50 +3154,23 @@ const OwnerProfile = ({ ownerId }) => {
               }}
             >
               <ModalHeader
-                title="Withdraw Funds"
+                title="Payment Information"
                 onClose={() => setWithdrawModalVisible(false)}
               />
 
               <Text style={{ fontSize: 16, marginBottom: 16 }}>
-                Available Balance: ${availableBalance.toFixed(2)}
+                Live Balance: ${ liveBalance && liveBalance.available && liveBalance.available[0] ? (liveBalance.available[0].amount / 100).toFixed(2) : (availableBalance / 100).toFixed(2) }
               </Text>
 
               <Text style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}>
-                Withdrawals will be processed to your connected bank account via Stripe.
+                Total Earned YTD: ${ (totalWithdrawn / 100).toFixed(2) }
               </Text>
 
-              <Section title="Withdrawal Email">
-                <CustomTextInput
-                  placeholder="Email Address"
-                  value={withdrawalEmail}
-                  onChangeText={(value) => setWithdrawalEmail(value)}
-                  keyboardType="email-address"
-                  accessibilityLabel="Withdrawal email input"
-                />
-              </Section>
-
-              <Section title="Withdrawal Amount">
-                <CustomTextInput
-                  placeholder="Amount to Withdraw ($)"
-                  value={withdrawalAmount}
-                  onChangeText={(value) => setWithdrawalAmount(value)}
-                  keyboardType="numeric"
-                  accessibilityLabel="Withdrawal amount input"
-                />
-              </Section>
-
-              <CustomButton
-                onPress={handleWithdraw}
-                title="Withdraw"
-                backgroundColor="#48bb78"
-                style={{ marginTop: 16, marginBottom: 8 }}
-                accessibilityLabel="Withdraw funds"
-              />
               <CustomButton
                 onPress={() => setWithdrawModalVisible(false)}
-                title="Cancel"
+                title="Close"
                 backgroundColor="#f56565"
-                accessibilityLabel="Cancel withdrawal"
+                accessibilityLabel="Close payment information"
               />
 
               {loading && (
@@ -3269,6 +3183,91 @@ const OwnerProfile = ({ ownerId }) => {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Stripe Info Modal */}
+      <Modal
+        visible={stripeInfoModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setStripeInfoModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader
+              title="About Stripe"
+              onClose={() => setStripeInfoModalVisible(false)}
+            />
+            <Text style={{ marginBottom: 16 }}>
+              Stripe is a payment processing platform that allows you to securely handle payments and transfers. Connecting your Stripe account enables you to receive payments directly to your bank account. For more information, tap Press Connect Stripe Account and it will direct you to the Stripe website for more details.
+            </Text>
+            <CustomButton
+              onPress={() => setStripeInfoModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
+              accessibilityLabel="Close Stripe information"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Connected Account Modal */}
+      <Modal
+        visible={connectedAccountModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setConnectedAccountModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "80%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader
+              title="Connected Stripe Account"
+              onClose={() => setConnectedAccountModalVisible(false)}
+            />
+            {stripeAccountId ? (
+              <Text style={{ fontSize: 16, marginBottom: 16 }}>
+                Your connected Stripe account ID is: {stripeAccountId}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 16, marginBottom: 16 }}>
+                No connected account information available.
+              </Text>
+            )}
+            <CustomButton
+              onPress={() => setConnectedAccountModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
+            />
+          </View>
+        </View>
       </Modal>
     </View>
   );

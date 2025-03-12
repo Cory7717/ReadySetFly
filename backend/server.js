@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 // ===================== 
 // Imports
 // =====================
@@ -31,11 +33,9 @@ if (!admin.logger) {
 // Configuration Constants
 // =====================
 const ALLOWED_PACKAGES = ['Basic', 'Featured', 'Enhanced']; // Note: 'FreeTrial' is handled separately.
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY ||
-  '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';
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = Stripe(stripeSecretKey);
-const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET ||
-  'whsec_bMda2WJta35W9IF1t0ZLTiLvN9tteI3Z';
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 // =====================
 // Initialize Express App
@@ -43,9 +43,13 @@ const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET ||
 const app = express();
 app.use(cors({ origin: true }));
 
-// =====================
-// Stripe Webhook Endpoint (raw body needed)
-// =====================
+/**
+ * ===============================
+ * Stripe Webhook Endpoint (raw body needed)
+ * IMPORTANT: We define this route BEFORE the JSON/body-parsing middleware
+ * so that req.body remains raw for Stripe's signature check.
+ * ===============================
+ */
 app.post(
   '/webhook',
   bodyParser.raw({ type: 'application/json' }),
@@ -105,7 +109,60 @@ app.post(
               });
               admin.logger.info(`Rental request ${rentalRequestId} updated to active.`);
             }
+
+            // *** NEW: Update the owner's availableBalance with net funds ***
+            // The owner should receive 94% of the base rental fee.
+            // In CheckoutScreen, totalAmount = baseFee * 1.1725, where baseFee = hourly rate * hours.
+            // Platform fee should be 23.25% of baseFee, i.e., total platform fee = baseFee * 0.2325.
+            // Therefore, application_fee_amount = totalAmount * (0.2325 / 1.1725)
+            const totalAmount = paymentIntent.amount; // in cents
+            const platformFeePercentage = 0.2325; // 23.25% of base fee
+            const totalMultiplier = 1.1725; // Total = base fee + fees
+            const applicationFee =
+              paymentIntent.application_fee_amount ||
+              Math.round(totalAmount * (platformFeePercentage / totalMultiplier));
+            const netAmount = totalAmount - applicationFee;
+            await db.collection('users').doc(ownerId).update({
+              availableBalance: admin.firestore.FieldValue.increment(netAmount)
+            });
+            admin.logger.info(`Owner ${ownerId} availableBalance incremented by ${netAmount} cents.`);
           }
+          break;
+        }
+        case 'payment_intent.payment_failed': {
+          const paymentIntent = event.data.object;
+          admin.logger.info(`PaymentIntent payment failed: ${paymentIntent.id}`);
+          // Additional handling for payment failures can be added here if needed.
+          break;
+        }
+        case 'payment_intent.canceled': {
+          const paymentIntent = event.data.object;
+          admin.logger.info(`PaymentIntent canceled: ${paymentIntent.id}`);
+          // Additional handling for canceled payments can be added here if needed.
+          break;
+        }
+        case 'charge.refunded': {
+          const charge = event.data.object;
+          admin.logger.info(`Charge refunded: ${charge.id}`);
+          // Additional handling for refunds can be added here if needed.
+          break;
+        }
+        case 'charge.dispute.created': {
+          const dispute = event.data.object;
+          admin.logger.info(`Charge dispute created: ${dispute.id}`);
+          // Additional handling for dispute creation can be added here if needed.
+          break;
+        }
+        case 'account.updated': {
+          const account = event.data.object;
+          admin.logger.info(`Account updated: ${account.id}`);
+          // Additional handling for account updates can be added here if needed.
+          break;
+        }
+        case 'payout.paid': {
+          const payout = event.data.object;
+          admin.logger.info(`Payout paid: ${payout.id}`);
+          // Additional handling for paid payouts can be added here if needed.
           break;
         }
         default:
@@ -157,7 +214,8 @@ const sanitizeData = (data) => {
   const sanitized = {};
   for (const key in data) {
     if (data.hasOwnProperty(key)) {
-      sanitized[key] = typeof data[key] === 'string' ? data[key].trim() : data[key];
+      sanitized[key] =
+        typeof data[key] === 'string' ? data[key].trim() : data[key];
     }
   }
   return sanitized;
@@ -197,9 +255,10 @@ app.post('/createListing', authenticate, async (req, res) => {
     }
     let listingDetails;
     try {
-      listingDetails = typeof listingDetailsRaw === 'string'
-        ? JSON.parse(listingDetailsRaw)
-        : listingDetailsRaw;
+      listingDetails =
+        typeof listingDetailsRaw === 'string'
+          ? JSON.parse(listingDetailsRaw)
+          : listingDetailsRaw;
       admin.logger.info(`Parsed listingDetails: ${JSON.stringify(listingDetails)}`);
     } catch (parseError) {
       admin.logger.error('Error parsing listingDetails:', parseError);
@@ -208,22 +267,67 @@ app.post('/createListing', authenticate, async (req, res) => {
     }
     // Destructure common fields
     const {
-      title, tailNumber, salePrice, description, city, state, email, phone,
-      companyName, jobTitle, jobDescription, category, flightSchoolName,
-      flightSchoolDetails, isFreeListing, selectedPricing, lat, lng, images,
-    } = sanitizeData(listingDetails);
-    // Destructure Aviation Gear fields
-    const {
-      gearTitle, gearDescription, gearCity, gearState, gearEmail, gearPhone, gearPrice,
+      title,
+      tailNumber,
+      salePrice,
+      description,
+      city,
+      state,
+      email,
+      phone,
+      companyName,
+      jobTitle,
+      jobDescription,
+      category,
+      flightSchoolName,
+      flightSchoolDetails,
+      isFreeListing,
+      selectedPricing,
+      lat,
+      lng,
+      images,
+      // ADDING new field for 'Aircraft for Sale'
+      airportIdentifier
     } = sanitizeData(listingDetails);
 
+    // // Destructure Aviation Gear fields
+    // const {
+    //   gearTitle,
+    //   gearDescription,
+    //   gearCity,
+    //   gearState,
+    //   gearEmail,
+    //   gearPhone,
+    //   gearPrice,
+    // } = sanitizeData(listingDetails);
+
     const categoryRequirements = {
-      'Aircraft for Sale': ['title', 'description'],
+      'Aircraft for Sale': ['title', 'description', 'airportIdentifier'],
       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
       'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
-      'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocations'],
-      'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
-      'Aviation Gear': ['gearTitle', 'gearDescription', 'gearCity', 'gearState', 'gearEmail'],
+      'Flight Instructors': [
+        'firstName',
+        'lastName',
+        'certifications',
+        'fiEmail',
+        'fiDescription',
+        'serviceLocations',
+      ],
+      'Aviation Mechanic': [
+        'amFirstName',
+        'amLastName',
+        'amCertifications',
+        'amEmail',
+        'amDescription',
+        'amServiceLocations',
+      ],
+      // 'Aviation Gear': [
+      //   'gearTitle',
+      //   'gearDescription',
+      //   'gearCity',
+      //   'gearState',
+      //   'gearEmail',
+      // ],
     };
 
     const requiredFields = categoryRequirements[category];
@@ -233,16 +337,22 @@ app.post('/createListing', authenticate, async (req, res) => {
       return res.status(400).json({ error: `Invalid category: ${category}` });
     }
 
-    // ---- FIX: For Aviation Gear, always treat listing as free ----
-    let freeListing = (isFreeListing === 'true' || isFreeListing === true);
-    if (category === 'Aviation Gear') {
-      freeListing = true;
-    }
+    let freeListing = isFreeListing === 'true' || isFreeListing === true;
+
+    // if (category === 'Aviation Gear') {
+    //   freeListing = true;
+    // }
+
     if (selectedPricing === 'FreeTrial') {
       freeListing = true;
     }
 
-    if (!freeListing && (!selectedPricing || (!ALLOWED_PACKAGES.includes(selectedPricing) && selectedPricing !== 'FreeTrial'))) {
+    if (
+      !freeListing &&
+      (!selectedPricing ||
+        (!ALLOWED_PACKAGES.includes(selectedPricing) &&
+          selectedPricing !== 'FreeTrial'))
+    ) {
       admin.logger.warn(`Invalid selectedPricing: ${selectedPricing}`);
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: 'Invalid or missing selectedPricing.' });
@@ -251,23 +361,27 @@ app.post('/createListing', authenticate, async (req, res) => {
     if (category === 'Aircraft for Sale' && !freeListing) {
       finalRequiredFields.push('salePrice', 'selectedPricing');
     }
-    const missingFields = finalRequiredFields.filter((field) => !listingDetails[field]);
+    const missingFields = finalRequiredFields.filter(
+      (field) => !listingDetails[field]
+    );
     if (missingFields.length > 0) {
       admin.logger.warn(`Missing required fields: ${missingFields.join(', ')}`);
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
     }
     if (!lat || !lng) {
-      admin.logger.warn("Missing location data in request");
+      admin.logger.warn('Missing location data in request');
       res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: "Missing location data (lat, lng)" });
+      return res.status(400).json({ error: 'Missing location data (lat, lng)' });
     }
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
     if (isNaN(latitude) || isNaN(longitude)) {
-      admin.logger.warn("Invalid location numbers");
+      admin.logger.warn('Invalid location numbers');
       res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: "Invalid location data. 'lat' and 'lng' must be numbers." });
+      return res.status(400).json({
+        error: "Invalid location data. 'lat' and 'lng' must be numbers.",
+      });
     }
 
     let finalSalePrice = 0;
@@ -315,18 +429,21 @@ app.post('/createListing', authenticate, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       ownerId: req.user.uid,
       status: 'pending',
+
+      // Storing new airportIdentifier for 'Aircraft for Sale'
+      airportIdentifier: airportIdentifier || '',
     };
 
-    // For Aviation Gear, add gear-specific fields
-    if (category === 'Aviation Gear') {
-      listingData.gearTitle = gearTitle || '';
-      listingData.gearDescription = gearDescription || '';
-      listingData.gearCity = gearCity || '';
-      listingData.gearState = gearState || '';
-      listingData.gearEmail = gearEmail || '';
-      listingData.gearPhone = gearPhone || '';
-      listingData.gearPrice = gearPrice != null ? parseFloat(gearPrice) : 0;
-    }
+    // // For Aviation Gear, add gear-specific fields
+    // if (category === 'Aviation Gear') {
+    //   listingData.gearTitle = gearTitle || '';
+    //   listingData.gearDescription = gearDescription || '';
+    //   listingData.gearCity = gearCity || '';
+    //   listingData.gearState = gearState || '';
+    //   listingData.gearEmail = gearEmail || '';
+    //   listingData.gearPhone = gearPhone || '';
+    //   listingData.gearPrice = gearPrice != null ? parseFloat(gearPrice) : 0;
+    // }
 
     if (freeListing && selectedPricing === 'FreeTrial') {
       listingData.trialExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
@@ -367,20 +484,42 @@ app.put('/updateListing', authenticate, async (req, res) => {
       ? JSON.parse(listingDetails)
       : listingDetails;
     const sanitizedListingDetails = sanitizeData(parsedListingDetails);
+
     // Destructure common fields
-    const { title, tailNumber, salePrice, description, city, state, email, phone,
-      companyName, jobTitle, jobDescription, category, flightSchoolName,
-      flightSchoolDetails, isFreeListing, selectedPricing, lat, lng, images } = sanitizedListingDetails;
-    // Destructure Aviation Gear fields
-    const { gearTitle, gearDescription, gearCity, gearState, gearEmail, gearPhone, gearPrice } = sanitizedListingDetails;
+    const {
+      title,
+      tailNumber,
+      salePrice,
+      description,
+      city,
+      state,
+      email,
+      phone,
+      companyName,
+      jobTitle,
+      jobDescription,
+      category,
+      flightSchoolName,
+      flightSchoolDetails,
+      isFreeListing,
+      selectedPricing,
+      lat,
+      lng,
+      images,
+      // ADDING new field for 'Aircraft for Sale'
+      airportIdentifier
+    } = sanitizedListingDetails;
+
+    // const { gearTitle, gearDescription, gearCity, gearState, gearEmail, gearPhone, gearPrice }
+    //   = sanitizedListingDetails;
 
     const categoryRequirements = {
-      'Aircraft for Sale': ['title', 'description'],
+      'Aircraft for Sale': ['title', 'description', 'airportIdentifier'],
       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
       'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
       'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocations'],
       'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
-      'Aviation Gear': ['gearTitle', 'gearDescription', 'gearCity', 'gearState', 'gearEmail'],
+      // 'Aviation Gear': ['gearTitle', 'gearDescription', 'gearCity', 'gearState', 'gearEmail'],
     };
 
     const reqCategoryRequirements = categoryRequirements[category];
@@ -389,11 +528,11 @@ app.put('/updateListing', authenticate, async (req, res) => {
       return res.status(400).json({ error: `Invalid category: ${category}` });
     }
 
-    // ---- FIX: For Aviation Gear, always treat listing as free ----
-    let freeListing = (isFreeListing === 'true' || isFreeListing === true);
-    if (category === 'Aviation Gear') {
-      freeListing = true;
-    }
+    let freeListing = isFreeListing === 'true' || isFreeListing === true;
+    // if (category === 'Aviation Gear') {
+    //   freeListing = true;
+    // }
+
     if (selectedPricing === 'FreeTrial') {
       freeListing = true;
     }
@@ -413,7 +552,7 @@ app.put('/updateListing', authenticate, async (req, res) => {
     }
     if (!lat || !lng) {
       res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: "Missing location data (lat, lng)" });
+      return res.status(400).json({ error: 'Missing location data (lat, lng)' });
     }
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
@@ -466,6 +605,9 @@ app.put('/updateListing', authenticate, async (req, res) => {
       packageCost: freeListing ? 0 : finalPackageCost,
       location: { lat: latitude, lng: longitude },
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+
+      // Updating the airportIdentifier if present
+      airportIdentifier: airportIdentifier || listingData.airportIdentifier,
     };
 
     // If there are new images, update them
@@ -473,16 +615,16 @@ app.put('/updateListing', authenticate, async (req, res) => {
       updateData.images = imageUrls;
     }
 
-    // For Aviation Gear, update gear-specific fields
-    if (category === 'Aviation Gear') {
-      updateData.gearTitle = gearTitle || listingData.gearTitle || '';
-      updateData.gearDescription = gearDescription || listingData.gearDescription || '';
-      updateData.gearCity = gearCity || listingData.gearCity || '';
-      updateData.gearState = gearState || listingData.gearState || '';
-      updateData.gearEmail = gearEmail || listingData.gearEmail || '';
-      updateData.gearPhone = gearPhone || listingData.gearPhone || '';
-      updateData.gearPrice = gearPrice != null ? parseFloat(gearPrice) : (listingData.gearPrice || 0);
-    }
+    // // For Aviation Gear, update gear-specific fields
+    // if (category === 'Aviation Gear') {
+    //   updateData.gearTitle = gearTitle || listingData.gearTitle || '';
+    //   updateData.gearDescription = gearDescription || listingData.gearDescription || '';
+    //   updateData.gearCity = gearCity || listingData.gearCity || '';
+    //   updateData.gearState = gearState || listingData.gearState || '';
+    //   updateData.gearEmail = gearEmail || listingData.gearEmail || '';
+    //   updateData.gearPhone = gearPhone || listingData.gearPhone || '';
+    //   updateData.gearPrice = gearPrice != null ? parseFloat(gearPrice) : listingData.gearPrice || 0;
+    // }
 
     await listingRef.update(updateData);
     res.setHeader('Content-Type', 'application/json');
@@ -629,16 +771,23 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Owner does not have a connected Stripe account' });
     }
 
-    // Create a PaymentIntent using destination charges so that the connected account
-    // automatically receives 94% of the payment and your platform retains a 6% fee.
+    // Create a PaymentIntent using destination charges.
+    // The total amount is calculated in CheckoutScreen (base fee plus fees).
+    // To split the funds:
+    //   Let B = base rental fee, then total = B * 1.1725.
+    //   Platform fee should be 23.25% of B, which is: (B * 0.2325) = total * (0.2325 / 1.1725).
+    const platformFeePercentage = 0.2325; // 23.25% of base fee (6% booking + 3% processing + 8.25% tax + 6% commission)
+    const totalMultiplier = 1.1725; // total = base fee * 1.1725
+    const applicationFee = Math.round(amount * (platformFeePercentage / totalMultiplier));
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: 'usd',
-      payment_method_types: ["card"],
+      payment_method_types: ['card'],
       transfer_data: {
         destination: connectedAccountId,
       },
-      application_fee_amount: Math.round(amount * 0.06),
+      application_fee_amount: applicationFee,
       metadata: { rentalRequestId, ownerId, renterId: req.user.uid },
     });
     res.setHeader('Content-Type', 'application/json');
@@ -655,12 +804,17 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
 app.post('/validateDiscount', authenticate, async (req, res) => {
   try {
     const { discountCode, amount } = req.body;
-    if (!discountCode || typeof amount !== 'number' || (amount <= 0 && discountCode.toUpperCase() !== "RSF2005")) {
+    if (!discountCode || typeof amount !== 'number' || (amount <= 0 && discountCode.toUpperCase() !== 'RSF2005')) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ valid: false, message: 'Invalid request parameters' });
     }
     const discountCodes = {
-      RSF2005: { type: 'free', value: 0, message: 'Free 2 week listing activated! Your listing will auto renew and you will be charged for renewal after 2 weeks.' },
+      RSF2005: {
+        type: 'free',
+        value: 0,
+        message:
+          'Free 2 week listing activated! Your listing will auto renew and you will be charged for renewal after 2 weeks.',
+      },
     };
     const discount = discountCodes[discountCode.toUpperCase()];
     if (!discount) {
@@ -698,7 +852,6 @@ app.post('/validateDiscount', authenticate, async (req, res) => {
 // ===================================================================
 // Stripe & Bank Account Endpoints
 // ===================================================================
-
 app.post('/attach-bank-account', authenticate, async (req, res) => {
   try {
     const { ownerId, token, bankName } = req.body;
@@ -757,8 +910,8 @@ app.post('/create-connected-account', authenticate, async (req, res) => {
     await db.collection('users').doc(ownerId).set({ stripeAccountId: account.id }, { merge: true });
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: 'https://your-app-url.com/reauth', // Replace with your URL
-      return_url: 'https://your-app-url.com/return',   // Replace with your URL
+      refresh_url: 'https://ready-set-fly-71506.web.app/reauth', // Replace with your URL
+      return_url: 'https://ready-set-fly-71506.firebaseapp.com/return',   // Replace with your URL
       type: 'account_onboarding',
     });
     res.setHeader('Content-Type', 'application/json');
@@ -802,37 +955,101 @@ app.post('/retrieve-connected-account', authenticate, async (req, res) => {
   }
 });
 
-app.post('/withdraw-funds', authenticate, async (req, res) => {
+// NEW: Get Stripe Balance Endpoint
+app.get('/get-stripe-balance', authenticate, async (req, res) => {
   try {
-    const { ownerId, amount, email } = req.body;
-    if (!ownerId || !amount || !email) {
-      res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: 'Missing required fields: ownerId, amount, email' });
-    }
-    const ownerDoc = await db.collection('users').doc(ownerId).get();
+    // Retrieve the owner's document using the UID from the decoded token
+    const ownerDoc = await db.collection('users').doc(req.user.uid).get();
     if (!ownerDoc.exists) {
-      res.setHeader('Content-Type', 'application/json');
       return res.status(404).json({ error: 'Owner not found' });
     }
     const ownerData = ownerDoc.data();
-    const connectedAccountId = ownerData.stripeAccountId;
-    if (!connectedAccountId) {
-      res.setHeader('Content-Type', 'application/json');
+    if (!ownerData.stripeAccountId) {
       return res.status(400).json({ error: 'Stripe account not connected' });
     }
-    const payout = await stripe.payouts.create(
-      { amount, currency: 'usd' },
-      { stripeAccount: connectedAccountId }
-    );
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({ message: 'Withdrawal processed successfully', payout });
+    // IMPORTANT: Retrieve the connected account’s balance with correct parameters
+    const balance = await stripe.balance.retrieve({}, { stripeAccount: ownerData.stripeAccountId });
+    return res.status(200).json({ balance });
   } catch (error) {
-    const errorMessage = error.message || 'Internal Server Error';
-    admin.logger.error('Error processing withdrawal:', error);
-    res.setHeader('Content-Type', 'application/json');
-    res.status(500).json({ error: errorMessage });
+    return res.status(500).json({ error: error.message });
   }
 });
+
+// ===================================================================
+// UPDATED Withdraw Funds Endpoint (commented out)
+// ===================================================================
+// The following withdraw funds endpoint is currently commented out
+// in order to align with the new update to owner.js. This endpoint
+// processed payouts. With the new changes, withdrawal is now
+// informational only on the client-side.
+// Uncomment the code below if you decide to re-enable withdrawals.
+
+/*
+// app.post('/withdraw-funds', authenticate, async (req, res) => {
+//   try {
+//     const { ownerId, amount, email } = req.body;
+//     if (!ownerId || !amount || !email) {
+//       res.setHeader('Content-Type', 'application/json');
+//       return res.status(400).json({ error: 'Missing required fields: ownerId, amount, email' });
+//     }
+//
+//     // Fetch the owner's document
+//     const ownerRef = db.collection('users').doc(ownerId);
+//     const ownerDoc = await ownerRef.get();
+//     if (!ownerDoc.exists) {
+//       res.setHeader('Content-Type', 'application/json');
+//       return res.status(404).json({ error: 'Owner not found' });
+//     }
+//     const ownerData = ownerDoc.data();
+//     const connectedAccountId = ownerData.stripeAccountId;
+//     if (!connectedAccountId) {
+//       res.setHeader('Content-Type', 'application/json');
+//       return res.status(400).json({ error: 'Stripe account not connected' });
+//     }
+//
+//     // Check if the owner has sufficient availableBalance (amount is in cents)
+//     const currentBalance = ownerData.availableBalance || 0;
+//     if (currentBalance < amount) {
+//       res.setHeader('Content-Type', 'application/json');
+//       return res.status(400).json({ error: 'Insufficient funds for withdrawal' });
+//     }
+//
+//     // Deduct the withdrawal amount from availableBalance in Firestore via transaction
+//     await db.runTransaction(async (transaction) => {
+//       const ownerSnapshot = await transaction.get(ownerRef);
+//       const balance = ownerSnapshot.get('availableBalance') || 0;
+//       if (balance < amount) {
+//         throw new Error('Insufficient funds for withdrawal');
+//       }
+//       transaction.update(ownerRef, { availableBalance: admin.firestore.FieldValue.increment(-amount) });
+//     });
+//
+//     // Process the payout via Stripe
+//     let payout;
+//     try {
+//       payout = await stripe.payouts.create(
+//         { amount, currency: 'usd' },
+//         { stripeAccount: connectedAccountId }
+//       );
+//     } catch (payoutError) {
+//       // Roll back the balance deduction if payout fails
+//       await ownerRef.update({ availableBalance: admin.firestore.FieldValue.increment(amount) });
+//       throw payoutError;
+//     }
+//
+//     // *** NEW: Update the owner's totalWithdrawn field in Firestore ***
+//     await ownerRef.update({ totalWithdrawn: admin.firestore.FieldValue.increment(amount) });
+//
+//     res.setHeader('Content-Type', 'application/json');
+//     res.status(200).json({ message: 'Withdrawal processed successfully', payout });
+//   } catch (error) {
+//     const errorMessage = error.message || 'Internal Server Error';
+//     admin.logger.error('Error processing withdrawal:', error);
+//     res.setHeader('Content-Type', 'application/json');
+//     res.status(500).json({ error: errorMessage });
+//   }
+// });
+*/
 
 // ===================================================================
 // Firestore-Triggered Functions
@@ -856,6 +1073,7 @@ exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapsho
         if (ownerData.fcmToken) tokens.push(ownerData.fcmToken);
       }
       const renterRef = db.collection('renters').doc(recipientId);
+      // getDoc is not a standard Firestore method in Node admin—assuming you have a helper or it’s a snippet
       const renterDoc = await getDoc(renterRef);
       if (renterDoc.exists) {
         const renterData = renterDoc.data();

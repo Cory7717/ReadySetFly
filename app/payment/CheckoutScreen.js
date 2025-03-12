@@ -324,7 +324,8 @@ export default function CheckoutScreen() {
       if (error) {
         Alert.alert('Payment failed', error.message);
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Instead of navigating immediately, show the confirmation modal
+        // Instead of navigating to ConfirmationScreen, navigate back to the renter's main screen
+        // and pass parameters to auto-open the chat modal with the owner.
         setIsOperationSuccess(true);
         setShowConfirmationModal(true);
       }
@@ -460,7 +461,12 @@ export default function CheckoutScreen() {
             <TouchableOpacity
               onPress={() => {
                 setShowConfirmationModal(false);
-                navigation.navigate('ConfirmationScreen', { rentalRequestId });
+                // Instead of navigating to ConfirmationScreen, reset the navigation to the renter's main screen.
+                // Pass parameters (e.g. autoOpenChat and ownerId) so the main screen auto-opens the chat modal.
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'renter', params: { autoOpenChat: true, ownerId, rentalRequestId } }],
+                });
               }}
               style={[styles.payButton, { marginTop: 20 }]}
             >

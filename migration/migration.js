@@ -13,7 +13,6 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 // ====================
 // Debugging: Verify Environment Variables
 // ====================
-
 console.log('🔑 STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY ? 'Loaded' : 'Missing');
 console.log('📧 EMAIL_USER:', process.env.EMAIL_USER ? 'Loaded' : 'Missing');
 console.log('🔒 EMAIL_PASS:', process.env.EMAIL_PASS ? 'Loaded' : 'Missing');
@@ -21,14 +20,12 @@ console.log('🔒 EMAIL_PASS:', process.env.EMAIL_PASS ? 'Loaded' : 'Missing');
 // ====================
 // Initialize Firebase Admin SDK with Service Account
 // ====================
-
-// Corrected path: serviceAccountKey.json is inside the migration folder
 const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
 
 if (fs.existsSync(serviceAccountPath)) {
   admin.initializeApp({
     credential: admin.credential.cert(require(serviceAccountPath)),
-    storageBucket: 'ready-set-fly-71506.appspot.com', // Replace with your actual bucket name if different
+    storageBucket: 'ready-set-fly-71506.appspot.com', // Replace if different
   });
   console.log('✅ Initialized Firebase Admin with service account.');
 } else {
@@ -41,20 +38,16 @@ const db = admin.firestore();
 // ====================
 // Initialize Stripe SDK
 // ====================
-
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-
 if (!stripeSecretKey) {
   console.error("❌ Stripe secret key is not configured. Please set STRIPE_SECRET_KEY in your .env");
   process.exit(1);
 }
-
 const stripe = stripePackage(stripeSecretKey);
 
 // ====================
 // Initialize Nodemailer
 // ====================
-
 const emailUser = process.env.EMAIL_USER;
 const emailPass = process.env.EMAIL_PASS;
 
@@ -74,11 +67,9 @@ const transporter = nodemailer.createTransport({
 // ====================
 // Load and Manage Schemas
 // ====================
-
 const schemasPath = path.join(__dirname, 'schemas.json');
-
-// Load existing schemas or initialize an empty object
 let expectedSchemas = {};
+
 if (fs.existsSync(schemasPath)) {
   try {
     const schemasData = fs.readFileSync(schemasPath, 'utf-8');
@@ -93,7 +84,6 @@ if (fs.existsSync(schemasPath)) {
   expectedSchemas = {};
 }
 
-// Utility function to save updated schemas back to schemas.json
 const saveSchemas = () => {
   try {
     fs.writeFileSync(schemasPath, JSON.stringify(expectedSchemas, null, 2));
@@ -138,8 +128,7 @@ const migrateAirplanesFields = async () => {
       });
 
       if (Object.keys(updates).length > 0) {
-        const docRef = airplanesRef.doc(docSnap.id);
-        batch.update(docRef, updates);
+        batch.update(docSnap.ref, updates);
         updateCount += 1;
         console.log(`🛠️ Updated fields for document ID: ${docSnap.id}`);
       }
@@ -159,7 +148,6 @@ const migrateAirplanesFields = async () => {
 
 /**
  * Migrate and validate the 'rentalRequestId' field in the 'rentalRequests' subcollections.
- * This function ensures that the 'rentalRequestId' field matches the document ID.
  */
 const migrateRentalRequestIds = async () => {
   console.log('🔄 Starting migration for rentalRequests subcollections...');
@@ -193,19 +181,16 @@ const migrateRentalRequestIds = async () => {
         const rentalRequestId = data.rentalRequestId;
 
         if (!rentalRequestId || rentalRequestId === '') {
-          // Set the missing rentalRequestId to the document ID
           batch.update(docSnap.ref, { rentalRequestId: documentId });
           updateCount += 1;
           console.log(`📝 Set missing rentalRequestId for document ID: ${documentId} under owner: ${ownerId}`);
         } else if (rentalRequestId !== documentId) {
-          // Update the mismatched rentalRequestId to match the document ID
           batch.update(docSnap.ref, { rentalRequestId: documentId });
           mismatchCount += 1;
           console.log(`🔄 Fixed mismatched rentalRequestId for document ID: ${documentId} under owner: ${ownerId}`);
           console.log(`   - Previous rentalRequestId: ${rentalRequestId}`);
           console.log(`   - Updated rentalRequestId to: ${documentId}`);
         } else {
-          // The rentalRequestId matches the document ID
           console.log(`✅ Valid rentalRequestId for document ID: ${documentId} under owner: ${ownerId}`);
         }
       }
@@ -227,10 +212,178 @@ const migrateRentalRequestIds = async () => {
 };
 
 /**
- * Function: addStripeAccountIdToOwners
- * Description: Adds a `stripeAccountId` field to each owner in the 'owners' collection.
- * If the field already exists, it skips the owner.
- * Otherwise, it creates a Stripe Connected Account and stores the `stripeAccountId`.
+ * Fix numeric fields (rentalHours, rentalCostPerHour) in the rentalRequests subcollections.
+ */
+const fixRentalHoursAndCostPerHour = async () => {
+  console.log('🔄 Starting migration to fix rentalHours and rentalCostPerHour in rentalRequests...');
+  try {
+    const rentalRequestsRef = db.collectionGroup('rentalRequests');
+
+    const snapshot = await rentalRequestsRef.get();
+
+    if (snapshot.empty) {
+      console.log('ℹ️ No documents found in rentalRequests subcollections.');
+      return;
+    }
+
+    const batch = db.batch();
+    let updateCount = 0;
+
+    snapshot.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      const updates = {};
+
+      // rentalCostPerHour
+      if (data.rentalCostPerHour === undefined) {
+        updates.rentalCostPerHour = 0;
+        updateCount += 1;
+        console.log(`📝 Setting missing rentalCostPerHour for Rental Request ID: ${docSnap.id}`);
+      } else if (typeof data.rentalCostPerHour === 'string') {
+        const parsedValue = parseFloat(data.rentalCostPerHour);
+        if (!isNaN(parsedValue)) {
+          updates.rentalCostPerHour = parsedValue;
+          updateCount += 1;
+          console.log(`🔄 Converted rentalCostPerHour from string to number for Rental Request ID: ${docSnap.id}`);
+        } else {
+          updates.rentalCostPerHour = 0;
+          updateCount += 1;
+          console.log(`⚠️ Invalid rentalCostPerHour format. Setting to 0 for Rental Request ID: ${docSnap.id}`);
+        }
+      } else if (typeof data.rentalCostPerHour !== 'number') {
+        updates.rentalCostPerHour = 0;
+        updateCount += 1;
+        console.log(`⚠️ Unexpected type for rentalCostPerHour. Setting to 0 for Rental Request ID: ${docSnap.id}`);
+      }
+
+      // rentalHours
+      if (data.rentalHours === undefined) {
+        updates.rentalHours = 0;
+        updateCount += 1;
+        console.log(`📝 Setting missing rentalHours for Rental Request ID: ${docSnap.id}`);
+      } else if (typeof data.rentalHours === 'string') {
+        const parsedValue = parseFloat(data.rentalHours);
+        if (!isNaN(parsedValue)) {
+          updates.rentalHours = parsedValue;
+          updateCount += 1;
+          console.log(`🔄 Converted rentalHours from string to number for Rental Request ID: ${docSnap.id}`);
+        } else {
+          updates.rentalHours = 0;
+          updateCount += 1;
+          console.log(`⚠️ Invalid rentalHours format. Setting to 0 for Rental Request ID: ${docSnap.id}`);
+        }
+      } else if (typeof data.rentalHours !== 'number') {
+        updates.rentalHours = 0;
+        updateCount += 1;
+        console.log(`⚠️ Unexpected type for rentalHours. Setting to 0 for Rental Request ID: ${docSnap.id}`);
+      }
+
+      if (Object.keys(updates).length > 0) {
+        batch.update(docSnap.ref, updates);
+      }
+    });
+
+    if (updateCount === 0) {
+      console.log('✅ No missing or improperly formatted rentalHours or rentalCostPerHour fields found.');
+      return;
+    }
+
+    await batch.commit();
+    console.log(`🎉 Successfully updated ${updateCount} fields in rentalRequests.`);
+  } catch (error) {
+    console.error('❌ Error fixing rentalHours and rentalCostPerHour:', error);
+  }
+};
+
+/**
+ * Update paymentStatus in top-level "rentalRequests" if rentalStatus is approved and paymentStatus != completed.
+ */
+const updatePaymentStatusInRentalRequests = async () => {
+  console.log('🔄 Starting migration to update paymentStatus in rentalRequests...');
+  try {
+    const rentalRequestsRef = db.collection('rentalRequests');
+    const snapshot = await rentalRequestsRef.get();
+    if (snapshot.empty) {
+      console.log('ℹ️ No documents found in rentalRequests collection.');
+      return;
+    }
+    const batch = db.batch();
+    let updateCount = 0;
+    snapshot.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.rentalStatus === "approved" && data.paymentStatus !== "completed") {
+        batch.update(docSnap.ref, { paymentStatus: "completed" });
+        updateCount++;
+        console.log(`🛠️ Updated paymentStatus for rentalRequest ID: ${docSnap.id}`);
+      }
+    });
+    if (updateCount === 0) {
+      console.log('✅ All rentalRequests already have correct paymentStatus.');
+      return;
+    }
+    await batch.commit();
+    console.log(`🎉 Successfully updated paymentStatus for ${updateCount} rentalRequest(s).`);
+  } catch (error) {
+    console.error('❌ Error updating paymentStatus in rentalRequests:', error);
+  }
+};
+
+/**
+ * NEW SCRIPT: Migrate existing notifications for renters.
+ * For each notification in a renter's notifications subcollection that has a rentalRequestId (or rentalRequest) field,
+ * if the corresponding rental request in the top-level "rentalRequests" collection has paymentStatus "completed" and its rentalStatus is not "active",
+ * update the rentalStatus to "active" and then delete the notification.
+ */
+const migrateNotificationsToActive = async () => {
+  console.log('🔄 Starting migration to update notifications to active in renters subcollections...');
+  try {
+    const rentersSnapshot = await db.collection('renters').get();
+    if (rentersSnapshot.empty) {
+      console.log('ℹ️ No renter documents found.');
+      return;
+    }
+    let totalNotificationsProcessed = 0;
+    let notificationsDeleted = 0;
+    for (const renterDoc of rentersSnapshot.docs) {
+      const renterId = renterDoc.id;
+      const notificationsRef = db.collection('renters').doc(renterId).collection('notifications');
+      const notificationsSnapshot = await notificationsRef.get();
+      if (notificationsSnapshot.empty) {
+        continue;
+      }
+      for (const notifDoc of notificationsSnapshot.docs) {
+        totalNotificationsProcessed++;
+        const notifData = notifDoc.data();
+        const rentalRequestId = notifData.rentalRequestId || notifData.rentalRequest;
+        if (!rentalRequestId) {
+          console.log(`ℹ️ Notification ${notifDoc.id} under renter ${renterId} does not have a rentalRequestId. Skipping.`);
+          continue;
+        }
+        const rentalRequestRef = db.collection('rentalRequests').doc(rentalRequestId);
+        const rentalRequestSnap = await rentalRequestRef.get();
+        if (!rentalRequestSnap.exists) {
+          console.log(`ℹ️ Rental request ${rentalRequestId} not found for notification ${notifDoc.id}. Skipping.`);
+          continue;
+        }
+        const rentalData = rentalRequestSnap.data();
+        if (rentalData.paymentStatus === "completed" && rentalData.rentalStatus !== "active") {
+          await rentalRequestRef.update({ rentalStatus: "active" });
+          console.log(`🛠️ Updated rental request ${rentalRequestId} rentalStatus to active.`);
+        }
+        if (rentalData.paymentStatus === "completed") {
+          await notifDoc.ref.delete();
+          notificationsDeleted++;
+          console.log(`🗑️ Deleted notification ${notifDoc.id} under renter ${renterId}.`);
+        }
+      }
+    }
+    console.log(`🎉 Migration completed. Processed ${totalNotificationsProcessed} notifications; deleted ${notificationsDeleted} notifications.`);
+  } catch (error) {
+    console.error('❌ Error migrating notifications to active:', error);
+  }
+};
+
+/**
+ * Add a stripeAccountId to each owner in the 'owners' collection if missing.
  */
 const addStripeAccountIdToOwners = async () => {
   console.log('🔄 Starting migration to add stripeAccountId to owners collection...');
@@ -258,21 +411,18 @@ const addStripeAccountIdToOwners = async () => {
         continue;
       }
 
-      // Validate email before attempting to create a Stripe account
       if (!ownerData.email || typeof ownerData.email !== 'string' || ownerData.email.trim() === '') {
         console.warn(`⚠️ Owner ID: ${ownerId} has an invalid or missing email. Skipping Stripe account creation.`);
         errorCount += 1;
         continue;
       }
 
-      // Create a new Stripe Connected Account
       try {
         console.log(`🛠️ Creating Stripe Connected Account for Owner ID: ${ownerId}`);
-
         const account = await stripe.accounts.create({
-          type: 'express', // You can choose 'standard', 'express', or 'custom' based on your needs
-          country: 'US', // Set the country as per your requirements
-          email: ownerData.email.trim(), // Ensure email is provided and trimmed
+          type: 'express',
+          country: 'US',
+          email: ownerData.email.trim(),
           metadata: {
             ownerId: ownerId,
             fullName: ownerData.fullName || '',
@@ -280,8 +430,10 @@ const addStripeAccountIdToOwners = async () => {
         });
 
         if (account.id) {
-          // Update Firestore document with stripeAccountId
-          batch.update(ownerDoc.ref, { stripeAccountId: account.id, stripeAccountStatus: account.charges_enabled ? 'active' : 'inactive' });
+          batch.update(ownerDoc.ref, {
+            stripeAccountId: account.id,
+            stripeAccountStatus: account.charges_enabled ? 'active' : 'inactive'
+          });
           updateCount += 1;
           console.log(`✅ Successfully created and assigned stripeAccountId: ${account.id} to Owner ID: ${ownerId}`);
         } else {
@@ -314,21 +466,289 @@ const addStripeAccountIdToOwners = async () => {
 };
 
 /**
- * 🔄 **Updated Function: Fix Rental Hours and Rental Cost Per Hour**
- * 
- * Ensures that every rentalRequest document has `rentalHours` and `rentalCostPerHour` fields set as numbers.
- * If these fields are missing or improperly formatted, they are either set to 0 or converted to numbers.
- * Crucially, it avoids overwriting fields that already have valid numerical values.
+ * Sync the stripeAccountId from "owners" to "users" by matching document IDs.
  */
-const fixRentalHoursAndCostPerHour = async () => {
-  console.log('🔄 Starting migration to fix rentalHours and rentalCostPerHour in rentalRequests...');
+const syncStripeAccountIdFromOwnersToUsers = async () => {
+  console.log('🔄 Starting synchronization of stripeAccountId from owners to users...');
   try {
-    const rentalRequestsRef = db.collectionGroup('rentalRequests'); // Using collectionGroup to access all subcollections
+    const ownersSnapshot = await db.collection('owners').get();
+    if (ownersSnapshot.empty) {
+      console.log('ℹ️ No owners found.');
+      return;
+    }
 
-    const snapshot = await rentalRequestsRef.get();
+    const batch = db.batch();
+    let updateCount = 0;
+    for (const ownerDoc of ownersSnapshot.docs) {
+      const ownerData = ownerDoc.data();
+      const ownerId = ownerDoc.id;
+      if (ownerData.stripeAccountId) {
+        const userRef = db.collection('users').doc(ownerId);
+        batch.set(
+          userRef,
+          {
+            stripeAccountId: ownerData.stripeAccountId,
+            stripeAccountStatus: ownerData.stripeAccountStatus || 'active'
+          },
+          { merge: true }
+        );
+        updateCount++;
+        console.log(`✅ Updated user ${ownerId} with stripeAccountId: ${ownerData.stripeAccountId}`);
+      }
+    }
 
+    if (updateCount > 0) {
+      await batch.commit();
+      console.log(`🎉 Successfully updated ${updateCount} user document(s) with stripeAccountId.`);
+    } else {
+      console.log('✅ No user documents required update.');
+    }
+  } catch (error) {
+    console.error('❌ Error synchronizing stripeAccountId from owners to users:', error);
+  }
+};
+
+/**
+ * Ensure messages have a participants array that includes both renter and owner if rentalRequestId is present.
+ */
+const migrateMessagesParticipants = async () => {
+  console.log('🔄 Starting migration for messages collection...');
+  try {
+    const messagesRef = db.collection('messages');
+    const snapshot = await messagesRef.get();
     if (snapshot.empty) {
-      console.log('ℹ️ No documents found in rentalRequests subcollections.');
+      console.log('ℹ️ No messages found.');
+      return;
+    }
+    const batch = db.batch();
+    let updateCount = 0;
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      if (!data.participants || !Array.isArray(data.participants)) {
+        console.warn(`⚠️ Message ${docSnap.id} is missing a valid participants field. Skipping.`);
+        continue;
+      }
+      if (data.participants.length >= 2) {
+        console.log(`✅ Message ${docSnap.id} already has multiple participants.`);
+        continue;
+      }
+      if (data.rentalRequestId) {
+        const rentalRequestRef = db.collection('rentalRequests').doc(data.rentalRequestId);
+        const rentalRequestSnap = await rentalRequestRef.get();
+        if (rentalRequestSnap.exists) {
+          const rentalData = rentalRequestSnap.data();
+          if (rentalData.ownerId) {
+            let newParticipants = data.participants.slice();
+            if (!newParticipants.includes(rentalData.ownerId)) {
+              newParticipants.push(rentalData.ownerId);
+              batch.update(docSnap.ref, { participants: newParticipants });
+              updateCount++;
+              console.log(`🔄 Updated message ${docSnap.id} with ownerId: ${rentalData.ownerId}`);
+            }
+          } else {
+            console.warn(`⚠️ Rental request ${data.rentalRequestId} does not have an ownerId for message ${docSnap.id}`);
+          }
+        } else {
+          console.warn(`⚠️ Rental request ${data.rentalRequestId} not found for message ${docSnap.id}`);
+        }
+      } else {
+        console.warn(`⚠️ Message ${docSnap.id} does not have rentalRequestId. Skipping update.`);
+      }
+    }
+    if (updateCount > 0) {
+      await batch.commit();
+      console.log(`🎉 Successfully updated ${updateCount} message document(s) in messages collection.`);
+    } else {
+      console.log('✅ No messages needed updating.');
+    }
+  } catch (error) {
+    console.error('❌ Error migrating messages participants:', error);
+  }
+};
+
+/**
+ * Ensure each airplane document includes its own doc ID in the "id" field.
+ */
+const migrateAirplaneDocumentIds = async () => {
+  console.log('🔄 Starting migration to ensure each airplane document includes its document ID in the data...');
+  try {
+    const airplanesRef = db.collection('airplanes');
+    const snapshot = await airplanesRef.get();
+    if (snapshot.empty) {
+      console.log('ℹ️ No documents found in airplanes collection.');
+      return;
+    }
+    const batch = db.batch();
+    let updateCount = 0;
+    snapshot.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (!data.id || data.id.trim() === "") {
+        batch.update(docSnap.ref, { id: docSnap.id });
+        updateCount++;
+        console.log(`📝 Updated document ID field for airplane: ${docSnap.id}`);
+      }
+    });
+    if (updateCount > 0) {
+      await batch.commit();
+      console.log(`🎉 Successfully updated ${updateCount} airplane document(s) with their document ID.`);
+    } else {
+      console.log('✅ All airplane documents already have a valid document ID.');
+    }
+  } catch (error) {
+    console.error('❌ Error migrating airplane document IDs:', error);
+  }
+};
+
+/**
+ * Clean up orphaned listings in the 'UserPost' collection that have no matching owner in 'owners'.
+ */
+const cleanupOrphanedListings = async () => {
+  console.log('🔄 Starting cleanup of orphaned listings in UserPost collection...');
+  try {
+    const userPostRef = db.collection('UserPost');
+    const listingsSnapshot = await userPostRef.get();
+
+    if (listingsSnapshot.empty) {
+      console.log('ℹ️ No listings found in UserPost collection.');
+      return;
+    }
+
+    const batch = db.batch();
+    let orphanedCount = 0;
+    let imagesDeletedCount = 0;
+
+    for (const listingDoc of listingsSnapshot.docs) {
+      const listingData = listingDoc.data();
+      const ownerId = listingData.ownerId;
+
+      if (!ownerId) {
+        console.warn(`⚠️ Listing ID: ${listingDoc.id} is missing 'ownerId'. Marking as orphaned.`);
+        batch.delete(listingDoc.ref);
+        orphanedCount += 1;
+
+        if (listingData.images && Array.isArray(listingData.images)) {
+          for (const imageUrl of listingData.images) {
+            try {
+              const filePath = decodeURIComponent(new URL(imageUrl).pathname)
+                .replace('/storage/v1/b/ready-set-fly-71506.appspot.com/o/', '')
+                .replace(/\+/g, ' ');
+              const storageRef = admin.storage().bucket().file(filePath);
+              await storageRef.delete();
+              imagesDeletedCount += 1;
+              console.log(`🗑️ Deleted image: ${filePath}`);
+            } catch (imageError) {
+              console.error(`❌ Failed to delete image at URL: ${imageUrl}`, imageError);
+            }
+          }
+        }
+
+        continue;
+      }
+
+      const ownerDoc = await db.collection('owners').doc(ownerId).get();
+      if (!ownerDoc.exists) {
+        console.warn(`⚠️ Orphaned Listing Found - Listing ID: ${listingDoc.id}, Owner ID: ${ownerId}`);
+        batch.delete(listingDoc.ref);
+        orphanedCount += 1;
+
+        if (listingData.images && Array.isArray(listingData.images)) {
+          for (const imageUrl of listingData.images) {
+            try {
+              const filePath = decodeURIComponent(new URL(imageUrl).pathname)
+                .replace('/storage/v1/b/ready-set-fly-71506.appspot.com/o/', '')
+                .replace(/\+/g, ' ');
+              const storageRef = admin.storage().bucket().file(filePath);
+              await storageRef.delete();
+              imagesDeletedCount += 1;
+              console.log(`🗑️ Deleted image: ${filePath}`);
+            } catch (imageError) {
+              console.error(`❌ Failed to delete image at URL: ${imageUrl}`, imageError);
+            }
+          }
+        }
+      }
+    }
+
+    if (orphanedCount === 0) {
+      console.log('✅ No orphaned listings found.');
+      return;
+    }
+
+    await batch.commit();
+    console.log(`🎉 Successfully deleted ${orphanedCount} orphaned listing(s) from UserPost collection.`);
+    console.log(`🗑️ Successfully deleted ${imagesDeletedCount} associated image(s).`);
+  } catch (error) {
+    console.error('❌ Error during cleanup of orphaned listings:', error);
+  }
+};
+
+/**
+ * Migrate the 'listings' collection to ensure compliance with fields in Classifieds.js.
+ */
+const migrateClassifiedsListings = async () => {
+  console.log('🔄 Starting migration for "listings" collection to align with Classifieds.js...');
+  try {
+    const listingsRef = db.collection('listings');
+    const snapshot = await listingsRef.get();
+    if (snapshot.empty) {
+      console.log('ℹ️ No documents found in "listings" collection.');
+      return;
+    }
+
+    const batch = db.batch();
+    let updateCount = 0;
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      const docRef = docSnap.ref;
+
+      const updates = {};
+
+      // Ensure 'images' is an array
+      if (!data.images || !Array.isArray(data.images)) {
+        updates.images = [];
+      }
+      // Ensure 'category' is a string
+      if (!data.category || typeof data.category !== 'string') {
+        updates.category = 'Uncategorized';
+      }
+      // Ensure 'packageType' is a string
+      if (!data.packageType || typeof data.packageType !== 'string') {
+        updates.packageType = 'Basic';
+      }
+      // Ensure 'createdAt' is present
+      if (!data.createdAt) {
+        updates.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      if (Object.keys(updates).length > 0) {
+        batch.update(docRef, updates);
+        updateCount++;
+        console.log(`🛠️ Updating listing ${docRef.id} with missing or default fields.`);
+      }
+    }
+
+    if (updateCount > 0) {
+      await batch.commit();
+      console.log(`🎉 Successfully updated ${updateCount} listing(s) in "listings" to align with Classifieds.js.`);
+    } else {
+      console.log('✅ All listings in "listings" collection are already aligned with Classifieds.js.');
+    }
+  } catch (error) {
+    console.error('❌ Error migrating "listings" collection:', error);
+  }
+};
+
+/**
+ * NEW SCRIPT: Add publiclyViewable: true to all 'listings' documents if missing.
+ */
+const addPubliclyViewableFieldToListings = async () => {
+  console.log('🔄 Starting migration to add "publiclyViewable: true" to all documents in the "listings" collection...');
+  try {
+    const listingsRef = db.collection('listings');
+    const snapshot = await listingsRef.get();
+    if (snapshot.empty) {
+      console.log('ℹ️ No documents found in "listings" to update.');
       return;
     }
 
@@ -337,82 +757,68 @@ const fixRentalHoursAndCostPerHour = async () => {
 
     snapshot.docs.forEach((docSnap) => {
       const data = docSnap.data();
-      const updates = {};
 
-      // Handle rentalCostPerHour
-      if (data.rentalCostPerHour === undefined) {
-        updates.rentalCostPerHour = 0; // Set default value
-        updateCount += 1;
-        console.log(`📝 Setting missing rentalCostPerHour for Rental Request ID: ${docSnap.id}`);
-      } else if (typeof data.rentalCostPerHour === 'string') {
-        const parsedValue = parseFloat(data.rentalCostPerHour);
-        if (!isNaN(parsedValue)) {
-          updates.rentalCostPerHour = parsedValue;
-          updateCount += 1;
-          console.log(`🔄 Converted rentalCostPerHour from string to number for Rental Request ID: ${docSnap.id}`);
-        } else {
-          updates.rentalCostPerHour = 0; // Fallback to 0 if parsing fails
-          updateCount += 1;
-          console.log(`⚠️ Invalid rentalCostPerHour format. Setting to 0 for Rental Request ID: ${docSnap.id}`);
-        }
-      } else if (typeof data.rentalCostPerHour !== 'number') {
-        // If it's neither undefined nor string nor number, set to 0
-        updates.rentalCostPerHour = 0;
-        updateCount += 1;
-        console.log(`⚠️ Unexpected type for rentalCostPerHour. Setting to 0 for Rental Request ID: ${docSnap.id}`);
-      }
-
-      // Handle rentalHours
-      if (data.rentalHours === undefined) {
-        updates.rentalHours = 0; // Set default value
-        updateCount += 1;
-        console.log(`📝 Setting missing rentalHours for Rental Request ID: ${docSnap.id}`);
-      } else if (typeof data.rentalHours === 'string') {
-        const parsedValue = parseFloat(data.rentalHours);
-        if (!isNaN(parsedValue)) {
-          updates.rentalHours = parsedValue;
-          updateCount += 1;
-          console.log(`🔄 Converted rentalHours from string to number for Rental Request ID: ${docSnap.id}`);
-        } else {
-          updates.rentalHours = 0; // Fallback to 0 if parsing fails
-          updateCount += 1;
-          console.log(`⚠️ Invalid rentalHours format. Setting to 0 for Rental Request ID: ${docSnap.id}`);
-        }
-      } else if (typeof data.rentalHours !== 'number') {
-        // If it's neither undefined nor string nor number, set to 0
-        updates.rentalHours = 0;
-        updateCount += 1;
-        console.log(`⚠️ Unexpected type for rentalHours. Setting to 0 for Rental Request ID: ${docSnap.id}`);
-      }
-
-      // Apply updates only if there are changes
-      if (Object.keys(updates).length > 0) {
-        batch.update(docSnap.ref, updates);
+      // If publiclyViewable is missing or not a boolean, set it to true
+      if (typeof data.publiclyViewable !== 'boolean') {
+        batch.update(docSnap.ref, { publiclyViewable: true });
+        updateCount++;
+        console.log(`🛠️ Setting publiclyViewable: true for listing ${docSnap.id}`);
       }
     });
 
-    if (updateCount === 0) {
-      console.log('✅ No missing or improperly formatted rentalHours or rentalCostPerHour fields found.');
-      return;
+    if (updateCount > 0) {
+      await batch.commit();
+      console.log(`🎉 Successfully updated ${updateCount} listings to have publiclyViewable: true`);
+    } else {
+      console.log('✅ All listings already have a publiclyViewable field set.');
     }
-
-    await batch.commit();
-    console.log(`🎉 Successfully updated ${updateCount} fields in rentalRequests.`);
   } catch (error) {
-    console.error('❌ Error fixing rentalHours and rentalCostPerHour:', error);
+    console.error('❌ Error adding publiclyViewable field to listings:', error);
   }
 };
 
 // ====================
-// Audit and Dynamic Schema Management Functions
+// NEW FUNCTION: Update all 'users' doc to have role="both"
+// ====================
+const updateUserRoleToBoth = async () => {
+  console.log('🔄 Starting updateUserRoleToBoth migration...');
+  try {
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.get();
+
+    if (snapshot.empty) {
+      console.log('ℹ️ No user documents found in "users" collection.');
+      return;
+    }
+
+    const batch = db.batch();
+    let updateCount = 0;
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      // If 'role' is missing or not 'both', set it to 'both'
+      if (!data.role || data.role !== 'both') {
+        batch.update(docSnap.ref, { role: 'both' });
+        updateCount++;
+        console.log(`🛠️ Setting role to "both" for user doc ID: ${docSnap.id}`);
+      }
+    });
+
+    if (updateCount > 0) {
+      await batch.commit();
+      console.log(`🎉 Successfully updated ${updateCount} user doc(s) to have "role: both".`);
+    } else {
+      console.log('✅ All user docs already have role="both" or no update needed.');
+    }
+  } catch (error) {
+    console.error('❌ Error updating user docs to role=both:', error);
+  }
+};
+
+// ====================
+// Audit and Dynamic Schema Management
 // ====================
 
-/**
- * Utility Function: Recursively Traverse Collections and Subcollections
- * @param {FirebaseFirestore.CollectionReference} collectionRef
- * @param {string} parentPath
- * @returns {Array} Array of document information
- */
 const traverseCollection = async (collectionRef, parentPath = '') => {
   const snapshot = await collectionRef.get();
   const data = [];
@@ -424,11 +830,10 @@ const traverseCollection = async (collectionRef, parentPath = '') => {
       id: doc.id,
       path: docPath,
       data: docData,
-      ref: doc.ref, // Include DocumentReference
+      ref: doc.ref,
       subcollections: [],
     };
 
-    // Check for subcollections
     const subcollections = await doc.ref.listCollections();
     for (const subcol of subcollections) {
       const subcolData = await traverseCollection(subcol, docPath);
@@ -441,74 +846,46 @@ const traverseCollection = async (collectionRef, parentPath = '') => {
   return data;
 };
 
-/**
- * Function: Analyze Document Structure Against Expected Schema
- * @param {string} collectionName
- * @param {object} docData
- * @param {string} docPath
- * @returns {Array} Array of issues found
- */
 const analyzeDocument = (collectionName, docData, docPath) => {
   const schema = expectedSchemas[collectionName];
   const issues = [];
 
   if (schema) {
     const expectedFields = schema.fields;
-
-    // Check for missing fields
     for (const field in expectedFields) {
       if (!(field in docData)) {
         issues.push(`❗ Missing field '${field}'`);
       } else {
-        // Check data type
         const expectedType = expectedFields[field];
         let actualType = typeof docData[field];
-        // Firestore Timestamps are objects
         if (docData[field] instanceof admin.firestore.Timestamp) {
           actualType = 'object';
         }
         if (actualType !== expectedType) {
-          issues.push(
-            `❗ Field '${field}' has type '${actualType}', expected '${expectedType}'`
-          );
+          issues.push(`❗ Field '${field}' has type '${actualType}', expected '${expectedType}'`);
         }
       }
     }
-
-    // Check for unexpected fields
     for (const field in docData) {
       if (!(field in expectedFields)) {
         issues.push(`⚠️ Unexpected field '${field}'`);
       }
     }
   } else {
-    // If no schema is defined for the collection, consider it as a new collection
     console.log(`🔍 Detected new collection: '${collectionName}'. Adding to schemas.json.`);
     expectedSchemas[collectionName] = { fields: {} };
     saveSchemas();
-    // After adding, no issues to report for this document
   }
-
   return issues;
 };
 
-/**
- * Function: Infer Data Type from Value
- * @param {any} value
- * @returns {string} Inferred data type
- */
 const inferDataType = (value) => {
   if (value instanceof admin.firestore.Timestamp) return 'object';
-  if (Array.isArray(value)) return 'object'; // Firestore arrays are of type 'object'
+  if (Array.isArray(value)) return 'object';
   return typeof value;
 };
 
-/**
- * Function: Fix Missing Fields
- * Assign default values to missing fields based on predefined defaults or inferred types.
- */
 const fixMissingFields = async (collectionName, docRef, field, ownerId = null) => {
-  // Validate docRef
   if (!docRef || typeof docRef.update !== 'function') {
     console.error(`❌ Invalid DocumentReference for field '${field}' in collection '${collectionName}'. Skipping update.`);
     return;
@@ -518,18 +895,15 @@ const fixMissingFields = async (collectionName, docRef, field, ownerId = null) =
     string: '',
     number: 0,
     boolean: false,
-    object: {}, // For arrays and objects
-    // Add other default types if necessary
+    object: {},
   };
 
-  // Determine default value based on expected type
   const fieldType = expectedSchemas[collectionName]?.fields[field];
   let defaultValue = null;
 
   if (fieldType && defaultValues[fieldType] !== undefined) {
     defaultValue = defaultValues[fieldType];
   } else {
-    // If type is unknown, set to null
     defaultValue = null;
   }
 
@@ -546,17 +920,11 @@ const fixMissingFields = async (collectionName, docRef, field, ownerId = null) =
   }
 };
 
-/**
- * Function: Remove Unexpected Fields
- * Deletes fields that are not defined in the expected schemas.
- */
 const removeUnexpectedFields = async (collectionName, docRef, field) => {
-  // Validate docRef
   if (!docRef || typeof docRef.update !== 'function') {
     console.error(`❌ Invalid DocumentReference for field '${field}' in collection '${collectionName}'. Skipping removal.`);
     return;
   }
-
   try {
     await docRef.update({ [field]: admin.firestore.FieldValue.delete() });
     console.log(`🗑️ Removed unexpected field '${field}' from document ID: ${docRef.id} in collection: ${collectionName}`);
@@ -565,29 +933,16 @@ const removeUnexpectedFields = async (collectionName, docRef, field) => {
   }
 };
 
-/**
- * Function: Add New Field to Schema
- * Automatically adds a new field to the schema with inferred type and assigns a default value.
- */
 const addFieldToSchema = async (collectionName, field, value) => {
   if (!expectedSchemas[collectionName]) {
     expectedSchemas[collectionName] = { fields: {} };
   }
-
   const inferredType = inferDataType(value);
   expectedSchemas[collectionName].fields[field] = inferredType;
   console.log(`🆕 Added new field '${field}' with type '${inferredType}' to collection '${collectionName}' in schemas.json.`);
   saveSchemas();
-
-  // Assign default value to existing documents
-  // (This can be resource-intensive; consider implementing batching or queuing if necessary)
 };
 
-/**
- * Function: Generate Audit Report and Fix Issues
- * This function traverses all collections and documents, analyzes them, logs issues, and fixes missing/unexpected fields.
- * It also detects and handles new fields and collections dynamically.
- */
 const generateAuditReportAndFix = async () => {
   console.log('\n🔍 Starting Firestore Audit and Fixes...');
   try {
@@ -627,27 +982,21 @@ const generateAuditReportAndFix = async () => {
             }
           });
 
-          // Iterate through each issue and attempt fixes
           for (const issue of issues) {
             if (issue.startsWith('❗ Missing field')) {
               const fieldMatch = issue.match(/'(.+)'/);
               if (fieldMatch && fieldMatch[1]) {
                 const field = fieldMatch[1];
-                // Determine ownerId only for rentalRequests
                 const ownerId = collectionName === 'rentalRequests' ? doc.data.ownerId : null;
                 await fixMissingFields(collectionName, doc.ref, field, ownerId);
               }
             }
-
             if (issue.startsWith('⚠️ Unexpected field')) {
               const fieldMatch = issue.match(/'(.+)'/);
               if (fieldMatch && fieldMatch[1]) {
                 const field = fieldMatch[1];
-                // Automatically add the new field to the schema with inferred type
                 const fieldValue = doc.data[field];
                 await addFieldToSchema(collectionName, field, fieldValue);
-
-                // Assign default value to this field in the current document
                 await fixMissingFields(collectionName, doc.ref, field);
               }
             }
@@ -660,11 +1009,9 @@ const generateAuditReportAndFix = async () => {
           issues,
         });
       }
-
       report.collections.push(collectionReport);
     }
 
-    // Output the report to the console
     console.log('\n📊 Audit Report:');
     console.log(`- Total Collections: ${report.summary.totalCollections}`);
     console.log(`- Total Documents: ${report.summary.totalDocuments}`);
@@ -675,8 +1022,6 @@ const generateAuditReportAndFix = async () => {
       for (const [issue, count] of Object.entries(report.summary.issuesByType)) {
         console.log(`  - ${issue}: ${count}`);
       }
-
-      // Save detailed report to a JSON file
       fs.writeFileSync('firestore_audit_report.json', JSON.stringify(report, null, 2));
       console.log('\n📄 Detailed report saved to firestore_audit_report.json');
     } else {
@@ -687,138 +1032,40 @@ const generateAuditReportAndFix = async () => {
   }
 };
 
-/**
- * Function: cleanupOrphanedListings
- * Description: Identifies and deletes listings in the 'UserPost' collection where the 'ownerId' does not correspond to any existing user in the 'owners' collection.
- * Optionally deletes associated images from Firebase Storage.
- */
-
-const updateSpecificOwnerStripeAccount = async () => {
-  const ownerId = "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2"; // Replace with the correct owner document ID
-  const ownerRef = db.collection("owners").doc(ownerId);
-  const ownerDoc = await ownerRef.get();
-  
-  if (!ownerDoc.exists) {
-    console.error("Owner not found.");
-    return;
-  }
-  
-  const ownerData = ownerDoc.data();
-  if (!ownerData.stripeAccountId) {
-    // If the connected account already exists in Stripe, replace this with the actual ID.
-    const knownStripeAccountId = "acct_1234567890abcdef"; 
-    await ownerRef.update({
-      stripeAccountId: knownStripeAccountId,
-      stripeAccountStatus: "active",
-    });
-    console.log(`Updated owner ${ownerId} with stripeAccountId ${knownStripeAccountId}`);
-  } else {
-    console.log("Owner already has stripeAccountId:", ownerData.stripeAccountId);
-  }
-};
-
-
-const cleanupOrphanedListings = async () => {
-  console.log('🔄 Starting cleanup of orphaned listings in UserPost collection...');
-  try {
-    const userPostRef = db.collection('UserPost');
-    const listingsSnapshot = await userPostRef.get();
-
-    if (listingsSnapshot.empty) {
-      console.log('ℹ️ No listings found in UserPost collection.');
-      return;
-    }
-
-    const batch = db.batch();
-    let orphanedCount = 0;
-    let imagesDeletedCount = 0;
-
-    for (const listingDoc of listingsSnapshot.docs) {
-      const listingData = listingDoc.data();
-      const ownerId = listingData.ownerId;
-
-      if (!ownerId) {
-        console.warn(`⚠️ Listing ID: ${listingDoc.id} is missing 'ownerId'. Marking as orphaned.`);
-        batch.delete(listingDoc.ref);
-        orphanedCount += 1;
-
-        // Optionally delete associated images
-        if (listingData.images && Array.isArray(listingData.images)) {
-          for (const imageUrl of listingData.images) {
-            try {
-              const filePath = decodeURIComponent(new URL(imageUrl).pathname)
-                .replace('/storage/v1/b/ready-set-fly-71506.appspot.com/o/', '')
-                .replace(/\+/g, ' ');
-              const storageRef = admin.storage().bucket().file(filePath);
-              await storageRef.delete();
-              imagesDeletedCount += 1;
-              console.log(`🗑️ Deleted image: ${filePath}`);
-            } catch (imageError) {
-              console.error(`❌ Failed to delete image at URL: ${imageUrl}`, imageError);
-            }
-          }
-        }
-
-        continue; // Skip further checks since ownerId is missing
-      }
-
-      // Check if the owner exists in the 'owners' collection
-      const ownerDoc = await db.collection('owners').doc(ownerId).get();
-      if (!ownerDoc.exists) {
-        console.warn(`⚠️ Orphaned Listing Found - Listing ID: ${listingDoc.id}, Owner ID: ${ownerId}`);
-        batch.delete(listingDoc.ref);
-        orphanedCount += 1;
-
-        // Optionally delete associated images
-        if (listingData.images && Array.isArray(listingData.images)) {
-          for (const imageUrl of listingData.images) {
-            try {
-              const filePath = decodeURIComponent(new URL(imageUrl).pathname)
-                .replace('/storage/v1/b/ready-set-fly-71506.appspot.com/o/', '')
-                .replace(/\+/g, ' ');
-              const storageRef = admin.storage().bucket().file(filePath);
-              await storageRef.delete();
-              imagesDeletedCount += 1;
-              console.log(`🗑️ Deleted image: ${filePath}`);
-            } catch (imageError) {
-              console.error(`❌ Failed to delete image at URL: ${imageUrl}`, imageError);
-            }
-          }
-        }
-      }
-    }
-
-    if (orphanedCount === 0) {
-      console.log('✅ No orphaned listings found.');
-      return;
-    }
-
-    await batch.commit();
-    console.log(`🎉 Successfully deleted ${orphanedCount} orphaned listing(s) from UserPost collection.`);
-    console.log(`🗑️ Successfully deleted ${imagesDeletedCount} associated image(s) from Firebase Storage.`);
-  } catch (error) {
-    console.error('❌ Error during cleanup of orphaned listings:', error);
-  }
-};
-
 // ====================
 // Execution Flow
 // ====================
-
-/**
- * Execute all migration and audit functions sequentially.
- */
 const runMigrationsAndAudit = async () => {
   console.log('🚀 Migration and Audit script started.');
 
   // Perform Migrations
   await migrateAirplanesFields();
   await migrateRentalRequestIds();
-  await fixRentalHoursAndCostPerHour(); // Updated migration function
-  await addStripeAccountIdToOwners(); // Existing migration function
+  await fixRentalHoursAndCostPerHour();
+  await updatePaymentStatusInRentalRequests();
+  await migrateNotificationsToActive(); // NEW: Migrate existing notifications to active state
+  await addStripeAccountIdToOwners();
+  
+  // Synchronize stripeAccountId into users collection
+  await syncStripeAccountIdFromOwnersToUsers();
 
-  // Perform Cleanup
+  // Migrate messages participants
+  await migrateMessagesParticipants();
+
+  // Ensure each airplane doc includes its own ID
+  await migrateAirplaneDocumentIds();
+
+  // Clean up orphaned listings in UserPost
   await cleanupOrphanedListings();
+
+  // Align 'listings' with Classifieds.js
+  await migrateClassifiedsListings();
+
+  // 🚨 NEW: Add publiclyViewable: true to all listings, if missing
+  await addPubliclyViewableFieldToListings();
+
+  // 🚨 NEW: Update all 'users' doc to have role="both"
+  await updateUserRoleToBoth();
 
   // Perform Audit and Dynamic Schema Management
   await generateAuditReportAndFix();

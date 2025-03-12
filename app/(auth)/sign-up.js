@@ -17,6 +17,7 @@ import {
   getAuth,
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  signInWithEmailAndPassword,
 } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { app } from "../../firebaseConfig"; // Adjust the path to your firebaseConfig.js
@@ -28,7 +29,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 const SignUp = () => {
   const navigation = useNavigation();
 
-  // State variables for form data and visibility
+  // State variables for form data and modal visibility
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -46,7 +47,7 @@ const SignUp = () => {
   const auth = getAuth(app); // Initialize Firebase Auth
   const db = getFirestore(app); // Initialize Firestore
 
-  // Handle form input changes
+  // Handle profile input changes
   const handleProfileChange = (field, value) => {
     setProfileData((prevState) => ({
       ...prevState,
@@ -54,74 +55,55 @@ const SignUp = () => {
     }));
   };
 
-  // Handle sign-up process with Firebase
-  const onSignUpPress = useCallback(async () => {
+  // Handle sign-up button press: validate input and open Terms modal
+  const onSignUpPress = useCallback(() => {
     if (!emailAddress.trim() || !password.trim() || !confirmPassword.trim()) {
       Alert.alert("Validation Error", "Please fill out all fields.");
       return;
     }
-
     if (password !== confirmPassword) {
       Alert.alert("Password Mismatch", "The passwords do not match. Please try again.");
       return;
     }
+    // Open the Terms modal (account creation is deferred)
+    setTermsVisible(true);
+  }, [emailAddress, password, confirmPassword]);
 
-    setLoading(true);
-    try {
-      // Create a new user with Firebase Authentication
-      await createUserWithEmailAndPassword(auth, emailAddress, password);
-      const user = auth.currentUser;
-
-      // Send email verification
-      if (user) {
-        await sendEmailVerification(user);
-        setTermsVisible(true); // Show Terms of Service modal if sign-up is successful
-      }
-    } catch (err) {
-      console.error("Sign Up Error:", err);
-      Alert.alert(
-        "Sign Up Error",
-        "There was an error during sign up. Please check your email and password."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [auth, emailAddress, password, confirmPassword]);
-
-  // Handle terms acceptance
+  // When the user accepts the terms, open the Profile modal
   const onAcceptTerms = useCallback(() => {
     setTermsVisible(false);
-
-    // Email verification is already sent during sign-up
-    setProfileVisible(true); // Show profile modal for user to complete their profile
+    setProfileVisible(true);
   }, []);
 
-  // Handle profile submission
+  // Handle profile submission:
+  // Create the new user account and save profile data to Firestore
   const onProfileSubmit = async () => {
-    const user = auth.currentUser;
-    if (user) {
-      try {
-        // Save profile data to Firestore
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          firstName: profileData.firstName,
-          lastName: profileData.lastName,
-          location: profileData.location,
-          profileType: profileData.profileType,
-          createdAt: new Date(),
-        });
+    setLoading(true);
+    try {
+      // Create the new user with Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, emailAddress, password);
+      const user = userCredential.user;
 
-        // Hide the profile modal
-        setProfileVisible(false);
+      // Save profile data to Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        location: profileData.location,
+        profileType: profileData.profileType,
+        createdAt: new Date(),
+      });
 
-        // Redirect to the home screen
-        navigation.navigate("(tabs)");
-      } catch (error) {
-        console.error("Error saving profile data:", error);
-        Alert.alert("Error", "Failed to save profile data. Please try again.");
-      }
-    } else {
-      Alert.alert("Error", "No authenticated user found.");
+      // Hide the profile modal
+      setProfileVisible(false);
+
+      // Redirect to the home screen
+      navigation.navigate("(tabs)");
+    } catch (error) {
+      console.error("Error creating account or saving profile data:", error);
+      Alert.alert("Error", "Failed to create account. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -265,9 +247,7 @@ const CustomButton = ({ onPress, text, loading, backgroundColor = "#3b82f6" }) =
     }}
     disabled={loading}
   >
-    <Text
-      style={{ color: "white", textAlign: "center", fontSize: 18, fontWeight: "600" }}
-    >
+    <Text style={{ color: "white", textAlign: "center", fontSize: 18, fontWeight: "600" }}>
       {loading ? "Please wait..." : text}
     </Text>
   </TouchableOpacity>
@@ -275,12 +255,7 @@ const CustomButton = ({ onPress, text, loading, backgroundColor = "#3b82f6" }) =
 
 // Terms of Service Modal with enhanced styling
 const TermsOfServiceModal = ({ visible, onAccept }) => (
-  <Modal
-    visible={visible}
-    animationType="slide"
-    transparent={true}
-    onRequestClose={() => {}}
-  >
+  <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={() => {}}>
     <View
       style={{
         flex: 1,
@@ -322,74 +297,53 @@ const TermsOfServiceModal = ({ visible, onAccept }) => (
             These Terms of Use ("Terms") govern your access to and use of the Ready, Set, Fly! mobile application ("App") and any related services (collectively, the "Services") provided by Austin Ready Set Fly, LLC. ("Company," "we," "us," or "our"). By accessing or using our Services, you agree to be bound by these Terms. If you do not agree to these Terms, please do not use our Services.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Eligibility</Text>
-            {"\n"}
-            1.1 You must be at least 18 years old to use our Services. By using the Services, you represent and warrant that you are of legal age to form a binding contract and meet all eligibility requirements.
-            {"\n"}
-            1.2 The Services are intended for users who can legally operate an aircraft and who possess all necessary licenses, certifications, and insurance. By using the Services, you represent and warrant that you meet these qualifications.
+            {"\n"}1.1 You must be at least 18 years old to use our Services. By using the Services, you represent and warrant that you are of legal age to form a binding contract and meet all eligibility requirements.
+            {"\n"}1.2 The Services are intended for users who can legally operate an aircraft and who possess all necessary licenses, certifications, and insurance. By using the Services, you represent and warrant that you meet these qualifications.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Account Registration</Text>
-            {"\n"}
-            2.1 To access certain features of the App, you may be required to create an account. When you create an account, you agree to provide accurate, current, and complete information and to update this information as necessary.
-            {"\n"}
-            2.2 You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You agree to notify us immediately of any unauthorized use of your account.
+            {"\n"}2.1 To access certain features of the App, you may be required to create an account. When you create an account, you agree to provide accurate, current, and complete information and to update this information as necessary.
+            {"\n"}2.2 You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You agree to notify us immediately of any unauthorized use of your account.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Use of Services</Text>
-            {"\n"}
-            3.1 Aircraft Listings: Aircraft owners ("Owners") may create listings to make their aircraft available for rent. Owners are solely responsible for the accuracy, content, and legality of their listings.
-            {"\n"}
-            3.2 Renters: Users who wish to rent an aircraft ("Renters") may browse available listings and make rental bookings through the App. Renters are responsible for complying with all terms and conditions set forth by the Owner.
-            {"\n"}
-            3.3 Bookings: When a Renter books an aircraft, a contract is formed directly between the Renter and the Owner. We are not a party to this contract and do not guarantee the quality, safety, or legality of the aircraft or the services provided by the Owner.
-            {"\n"}
-            3.4 FAA Safety and Insurance Obligations:
+            {"\n"}3.1 Aircraft Listings: Aircraft owners ("Owners") may create listings to make their aircraft available for rent. Owners are solely responsible for the accuracy, content, and legality of their listings.
+            {"\n"}3.2 Renters: Users who wish to rent an aircraft ("Renters") may browse available listings and make rental bookings through the App. Renters are responsible for complying with all terms and conditions set forth by the Owner.
+            {"\n"}3.3 Bookings: When a Renter books an aircraft, a contract is formed directly between the Renter and the Owner. We are not a party to this contract and do not guarantee the quality, safety, or legality of the aircraft or the services provided by the Owner.
+            {"\n"}3.4 FAA Safety and Insurance Obligations:
             {"\n"}- FAA Safety Regulations: It is the sole responsibility of both Owners and Renters to comply with all applicable Federal Aviation Administration (FAA) safety regulations during each rental transaction.
             {"\n"}- Insurance Responsibilities: All users are responsible for maintaining the required insurance coverage as mandated by applicable law and for any additional insurance obligations that may be agreed upon by the parties involved in a rental transaction.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Fees and Payments</Text>
-            {"\n"}
-            4.1 Service Fees: We may charge service fees for the use of the App, including fees for processing payments. These fees will be disclosed to you before you complete a transaction.
-            {"\n"}
-            4.2 Payment Processing: Payments between Renters and Owners may be processed through third-party payment providers. By using the Services, you agree to comply with the terms and conditions of the payment provider.
-            {"\n"}
-            4.3 Cancellations and Refunds: Cancellation and refund policies may vary depending on the terms set by the Owner. It is your responsibility to review these terms before making a booking. We are not responsible for any cancellations or refunds.
+            {"\n"}4.1 Service Fees: We may charge service fees for the use of the App, including fees for processing payments. These fees will be disclosed to you before you complete a transaction.
+            {"\n"}4.2 Payment Processing: Payments between Renters and Owners may be processed through third-party payment providers. By using the Services, you agree to comply with the terms and conditions of the payment provider.
+            {"\n"}4.3 Cancellations and Refunds: Cancellation and refund policies may vary depending on the terms set by the Owner. It is your responsibility to review these terms before making a booking. We are not responsible for any cancellations or refunds.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>User Conduct</Text>
-            {"\n"}
-            5.1 You agree not to use the Services for any unlawful or prohibited purpose. You agree not to:
+            {"\n"}5.1 You agree not to use the Services for any unlawful or prohibited purpose. You agree not to:
             {"\n"}- Violate any applicable laws or regulations.
             {"\n"}- Post or transmit any false, misleading, or defamatory content.
             {"\n"}- Infringe on the rights of others, including intellectual property rights.
             {"\n"}- Engage in any conduct that is harmful, fraudulent, or deceptive.
-            {"\n"}
-            5.2 We reserve the right to suspend or terminate your account if you violate these Terms or engage in any prohibited conduct.
+            {"\n"}5.2 We reserve the right to suspend or terminate your account if you violate these Terms or engage in any prohibited conduct.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Intellectual Property</Text>
-            {"\n"}
-            6.1 All content and materials available on the App, including text, graphics, logos, and software, are the property of the Company or its licensors and are protected by copyright, trademark, and other intellectual property laws.
-            {"\n"}
-            6.2 You are granted a limited, non-exclusive, non-transferable, and revocable license to access and use the App for your personal, non-commercial use. You may not reproduce, distribute, modify, or create derivative works from any content or materials on the App without our prior written consent.
+            {"\n"}6.1 All content and materials available on the App, including text, graphics, logos, and software, are the property of the Company or its licensors and are protected by copyright, trademark, and other intellectual property laws.
+            {"\n"}6.2 You are granted a limited, non-exclusive, non-transferable, and revocable license to access and use the App for your personal, non-commercial use. You may not reproduce, distribute, modify, or create derivative works from any content or materials on the App without our prior written consent.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Disclaimers</Text>
-            {"\n"}
-            7.1 No Warranty: The Services are provided on an "as-is" and "as-available" basis. We make no warranties or representations about the accuracy, reliability, completeness, or timeliness of the Services. We do not warrant that the Services will be uninterrupted, error-free, or secure.
-            {"\n"}
-            7.2 Limitation of Liability: To the fullest extent permitted by law, we shall not be liable for any direct, indirect, incidental, special, or consequential damages arising out of or in connection with your use of the Services, including any damages resulting from the use or inability to use the App, or any content or materials obtained through the App.
+            {"\n"}7.1 No Warranty: The Services are provided on an "as-is" and "as-available" basis. We make no warranties or representations about the accuracy, reliability, completeness, or timeliness of the Services. We do not warrant that the Services will be uninterrupted, error-free, or secure.
+            {"\n"}7.2 Limitation of Liability: To the fullest extent permitted by law, we shall not be liable for any direct, indirect, incidental, special, or consequential damages arising out of or in connection with your use of the Services, including any damages resulting from the use or inability to use the App, or any content or materials obtained through the App.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Indemnification</Text>
-            {"\n"}
-            You agree to indemnify, defend, and hold harmless the Company, its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, and expenses, including reasonable attorneys' fees, arising out of or in any way connected with your access to or use of the Services, your violation of these Terms, or your infringement of any rights of another.
+            {"\n"}You agree to indemnify, defend, and hold harmless the Company, its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, and expenses, including reasonable attorneys' fees, arising out of or in any way connected with your access to or use of the Services, your violation of these Terms, or your infringement of any rights of another.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Termination</Text>
-            {"\n"}
-            We reserve the right to terminate or suspend your account and access to the Services at any time, with or without cause, and with or without notice.
+            {"\n"}We reserve the right to terminate or suspend your account and access to the Services at any time, with or without cause, and with or without notice.
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Governing Law</Text>
-            {"\n"}
-            These Terms shall be governed by and construed in accordance with the laws of the State of [State], without regard to its conflict of law principles. Any disputes arising out of or in connection with these Terms shall be resolved in the state or federal courts located in [County, State].
+            {"\n"}These Terms shall be governed by and construed in accordance with the laws of the State of [State], without regard to its conflict of law principles. Any disputes arising out of or in connection with these Terms shall be resolved in the state or federal courts located in [County, State].
             {"\n\n"}
             <Text style={{ fontWeight: "bold" }}>Changes to the Terms</Text>
-            {"\n"}
-            We may update these Terms from time to time. If we make material changes, we will notify you by posting the updated Terms on the App and updating the "Effective Date" at the top of the Terms. Your continued use of the Services after any such changes constitutes your acceptance of the new Terms.
+            {"\n"}We may update these Terms from time to time. If we make material changes, we will notify you by posting the updated Terms on the App and updating the "Effective Date" at the top of the Terms. Your continued use of the Services after any such changes constitutes your acceptance of the new Terms.
           </Text>
           <CustomButton onPress={onAccept} text="Accept Terms" backgroundColor="#10b981" />
         </ScrollView>
@@ -400,12 +354,7 @@ const TermsOfServiceModal = ({ visible, onAccept }) => (
 
 // Profile Information Modal
 const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
-  <Modal
-    visible={visible}
-    animationType="slide"
-    transparent={true}
-    onRequestClose={() => {}}
-  >
+  <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={() => {}}>
     <View
       style={{
         flex: 1,
@@ -471,6 +420,7 @@ const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
             items={[
               { label: "Looking to Rent an Aircraft", value: "renter" },
               { label: "Owner Looking to List an Aircraft", value: "owner" },
+              { label: "Both: Rent & List an Aircraft", value: "both" },
             ]}
             value={profileData.profileType}
             style={{

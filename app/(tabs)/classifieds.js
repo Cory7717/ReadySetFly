@@ -1,4 +1,4 @@
-// src/screens/Classifieds.js 
+// src/screens/Classifieds.js
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Text,
@@ -70,7 +70,7 @@ const formatPhoneNumber = (phone) => {
 const getMaxImages = (selectedCategory, selectedPricing) => {
   if (selectedCategory === 'Aviation Jobs') return 3;
   if (selectedCategory === 'Flight Schools') return 5;
-  if (selectedCategory === 'Aviation Gear') return 5; // Aviation Gear allows up to 5 images
+  // if (selectedCategory === 'Aviation Gear') return 5; // Aviation Gear allows up to 5 images
   if (selectedCategory === 'Aircraft for Sale') {
     if (selectedPricing === 'Basic') return 7;
     if (selectedPricing === 'Featured') return 14;
@@ -106,30 +106,32 @@ const renderListingDetails = (item) => {
         </Text>
       </View>
     );
-  } else if (item.category === 'Aviation Gear') {
-    return (
-      <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
-          {item.gearTitle || 'No Title'}
-        </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
-          {item.gearCity || 'No City'}, {item.gearState || 'No State'}
-        </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
-          Email: {item.gearEmail || 'N/A'}
-        </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
-          Phone: {formatPhoneNumber(item.gearPhone)}
-        </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
-          Price: ${item.gearPrice != null ? Number(item.gearPrice).toLocaleString() : 'N/A'}
-        </Text>
-        <Text style={{ fontSize: 18, color: COLORS.black, marginTop: 10 }}>
-          {item.gearDescription || 'No Description'}
-        </Text>
-      </View>
-    );
-  } else if (item.category === 'Flight Instructors') {
+  }
+  // else if (item.category === 'Aviation Gear') {
+  //   return (
+  //     <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
+  //       <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+  //         {item.gearTitle || 'No Title'}
+  //       </Text>
+  //       <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+  //         {item.gearCity || 'No City'}, {item.gearState || 'No State'}
+  //       </Text>
+  //       <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+  //         Email: {item.gearEmail || 'N/A'}
+  //       </Text>
+  //       <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+  //         Phone: {formatPhoneNumber(item.gearPhone)}
+  //       </Text>
+  //       <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+  //         Price: ${item.gearPrice != null ? Number(item.gearPrice).toLocaleString() : 'N/A'}
+  //       </Text>
+  //       <Text style={{ fontSize: 18, color: COLORS.black, marginTop: 10 }}>
+  //         {item.gearDescription || 'No Description'}
+  //       </Text>
+  //     </View>
+  //   );
+  // }
+  else if (item.category === 'Flight Instructors') {
     return (
       <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
         <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}>
@@ -167,8 +169,13 @@ const renderListingDetails = (item) => {
       </View>
     );
   } else {
+    // Aircraft for Sale fallback (or any other category not specifically handled above).
     return (
       <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
+        {/* Removed City, State line here to avoid duplication since it's on the image overlay */}
+        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+          Airport Identifier: {item.airportIdentifier || 'N/A'}
+        </Text>
         <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
           Tail Number: {item.tailNumber || 'N/A'}
         </Text>
@@ -223,7 +230,7 @@ const categories = [
   'Flight Schools',
   'Flight Instructors',
   'Aviation Mechanic',
-  'Aviation Gear',
+  // 'Aviation Gear', // commented out
 ];
 
 // Default pricing packages (used for Aircraft for Sale)
@@ -253,9 +260,9 @@ const pricingDescriptions = {
 • 30-day listing
 • Designed for aviation mechanics
 • $30/month listing`,
-  Free: `Free Listing:
-• 30-day listing
-• Posted for free`,
+  // 'Free': `Free Listing:
+  // • 30-day listing
+  // • Posted for free`,
 };
 
 // Initialize pricing modal visibility state for all pricing options
@@ -264,7 +271,7 @@ const initialPricingModalState = Object.keys(pricingDescriptions).reduce((acc, k
   return acc;
 }, {});
 
-/* 
+/*
   FullScreenImageModal Component
 
   This component always mounts and uses a PinchGestureHandler to allow
@@ -299,7 +306,7 @@ const FullScreenImageModal = ({ visible, onRequestClose, imageUri }) => {
           onGestureEvent={onPinchGestureEvent}
           onHandlerStateChange={onPinchHandlerStateChange}
         >
-          <Animated.View style={[styles.zoomScrollView, { transform: [{ scale: pinchScale }] }]} >
+          <Animated.View style={[styles.zoomScrollView, { transform: [{ scale: pinchScale }] }]}>
             {imageUri && (
               <Image source={{ uri: imageUri }} style={styles.zoomImage} resizeMode="contain" />
             )}
@@ -380,10 +387,12 @@ const Classifieds = () => {
     } else if (selectedCategory === 'Aviation Mechanic') {
       setPricingPackages({ 'Aviation Mechanic': 30 });
       setSelectedPricing('Aviation Mechanic');
-    } else if (selectedCategory === 'Aviation Gear') {
-      setPricingPackages({ Free: 0 });
-      setSelectedPricing('Free');
-    } else {
+    } 
+    // else if (selectedCategory === 'Aviation Gear') {
+    //   setPricingPackages({ Free: 0 });
+    //   setSelectedPricing('Free');
+    // }
+    else {
       setPricingPackages(defaultPricingPackages);
       setSelectedPricing('Basic');
     }
@@ -475,9 +484,6 @@ const Classifieds = () => {
           case 'Aviation Jobs':
           case 'Flight Schools':
             locField = listing.city || '';
-            break;
-          case 'Aviation Gear':
-            locField = listing.gearCity || '';
             break;
           default:
             locField = listing.city || '';
@@ -576,20 +582,15 @@ const Classifieds = () => {
   // -----------------------
   // Listing Images Render
   // -----------------------
-  const renderListingImages = (item) => (
-    <View style={{ position: 'relative' }}>
-      <FlatList
-        data={item.images || []}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(imageUri, index) => `${item.id}-${index}`}
-        renderItem={({ item: imageUri }) => (
-          <TouchableOpacity
-            onPress={() => handleImagePress(imageUri)}
-            activeOpacity={0.9}
-            accessibilityLabel="View Listing Image"
-            accessibilityRole="imagebutton"
-          >
+  const renderListingImages = (item) => {
+    return (
+      <View style={{ position: 'relative' }}>
+        <FlatList
+          data={item.images || []}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(imageUri, index) => `${item.id}-${index}`}
+          renderItem={({ item: imageUri }) => (
             <Image
               source={{ uri: imageUri }}
               style={{
@@ -597,26 +598,29 @@ const Classifieds = () => {
                 height: 200,
                 borderRadius: 10,
                 marginBottom: 10,
+                marginRight: 10,
               }}
             />
-          </TouchableOpacity>
-        )}
-      />
-      {item.category === 'Aircraft for Sale' && (
-        <View style={styles.priceLocationOverlay}>
-          <Text style={styles.priceText}>
-            Price: ${item.salePrice != null ? Number(item.salePrice).toLocaleString() : 'N/A'}
-          </Text>
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={20} color={COLORS.white} />
-            <Text style={styles.locationText}>
-              {item.city ? item.city : 'N/A'}, {item.state ? item.state : 'N/A'}
+          )}
+        />
+        {/* Price/location overlay for Aircraft for Sale */}
+        {item.category === 'Aircraft for Sale' && (
+          <View style={styles.priceLocationOverlay}>
+            <Text style={styles.priceText}>
+              Price: ${item.salePrice != null ? Number(item.salePrice).toLocaleString() : 'N/A'}
             </Text>
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={20} color={COLORS.white} />
+              {/* Updated so it no longer says "City, State:" */}
+              <Text style={styles.locationText}>
+                {item.city ? item.city : 'N/A'}, {item.state ? item.state : 'N/A'}
+              </Text>
+            </View>
           </View>
-        </View>
-      )}
-    </View>
-  );
+        )}
+      </View>
+    );
+  };
 
   // -----------------------
   // Distance Filter Helpers (Kept for backward compatibility)
@@ -684,19 +688,15 @@ const Classifieds = () => {
     }
   };
 
-  // Updated handleAskQuestion to check gearEmail if it's an Aviation Gear listing
   const handleAskQuestion = () => {
     if (!selectedListing) {
       Alert.alert('Error', 'No listing selected.');
       return;
     }
-    const contactEmail =
-      selectedListing.category === 'Aviation Gear'
-        ? selectedListing.gearEmail
-        : selectedListing.email;
+    const contactEmail = selectedListing.email;
     if (contactEmail) {
       const subject = encodeURIComponent(
-        `Inquiry about ${selectedListing.title || selectedListing.gearTitle || 'Your Listing'}`
+        `Inquiry about ${selectedListing.title || 'Your Listing'}`
       );
       const mailUrl = `mailto:${contactEmail}?subject=${subject}`;
       Linking.openURL(mailUrl).catch((error) => {
@@ -720,7 +720,6 @@ const Classifieds = () => {
     });
   };
 
-  // Delete listing handler
   const handleDeleteListing = (listingId) => {
     Alert.alert('Confirm Deletion', 'Are you sure you want to delete this listing?', [
       {
@@ -765,15 +764,14 @@ const Classifieds = () => {
     ]);
   };
 
-  // -----------------------
-  // Updated onSubmitMethod for listing submission/editing
-  // -----------------------
   const onSubmitMethod = (values) => {
     const listingDetails = {
       ...values,
       images,
       location: location ? { lat: location.coords.latitude, lng: location.coords.longitude } : {},
     };
+
+    // If editing, update listing:
     if (editingListing) {
       console.log("Updating listing with payload:", { listingId: editingListing.id, listingDetails });
       getFirebaseIdToken().then((token) => {
@@ -808,8 +806,12 @@ const Classifieds = () => {
             Alert.alert('Error', 'Failed to update listing.');
           });
       });
-    } else if (values.category === 'Aviation Gear') {
-      console.log("Creating Aviation Gear listing with payload:", { listingDetails, selectedCategory: values.category, selectedPricing });
+
+    // Otherwise, if it's a new listing, we either post directly for free if "Basic + Aircraft for Sale",
+    // or navigate to payment if any other scenario:
+    } else if (values.category === 'Aircraft for Sale' && values.selectedPricing === 'Basic') {
+      // Bypass payment: Post listing for free for 7 days
+      console.log("Posting listing for free Basic package for 7 days...");
       getFirebaseIdToken().then((token) => {
         fetch(`${API_URL}/createListing`, {
           method: 'POST',
@@ -817,11 +819,11 @@ const Classifieds = () => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ listingDetails, selectedCategory: values.category, selectedPricing }),
+          body: JSON.stringify({ listingDetails }),
         })
           .then((response) => {
             if (response.ok) {
-              Alert.alert('Listing Posted', 'Your listing has been posted successfully.');
+              Alert.alert('Listing Created', 'Your Basic listing is posted for free for 7 days!');
               closeAllModals();
               setEditingListing(null);
               setImages([]);
@@ -829,21 +831,27 @@ const Classifieds = () => {
               response.text().then((text) => {
                 try {
                   const data = JSON.parse(text);
-                  Alert.alert('Error', data.error || 'Failed to post listing.');
+                  Alert.alert('Error', data.error || 'Failed to create listing.');
                 } catch (err) {
                   console.error('Error parsing createListing error data:', err);
-                  Alert.alert('Error', 'Failed to post listing. ' + text);
+                  Alert.alert('Error', 'Failed to create listing. ' + text);
                 }
               });
             }
           })
           .catch((error) => {
-            console.error('Error posting listing:', error);
-            Alert.alert('Error', 'Failed to post listing.');
+            console.error('Error creating listing:', error);
+            Alert.alert('Error', 'Failed to create listing.');
           });
       });
+
     } else {
-      console.log("Navigating to classifiedsPaymentScreen with payload:", { listingDetails, selectedCategory, selectedPricing });
+      // Default route: Navigate to Payment screen
+      console.log("Navigating to classifiedsPaymentScreen with payload:", {
+        listingDetails,
+        selectedCategory,
+        selectedPricing,
+      });
       navigation.navigate('classifiedsPaymentScreen', {
         listingDetails,
         selectedCategory,
@@ -852,9 +860,6 @@ const Classifieds = () => {
     }
   };
 
-  // -----------------------
-  // Clear stale state on focus
-  // -----------------------
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       closeAllModals();
@@ -932,6 +937,7 @@ const Classifieds = () => {
       </SafeAreaView>
     );
   }
+
   const renderEditAndDeleteButtons = (listing) => {
     if (user && listing?.ownerId === user.uid) {
       return (
@@ -957,7 +963,7 @@ const Classifieds = () => {
     }
     return null;
   };
-  
+
   const renderPaginationDots = () => {
     if (!selectedListing || !selectedListing.images) return null;
     return (
@@ -974,7 +980,7 @@ const Classifieds = () => {
       </View>
     );
   };
-  
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }}>
       <Animated.ScrollView
@@ -1004,7 +1010,7 @@ const Classifieds = () => {
             </Animated.View>
           </ImageBackground>
         </Animated.View>
-  
+
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
           <Text style={{ fontSize: 18, color: COLORS.secondary }}>
             Filter by Location{selectedCategory === 'Aircraft for Sale' ? ' or Aircraft Make' : ''}
@@ -1018,7 +1024,7 @@ const Classifieds = () => {
             <Ionicons name="filter" size={24} color="gray" />
           </TouchableOpacity>
         </View>
-  
+
         <FlatList
           data={categories}
           renderItem={({ item }) => (
@@ -1054,13 +1060,13 @@ const Classifieds = () => {
           showsHorizontalScrollIndicator={false}
           style={{ marginBottom: 16 }}
         />
-  
+
         <Text
           style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: COLORS.black }}
         >
           Aviation Marketplace
         </Text>
-  
+
         <TouchableOpacity
           onPress={() => {
             closeAllModals();
@@ -1074,7 +1080,7 @@ const Classifieds = () => {
         >
           <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>Add Listing</Text>
         </TouchableOpacity>
-  
+
         {/* Broker Services Information Block */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
           <TouchableOpacity onPress={() => setBrokerModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1084,7 +1090,7 @@ const Classifieds = () => {
             </Text>
           </TouchableOpacity>
         </View>
-  
+
         {filteredListings.length > 0 ? (
           filteredListings.map((item, index) => (
             <React.Fragment key={item.id}>
@@ -1109,25 +1115,27 @@ const Classifieds = () => {
                     </Text>
                   </View>
                 )}
+
+                {/* SINGLE pressable card: images + details together */}
                 <TouchableOpacity
                   onPress={() => handleListingPress(item)}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, padding: 10 }}
                   accessibilityLabel={`View details of listing ${item.title || 'No Title'}`}
                   accessibilityRole="button"
                 >
                   {item.images && item.images.length > 0 ? (
-                    <View>{renderListingImages(item)}</View>
+                    renderListingImages(item)
                   ) : (
                     <Text style={{ textAlign: 'center', color: COLORS.gray, marginTop: 10, padding: 10 }}>
                       No Images Available
                     </Text>
                   )}
+
                   <Text
                     style={{
                       fontSize: 18,
                       fontWeight: 'bold',
                       color: COLORS.black,
-                      paddingHorizontal: 10,
                       marginTop: 10,
                     }}
                   >
@@ -1144,7 +1152,7 @@ const Classifieds = () => {
           <Text style={{ textAlign: 'center', color: COLORS.gray }}>No listings available</Text>
         )}
       </Animated.ScrollView>
-  
+
       {showUpButton && (
         <TouchableOpacity
           onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
@@ -1155,7 +1163,7 @@ const Classifieds = () => {
           <Ionicons name="arrow-up" size={24} color={COLORS.white} />
         </TouchableOpacity>
       )}
-  
+
       {/* Filter Modal */}
       <Modal
         animationType="slide"
@@ -1249,7 +1257,7 @@ const Classifieds = () => {
           </KeyboardAvoidingView>
         </View>
       </Modal>
-  
+
       {/* Broker Services Modal */}
       <Modal
         visible={brokerModalVisible}
@@ -1290,7 +1298,7 @@ const Classifieds = () => {
           </View>
         </View>
       </Modal>
-  
+
       {/* Aviation Jobs - Details Modal */}
       <Modal
         visible={jobDetailsModalVisible}
@@ -1335,8 +1343,8 @@ const Classifieds = () => {
           </SafeAreaView>
         </View>
       </Modal>
-  
-      {/* Details Modal (including fix for Aviation Gear) */}
+
+      {/* Details Modal */}
       <Modal
         visible={detailsModalVisible}
         transparent={true}
@@ -1354,6 +1362,7 @@ const Classifieds = () => {
               >
                 <Ionicons name="close" size={30} color={COLORS.white} />
               </TouchableOpacity>
+
               {selectedListing?.images && selectedListing.images.length > 0 ? (
                 <View style={{ position: 'relative' }}>
                   <Animated.ScrollView
@@ -1391,92 +1400,50 @@ const Classifieds = () => {
               ) : (
                 <Text style={{ color: COLORS.white, marginTop: 20 }}>No Images Available</Text>
               )}
-              {selectedListing?.category === 'Aviation Gear' ? (
-                <>
-                  <Text
-                    style={{
-                      color: COLORS.white,
-                      fontSize: 24,
-                      fontWeight: 'bold',
-                      marginTop: 20,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {selectedListing?.gearTitle || 'No Title'}
-                  </Text>
-                  <View style={styles.centeredRow}>
-                    <Ionicons name="location-outline" size={20} color={COLORS.gray} />
-                    <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
-                      {selectedListing?.gearCity || 'No City'}, {selectedListing?.gearState || 'No State'}
-                    </Text>
-                  </View>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
-                    Email: {selectedListing?.gearEmail || 'N/A'}
-                  </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    Phone: {formatPhoneNumber(selectedListing?.gearPhone)}
-                  </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    Price: ${selectedListing?.gearPrice != null ? Number(selectedListing.gearPrice).toLocaleString() : 'N/A'}
-                  </Text>
-                  <Text
-                    style={{
-                      color: COLORS.white,
-                      fontSize: 18,
-                      marginTop: 20,
-                      textAlign: 'left',
-                      paddingHorizontal: 20,
-                    }}
-                  >
-                    {selectedListing?.gearDescription || 'No Description'}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text
-                    style={{
-                      color: COLORS.white,
-                      fontSize: 24,
-                      fontWeight: 'bold',
-                      marginTop: 20,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {selectedListing?.flightSchoolName || selectedListing?.title || 'No Title'}
-                  </Text>
-                  <View style={styles.centeredRow}>
-                    <Ionicons name="location-outline" size={20} color={COLORS.gray} />
-                    <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
-                      {selectedListing?.city || 'No City'}, {selectedListing?.state || 'No State'}
-                    </Text>
-                  </View>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
-                    Email: {selectedListing?.email || 'N/A'}
-                  </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    Phone: {formatPhoneNumber(selectedListing?.phone)}
-                  </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    Tail Number: {selectedListing?.tailNumber || 'N/A'}
-                  </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    Price: ${selectedListing?.salePrice != null ? Number(selectedListing.salePrice).toLocaleString() : 'N/A'}
-                  </Text>
-                  <Text
-                    style={{
-                      color: COLORS.white,
-                      fontSize: 18,
-                      marginTop: 20,
-                      textAlign: 'left',
-                      paddingHorizontal: 20,
-                    }}
-                  >
-                    {selectedListing?.flightSchoolDetails ||
-                      selectedListing?.description ||
-                      'No Description'}
-                  </Text>
-                </>
-              )}
+
+              <Text
+                style={{
+                  color: COLORS.white,
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  marginTop: 20,
+                  textAlign: 'center',
+                }}
+              >
+                {selectedListing?.flightSchoolName || selectedListing?.title || 'No Title'}
+              </Text>
+              <View style={styles.centeredRow}>
+                <Ionicons name="location-outline" size={20} color={COLORS.gray} />
+                <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
+                  {selectedListing?.city || 'No City'}, {selectedListing?.state || 'No State'}
+                </Text>
+              </View>
+              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
+                Email: {selectedListing?.email || 'N/A'}
+              </Text>
+              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                Phone: {formatPhoneNumber(selectedListing?.phone)}
+              </Text>
+              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                Tail Number: {selectedListing?.tailNumber || 'N/A'}
+              </Text>
+              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                Price: ${selectedListing?.salePrice != null ? Number(selectedListing.salePrice).toLocaleString() : 'N/A'}
+              </Text>
+              <Text
+                style={{
+                  color: COLORS.white,
+                  fontSize: 18,
+                  marginTop: 20,
+                  textAlign: 'left',
+                  paddingHorizontal: 20,
+                }}
+              >
+                {selectedListing?.flightSchoolDetails ||
+                  selectedListing?.description ||
+                  'No Description'}
+              </Text>
+
               <TouchableOpacity
                 style={{ marginTop: 20, backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center' }}
                 onPress={handleAskQuestion}
@@ -1485,12 +1452,13 @@ const Classifieds = () => {
               >
                 <Text style={{ color: COLORS.white, fontSize: 16 }}>Ask a question</Text>
               </TouchableOpacity>
+
               {renderEditAndDeleteButtons(selectedListing)}
             </ScrollView>
           </SafeAreaView>
         </View>
       </Modal>
-  
+
       {/* Pricing Info Modals */}
       {Object.keys(pricingDescriptions).map((key) => (
         <Modal
@@ -1518,6 +1486,7 @@ const Classifieds = () => {
           </View>
         </Modal>
       ))}
+
       {/* Add / Edit Listing Modal */}
       <Modal
         animationType="none"
@@ -1554,7 +1523,7 @@ const Classifieds = () => {
                 </Text>
                 <Formik
                   initialValues={{
-                    // New fields for Flight Instructors
+                    // Flight Instructors
                     firstName:
                       editingListing && editingListing.category === 'Flight Instructors'
                         ? editingListing.firstName || ''
@@ -1596,7 +1565,8 @@ const Classifieds = () => {
                       editingListing && editingListing.category === 'Flight Instructors'
                         ? editingListing.aircraftProvided || false
                         : false,
-                    // New fields for Aviation Mechanic
+
+                    // Aviation Mechanic
                     amFirstName:
                       editingListing && editingListing.category === 'Aviation Mechanic'
                         ? editingListing.firstName || ''
@@ -1625,36 +1595,10 @@ const Classifieds = () => {
                       editingListing && editingListing.category === 'Aviation Mechanic'
                         ? editingListing.serviceLocations || ''
                         : '',
-                    // New fields for Aviation Gear
-                    gearTitle:
-                      editingListing && editingListing.category === 'Aviation Gear'
-                        ? editingListing.title || ''
-                        : '',
-                    gearDescription:
-                      editingListing && editingListing.category === 'Aviation Gear'
-                        ? editingListing.description || ''
-                        : '',
-                    gearCity:
-                      editingListing && editingListing.category === 'Aviation Gear'
-                        ? editingListing.city || ''
-                        : '',
-                    gearState:
-                      editingListing && editingListing.category === 'Aviation Gear'
-                        ? editingListing.state || ''
-                        : '',
-                    gearEmail:
-                      editingListing && editingListing.category === 'Aviation Gear'
-                        ? editingListing.email || ''
-                        : '',
-                    gearPhone:
-                      editingListing && editingListing.category === 'Aviation Gear'
-                        ? editingListing.phone || ''
-                        : '',
-                    gearPrice:
-                      editingListing && editingListing.category === 'Aviation Gear'
-                        ? editingListing.gearPrice?.toString() || ''
-                        : '',
-                    // Original fields for Aircraft for Sale, Aviation Jobs, Flight Schools
+
+                    // (Aviation Gear commented out)
+
+                    // Original fields
                     title: editingListing ? editingListing.title || '' : '',
                     tailNumber: editingListing ? editingListing.tailNumber || '' : '',
                     salePrice: editingListing?.salePrice?.toString() || '',
@@ -1679,11 +1623,16 @@ const Classifieds = () => {
                     selectedPricing: selectedPricing || 'Basic',
                     packageCost: selectedPricing ? pricingPackages[selectedPricing] || 0 : 0,
                     category: editingListing ? editingListing.category || selectedCategory : selectedCategory,
+
+                    // Add back airportIdentifier for "Aircraft for Sale"
+                    airportIdentifier: editingListing && editingListing.category === 'Aircraft for Sale'
+                      ? editingListing.airportIdentifier || ''
+                      : '',
                   }}
                   enableReinitialize={true}
                   validate={(values) => {
                     const errors = {};
-                    const { category, selectedPricing } = values;
+                    const { category } = values;
                     if (category === 'Flight Instructors') {
                       if (!values.firstName) errors.firstName = 'First name is required.';
                       if (!values.lastName) errors.lastName = 'Last name is required.';
@@ -1712,20 +1661,6 @@ const Classifieds = () => {
                       }
                       if (!values.amDescription) errors.amDescription = 'Description is required.';
                       if (!values.amServiceLocations) errors.amServiceLocations = 'Service locations are required.';
-                    } else if (category === 'Aviation Gear') {
-                      if (!values.gearTitle) errors.gearTitle = 'Title is required.';
-                      if (!values.gearDescription) errors.gearDescription = 'Description is required.';
-                      if (!values.gearCity) errors.gearCity = 'City is required.';
-                      if (!values.gearState) errors.gearState = 'State is required.';
-                      if (!values.gearEmail) {
-                        errors.gearEmail = 'Contact email is required.';
-                      } else if (!/\S+@\S+\.\S+/.test(values.gearEmail)) {
-                        errors.gearEmail = 'Invalid email address.';
-                      }
-                      if (!values.gearPrice) errors.gearPrice = 'Price is required.';
-                      else if (isNaN(Number(values.gearPrice))) {
-                        errors.gearPrice = 'Price must be a valid number.';
-                      }
                     } else if (category === 'Aviation Jobs') {
                       if (!values.companyName) errors.companyName = 'Company Name is required.';
                       if (!values.jobTitle) errors.jobTitle = 'Job Title is required.';
@@ -1744,6 +1679,7 @@ const Classifieds = () => {
                         errors.email = 'Invalid email address.';
                       }
                     } else {
+                      // Aircraft for Sale block
                       if (!values.title) errors.title = 'Title is required.';
                       if (!values.description) errors.description = 'Description is required.';
                       if (!values.salePrice) errors.salePrice = 'Sale Price is required.';
@@ -2124,139 +2060,6 @@ const Classifieds = () => {
                             <Text style={{ color: 'red', marginBottom: 8 }}>{errors.amServiceLocations}</Text>
                           )}
                         </>
-                      ) : values.category === 'Aviation Gear' ? (
-                        <>
-                          <TextInput
-                            placeholder="Title"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('gearTitle')}
-                            onBlur={handleBlur('gearTitle')}
-                            value={values.gearTitle}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Title Input"
-                          />
-                          {touched.gearTitle && errors.gearTitle && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.gearTitle}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Description"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('gearDescription')}
-                            onBlur={handleBlur('gearDescription')}
-                            value={values.gearDescription}
-                            multiline
-                            numberOfLines={4}
-                            maxLength={3000}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                              textAlignVertical: 'top',
-                            }}
-                            accessibilityLabel="Description Input"
-                          />
-                          {touched.gearDescription && errors.gearDescription && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.gearDescription}</Text>
-                          )}
-                          <TextInput
-                            placeholder="City"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('gearCity')}
-                            onBlur={handleBlur('gearCity')}
-                            value={values.gearCity}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="City Input"
-                          />
-                          {touched.gearCity && errors.gearCity && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.gearCity}</Text>
-                          )}
-                          <TextInput
-                            placeholder="State"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('gearState')}
-                            onBlur={handleBlur('gearState')}
-                            value={values.gearState}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="State Input"
-                          />
-                          {touched.gearState && errors.gearState && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.gearState}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Contact Email"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('gearEmail')}
-                            onBlur={handleBlur('gearEmail')}
-                            value={values.gearEmail}
-                            keyboardType="email-address"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Contact Email Input"
-                          />
-                          {touched.gearEmail && errors.gearEmail && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.gearEmail}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Phone Number (Optional)"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('gearPhone')}
-                            onBlur={handleBlur('gearPhone')}
-                            value={values.gearPhone}
-                            keyboardType="phone-pad"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Phone Number Input"
-                          />
-                          <TextInput
-                            placeholder="Price"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('gearPrice')}
-                            onBlur={handleBlur('gearPrice')}
-                            value={values.gearPrice}
-                            keyboardType="numeric"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Price Input"
-                          />
-                          {touched.gearPrice && errors.gearPrice && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.gearPrice}</Text>
-                          )}
-                        </>
                       ) : values.category === 'Aviation Jobs' ? (
                         <>
                           <TextInput
@@ -2317,7 +2120,6 @@ const Classifieds = () => {
                           {touched.jobDescription && errors.jobDescription && (
                             <Text style={{ color: 'red', marginBottom: 8 }}>{errors.jobDescription}</Text>
                           )}
-                          {/* Added Contact Email and Phone fields for Aviation Jobs */}
                           <TextInput
                             placeholder="Contact Email"
                             placeholderTextColor={COLORS.gray}
@@ -2356,6 +2158,7 @@ const Classifieds = () => {
                         </>
                       ) : (
                         <>
+                          {/* Aircraft for Sale Category (plus any fallback) */}
                           <TextInput
                             placeholder="Aircraft Year/Make/Model"
                             placeholderTextColor={COLORS.gray}
@@ -2411,6 +2214,55 @@ const Classifieds = () => {
                           {touched.salePrice && errors.salePrice && (
                             <Text style={{ color: 'red', marginBottom: 8 }}>{errors.salePrice}</Text>
                           )}
+
+                          {/* Airport Identifier for "Aircraft for Sale" */}
+                          <TextInput
+                            placeholder="Airport Identifier"
+                            placeholderTextColor={COLORS.gray}
+                            onChangeText={handleChange('airportIdentifier')}
+                            onBlur={handleBlur('airportIdentifier')}
+                            value={values.airportIdentifier}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
+                            accessibilityLabel="Airport Identifier Input"
+                          />
+
+                          {/* City, State fields */}
+                          <TextInput
+                            placeholder="City"
+                            placeholderTextColor={COLORS.gray}
+                            onChangeText={handleChange('city')}
+                            onBlur={handleBlur('city')}
+                            value={values.city}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
+                            accessibilityLabel="City Input"
+                          />
+                          <TextInput
+                            placeholder="State"
+                            placeholderTextColor={COLORS.gray}
+                            onChangeText={handleChange('state')}
+                            onBlur={handleBlur('state')}
+                            value={values.state}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
+                            accessibilityLabel="State Input"
+                          />
                           <TextInput
                             placeholder="Description"
                             placeholderTextColor={COLORS.gray}
@@ -2433,7 +2285,6 @@ const Classifieds = () => {
                           {touched.description && errors.description && (
                             <Text style={{ color: 'red', marginBottom: 8 }}>{errors.description}</Text>
                           )}
-                          {/* Added Contact Email and Phone fields for Aircraft for Sale (default) */}
                           <TextInput
                             placeholder="Contact Email"
                             placeholderTextColor={COLORS.gray}
@@ -2471,7 +2322,7 @@ const Classifieds = () => {
                           />
                         </>
                       )}
-  
+
                       {['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale'].includes(values.category) && (
                         <>
                           <Text
@@ -2521,8 +2372,8 @@ const Classifieds = () => {
                           {renderImageUploadButton()}
                         </>
                       )}
-  
-                      {/* Restore Select Pricing Package block for non-Aviation Gear listings */}
+
+                      {/* Pricing Package Selection (not shown for Aviation Gear if it were active) */}
                       {values.category !== 'Aviation Gear' && (
                         <>
                           <Text
@@ -2577,20 +2428,28 @@ const Classifieds = () => {
                                   >
                                     {packageType}
                                   </Text>
-                                  <Text
-                                    style={{
-                                      color: selectedPricing === packageType ? COLORS.white : COLORS.black,
-                                    }}
-                                  >
-                                    ${pricingPackages[packageType]}
-                                  </Text>
+
+                                  {/* Here is where we conditionally strike through $25 and show Free for 7 days */}
+                                  {packageType === 'Basic' && values.category === 'Aircraft for Sale' ? (
+                                    <Text style={{ color: selectedPricing === packageType ? COLORS.white : COLORS.black }}>
+                                      <Text style={{ textDecorationLine: 'line-through' }}>$25</Text>  Free for 7 days
+                                    </Text>
+                                  ) : (
+                                    <Text
+                                      style={{
+                                        color: selectedPricing === packageType ? COLORS.white : COLORS.black,
+                                      }}
+                                    >
+                                      ${pricingPackages[packageType]}
+                                    </Text>
+                                  )}
                                 </TouchableOpacity>
                               </View>
                             ))}
                           </View>
                         </>
                       )}
-  
+
                       {/* Preview Listing Button */}
                       <TouchableOpacity
                         onPress={() => {
@@ -2605,7 +2464,7 @@ const Classifieds = () => {
                           Preview Listing
                         </Text>
                       </TouchableOpacity>
-  
+
                       {loading ? (
                         <ActivityIndicator size="large" color={COLORS.red} accessibilityLabel="Submitting Listing" />
                       ) : (
@@ -2613,24 +2472,18 @@ const Classifieds = () => {
                           onPress={handleSubmit}
                           style={{ backgroundColor: COLORS.red, paddingVertical: 12, borderRadius: 50 }}
                           accessibilityLabel={
-                            values.category === 'Aviation Gear'
-                              ? 'Post for Free'
-                              : editingListing
+                            editingListing
                               ? 'Save'
                               : 'Proceed to pay'
                           }
                           accessibilityRole="button"
                         >
                           <Text style={{ color: COLORS.white, textAlign: 'center', fontWeight: 'bold' }}>
-                            {values.category === 'Aviation Gear'
-                              ? 'Post for Free'
-                              : editingListing
-                              ? 'Save'
-                              : 'Proceed to pay'}
+                            {editingListing ? 'Save' : 'Proceed to pay'}
                           </Text>
                         </TouchableOpacity>
                       )}
-  
+
                       <TouchableOpacity
                         onPress={() => {
                           closeAllModals();
@@ -2656,7 +2509,7 @@ const Classifieds = () => {
           </Animated.View>
         </View>
       </Modal>
-  
+
       {/* Preview Listing Modal (Full Screen) */}
       <Modal
         animationType="slide"
@@ -2687,8 +2540,8 @@ const Classifieds = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-  
-      {/* Full-Screen Image Modal as a separate component */}
+
+      {/* Full-Screen Image Modal */}
       <FullScreenImageModal
         visible={fullScreenModalVisible}
         onRequestClose={() => setFullScreenModalVisible(false)}
@@ -2696,158 +2549,158 @@ const Classifieds = () => {
       />
     </SafeAreaView>
   );
-  };
-  
-  const AppNavigator = () => (
-    <NavigationContainer independent={true}>
-      <Stack.Navigator initialRouteName="Classifieds">
-        <Stack.Screen name="Classifieds" component={Classifieds} options={{ headerShown: false }} />
-        {/* For rental payments */}
-        {/* <Stack.Screen name="CheckoutScreen" component={CheckoutScreen} options={{ headerShown: false }} /> */}
-        {/* New screen for classifieds payment */}
-        <Stack.Screen
-          name="classifiedsPaymentScreen"
-          component={classifiedsPaymentScreen}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
-  
-  export default AppNavigator;
-  
-  const styles = StyleSheet.create({
-    paginationDotsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    paginationDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      marginHorizontal: 4,
-    },
-    activeDot: {
-      backgroundColor: COLORS.primary,
-    },
-    inactiveDot: {
-      backgroundColor: COLORS.lightGray,
-    },
-    zoomModalContainer: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.9)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    zoomCloseButton: {
-      position: 'absolute',
-      top: Platform.OS === 'ios' ? 60 : 30,
-      right: 20,
-      zIndex: 1,
-    },
-    zoomScrollView: {
-      width: SCREEN_WIDTH,
-      height: SCREEN_HEIGHT,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    zoomImage: {
-      width: SCREEN_WIDTH,
-      height: SCREEN_HEIGHT,
-    },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 5,
-    },
-    rowBetween: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 5,
-    },
-    priceLocationOverlay: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      padding: 10,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    priceText: {
-      color: COLORS.white,
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
-    locationContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    locationText: {
-      color: COLORS.white,
-      fontSize: 16,
-      marginLeft: 5,
-    },
-    centeredRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginTop: 10,
-    },
-    editDeleteContainer: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      padding: 10,
-    },
-    editButton: {
-      backgroundColor: COLORS.primary,
-      padding: 8,
-      borderRadius: 20,
-      marginRight: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    deleteButton: {
-      backgroundColor: COLORS.red,
-      padding: 8,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    upButton: {
-      position: 'absolute',
-      bottom: 30,
-      right: 20,
-      backgroundColor: COLORS.primary,
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      justifyContent: 'center',
-      alignItems: 'center',
-      shadowColor: COLORS.black,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 3,
-      elevation: 5,
-      zIndex: 1000,
-    },
-    featuredTag: {
-      position: 'absolute',
-      top: 10,
-      right: 10,
-      backgroundColor: COLORS.primary,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 4,
-      zIndex: 10,
-    },
-    featuredTagText: {
-      color: COLORS.white,
-      fontSize: 10,
-      fontWeight: 'bold',
-    },
-  });
+};
+
+const AppNavigator = () => (
+  <NavigationContainer independent={true}>
+    <Stack.Navigator initialRouteName="Classifieds">
+      <Stack.Screen name="Classifieds" component={Classifieds} options={{ headerShown: false }} />
+      {/* For rental payments */}
+      {/* <Stack.Screen name="CheckoutScreen" component={CheckoutScreen} options={{ headerShown: false }} /> */}
+      {/* New screen for classifieds payment */}
+      <Stack.Screen
+        name="classifiedsPaymentScreen"
+        component={classifiedsPaymentScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  </NavigationContainer>
+);
+
+export default AppNavigator;
+
+const styles = StyleSheet.create({
+  paginationDotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: COLORS.primary,
+  },
+  inactiveDot: {
+    backgroundColor: COLORS.lightGray,
+  },
+  zoomModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomCloseButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 30,
+    right: 20,
+    zIndex: 1,
+  },
+  zoomScrollView: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  priceLocationOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  priceText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginLeft: 5,
+  },
+  centeredRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  editDeleteContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 10,
+  },
+  editButton: {
+    backgroundColor: COLORS.primary,
+    padding: 8,
+    borderRadius: 20,
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButton: {
+    backgroundColor: COLORS.red,
+    padding: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: COLORS.primary,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  featuredTag: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    zIndex: 10,
+  },
+  featuredTagText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+});

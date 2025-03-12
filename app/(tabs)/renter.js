@@ -211,6 +211,36 @@ const renter = () => {
   const renterId = renter?.uid;
 
   // ----------------------------------------------------------------
+  // NEW: Fetch Profile on Mount to update header greeting
+  // ----------------------------------------------------------------
+  useEffect(() => {
+    if (renterId && !profileData.firstName) {
+      (async () => {
+        try {
+          const profileDocRef = doc(db, "users", renterId);
+          const profileDocSnap = await getDoc(profileDocRef);
+          if (profileDocSnap.exists()) {
+            const data = profileDocSnap.data();
+            setProfileData(prev => ({
+              ...prev,
+              firstName: data.firstName || "",
+              lastName: data.lastName || "",
+              insurance: data.insurance || null,
+              pilotLicense: data.pilotLicense || null,
+              medical: data.medical || null,
+              aircraftType: data.aircraftType || "",
+              certifications: data.certifications || "",
+              image: data.image || null,
+            }));
+          }
+        } catch (error) {
+          console.error("Error fetching profile on mount", error);
+        }
+      })();
+    }
+  }, [renterId]);
+
+  // ----------------------------------------------------------------
   // 3) Data Migration (One-time check)
   // ----------------------------------------------------------------
   useEffect(() => {
@@ -580,17 +610,26 @@ const renter = () => {
               const data = docSnap.data();
               if (data.paymentStatus === "completed" && data.rentalStatus !== "active") {
                 updateDoc(rentalRequestRef, { rentalStatus: "active" })
-                  .then(() => {
+                  .then(async () => {
                     setPaymentComplete(true);
                     // --- Messaging Update: Set the currentChatOwnerId so the messaging modal connects to the owner ---
                     if (selectedListing && selectedListing.ownerId) {
                       setCurrentChatOwnerId(selectedListing.ownerId);
                     }
                     Alert.alert("Payment Complete", "Your payment has been processed.");
-                    deleteDoc(doc(db, "renters", renterId, "notifications", notification.id))
+                    await deleteDoc(doc(db, "renters", renterId, "notifications", notification.id))
                       .catch((error) =>
                         console.error("Error deleting notification:", error)
                       );
+                    // Automatically send an auto-message with both participant IDs
+                    await addDoc(collection(db, "messages"), {
+                      senderId: renterId,
+                      senderName: renter.displayName || "User",
+                      text: "Payment complete. Let's start chatting!",
+                      timestamp: serverTimestamp(),
+                      participants: [renterId, selectedListing.ownerId],
+                      rentalRequestId: selectedNotification?.rentalRequestId || selectedRentalRequest.id,
+                    }).catch((err) => console.error("Error sending auto message:", err));
                     // Automatically open the messaging modal now that payment is complete
                     setMessagesModalVisible(true);
                   })
@@ -793,7 +832,8 @@ const renter = () => {
         senderName: renter.displayName || "User",
         text: messageText.trim(),
         timestamp: serverTimestamp(),
-        participants: [renterId],
+        // Include both renterId and currentChatOwnerId (if available) for consistency with owner.js
+        participants: currentChatOwnerId ? [renterId, currentChatOwnerId] : [renterId],
         rentalRequestId: rentalRequestId,
       });
       setMessageText("");
@@ -831,6 +871,41 @@ const renter = () => {
     });
     if (result.type !== "cancel") {
       setProfileData({ ...profileData, [field]: result.uri });
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // NEW: Fetch User Profile from Firestore when profile avatar is pressed
+  // ----------------------------------------------------------------
+  const fetchUserProfile = async () => {
+    if (!renterId) {
+      console.error("No renter ID available");
+      return;
+    }
+    try {
+      // Assuming that the sign-up data is stored in the "users" collection
+      const profileDocRef = doc(db, "users", renterId);
+      const profileDocSnap = await getDoc(profileDocRef);
+      if (profileDocSnap.exists()) {
+        const data = profileDocSnap.data();
+        // Map sign-up fields to your profileData structure.
+        setProfileData({
+          firstName: data.firstName || "",
+          lastName: data.lastName || "",
+          insurance: data.insurance || null,
+          pilotLicense: data.pilotLicense || null,
+          medical: data.medical || null,
+          aircraftType: data.aircraftType || "",
+          certifications: data.certifications || "",
+          image: data.image || null,
+        });
+      } else {
+        console.warn("Profile document not found in 'users'.");
+      }
+      setProfileModalVisible(true);
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      Alert.alert("Error", "Unable to load profile.");
     }
   };
 
@@ -999,11 +1074,9 @@ const renter = () => {
             <View style={styles.headerOverlay}>
               <SafeAreaView style={styles.headerContent}>
                 <View style={styles.headerTopRow}>
-                  <Text style={styles.greetingText}>
-                    Good afternoon, {renter?.displayName || "User"}
-                  </Text>
+                  {/* Swapped: Avatar on the left */}
                   <TouchableOpacity
-                    onPress={() => setProfileModalVisible(true)}
+                    onPress={fetchUserProfile}
                     style={styles.profileImageButton}
                     accessibilityLabel="Edit profile"
                     accessibilityRole="button"
@@ -1014,6 +1087,12 @@ const renter = () => {
                       <Ionicons name="person-circle-outline" size={48} color="#fff" />
                     )}
                   </TouchableOpacity>
+                  <Text style={styles.greetingText}>
+                    Good afternoon,{" "}
+                    {profileData.firstName
+                      ? `${profileData.firstName} ${profileData.lastName}`
+                      : renter?.displayName || "User"}
+                  </Text>
                 </View>
               </SafeAreaView>
             </View>
@@ -1236,7 +1315,7 @@ const renter = () => {
           </View>
 
           {/* Button to navigate to CheckoutScreen */}
-          {selectedRentalRequest && selectedListing && (
+          {selectedRentalRequest && selectedListing && !paymentComplete && (
             <TouchableOpacity
               onPress={() =>
                 navigateToCheckout(
@@ -1543,7 +1622,7 @@ const renter = () => {
                     )}
                   </View>
                 )}
-                {selectedRentalRequest && (
+                {!paymentComplete && (
                   <TouchableOpacity
                     onPress={() =>
                       navigateToCheckout(
@@ -1567,14 +1646,19 @@ const renter = () => {
                     )}
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity
-                  onPress={closeModal}
-                  style={styles.closeNotificationModalButton}
-                  accessibilityLabel="Close notification modal"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.closeNotificationModalButtonText}>Close</Text>
-                </TouchableOpacity>
+                {paymentComplete && (
+                  <View style={{ alignItems: 'center', marginVertical: 16 }}>
+                    <Text style={{ fontSize: 18, color: '#38a169', marginBottom: 8 }}>Payment Completed. Rental is now active.</Text>
+                    <TouchableOpacity
+                      onPress={closeModal}
+                      style={styles.closeNotificationModalButton}
+                      accessibilityLabel="Close notification modal"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.closeNotificationModalButtonText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </ScrollView>
             ) : selectedNotification ? (
               <ScrollView contentContainerStyle={{ padding: 16 }}>
@@ -1766,25 +1850,31 @@ const styles = StyleSheet.create({
   headerImage: {
     width: "100%",
     height: 200,
-    justifyContent: "flex-end",
   },
   headerOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.4)",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
   },
   headerContent: {
     padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    position: "absolute",
+    top: 20,
+    left: 16,
+    right: 16,
   },
   headerTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
   },
   greetingText: {
     color: "#fff",
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "600",
+    marginLeft: 12,
   },
   profileImageButton: {
     padding: 4,

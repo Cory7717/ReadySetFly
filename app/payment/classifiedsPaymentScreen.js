@@ -290,6 +290,10 @@ export default function ClassifiedsPaymentScreen() {
 
   // Handle classifieds payment (and listing creation if needed)
   const handleClassifiedPayment = async (values) => {
+    // ===========================
+    // Aviation Gear Block (COMMENTED OUT)
+    // ===========================
+    /*
     // === New block: Skip payment for Aviation Gear ===
     if (listingDetails.category === 'Aviation Gear') {
       try {
@@ -358,6 +362,7 @@ export default function ClassifiedsPaymentScreen() {
       }
       return; // Skip the rest of the payment flow
     }
+    */
 
     // === Existing payment logic for other categories ===
     if (values.cardholderName.trim() === '') {

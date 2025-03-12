@@ -72,7 +72,9 @@
       "tailNumber": "number",
       "engineType": "string",
       "totalTimeOnFrame": "number",
-      "aircraftModel": "string"
+      "aircraftModel": "string",
+      "id": "string",
+      "updatedAt": "object"
     }
   },
   "bookings": {
@@ -114,7 +116,9 @@
       "gearPrice": "number",
       "gearTitle": "string",
       "gearEmail": "string",
-      "gearState": "string"
+      "gearState": "string",
+      "publiclyViewable": "boolean",
+      "airportIdentifier": "string"
     }
   },
   "messages": {
@@ -131,7 +135,8 @@
       "timestamp": "object",
       "status": "string",
       "timeStamp": "string",
-      "messages": "object"
+      "messages": "object",
+      "renterId": "string"
     }
   },
   "migrationFlags": {
@@ -297,7 +302,12 @@
       "aircraftDetails": "object",
       "userEmail": "string",
       "userID": "string",
-      "stripeAccountId": "string"
+      "stripeAccountId": "string",
+      "email": "string",
+      "location": "string",
+      "profileType": "string",
+      "createdAt": "object",
+      "stripeAccountStatus": "string"
     }
   },
   "your-collection": {
