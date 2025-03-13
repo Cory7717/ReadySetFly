@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react"; 
+import React, { useEffect, useState, useRef } from "react";
 import {
   Text,
   View,
@@ -33,6 +33,7 @@ import {
   getDocs,
   limit,
   setDoc,
+  getDoc, // Added getDoc import to fetch user role
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import wingtipClouds from "../../Assets/images/wingtip_clouds.jpg";
@@ -48,6 +49,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const Home = ({ route, navigation }) => {
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(""); // New state for account type: "Owner", "Renter", or "Both"
   const [listings, setListings] = useState([]);
   const [selectedListing, setSelectedListing] = useState(null);
   const [imageIndex, setImageIndex] = useState(0);
@@ -92,6 +94,9 @@ const Home = ({ route, navigation }) => {
   // NEW: State for the uploaded image in the header
   const [uploadedImage, setUploadedImage] = useState(null);
 
+  // NEW: State to hold favorite listings (storing listing IDs)
+  const [favorites, setFavorites] = useState([]);
+
   // NEW: Function to handle image upload using Expo ImagePicker
   const handleUploadImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -109,6 +114,41 @@ const Home = ({ route, navigation }) => {
       setUploadedImage(pickerResult.uri);
     }
   };
+
+  // NEW: Function to handle favoriting a listing
+  const handleFavorite = async (listing) => {
+    if (!user) return;
+    if (listing.ownerId === user.uid) {
+      Alert.alert("Action Not Allowed", "You cannot favorite your own listing.");
+      return;
+    }
+    if (favorites.includes(listing.id)) {
+      Alert.alert("Already Favorited", "This listing is already in your favorites.");
+      return;
+    }
+    try {
+      // Save the listing to the user's favorites subcollection in Firestore
+      await addDoc(collection(db, "users", user.uid, "favorites"), listing);
+      // No need to manually update state—subscription will update favorites.
+      Alert.alert("Favorite Added", "Listing has been added to your favorites.");
+    } catch (error) {
+      console.error("Error favoriting listing:", error);
+      Alert.alert("Error", "Failed to add listing to favorites.");
+    }
+  };
+
+  // NEW: Subscribe to the user's favorites so that the heart icon stays filled
+  useEffect(() => {
+    if (!user) return;
+    const favRef = collection(db, "users", user.uid, "favorites");
+    const unsubscribeFav = onSnapshot(favRef, (snapshot) => {
+      const favIDs = snapshot.docs.map((docSnap) => docSnap.data().id);
+      setFavorites(favIDs);
+    }, (error) => {
+      console.error("Error subscribing to favorites:", error);
+    });
+    return () => unsubscribeFav();
+  }, [user]);
 
   // Register for Push Notifications and Update Firestore
   useEffect(() => {
@@ -228,6 +268,22 @@ const Home = ({ route, navigation }) => {
     });
     return () => unsubscribeAuth();
   }, []);
+
+  // Fetch user role from Firestore
+  useEffect(() => {
+    if (user) {
+      const userDocRef = doc(db, "users", user.uid);
+      getDoc(userDocRef)
+        .then((docSnapshot) => {
+          if (docSnapshot.exists()) {
+            setUserRole(docSnapshot.data().accountType);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching user role:", error);
+        });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -371,6 +427,13 @@ const Home = ({ route, navigation }) => {
     console.log("Attempting to send rental request.");
     console.log("Selected Listing:", selectedListing);
     console.log("Selected Listing ID:", selectedListing?.id);
+
+    // Restrict rental requests to users with role "Renter" or "Both"
+    if (!(userRole === "Renter" || userRole === "Both")) {
+      Alert.alert("Access Denied", "Only renters can send rental requests.");
+      return;
+    }
+
     if (!selectedListing) {
       Alert.alert("Selection Error", "No listing selected.");
       return;
@@ -636,9 +699,18 @@ const Home = ({ route, navigation }) => {
         </View>
 
         <View style={styles.newListingInfoContainer}>
-          <Text style={styles.newListingTitle} numberOfLines={1}>
-            {`${yearDisplay} ${makeDisplay}`}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={styles.newListingTitle} numberOfLines={1}>
+              {`${yearDisplay} ${makeDisplay}`}
+            </Text>
+            <TouchableOpacity onPress={() => handleFavorite(item)} accessibilityLabel="Favorite listing">
+              <Ionicons
+                name={favorites.includes(item.id) ? "heart" : "heart-outline"}
+                size={24}
+                color="#FF0000"
+              />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.newListingModel} numberOfLines={1}>
             {airplaneModelDisplay}
           </Text>
@@ -655,7 +727,7 @@ const Home = ({ route, navigation }) => {
 
   const renderListHeader = () => (
     <>
-      <Text style={styles.availableAircraftHeader}>Available Aircraft Rentals</Text>
+      <Text style={styles.availableAircraftHeader}>Aircraft Rental Marketplace</Text>
       <View style={styles.filterHeader}>
         <Text style={styles.filterTitle}>Filter Listings</Text>
         <TouchableOpacity
@@ -776,7 +848,7 @@ const Home = ({ route, navigation }) => {
                 </Text>
                 <Text style={styles.modalLocation}>Location: {selectedListing.location}</Text>
                 <Text style={styles.modalDescription}>{selectedListing.description}</Text>
-                {selectedListing.ownerId === user.uid && (
+                {selectedListing.ownerId === user.uid && (userRole === "Owner" || userRole === "Both") && (
                   <View style={styles.modalOwnerActions}>
                     <TouchableOpacity
                       onPress={() => handleEditListing(selectedListing.id)}
@@ -1061,8 +1133,8 @@ const styles = StyleSheet.create({
     top: 0,
     width: "100%",
     zIndex: 1,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    // borderBottomLeftRadius: 20,
+    // borderBottomRightRadius: 20,
     overflow: "hidden",
   },
   headerImage: {

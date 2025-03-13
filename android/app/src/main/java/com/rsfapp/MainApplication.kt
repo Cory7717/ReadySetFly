@@ -1,4 +1,4 @@
-package com.rsfapp
+package com.readysetfly.readysetfly
 
 import android.app.Application
 import android.content.res.Configuration

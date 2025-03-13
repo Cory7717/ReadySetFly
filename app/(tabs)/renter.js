@@ -148,6 +148,8 @@ const renter = () => {
   const [activeRentalModalVisible, setActiveRentalModalVisible] = useState(false);
   const processedRentalsRef = useRef([]);
   const rentalRequestListenerRef = useRef(null);
+  // NEW: State for favorites listings (up to 5)
+  const [favoritesListings, setFavoritesListings] = useState([]);
 
   // ----------------------------------------------------------------
   // 1) Utility Functions
@@ -376,6 +378,42 @@ const renter = () => {
   }, [isAuthChecked, renterId]);
 
   // ----------------------------------------------------------------
+  // NEW: Fetch Favorites Listings (up to 5)
+  // ----------------------------------------------------------------
+  useEffect(() => {
+    if (!renterId) return;
+    const favoritesRef = collection(db, "users", renterId, "favorites");
+    const favoritesQuery = query(favoritesRef, limit(5));
+    const unsubscribeFavorites = onSnapshot(favoritesQuery, (snapshot) => {
+      // Filter out listings where the owner is the same as the renter
+      const favs = snapshot.docs
+        .map(docSnap => docSnap.data())
+        .filter(fav => fav.ownerId !== renterId);
+      setFavoritesListings(favs);
+    }, (error) => {
+      console.error("Error fetching favorites: ", error);
+    });
+    return () => unsubscribeFavorites();
+  }, [renterId]);
+  
+  // NEW: Function to remove a favorite listing
+  const removeFavorite = async (listing) => {
+    if (!renterId) return;
+    try {
+      const favRef = collection(db, "users", renterId, "favorites");
+      const favQuery = query(favRef, where("id", "==", listing.id));
+      const favSnapshot = await getDocs(favQuery);
+      favSnapshot.forEach(async (docSnap) => {
+        await deleteDoc(doc(db, "users", renterId, "favorites", docSnap.id));
+      });
+      Alert.alert("Favorite Removed", "Listing removed from favorites.");
+    } catch (error) {
+      console.error("Error removing favorite:", error);
+      Alert.alert("Error", "Failed to remove favorite.");
+    }
+  };
+
+  // ----------------------------------------------------------------
   // 4) Fetch Rentals & Notifications
   // ----------------------------------------------------------------
   useEffect(() => {
@@ -469,45 +507,6 @@ const renter = () => {
       unsubscribeNotifications();
     };
   }, [renterId, isAuthChecked]);
-
-  // ----------------------------------------------------------------
-  // NEW: Function to fetch more rentals (pagination)
-  // ----------------------------------------------------------------
-  const fetchMoreRentals = async () => {
-    if (!hasMoreRentals || !rentalsLastDoc) return;
-    try {
-      const rentalsQueryInstance = query(
-        collection(db, "rentalRequests"),
-        where("renterId", "==", renterId),
-        where("rentalStatus", "in", ["active", "approved"]),
-        orderBy("createdAt", "desc"),
-        startAfter(rentalsLastDoc),
-        limit(RENTALS_PAGE_SIZE)
-      );
-      const snapshot = await getDocs(rentalsQueryInstance);
-      if (snapshot.empty) {
-        setHasMoreRentals(false);
-        return;
-      }
-      const moreRentals = [];
-      snapshot.docs.forEach((docSnap) => {
-        const data = docSnap.data();
-        moreRentals.push({
-          id: docSnap.id,
-          ...data,
-        });
-      });
-      setRentals([...rentals, ...moreRentals]);
-      const lastRentalDoc = snapshot.docs[snapshot.docs.length - 1];
-      setRentalsLastDoc(lastRentalDoc);
-      if (snapshot.docs.length < RENTALS_PAGE_SIZE) {
-        setHasMoreRentals(false);
-      }
-    } catch (error) {
-      console.error("Error fetching more rentals:", error);
-      Alert.alert("Error", "Failed to fetch more rentals.");
-    }
-  };
 
   // ----------------------------------------------------------------
   // 5) Payment Navigation
@@ -875,7 +874,7 @@ const renter = () => {
   };
 
   // ----------------------------------------------------------------
-  // NEW: Fetch User Profile from Firestore when profile avatar is pressed
+  // NEW: Fetch User Profile from Firestore when profile header is pressed
   // ----------------------------------------------------------------
   const fetchUserProfile = async () => {
     if (!renterId) {
@@ -1027,6 +1026,43 @@ const renter = () => {
   );
 
   // ----------------------------------------------------------------
+  // NEW: Render Favorite Listing Item (small card) with a remove "X" button
+  // ----------------------------------------------------------------
+  const renderFavoriteItem = ({ item }) => (
+    <View style={styles.favoriteCard}>
+      <TouchableOpacity
+        style={styles.favoriteRemoveButton}
+        onPress={() => removeFavorite(item)}
+        accessibilityLabel="Remove favorite listing"
+        accessibilityRole="button"
+      >
+        <Ionicons name="close-circle" size={20} color="#FF0000" />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: "/home",
+            params: { listingId: item.id },
+          })
+        }
+        accessibilityLabel={`View favorite listing: ${item.year} ${item.make}`}
+        accessibilityRole="button"
+      >
+        <ImageBackground
+          source={{ uri: item.images && item.images[0] }}
+          style={styles.favoriteImage}
+          imageStyle={{ borderTopLeftRadius: 8, borderTopRightRadius: 8 }}
+        />
+        <View style={styles.favoriteInfo}>
+          <Text style={styles.favoriteTitle} numberOfLines={1}>
+            {`${item.year} ${item.make}`}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // ----------------------------------------------------------------
   // 19) Navigation by Filter (Optional)
   // ----------------------------------------------------------------
   const handleNavigationInternal = (filter) => {
@@ -1066,37 +1102,32 @@ const renter = () => {
           contentContainerStyle={{ paddingBottom: 16 }}
         >
           {/* Header with background */}
-          <ImageBackground
-            source={require("../../Assets/images/wingtip_clouds.jpg")}
-            style={styles.headerImage}
-            resizeMode="cover"
-          >
-            <View style={styles.headerOverlay}>
-              <SafeAreaView style={styles.headerContent}>
-                <View style={styles.headerTopRow}>
-                  {/* Swapped: Avatar on the left */}
+          <View style={styles.headerWrapper}>
+            <ImageBackground
+              source={require("../../Assets/images/wingtip_clouds.jpg")}
+              style={styles.headerImage}
+              resizeMode="cover"
+            >
+              <View style={styles.headerOverlay}>
+                {/* Header content now only contains a pressable welcome text on the far left */}
+                <View style={styles.headerContent}>
                   <TouchableOpacity
                     onPress={fetchUserProfile}
-                    style={styles.profileImageButton}
+                    style={styles.headerTextContainer}
                     accessibilityLabel="Edit profile"
                     accessibilityRole="button"
                   >
-                    {profileData.image ? (
-                      <Image source={{ uri: profileData.image }} style={styles.profileImage} />
-                    ) : (
-                      <Ionicons name="person-circle-outline" size={48} color="#fff" />
-                    )}
+                    <Text style={styles.welcomeText}>Welcome,</Text>
+                    <Text style={styles.userNameText}>
+                      {profileData.firstName
+                        ? `${profileData.firstName} ${profileData.lastName}`
+                        : renter?.displayName || "User"}
+                    </Text>
                   </TouchableOpacity>
-                  <Text style={styles.greetingText}>
-                    Good afternoon,{" "}
-                    {profileData.firstName
-                      ? `${profileData.firstName} ${profileData.lastName}`
-                      : renter?.displayName || "User"}
-                  </Text>
                 </View>
-              </SafeAreaView>
-            </View>
-          </ImageBackground>
+              </View>
+            </ImageBackground>
+          </View>
 
           {/* Navigation Buttons */}
           <View style={styles.navigationButtonsContainer}>
@@ -1169,51 +1200,19 @@ const renter = () => {
             )}
           </View>
 
-          {/* Recommended for You */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Recommended for you</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <TouchableOpacity
-                style={styles.recommendedBox}
-                onPress={() => {}}
-                accessibilityLabel="Select Cessna 172"
-                accessibilityRole="button"
-              >
-                <Image
-                  source={require("../../Assets/images/recommended1.jpg")}
-                  style={styles.recommendedImage}
-                  resizeMode="cover"
-                />
-                <Text style={styles.recommendedText}>Cessna 172</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.recommendedBox}
-                onPress={() => {}}
-                accessibilityLabel="Select Beechcraft Baron"
-                accessibilityRole="button"
-              >
-                <Image
-                  source={require("../../Assets/images/recommended2.jpg")}
-                  style={styles.recommendedImage}
-                  resizeMode="cover"
-                />
-                <Text style={styles.recommendedText}>Beechcraft Baron</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.recommendedBox}
-                onPress={() => {}}
-                accessibilityLabel="Select Cirrus SR22"
-                accessibilityRole="button"
-              >
-                <Image
-                  source={require("../../Assets/images/recommended3.jpg")}
-                  style={styles.recommendedImage}
-                  resizeMode="cover"
-                />
-                <Text style={styles.recommendedText}>Cirrus SR22</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+          {/* Favorites Section */}
+          {favoritesListings.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Favorites</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {favoritesListings.map((item, index) => (
+                  <View key={item.id || index} style={{ marginRight: 16 }}>
+                    {renderFavoriteItem({ item })}
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Active Rentals */}
           <View style={styles.sectionContainer}>
@@ -1847,6 +1846,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  /* A wrapper to ensure the header doesn't get cut off */
+  headerWrapper: {
+    width: "100%",
+    overflow: "hidden",
+  },
   headerImage: {
     width: "100%",
     height: 200,
@@ -1870,19 +1874,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  greetingText: {
+  /* New container for two-line header text */
+  headerTextContainer: {
+    justifyContent: "center",
+    alignItems: "flex-start"
+  },
+  welcomeText: {
     color: "#fff",
-    fontSize: 20,
-    fontWeight: "600",
-    marginLeft: 12,
+    fontSize: 18,
+  },
+  userNameText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
   },
   profileImageButton: {
     padding: 4,
   },
+  /* Increased avatar size */
   profileImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   navigationButtonsContainer: {
     flexDirection: "row",
@@ -2163,18 +2176,6 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: "#a0aec0",
   },
-  messageOwnerButton: {
-    backgroundColor: "#3182ce",
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  messageOwnerButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
   disabledButtonText: {
     color: "#cbd5e0",
   },
@@ -2220,6 +2221,38 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
     fontSize: 14,
+  },
+  // New styles for favorites listing card
+  favoriteCard: {
+    width: 120,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    overflow: "hidden",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    position: "relative",
+  },
+  favoriteRemoveButton: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    zIndex: 2,
+  },
+  favoriteImage: {
+    width: "100%",
+    height: 80,
+  },
+  favoriteInfo: {
+    padding: 6,
+  },
+  favoriteTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#2D3748",
+    textAlign: "center",
   },
   chatBubbleIcon: {
     position: "absolute",

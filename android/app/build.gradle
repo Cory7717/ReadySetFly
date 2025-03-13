@@ -84,9 +84,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.rsfapp"
+    namespace "com.readysetfly.readysetfly"
     defaultConfig {
-        applicationId "com.rsfapp"
+        applicationId "com.readysetfly.readysetfly"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -148,7 +148,7 @@ dependencies {
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
     def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
-    classpath 'com.google.gms:google-services:4.3.3'
+    
 
     if (isGifEnabled) {
         // For animated gif support

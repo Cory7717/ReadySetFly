@@ -39,7 +39,8 @@ const SignUp = () => {
   const [profileData, setProfileData] = useState({
     firstName: "",
     lastName: "",
-    location: "",
+    email: "",
+    phoneNumber: "",
     profileType: "renter", // Default to "renter"
   });
   const [loading, setLoading] = useState(false);
@@ -72,24 +73,37 @@ const SignUp = () => {
   // When the user accepts the terms, open the Profile modal
   const onAcceptTerms = useCallback(() => {
     setTermsVisible(false);
+    // Pre-populate the email field in the profile modal with the sign-up email
+    setProfileData((prevState) => ({
+      ...prevState,
+      email: emailAddress,
+    }));
     setProfileVisible(true);
-  }, []);
+  }, [emailAddress]);
 
   // Handle profile submission:
   // Create the new user account and save profile data to Firestore
   const onProfileSubmit = async () => {
+    if (!profileData.email.trim()) {
+      Alert.alert("Validation Error", "Please provide your email address.");
+      return;
+    }
     setLoading(true);
     try {
-      // Create the new user with Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, emailAddress, password);
+      // Create the new user with Firebase Authentication using the email from profile modal
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        profileData.email,
+        password
+      );
       const user = userCredential.user;
 
       // Save profile data to Firestore
       await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
+        email: profileData.email,
         firstName: profileData.firstName,
         lastName: profileData.lastName,
-        location: profileData.location,
+        phoneNumber: profileData.phoneNumber,
         profileType: profileData.profileType,
         createdAt: new Date(),
       });
@@ -205,7 +219,9 @@ const SignUp = () => {
             marginTop: 16,
           }}
         >
-          <Text style={{ fontSize: 18, color: "#4b5563" }}>Already have an account?</Text>
+          <Text style={{ fontSize: 18, color: "#4b5563" }}>
+            Already have an account?
+          </Text>
           <TouchableOpacity onPress={() => navigation.navigate("sign-in")}>
             <Text
               style={{
@@ -403,10 +419,23 @@ const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
             }}
           />
           <TextInput
-            placeholder="City and State"
+            placeholder="Email Address"
             placeholderTextColor="#888"
-            value={profileData.location}
-            onChangeText={(value) => onProfileChange("location", value)}
+            value={profileData.email}
+            onChangeText={(value) => onProfileChange("email", value)}
+            style={{
+              borderWidth: 1,
+              borderColor: "#ccc",
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          />
+          <TextInput
+            placeholder="Phone Number (optional)"
+            placeholderTextColor="#888"
+            value={profileData.phoneNumber}
+            onChangeText={(value) => onProfileChange("phoneNumber", value)}
             style={{
               borderWidth: 1,
               borderColor: "#ccc",
@@ -418,9 +447,9 @@ const ProfileModal = ({ visible, profileData, onProfileChange, onSave }) => (
           <RNPickerSelect
             onValueChange={(value) => onProfileChange("profileType", value)}
             items={[
-              { label: "Looking to Rent an Aircraft", value: "renter" },
-              { label: "Owner Looking to List an Aircraft", value: "owner" },
-              { label: "Both: Rent & List an Aircraft", value: "both" },
+              { label: "Renter", value: "renter" },
+              { label: "Other", value: "other" },
+              { label: "Both", value: "both" },
             ]}
             value={profileData.profileType}
             style={{

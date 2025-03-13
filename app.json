@@ -35,7 +35,7 @@
       }
     },
     "android": {
-      "package": "com.carmer7717.rsf_app",
+      "package": "com.readysetfly.readysetfly",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"

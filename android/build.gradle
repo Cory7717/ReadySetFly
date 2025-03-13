@@ -4,7 +4,7 @@
   - https://mvnrepository.com/artifact/com.stripe/stripe-java or
   - https://github.com/stripe/stripe-java/releases/latest
 */
-implementation "com.stripe:stripe-java:26.0.0"
+// implementation "com.stripe:stripe-java:26.0.0"
 
 buildscript {
     ext {
@@ -24,10 +24,12 @@ buildscript {
         classpath('com.android.tools.build:gradle')
         classpath('com.facebook.react:react-native-gradle-plugin')
         classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+        classpath 'com.google.gms:google-services:4.3.3' // <-- This is correct here.
     }
 }
 
-apply plugin: "com.facebook.react.rootproject"
+apply plugin: 
+"com.facebook.react.rootproject"
 
 allprojects {
     repositories {

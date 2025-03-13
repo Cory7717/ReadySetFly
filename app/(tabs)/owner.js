@@ -181,12 +181,45 @@ const OwnerProfile = ({ ownerId }) => {
   const stripe = useStripe();
   const resolvedOwnerId = ownerId || user?.uid; // Resolve ownerId or default to Firebase user ID
 
+  // NEW: New state for account type ("Owner", "Renter", or "Both")
+  const [userRole, setUserRole] = useState("");
+
+  // NEW: Fetch user role from Firestore
+  useEffect(() => {
+    if (user) {
+      const userDocRef = doc(db, "users", user.uid);
+      getDoc(userDocRef)
+        .then((docSnapshot) => {
+          if (docSnapshot.exists()) {
+            setUserRole(docSnapshot.data().accountType);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching user role in owner.js:", error);
+        });
+    }
+  }, [user]);
+
+  // NEW: Prevent access to this screen if the user is only a "Renter"
+  useEffect(() => {
+    if (userRole && userRole === "Renter") {
+      Alert.alert(
+        "Access Denied",
+        "This section is for aircraft owners. Please use the renter section."
+      );
+      navigation.goBack();
+    }
+  }, [userRole]);
+
   // New state for Manage Rental Modal
   const [manageRentalModalVisible, setManageRentalModalVisible] = useState(false);
   // NEW: State for Connected Account Modal (to be opened when "View Connected Account" is pressed)
   const [connectedAccountModalVisible, setConnectedAccountModalVisible] = useState(false);
   // NEW: State for live balance retrieved from Stripe
   const [liveBalance, setLiveBalance] = useState(null);
+
+  // NEW: State for Update Profile Modal (newly added)
+  const [updateProfileModalVisible, setUpdateProfileModalVisible] = useState(false);
 
   // ... (other state definitions remain unchanged)
   const [profileData, setProfileData] = useState({
@@ -1628,22 +1661,24 @@ const OwnerProfile = ({ ownerId }) => {
           style={{ height: 224 }}
           resizeMode="cover"
         >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingTop: 24,
-            }}
-          >
-            <View>
-              <Text style={{ fontSize: 14, color: "#fff" }}>Good Morning</Text>
-              <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>
-                {user?.displayName || "User"}
-              </Text>
+          <TouchableOpacity onPress={() => setUpdateProfileModalVisible(true)}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingHorizontal: 16,
+                paddingTop: 24,
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: 14, color: "#fff" }}>Welcome</Text>
+                <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>
+                  {profileData.fullName || user?.displayName || "User"}
+                </Text>
+              </View>
             </View>
-          </View>
+          </TouchableOpacity>
         </ImageBackground>
 
         <View
@@ -3265,6 +3300,68 @@ const OwnerProfile = ({ ownerId }) => {
               onPress={() => setConnectedAccountModalVisible(false)}
               title="Close"
               backgroundColor="#3182ce"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Update Profile Modal (newly added) */}
+      <Modal
+        visible={updateProfileModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setUpdateProfileModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader
+              title="Update Profile"
+              onClose={() => setUpdateProfileModalVisible(false)}
+            />
+            <CustomTextInput
+              placeholder="Full Name"
+              value={profileData.fullName}
+              onChangeText={(value) => handleInputChange("fullName", value)}
+              accessibilityLabel="Full Name input"
+            />
+            <CustomTextInput
+              placeholder="Contact"
+              value={profileData.contact}
+              onChangeText={(value) => handleInputChange("contact", value)}
+              accessibilityLabel="Contact input"
+            />
+            <CustomTextInput
+              placeholder="Address"
+              value={profileData.address}
+              onChangeText={(value) => handleInputChange("address", value)}
+              accessibilityLabel="Address input"
+            />
+            <CustomTextInput
+              placeholder="Email Address"
+              value={profileData.email}
+              onChangeText={(value) => handleInputChange("email", value)}
+              keyboardType="email-address"
+              accessibilityLabel="Email Address input"
+            />
+            <CustomButton
+              onPress={() => setUpdateProfileModalVisible(false)}
+              title="Save"
+              backgroundColor="#3182ce"
+              accessibilityLabel="Save profile changes"
             />
           </View>
         </View>

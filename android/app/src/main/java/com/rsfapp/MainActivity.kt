@@ -1,4 +1,4 @@
-package com.rsfapp
+package com.readysetfly.readysetfly
 
 import android.os.Build
 import android.os.Bundle
