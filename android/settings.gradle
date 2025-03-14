@@ -1,4 +1,4 @@
-rootProject.name = 'rsfapp'
+rootProject.name = 'rsf_app'
 
 dependencyResolutionManagement {
   versionCatalogs {

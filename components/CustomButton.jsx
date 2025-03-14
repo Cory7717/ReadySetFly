@@ -25,7 +25,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#007bff', // Change this to the color you want for your text
-    fontFamily: 'Rubik-Regular', // Make sure this font is loaded in your app
     fontSize: 18, // text-lg
   },
   disabled: {

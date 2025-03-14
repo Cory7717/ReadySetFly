@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { SplashScreen, Stack } from "expo-router";
-import { useFonts } from "expo-font";
 import * as SecureStore from "expo-secure-store";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -19,9 +18,9 @@ const firebaseConfig = {
 // Initialize Firebase only if no app is initialized
 let app;
 if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig); // Initialize if no apps exist
+  app = initializeApp(firebaseConfig);
 } else {
-  app = getApp(); // Use the already initialized app
+  app = getApp();
 }
 
 const auth = getAuth(app);
@@ -43,11 +42,11 @@ const tokenCache = {
       if (item) {
         console.log(`${key} was used 🔐 \n`);
       } else {
-        console.log('No values stored under key: ' + key);
+        console.log("No values stored under key: " + key);
       }
       return item;
     } catch (error) {
-      console.error('SecureStore get item error: ', error);
+      console.error("SecureStore get item error: ", error);
       await SecureStore.deleteItemAsync(key);
       return null;
     }
@@ -56,7 +55,7 @@ const tokenCache = {
     try {
       return SecureStore.setItemAsync(key, value);
     } catch (err) {
-      console.error('SecureStore save item error: ', err);
+      console.error("SecureStore save item error: ", err);
     }
   },
 };
@@ -64,36 +63,25 @@ const tokenCache = {
 SplashScreen.preventAutoHideAsync();
 
 const RootLayout = () => {
-  const [fontsLoaded, error] = useFonts({
-    "Rubik-Black": require("../Assets/fonts/Rubik-Black.ttf"),
-    "Rubik-Bold": require("../Assets/fonts/Rubik-Bold.ttf"),
-    "Rubik-Regular": require("../Assets/fonts/Rubik-Regular.ttf"),
-    "Rubik-Medium": require("../Assets/fonts/Rubik-Medium.ttf"),
-    "Rubik-ExtraBold": require("../Assets/fonts/Rubik-ExtraBold.ttf"),
-  });
-
   const [user, setUser] = useState(null); // Track the authenticated user
 
   useEffect(() => {
-    if (error) throw error;
-    if (fontsLoaded) SplashScreen.hideAsync();
-  }, [fontsLoaded, error]);
+    // Hide the splash screen immediately on mount
+    SplashScreen.hideAsync();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
-        setUser(currentUser); // Set the user if authenticated
+        setUser(currentUser);
         console.log("User is authenticated:", currentUser);
       } else {
-        setUser(null); // Clear user if not authenticated
+        setUser(null);
         console.log("No user is authenticated.");
       }
     });
-
-    return () => unsubscribe(); // Clean up the auth listener on component unmount
+    return () => unsubscribe();
   }, []);
-
-  if (!fontsLoaded && !error) return null;
 
   const stripePublishableKey = getStripePublishableKey();
 

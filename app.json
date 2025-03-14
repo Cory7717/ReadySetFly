@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "rsf_app",
-    "slug": "rsf_app",
+    "name": "Ready, Set, Fly!",
+    "slug": "Ready-Set-Fly",
     "version": "1.0.0",
     "scheme": "rsfapp",
     "orientation": "portrait",
