@@ -509,6 +509,85 @@ const syncStripeAccountIdFromOwnersToUsers = async () => {
 };
 
 /**
+
+/**
+ * Ensure each airplane document includes its own doc ID in the "id" field.
+ */
+
+/**
+
+/**
+ * Migrate the 'listings' collection to ensure compliance with fields in Classifieds.js.
+ */
+
+// Duplicate function removed
+
+// Duplicate function removed
+
+/**
+ * NEW SCRIPT: Migrate Flight Schools listings.
+ * For each document in the "listings" collection where category is "Flight Schools",
+ * ensure that a nested flightSchoolDetails object exists with the following keys:
+ *  - flightSchoolName
+ *  - flightSchoolLocation
+ *  - flightSchoolEmail
+ *  - flightSchoolPhone
+ *  - flightSchoolDescription
+ * If any of these fields are missing, add them with an empty string.
+ * Also, remove any top-level flightSchool* fields.
+ */
+const migrateFlightSchoolFields = async () => {
+  console.log('🔄 Starting migration for Flight Schools listings...');
+  try {
+    const listingsRef = db.collection('listings');
+    const snapshot = await listingsRef.where('category', '==', 'Flight Schools').get();
+    if (snapshot.empty) {
+      console.log('ℹ️ No Flight Schools listings found.');
+      return;
+    }
+    const batch = db.batch();
+    let updateCount = 0;
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      let flightSchoolDetails = data.flightSchoolDetails;
+      // If flightSchoolDetails does not exist, create it from top-level fields if available; otherwise, use defaults.
+      if (!flightSchoolDetails) {
+        flightSchoolDetails = {
+          flightSchoolName: data.flightSchoolName || '',
+          flightSchoolLocation: data.flightSchoolLocation || '',
+          flightSchoolEmail: data.flightSchoolEmail || '',
+          flightSchoolPhone: data.flightSchoolPhone || '',
+          flightSchoolDescription: data.flightSchoolDescription || ''
+        };
+      } else {
+        // Ensure each field exists.
+        flightSchoolDetails.flightSchoolName = flightSchoolDetails.flightSchoolName || data.flightSchoolName || '';
+        flightSchoolDetails.flightSchoolLocation = flightSchoolDetails.flightSchoolLocation || data.flightSchoolLocation || '';
+        flightSchoolDetails.flightSchoolEmail = flightSchoolDetails.flightSchoolEmail || data.flightSchoolEmail || '';
+        flightSchoolDetails.flightSchoolPhone = flightSchoolDetails.flightSchoolPhone || data.flightSchoolPhone || '';
+        flightSchoolDetails.flightSchoolDescription = flightSchoolDetails.flightSchoolDescription || data.flightSchoolDescription || '';
+      }
+      // Prepare update: set flightSchoolDetails and remove any top-level flightSchool fields.
+      const updateData = {
+        flightSchoolDetails: flightSchoolDetails,
+        flightSchoolName: admin.firestore.FieldValue.delete(),
+        flightSchoolLocation: admin.firestore.FieldValue.delete(),
+        flightSchoolEmail: admin.firestore.FieldValue.delete(),
+        flightSchoolPhone: admin.firestore.FieldValue.delete(),
+        flightSchoolDescription: admin.firestore.FieldValue.delete()
+      };
+      batch.update(doc.ref, updateData);
+      updateCount++;
+      console.log(`🛠️ Updated Flight Schools listing: ${doc.id}`);
+    });
+    await batch.commit();
+    console.log(`🎉 Successfully updated ${updateCount} Flight Schools listing(s).`);
+  } catch (error) {
+    console.error('❌ Error migrating Flight Schools listings:', error);
+  }
+};
+
+/**
  * Ensure messages have a participants array that includes both renter and owner if rentalRequestId is present.
  */
 const migrateMessagesParticipants = async () => {
@@ -777,9 +856,9 @@ const addPubliclyViewableFieldToListings = async () => {
   }
 };
 
-// ====================
-// NEW FUNCTION: Update all 'users' doc to have role="both"
-// ====================
+/**
+ * NEW FUNCTION: Update all 'users' doc to have role="both"
+ */
 const updateUserRoleToBoth = async () => {
   console.log('🔄 Starting updateUserRoleToBoth migration...');
   try {
@@ -1066,6 +1145,9 @@ const runMigrationsAndAudit = async () => {
 
   // 🚨 NEW: Update all 'users' doc to have role="both"
   await updateUserRoleToBoth();
+
+  // 🚨 NEW: Migrate Flight Schools listings to have a nested flightSchoolDetails object
+  await migrateFlightSchoolFields();
 
   // Perform Audit and Dynamic Schema Management
   await generateAuditReportAndFix();

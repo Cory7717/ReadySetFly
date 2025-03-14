@@ -1,5 +1,3 @@
-// src/components/renter.js
-
 import React, { useState, useEffect, useRef } from "react";
 import {
   TextInput,
@@ -19,6 +17,7 @@ import {
   ActivityIndicator,
   FlatList,
   StyleSheet,
+  Linking,
 } from "react-native";
 
 import {
@@ -64,6 +63,44 @@ const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api"
 
 import { db, auth } from "../../firebaseConfig";
 
+// --- Added ModalHeader Component (identical to owner.js) ---
+const ModalHeader = ({ title, onClose }) => (
+  <View
+    style={{
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    }}
+  >
+    <Text style={{ fontSize: 20, fontWeight: "bold" }}>{title}</Text>
+    <TouchableOpacity
+      onPress={onClose}
+      style={{ padding: 8 }}
+      accessibilityLabel="Close modal"
+      accessibilityRole="button"
+    >
+      <Ionicons name="close" size={24} color="#2d3748" />
+    </TouchableOpacity>
+  </View>
+);
+
+// --- Added CustomButton Component to fix the error ---
+const CustomButton = ({ onPress, title, backgroundColor }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={{
+      backgroundColor: backgroundColor || "#3182ce",
+      padding: 16,
+      borderRadius: 8,
+      alignItems: "center",
+      marginTop: 16,
+    }}
+  >
+    <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>{title}</Text>
+  </TouchableOpacity>
+);
+
 const renter = () => {
   const router = useRouter();
 
@@ -86,6 +123,10 @@ const renter = () => {
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [allNotificationsModalVisible, setAllNotificationsModalVisible] = useState(false);
+  // New modals for support, FAQ, and INVEST (removed Contact)
+  const [supportModalVisible, setSupportModalVisible] = useState(false);
+  const [faqModalVisible, setFaqModalVisible] = useState(false);
+  const [investModalVisible, setInvestModalVisible] = useState(false);
 
   const [profileData, setProfileData] = useState({
     firstName: "",
@@ -403,7 +444,7 @@ const renter = () => {
       const favRef = collection(db, "users", renterId, "favorites");
       const favQuery = query(favRef, where("id", "==", listing.id));
       const favSnapshot = await getDocs(favQuery);
-      favSnapshot.forEach(async (docSnap) => {
+      favSnapshot.docs.forEach(async (docSnap) => {
         await deleteDoc(doc(db, "users", renterId, "favorites", docSnap.id));
       });
       Alert.alert("Favorite Removed", "Listing removed from favorites.");
@@ -626,7 +667,7 @@ const renter = () => {
                       senderName: renter.displayName || "User",
                       text: "Payment complete. Let's start chatting!",
                       timestamp: serverTimestamp(),
-                      participants: [renterId, selectedListing.ownerId],
+                      participants: currentChatOwnerId ? [renterId, currentChatOwnerId] : [renterId],
                       rentalRequestId: selectedNotification?.rentalRequestId || selectedRentalRequest.id,
                     }).catch((err) => console.error("Error sending auto message:", err));
                     // Automatically open the messaging modal now that payment is complete
@@ -1063,28 +1104,7 @@ const renter = () => {
   );
 
   // ----------------------------------------------------------------
-  // 19) Navigation by Filter (Optional)
-  // ----------------------------------------------------------------
-  const handleNavigationInternal = (filter) => {
-    if (filter === "all") {
-      router.push("/AllAircraftScreen");
-    } else if (filter === "jets") {
-      router.push("/JetsScreen");
-    } else if (filter === "pistons") {
-      router.push("/PistonsScreen");
-    } else if (filter === "helicopters") {
-      router.push("/HelicoptersScreen");
-    } else if (filter === "cessna-172") {
-      router.push("/payment/CheckoutScreen");
-    } else if (filter === "beechcraft-baron") {
-      router.push("/payment/CheckoutScreen");
-    } else if (filter === "cirrus-sr22") {
-      router.push("/payment/CheckoutScreen");
-    }
-  };
-
-  // ----------------------------------------------------------------
-  // 20) Main Return
+  // 19) Main Return
   // ----------------------------------------------------------------
   return (
     <View style={styles.container}>
@@ -1133,39 +1153,40 @@ const renter = () => {
           <View style={styles.navigationButtonsContainer}>
             <TouchableOpacity
               style={styles.navigationButton}
-              onPress={() => handleNavigationInternal("all")}
-              accessibilityLabel="View all aircraft"
+              onPress={() => setSupportModalVisible(true)}
+              accessibilityLabel="Get support"
               accessibilityRole="button"
             >
-              <Octicons name="paper-airplane" size={32} color="#3182ce" />
-              <Text>All</Text>
+              <MaterialCommunityIcons name="lifebuoy" size={32} color="#3182ce" />
+              <Text>Support</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navigationButton}
-              onPress={() => handleNavigationInternal("jets")}
-              accessibilityLabel="View jets"
+              onPress={() => setFaqModalVisible(true)}
+              accessibilityLabel="Frequently Asked Questions"
               accessibilityRole="button"
             >
-              <Ionicons name="airplane-outline" size={32} color="#3182ce" />
-              <Text>Jets</Text>
+              <Ionicons name="help-circle-outline" size={32} color="#3182ce" />
+              <Text>FAQ</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navigationButton}
-              onPress={() => handleNavigationInternal("pistons")}
-              accessibilityLabel="View piston aircraft"
+              onPress={fetchUserProfile}
+              accessibilityLabel="Edit profile"
               accessibilityRole="button"
             >
-              <MaterialCommunityIcons name="engine-outline" size={32} color="#3182ce" />
-              <Text>Pistons</Text>
+              <Ionicons name="person-circle-outline" size={32} color="#3182ce" />
+              <Text>Profile</Text>
             </TouchableOpacity>
+            {/* Replaced Contact Icon with Invest in R.S.F? Icon */}
             <TouchableOpacity
               style={styles.navigationButton}
-              onPress={() => handleNavigationInternal("helicopters")}
-              accessibilityLabel="View helicopters"
+              onPress={() => setInvestModalVisible(true)}
+              accessibilityLabel="Invest in Ready Set Fly"
               accessibilityRole="button"
             >
-              <Fontisto name="helicopter" size={32} color="#3182ce" />
-              <Text>Helicopters</Text>
+              <Ionicons name="rocket-outline" size={32} color="#3182ce" />
+              <Text style={{ textAlign: "center", fontSize: 12 }}>Invest in R.S.F?</Text>
             </TouchableOpacity>
           </View>
 
@@ -1814,6 +1835,107 @@ const renter = () => {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* --- Support Modal --- */}
+      <Modal
+        visible={supportModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSupportModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={styles.modalTitle}>Support</Text>
+            <Text>Support content goes here.</Text>
+            <TouchableOpacity
+              onPress={() => setSupportModalVisible(false)}
+              style={styles.saveButton}
+              accessibilityLabel="Close support"
+              accessibilityRole="button"
+            >
+              <Text style={styles.saveButtonText}>Close</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* --- FAQ Modal --- */}
+      <Modal
+        visible={faqModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setFaqModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={styles.modalTitle}>FAQ</Text>
+            <Text>FAQ content goes here.</Text>
+            <TouchableOpacity
+              onPress={() => setFaqModalVisible(false)}
+              style={styles.saveButton}
+              accessibilityLabel="Close FAQ"
+              accessibilityRole="button"
+            >
+              <Text style={styles.saveButtonText}>Close</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* --- Invest Modal --- */}
+      <Modal
+        visible={investModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setInvestModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader title="Invest in Ready Set Fly?" onClose={() => setInvestModalVisible(false)} />
+            <Text style={{ marginBottom: 16 }}>
+              Interested in investing in Ready Set Fly? Contact us at{" "}
+              <Text
+                style={{ color: "#3182ce", textDecorationLine: "underline" }}
+                onPress={() =>
+                  Linking.openURL(
+                    "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready,%20Set,%20Fly!"
+                  )
+                }
+              >
+                coryarmer@gmail.com
+              </Text>{" "}
+              for more details.
+            </Text>
+            <CustomButton
+              onPress={() => setInvestModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- Contact Modal has been removed --- */}
+
       {/* Chat Bubble Icon to open Messages */}
       <TouchableOpacity
         style={styles.chatBubbleIcon}
@@ -1877,7 +1999,7 @@ const styles = StyleSheet.create({
   /* New container for two-line header text */
   headerTextContainer: {
     justifyContent: "center",
-    alignItems: "flex-start"
+    alignItems: "flex-start",
   },
   welcomeText: {
     color: "#fff",

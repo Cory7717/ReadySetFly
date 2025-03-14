@@ -5,10 +5,10 @@
     "version": "1.0.0",
     "scheme": "rsfapp",
     "orientation": "portrait",
-    "icon": "./Assets/icon.png",
+    "icon": "./Assets/images/RSFOpaqueLogo.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./Assets/images/fulllogo_transparent.png",
+      "image": "./Assets/images/RSFOpaqueLogo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },

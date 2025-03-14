@@ -243,6 +243,9 @@ const initialPricingModalState = Object.keys(pricingDescriptions).reduce((acc, k
   return acc;
 }, {});
 
+// TEMPORARILY bypass payment (set to false when going live)
+const TEMPORARY_BYPASS_PAYMENT = true;
+
 const FullScreenImageModal = ({ visible, onRequestClose, imageUri }) => {
   const pinchScale = useRef(new Animated.Value(1)).current;
   const onPinchGestureEvent = Animated.event([{ nativeEvent: { scale: pinchScale } }], {
@@ -707,13 +710,41 @@ const Classifieds = () => {
     ]);
   };
 
+  // TEMPORARILY bypass payment for new listings (all categories)
+  // Option one: Do not group Flight School fields so that they remain as top-level keys
   const onSubmitMethod = (values) => {
     const listingDetails = {
       ...values,
       images,
       location: location ? { lat: location.coords.latitude, lng: location.coords.longitude } : {},
     };
-
+  
+    // For Flight Schools, nest flight school fields in a flightSchoolDetails object
+    if (listingDetails.category === 'Flight Schools') {
+      const {
+        flightSchoolEmail,
+        flightSchoolName,
+        flightSchoolLocation,
+        flightSchoolPhone,
+        flightSchoolDescription,
+      } = listingDetails;
+      listingDetails.flightSchoolDetails = {
+        flightSchoolEmail, // required field
+        ...(flightSchoolName ? { flightSchoolName } : {}),
+        ...(flightSchoolLocation ? { flightSchoolLocation } : {}),
+        ...(flightSchoolPhone ? { flightSchoolPhone } : {}),
+        ...(flightSchoolDescription ? { flightSchoolDescription } : {}),
+      };
+      // Optionally remove the top-level flight school fields
+      delete listingDetails.flightSchoolName;
+      delete listingDetails.flightSchoolLocation;
+      delete listingDetails.flightSchoolEmail;
+      delete listingDetails.flightSchoolPhone;
+      delete listingDetails.flightSchoolDescription;
+      // Remove salePrice field for Flight Schools since it does not apply
+      delete listingDetails.salePrice;
+    }
+  
     if (editingListing) {
       console.log("Updating listing with payload:", { listingId: editingListing.id, listingDetails });
       getFirebaseIdToken().then((token) => {
@@ -748,8 +779,8 @@ const Classifieds = () => {
             Alert.alert('Error', 'Failed to update listing.');
           });
       });
-    } else if (values.category === 'Aircraft for Sale' && values.selectedPricing === 'Basic') {
-      console.log("Posting listing for free Basic package for 7 days...");
+    } else if (TEMPORARY_BYPASS_PAYMENT) {
+      console.log("Posting listing automatically for free...");
       getFirebaseIdToken().then((token) => {
         fetch(`${API_URL}/createListing`, {
           method: 'POST',
@@ -761,7 +792,7 @@ const Classifieds = () => {
         })
           .then((response) => {
             if (response.ok) {
-              Alert.alert('Listing Created', 'Your Basic listing is posted for free for 7 days!');
+              Alert.alert('Listing Created', 'Your listing has been posted for free for 7 days!');
               closeAllModals();
               setEditingListing(null);
               setImages([]);
@@ -795,6 +826,7 @@ const Classifieds = () => {
       });
     }
   };
+  
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -926,7 +958,7 @@ const Classifieds = () => {
         })}
       >
         <Animated.View style={{ width: SCREEN_WIDTH, marginHorizontal: -16, overflow: 'hidden', height: headerHeight, opacity: headerOpacity, marginBottom: 16 }}>
-          <ImageBackground source={wingtipClouds} style={{ width: SCREEN_WIDTH, height: '100%', justifyContent: 'flex-end' }} resizeMode="cover">
+          <ImageBackground source={wingtipClouds} style={{ width: SCREEN_WIDTH, height: '100%', justifyContent: 'flex-start' }} resizeMode="cover">
             <Animated.View style={{ paddingHorizontal: 16, paddingTop: headerPaddingTop, paddingBottom: 20 }}>
               <Animated.Text
                 style={{ color: COLORS.white, fontWeight: 'bold', fontSize: headerFontSize }}
@@ -938,11 +970,17 @@ const Classifieds = () => {
                 style={{ color: COLORS.white, fontWeight: 'bold', fontSize: headerFontSize }}
                 accessibilityLabel="User Name"
               >
-                {user?.displayName ? user.displayName : 'User'}
+                {user.displayName}
               </Animated.Text>
             </Animated.View>
           </ImageBackground>
         </Animated.View>
+
+        <Text
+          style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: COLORS.black }}
+        >
+          Aviation Marketplace
+        </Text>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
           <Text style={{ fontSize: 18, color: COLORS.secondary }}>
@@ -993,12 +1031,6 @@ const Classifieds = () => {
           showsHorizontalScrollIndicator={false}
           style={{ marginBottom: 16 }}
         />
-
-        <Text
-          style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: COLORS.black }}
-        >
-          Aviation Marketplace
-        </Text>
 
         <TouchableOpacity
           onPress={() => {
@@ -1460,9 +1492,8 @@ const Classifieds = () => {
                       editingListing && editingListing.category === 'Flight Instructors'
                         ? editingListing.certifications || ''
                         : '',
-                    flightHours:
-                      editingListing && editingListing.category === 'Flight Instructors'
-                        ? editingListing.flightHours?.toString() || ''
+                    flightHours: editingListing?.category === 'Flight Instructors' && editingListing?.flightHours != null
+                        ? String(editingListing.flightHours)
                         : '',
                     fiEmail:
                       editingListing && editingListing.category === 'Flight Instructors'
@@ -1481,9 +1512,8 @@ const Classifieds = () => {
                         ? editingListing.serviceLocationsList || []
                         : [],
                     newServiceLocation: '',
-                    fiCostPerHour:
-                      editingListing && editingListing.category === 'Flight Instructors'
-                        ? editingListing.fiCostPerHour?.toString() || ''
+                    fiCostPerHour: editingListing?.category === 'Flight Instructors' && editingListing?.fiCostPerHour != null
+                        ? String(editingListing.fiCostPerHour)
                         : '',
                     aircraftProvided:
                       editingListing && editingListing.category === 'Flight Instructors'
@@ -1520,7 +1550,7 @@ const Classifieds = () => {
                         ? editingListing.serviceLocations || ''
                         : '',
 
-                    // For Flight Schools, only include the following fields:
+                    // For Flight Schools, only include Flight School fields
                     flightSchoolName: editingListing && editingListing.category === 'Flight Schools'
                       ? editingListing.flightSchoolName || ''
                       : '',
@@ -1537,52 +1567,50 @@ const Classifieds = () => {
                       ? editingListing.flightSchoolDescription || ''
                       : '',
 
-                    // For other categories (Aircraft for Sale, Aviation Jobs)
-                    title: editingListing && editingListing.category !== 'Flight Schools'
+                    // For Aircraft for Sale and Aviation Jobs, only include these fields
+                    title: editingListing && editingListing.category === 'Aircraft for Sale'
                       ? editingListing.title || ''
                       : '',
-                    tailNumber: editingListing && editingListing.category !== 'Flight Schools'
+                    tailNumber: editingListing && editingListing.category === 'Aircraft for Sale'
                       ? editingListing.tailNumber || ''
                       : '',
-                    salePrice: editingListing && editingListing.category !== 'Flight Schools'
-                      ? editingListing.salePrice?.toString() || ''
+                    salePrice: editingListing?.category === 'Aircraft for Sale' && editingListing?.salePrice != null
+                      ? String(editingListing.salePrice)
                       : '',
-                    description: editingListing && editingListing.category !== 'Flight Schools'
+                    description: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.description || ''
                       : '',
-                    city: editingListing && editingListing.category !== 'Flight Schools'
+                    city: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.city || ''
                       : '',
-                    state: editingListing && editingListing.category !== 'Flight Schools'
+                    state: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.state || ''
                       : '',
-                    email: editingListing && editingListing.category !== 'Flight Schools'
+                    email: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.email || ''
                       : '',
-                    phone: editingListing && editingListing.category !== 'Flight Schools'
+                    phone: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.phone || ''
                       : '',
-                    companyName: editingListing && editingListing.category !== 'Flight Schools'
+                    companyName: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.companyName || ''
                       : '',
-                    jobTitle: editingListing && editingListing.category !== 'Flight Schools'
+                    jobTitle: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.jobTitle || ''
                       : '',
-                    jobDescription: editingListing && editingListing.category !== 'Flight Schools'
+                    jobDescription: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.jobDescription || ''
                       : '',
                     // For Aircraft for Sale (if applicable)
                     airportIdentifier: editingListing && editingListing.category === 'Aircraft for Sale'
                       ? editingListing.airportIdentifier || ''
                       : '',
-                    lat:
-                      editingListing?.location?.lat?.toString() ||
-                      location?.coords?.latitude?.toString() ||
-                      '',
-                    lng:
-                      editingListing?.location?.lng?.toString() ||
-                      location?.coords?.longitude?.toString() ||
-                      '',
+                    lat: editingListing?.location?.lat != null
+                        ? String(editingListing.location.lat)
+                        : (location?.coords?.latitude != null ? String(location.coords.latitude) : ''),
+                    lng: editingListing?.location?.lng != null
+                        ? String(editingListing.location.lng)
+                        : (location?.coords?.longitude != null ? String(location.coords.longitude) : ''),
                     selectedPricing: selectedPricing || 'Basic',
                     packageCost: selectedPricing ? pricingPackages[selectedPricing] || 0 : 0,
                     category: editingListing ? editingListing.category || selectedCategory : selectedCategory,
@@ -1629,14 +1657,12 @@ const Classifieds = () => {
                         errors.email = 'Invalid email address.';
                       }
                     } else if (category === 'Flight Schools') {
-                      if (!values.flightSchoolName) errors.flightSchoolName = 'Flight School Name is required.';
-                      if (!values.flightSchoolLocation) errors.flightSchoolLocation = 'Location is required.';
+                      // For Flight Schools, only require the email field.
                       if (!values.flightSchoolEmail) {
                         errors.flightSchoolEmail = 'Contact email is required.';
                       } else if (!/\S+@\S+\.\S+/.test(values.flightSchoolEmail)) {
                         errors.flightSchoolEmail = 'Invalid email address.';
                       }
-                      if (!values.flightSchoolDescription) errors.flightSchoolDescription = 'Description is required.';
                     } else {
                       if (!values.title) errors.title = 'Title is required.';
                       if (!values.description) errors.description = 'Description is required.';
@@ -2117,167 +2143,170 @@ const Classifieds = () => {
                       ) : (
                         <>
                           {/* For Aircraft for Sale (fallback) */}
-                          <TextInput
-                            placeholder="Aircraft Year/Make/Model"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('title')}
-                            onBlur={handleBlur('title')}
-                            value={values.title}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Aircraft Year/Make/Model Input"
-                          />
-                          {touched.title && errors.title && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.title}</Text>
+                          {values.category === 'Aircraft for Sale' && (
+                            <>
+                              <TextInput
+                                placeholder="Aircraft Year/Make/Model"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('title')}
+                                onBlur={handleBlur('title')}
+                                value={values.title}
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                }}
+                                accessibilityLabel="Aircraft Year/Make/Model Input"
+                              />
+                              {touched.title && errors.title && (
+                                <Text style={{ color: 'red', marginBottom: 8 }}>{errors.title}</Text>
+                              )}
+                              <TextInput
+                                placeholder="Aircraft Tail Number"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('tailNumber')}
+                                onBlur={handleBlur('tailNumber')}
+                                value={values.tailNumber}
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                }}
+                                accessibilityLabel="Aircraft Tail Number Input"
+                              />
+                              {touched.tailNumber && errors.tailNumber && (
+                                <Text style={{ color: 'red', marginBottom: 8 }}>{errors.tailNumber}</Text>
+                              )}
+                              <TextInput
+                                placeholder="Sale Price"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('salePrice')}
+                                onBlur={handleBlur('salePrice')}
+                                value={values.salePrice}
+                                keyboardType="numeric"
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                }}
+                                accessibilityLabel="Sale Price Input"
+                              />
+                              {touched.salePrice && errors.salePrice && (
+                                <Text style={{ color: 'red', marginBottom: 8 }}>{errors.salePrice}</Text>
+                              )}
+                              <TextInput
+                                placeholder="Airport Identifier"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('airportIdentifier')}
+                                onBlur={handleBlur('airportIdentifier')}
+                                value={values.airportIdentifier}
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                }}
+                                accessibilityLabel="Airport Identifier Input"
+                              />
+                              <TextInput
+                                placeholder="City"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('city')}
+                                onBlur={handleBlur('city')}
+                                value={values.city}
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                }}
+                                accessibilityLabel="City Input"
+                              />
+                              <TextInput
+                                placeholder="State"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('state')}
+                                onBlur={handleBlur('state')}
+                                value={values.state}
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                }}
+                                accessibilityLabel="State Input"
+                              />
+                              <TextInput
+                                placeholder="Description"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('description')}
+                                onBlur={handleBlur('description')}
+                                value={values.description}
+                                multiline
+                                numberOfLines={4}
+                                maxLength={3000}
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                  textAlignVertical: 'top',
+                                }}
+                                accessibilityLabel="Description Input"
+                              />
+                              {touched.description && errors.description && (
+                                <Text style={{ color: 'red', marginBottom: 8 }}>{errors.description}</Text>
+                              )}
+                              <TextInput
+                                placeholder="Contact Email"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('email')}
+                                onBlur={handleBlur('email')}
+                                value={values.email}
+                                keyboardType="email-address"
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                }}
+                                accessibilityLabel="Contact Email Input"
+                              />
+                              {touched.email && errors.email && (
+                                <Text style={{ color: 'red', marginBottom: 8 }}>{errors.email}</Text>
+                              )}
+                              <TextInput
+                                placeholder="Phone Number (Optional)"
+                                placeholderTextColor={COLORS.gray}
+                                onChangeText={handleChange('phone')}
+                                onBlur={handleBlur('phone')}
+                                value={values.phone}
+                                keyboardType="phone-pad"
+                                style={{
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: COLORS.lightGray,
+                                  marginBottom: 16,
+                                  padding: 8,
+                                  color: COLORS.black,
+                                }}
+                                accessibilityLabel="Phone Number Input"
+                              />
+                            </>
                           )}
-                          <TextInput
-                            placeholder="Aircraft Tail Number"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('tailNumber')}
-                            onBlur={handleBlur('tailNumber')}
-                            value={values.tailNumber}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Aircraft Tail Number Input"
-                          />
-                          {touched.tailNumber && errors.tailNumber && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.tailNumber}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Sale Price"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('salePrice')}
-                            onBlur={handleBlur('salePrice')}
-                            value={values.salePrice}
-                            keyboardType="numeric"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Sale Price Input"
-                          />
-                          {touched.salePrice && errors.salePrice && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.salePrice}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Airport Identifier"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('airportIdentifier')}
-                            onBlur={handleBlur('airportIdentifier')}
-                            value={values.airportIdentifier}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Airport Identifier Input"
-                          />
-                          <TextInput
-                            placeholder="City"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('city')}
-                            onBlur={handleBlur('city')}
-                            value={values.city}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="City Input"
-                          />
-                          <TextInput
-                            placeholder="State"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('state')}
-                            onBlur={handleBlur('state')}
-                            value={values.state}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="State Input"
-                          />
-                          <TextInput
-                            placeholder="Description"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('description')}
-                            onBlur={handleBlur('description')}
-                            value={values.description}
-                            multiline
-                            numberOfLines={4}
-                            maxLength={3000}
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                              textAlignVertical: 'top',
-                            }}
-                            accessibilityLabel="Description Input"
-                          />
-                          {touched.description && errors.description && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.description}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Contact Email"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('email')}
-                            onBlur={handleBlur('email')}
-                            value={values.email}
-                            keyboardType="email-address"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Contact Email Input"
-                          />
-                          {touched.email && errors.email && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.email}</Text>
-                          )}
-                          <TextInput
-                            placeholder="Phone Number (Optional)"
-                            placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('phone')}
-                            onBlur={handleBlur('phone')}
-                            value={values.phone}
-                            keyboardType="phone-pad"
-                            style={{
-                              borderBottomWidth: 1,
-                              borderBottomColor: COLORS.lightGray,
-                              marginBottom: 16,
-                              padding: 8,
-                              color: COLORS.black,
-                            }}
-                            accessibilityLabel="Phone Number Input"
-                          />
                         </>
                       )}
 
-                      {/* For Flight Schools, remove all the fields above Flight School Name */}
                       {values.category === 'Flight Schools' && (
                         <>
                           <TextInput
@@ -2376,7 +2405,7 @@ const Classifieds = () => {
                         </>
                       )}
 
-                      {['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale'].includes(values.category) && (
+                      {(['Aviation Jobs', 'Flight Schools', 'Aircraft for Sale'].includes(values.category)) && (
                         <>
                           <Text
                             style={{
@@ -2480,9 +2509,13 @@ const Classifieds = () => {
                                   >
                                     {packageType}
                                   </Text>
-                                  {packageType === 'Basic' && values.category === 'Aircraft for Sale' ? (
+                                  {((packageType === 'Basic' && (values.category === 'Aircraft for Sale' || values.category === 'Flight Schools')) ||
+                                    (packageType === 'Flight Instructors' && values.category === 'Flight Instructors') ||
+                                    (packageType === 'Aviation Mechanic' && values.category === 'Aviation Mechanic')) ? (
                                     <Text style={{ color: selectedPricing === packageType ? COLORS.white : COLORS.black }}>
-                                      <Text style={{ textDecorationLine: 'line-through' }}>$25</Text>  Free for 7 days
+                                      <Text style={{ textDecorationLine: 'line-through' }}>
+                                        ${pricingPackages[packageType]}
+                                      </Text>  Free for 7 days
                                     </Text>
                                   ) : (
                                     <Text

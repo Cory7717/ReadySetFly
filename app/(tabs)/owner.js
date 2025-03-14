@@ -181,6 +181,10 @@ const OwnerProfile = ({ ownerId }) => {
   const stripe = useStripe();
   const resolvedOwnerId = ownerId || user?.uid; // Resolve ownerId or default to Firebase user ID
 
+  // NEW: New state for FAQ and Invest modals
+  const [faqModalVisible, setFaqModalVisible] = useState(false);
+  const [investModalVisible, setInvestModalVisible] = useState(false);
+
   // NEW: New state for account type ("Owner", "Renter", or "Both")
   const [userRole, setUserRole] = useState("");
 
@@ -1695,6 +1699,43 @@ const OwnerProfile = ({ ownerId }) => {
             style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 24 }}
             textStyle={{ fontSize: 16, fontWeight: "bold" }}
           />
+        </View>
+
+        {/* New Icons Row */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-around",
+            paddingHorizontal: 16,
+            marginBottom: 16,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => setFaqModalVisible(true)}
+            style={{ alignItems: "center" }}
+            accessibilityLabel="FAQ"
+          >
+            <Ionicons name="help-circle-outline" size={36} color="#3182ce" />
+            <Text style={{ marginTop: 4 }}>FAQ</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setUpdateProfileModalVisible(true)}
+            style={{ alignItems: "center" }}
+            accessibilityLabel="Profile"
+          >
+            <Ionicons name="person-circle-outline" size={36} color="#3182ce" />
+            <Text style={{ marginTop: 4 }}>Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setInvestModalVisible(true)}
+            style={{ alignItems: "center" }}
+            accessibilityLabel="Invest in Ready Set Fly"
+          >
+            <Ionicons name="rocket-outline" size={36} color="#3182ce" />
+            <Text style={{ marginTop: 4, textAlign: "center", fontSize: 12 }}>
+              Invest in R S F?
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={{ paddingHorizontal: 16 }}>
@@ -3362,6 +3403,89 @@ const OwnerProfile = ({ ownerId }) => {
               title="Save"
               backgroundColor="#3182ce"
               accessibilityLabel="Save profile changes"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* FAQ Modal */}
+      <Modal
+        visible={faqModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setFaqModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader title="FAQ" onClose={() => setFaqModalVisible(false)} />
+            <Text style={{ marginBottom: 16 }}>
+              Here are some frequently asked questions. (Placeholder content)
+            </Text>
+            <CustomButton
+              onPress={() => setFaqModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Invest Modal */}
+      <Modal
+        visible={investModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setInvestModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader title="Invest in Ready Set Fly?" onClose={() => setInvestModalVisible(false)} />
+            <Text style={{ marginBottom: 16 }}>
+              Interested in investing in Ready Set Fly? Contact us at{" "}
+              <Text
+                style={{ color: "#3182ce", textDecorationLine: "underline" }}
+                onPress={() =>
+                  Linking.openURL(
+                    "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready,%20Set,%20Fly!"
+                  )
+                }
+              >
+                coryarmer@gmail.com
+              </Text>{" "}
+              for more details.
+            </Text>
+            <CustomButton
+              onPress={() => setInvestModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
             />
           </View>
         </View>

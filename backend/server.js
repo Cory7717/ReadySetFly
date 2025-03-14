@@ -290,21 +290,11 @@ app.post('/createListing', authenticate, async (req, res) => {
       airportIdentifier
     } = sanitizeData(listingDetails);
 
-    // // Destructure Aviation Gear fields
-    // const {
-    //   gearTitle,
-    //   gearDescription,
-    //   gearCity,
-    //   gearState,
-    //   gearEmail,
-    //   gearPhone,
-    //   gearPrice,
-    // } = sanitizeData(listingDetails);
-
+    // Updated category requirements for Flight Schools
     const categoryRequirements = {
       'Aircraft for Sale': ['title', 'description', 'airportIdentifier'],
       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
-      'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
+      'Flight Schools': ['flightSchoolDetails'],
       'Flight Instructors': [
         'firstName',
         'lastName',
@@ -321,13 +311,6 @@ app.post('/createListing', authenticate, async (req, res) => {
         'amDescription',
         'amServiceLocations',
       ],
-      // 'Aviation Gear': [
-      //   'gearTitle',
-      //   'gearDescription',
-      //   'gearCity',
-      //   'gearState',
-      //   'gearEmail',
-      // ],
     };
 
     const requiredFields = categoryRequirements[category];
@@ -339,24 +322,10 @@ app.post('/createListing', authenticate, async (req, res) => {
 
     let freeListing = isFreeListing === 'true' || isFreeListing === true;
 
-    // if (category === 'Aviation Gear') {
-    //   freeListing = true;
-    // }
-
     if (selectedPricing === 'FreeTrial') {
       freeListing = true;
     }
 
-    if (
-      !freeListing &&
-      (!selectedPricing ||
-        (!ALLOWED_PACKAGES.includes(selectedPricing) &&
-          selectedPricing !== 'FreeTrial'))
-    ) {
-      admin.logger.warn(`Invalid selectedPricing: ${selectedPricing}`);
-      res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: 'Invalid or missing selectedPricing.' });
-    }
     let finalRequiredFields = [...requiredFields];
     if (category === 'Aircraft for Sale' && !freeListing) {
       finalRequiredFields.push('salePrice', 'selectedPricing');
@@ -368,6 +337,18 @@ app.post('/createListing', authenticate, async (req, res) => {
       admin.logger.warn(`Missing required fields: ${missingFields.join(', ')}`);
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
+    }
+    // For Flight Schools, only the flightSchoolDetails object is expected.
+    // Ensure that flightSchoolDetails exists and has a non-empty flightSchoolEmail.
+    if (category === 'Flight Schools') {
+      if (
+        !listingDetails.flightSchoolDetails ||
+        !listingDetails.flightSchoolDetails.flightSchoolEmail
+      ) {
+        admin.logger.warn('Missing required field: flightSchoolDetails.flightSchoolEmail');
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: 'Missing required field: flightSchoolDetails.flightSchoolEmail' });
+      }
     }
     if (!lat || !lng) {
       admin.logger.warn('Missing location data in request');
@@ -434,17 +415,6 @@ app.post('/createListing', authenticate, async (req, res) => {
       airportIdentifier: airportIdentifier || '',
     };
 
-    // // For Aviation Gear, add gear-specific fields
-    // if (category === 'Aviation Gear') {
-    //   listingData.gearTitle = gearTitle || '';
-    //   listingData.gearDescription = gearDescription || '';
-    //   listingData.gearCity = gearCity || '';
-    //   listingData.gearState = gearState || '';
-    //   listingData.gearEmail = gearEmail || '';
-    //   listingData.gearPhone = gearPhone || '';
-    //   listingData.gearPrice = gearPrice != null ? parseFloat(gearPrice) : 0;
-    // }
-
     if (freeListing && selectedPricing === 'FreeTrial') {
       listingData.trialExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
     }
@@ -485,64 +455,32 @@ app.put('/updateListing', authenticate, async (req, res) => {
       : listingDetails;
     const sanitizedListingDetails = sanitizeData(parsedListingDetails);
 
-    // Destructure common fields
-    const {
-      title,
-      tailNumber,
-      salePrice,
-      description,
-      city,
-      state,
-      email,
-      phone,
-      companyName,
-      jobTitle,
-      jobDescription,
-      category,
-      flightSchoolName,
-      flightSchoolDetails,
-      isFreeListing,
-      selectedPricing,
-      lat,
-      lng,
-      images,
-      // ADDING new field for 'Aircraft for Sale'
-      airportIdentifier
-    } = sanitizedListingDetails;
-
-    // const { gearTitle, gearDescription, gearCity, gearState, gearEmail, gearPhone, gearPrice }
-    //   = sanitizedListingDetails;
-
+    // Updated category requirements for Flight Schools
     const categoryRequirements = {
       'Aircraft for Sale': ['title', 'description', 'airportIdentifier'],
       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
-      'Flight Schools': ['flightSchoolName', 'flightSchoolDetails'],
+      'Flight Schools': ['flightSchoolDetails'],
       'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocations'],
       'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
-      // 'Aviation Gear': ['gearTitle', 'gearDescription', 'gearCity', 'gearState', 'gearEmail'],
     };
 
-    const reqCategoryRequirements = categoryRequirements[category];
+    const reqCategoryRequirements = categoryRequirements[sanitizedListingDetails.category];
     if (!reqCategoryRequirements) {
       res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: `Invalid category: ${category}` });
+      return res.status(400).json({ error: `Invalid category: ${sanitizedListingDetails.category}` });
     }
 
-    let freeListing = isFreeListing === 'true' || isFreeListing === true;
-    // if (category === 'Aviation Gear') {
-    //   freeListing = true;
-    // }
-
-    if (selectedPricing === 'FreeTrial') {
+    let freeListing = sanitizedListingDetails.isFreeListing === 'true' || sanitizedListingDetails.isFreeListing === true;
+    if (sanitizedListingDetails.selectedPricing === 'FreeTrial') {
       freeListing = true;
     }
 
-    if (!freeListing && (!selectedPricing || (!ALLOWED_PACKAGES.includes(selectedPricing) && selectedPricing !== 'FreeTrial'))) {
+    if (!freeListing && (!sanitizedListingDetails.selectedPricing || (!ALLOWED_PACKAGES.includes(sanitizedListingDetails.selectedPricing) && sanitizedListingDetails.selectedPricing !== 'FreeTrial'))) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: 'Invalid or missing selectedPricing.' });
     }
     let finalRequiredFields = [...reqCategoryRequirements];
-    if (category === 'Aircraft for Sale' && !freeListing) {
+    if (sanitizedListingDetails.category === 'Aircraft for Sale' && !freeListing) {
       finalRequiredFields.push('salePrice', 'selectedPricing');
     }
     const missingFields = finalRequiredFields.filter((field) => !sanitizedListingDetails[field]);
@@ -550,12 +488,22 @@ app.put('/updateListing', authenticate, async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
     }
-    if (!lat || !lng) {
+    // For Flight Schools, ensure that flightSchoolDetails exists and has a non-empty flightSchoolEmail.
+    if (sanitizedListingDetails.category === 'Flight Schools') {
+      if (
+        !sanitizedListingDetails.flightSchoolDetails ||
+        !sanitizedListingDetails.flightSchoolDetails.flightSchoolEmail
+      ) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: 'Missing required field: flightSchoolDetails.flightSchoolEmail' });
+      }
+    }
+    if (!sanitizedListingDetails.lat || !sanitizedListingDetails.lng) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: 'Missing location data (lat, lng)' });
     }
-    const latitude = parseFloat(lat);
-    const longitude = parseFloat(lng);
+    const latitude = parseFloat(sanitizedListingDetails.lat);
+    const longitude = parseFloat(sanitizedListingDetails.lng);
     if (isNaN(latitude) || isNaN(longitude)) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: "Invalid location data. 'lat' and 'lng' must be numbers." });
@@ -569,8 +517,8 @@ app.put('/updateListing', authenticate, async (req, res) => {
       finalPackageCost = 0;
       finalPackageType = null;
     } else {
-      if (salePrice && String(salePrice).trim().toLowerCase() !== 'n/a') {
-        const salePriceString = String(salePrice).trim();
+      if (sanitizedListingDetails.salePrice && String(sanitizedListingDetails.salePrice).trim().toLowerCase() !== 'n/a') {
+        const salePriceString = String(sanitizedListingDetails.salePrice).trim();
         const sanitizedSalePrice = salePriceString.replace(/[^0-9.]/g, '');
         const parsedSalePrice = parseFloat(sanitizedSalePrice);
         if (isNaN(parsedSalePrice) || parsedSalePrice <= 0) {
@@ -579,27 +527,27 @@ app.put('/updateListing', authenticate, async (req, res) => {
         }
         finalSalePrice = parsedSalePrice;
       }
-      if (selectedPricing) {
-        finalPackageCost = calculateTotalCost(selectedPricing);
-        finalPackageType = selectedPricing;
+      if (sanitizedListingDetails.selectedPricing) {
+        finalPackageCost = calculateTotalCost(sanitizedListingDetails.selectedPricing);
+        finalPackageType = sanitizedListingDetails.selectedPricing;
       }
     }
-    const imageUrls = Array.isArray(images) ? images : [];
+    const imageUrls = Array.isArray(sanitizedListingDetails.images) ? sanitizedListingDetails.images : [];
     const updateData = {
-      title: title || listingData.title,
-      tailNumber: tailNumber || listingData.tailNumber,
+      title: sanitizedListingDetails.title || listingData.title,
+      tailNumber: sanitizedListingDetails.tailNumber || listingData.tailNumber,
       salePrice: finalSalePrice,
-      description: description || listingData.description,
-      city: city || listingData.city,
-      state: state || listingData.state,
-      email: email || listingData.email,
-      phone: phone || listingData.phone,
-      companyName: companyName || listingData.companyName,
-      jobTitle: jobTitle || listingData.jobTitle,
-      jobDescription: jobDescription || listingData.jobDescription,
-      category: category || listingData.category,
-      flightSchoolName: flightSchoolName || listingData.flightSchoolName,
-      flightSchoolDetails: flightSchoolDetails || listingData.flightSchoolDetails,
+      description: sanitizedListingDetails.description || listingData.description,
+      city: sanitizedListingDetails.city || listingData.city,
+      state: sanitizedListingDetails.state || listingData.state,
+      email: sanitizedListingDetails.email || listingData.email,
+      phone: sanitizedListingDetails.phone || listingData.phone,
+      companyName: sanitizedListingDetails.companyName || listingData.companyName,
+      jobTitle: sanitizedListingDetails.jobTitle || listingData.jobTitle,
+      jobDescription: sanitizedListingDetails.jobDescription || listingData.jobDescription,
+      category: sanitizedListingDetails.category || listingData.category,
+      flightSchoolName: sanitizedListingDetails.flightSchoolName || listingData.flightSchoolName,
+      flightSchoolDetails: sanitizedListingDetails.flightSchoolDetails || listingData.flightSchoolDetails,
       isFreeListing: freeListing,
       packageType: freeListing ? null : finalPackageType,
       packageCost: freeListing ? 0 : finalPackageCost,
@@ -607,24 +555,13 @@ app.put('/updateListing', authenticate, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
 
       // Updating the airportIdentifier if present
-      airportIdentifier: airportIdentifier || listingData.airportIdentifier,
+      airportIdentifier: sanitizedListingDetails.airportIdentifier || listingData.airportIdentifier,
     };
 
     // If there are new images, update them
     if (imageUrls.length > 0) {
       updateData.images = imageUrls;
     }
-
-    // // For Aviation Gear, update gear-specific fields
-    // if (category === 'Aviation Gear') {
-    //   updateData.gearTitle = gearTitle || listingData.gearTitle || '';
-    //   updateData.gearDescription = gearDescription || listingData.gearDescription || '';
-    //   updateData.gearCity = gearCity || listingData.gearCity || '';
-    //   updateData.gearState = gearState || listingData.gearState || '';
-    //   updateData.gearEmail = gearEmail || listingData.gearEmail || '';
-    //   updateData.gearPhone = gearPhone || listingData.gearPhone || '';
-    //   updateData.gearPrice = gearPrice != null ? parseFloat(gearPrice) : listingData.gearPrice || 0;
-    // }
 
     await listingRef.update(updateData);
     res.setHeader('Content-Type', 'application/json');
@@ -776,8 +713,8 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
     // To split the funds:
     //   Let B = base rental fee, then total = B * 1.1725.
     //   Platform fee should be 23.25% of B, which is: (B * 0.2325) = total * (0.2325 / 1.1725).
-    const platformFeePercentage = 0.2325; // 23.25% of base fee (6% booking + 3% processing + 8.25% tax + 6% commission)
-    const totalMultiplier = 1.1725; // total = base fee * 1.1725
+    const platformFeePercentage = 0.2325; // 23.25% of base fee
+    const totalMultiplier = 1.1725; // total = base fee + fees
     const applicationFee = Math.round(amount * (platformFeePercentage / totalMultiplier));
 
     const paymentIntent = await stripe.paymentIntents.create({
