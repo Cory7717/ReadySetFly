@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { initializeApp, getApps, getApp } from "firebase/app";
+import Constants from "expo-constants";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -25,11 +26,14 @@ if (getApps().length === 0) {
 
 const auth = getAuth(app);
 
-// Retrieve Stripe Publishable Key
+// Retrieve Stripe Publishable Key from Expo Constants (check both expoConfig and manifest)
 const getStripePublishableKey = () => {
-  const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  const extra = Constants.expoConfig?.extra || Constants.manifest?.extra;
+  const stripePublishableKey = extra?.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   if (!stripePublishableKey) {
-    throw new Error('Missing Stripe Publishable Key. Please set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY in your .env');
+    throw new Error(
+      "Missing Stripe Publishable Key. Please set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY in app.json"
+    );
   }
   return stripePublishableKey;
 };

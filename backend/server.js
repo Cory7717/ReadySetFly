@@ -111,10 +111,6 @@ app.post(
             }
 
             // *** NEW: Update the owner's availableBalance with net funds ***
-            // The owner should receive 94% of the base rental fee.
-            // In CheckoutScreen, totalAmount = baseFee * 1.1725, where baseFee = hourly rate * hours.
-            // Platform fee should be 23.25% of baseFee, i.e., total platform fee = baseFee * 0.2325.
-            // Therefore, application_fee_amount = totalAmount * (0.2325 / 1.1725)
             const totalAmount = paymentIntent.amount; // in cents
             const platformFeePercentage = 0.2325; // 23.25% of base fee
             const totalMultiplier = 1.1725; // Total = base fee + fees
@@ -132,48 +128,40 @@ app.post(
         case 'payment_intent.payment_failed': {
           const paymentIntent = event.data.object;
           admin.logger.info(`PaymentIntent payment failed: ${paymentIntent.id}`);
-          // Additional handling for payment failures can be added here if needed.
           break;
         }
         case 'payment_intent.canceled': {
           const paymentIntent = event.data.object;
           admin.logger.info(`PaymentIntent canceled: ${paymentIntent.id}`);
-          // Additional handling for canceled payments can be added here if needed.
           break;
         }
         case 'charge.refunded': {
           const charge = event.data.object;
           admin.logger.info(`Charge refunded: ${charge.id}`);
-          // Additional handling for refunds can be added here if needed.
           break;
         }
         case 'charge.dispute.created': {
           const dispute = event.data.object;
           admin.logger.info(`Charge dispute created: ${dispute.id}`);
-          // Additional handling for dispute creation can be added here if needed.
           break;
         }
         case 'account.updated': {
           const account = event.data.object;
           admin.logger.info(`Account updated: ${account.id}`);
-          // Additional handling for account updates can be added here if needed.
           break;
         }
         case 'payout.paid': {
           const payout = event.data.object;
           admin.logger.info(`Payout paid: ${payout.id}`);
-          // Additional handling for paid payouts can be added here if needed.
           break;
         }
         default:
           admin.logger.warn(`Unhandled event type ${event.type}`);
       }
     } catch (err) {
-      // Log any error that occurs during processing but don't throw it.
       admin.logger.error(`Error processing event ${event.id}: ${err.message}`, err);
     }
 
-    // Always respond with 200 to prevent Stripe from retrying the event.
     res.setHeader('Content-Type', 'application/json');
     res.json({ received: true });
   }
@@ -286,11 +274,10 @@ app.post('/createListing', authenticate, async (req, res) => {
       lat,
       lng,
       images,
-      // ADDING new field for 'Aircraft for Sale'
       airportIdentifier
     } = sanitizeData(listingDetails);
 
-    // Updated category requirements for Flight Schools
+    // Updated category requirements for Flight Schools and Flight Instructors
     const categoryRequirements = {
       'Aircraft for Sale': ['title', 'description', 'airportIdentifier'],
       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
@@ -301,7 +288,7 @@ app.post('/createListing', authenticate, async (req, res) => {
         'certifications',
         'fiEmail',
         'fiDescription',
-        'serviceLocations',
+        'serviceLocationsList'
       ],
       'Aviation Mechanic': [
         'amFirstName',
@@ -321,8 +308,11 @@ app.post('/createListing', authenticate, async (req, res) => {
     }
 
     let freeListing = isFreeListing === 'true' || isFreeListing === true;
-
     if (selectedPricing === 'FreeTrial') {
+      freeListing = true;
+    }
+    // FORCE freeListing for Flight Schools since salePrice is not applicable.
+    if (category === 'Flight Schools') {
       freeListing = true;
     }
 
@@ -367,25 +357,30 @@ app.post('/createListing', authenticate, async (req, res) => {
 
     let finalSalePrice = 0;
     let finalPackageCost = 0;
-    if (freeListing) {
-      finalSalePrice = 0;
-      finalPackageCost = 0;
-    } else {
-      let salePriceString = salePrice;
-      if (typeof salePrice !== 'string') {
-        salePriceString = salePrice.toString();
+    // Only process salePrice if the category is NOT Flight Instructors.
+    if (category !== 'Flight Instructors') {
+      if (freeListing) {
+        finalSalePrice = 0;
+        finalPackageCost = 0;
+      } else {
+        if (salePrice === undefined) {
+          admin.logger.warn("Missing salePrice for category " + category);
+          res.setHeader('Content-Type', 'application/json');
+          return res.status(400).json({ error: 'Missing salePrice for this category' });
+        }
+        let salePriceString = typeof salePrice === 'string' ? salePrice : salePrice.toString();
+        const sanitizedSalePrice = salePriceString.replace(/[^0-9.]/g, '');
+        const parsedSalePrice = parseFloat(sanitizedSalePrice);
+        if (isNaN(parsedSalePrice) || parsedSalePrice <= 0) {
+          admin.logger.warn(`Invalid salePrice: ${salePrice}`);
+          res.setHeader('Content-Type', 'application/json');
+          return res.status(400).json({ error: 'Invalid salePrice. It must be a positive number.' });
+        }
+        finalSalePrice = parsedSalePrice;
+        finalPackageCost = calculateTotalCost(selectedPricing);
       }
-      const sanitizedSalePrice = salePriceString.replace(/[^0-9.]/g, '');
-      const parsedSalePrice = parseFloat(sanitizedSalePrice);
-      if (isNaN(parsedSalePrice) || parsedSalePrice <= 0) {
-        admin.logger.warn(`Invalid salePrice: ${salePrice}`);
-        res.setHeader('Content-Type', 'application/json');
-        return res.status(400).json({ error: 'Invalid salePrice. It must be a positive number.' });
-      }
-      finalSalePrice = parsedSalePrice;
-      finalPackageCost = calculateTotalCost(selectedPricing);
     }
-
+    // For Flight Instructors, salePrice remains 0.
     const imageUrls = Array.isArray(images) ? images : [];
     const listingData = {
       title: title || '',
@@ -410,13 +405,32 @@ app.post('/createListing', authenticate, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       ownerId: req.user.uid,
       status: 'pending',
-
-      // Storing new airportIdentifier for 'Aircraft for Sale'
       airportIdentifier: airportIdentifier || '',
     };
 
     if (freeListing && selectedPricing === 'FreeTrial') {
       listingData.trialExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
+    }
+
+    // For Flight Instructors, remove salePrice and add hourlyRate
+    if (category === 'Flight Instructors') {
+      listingData.firstName = listingDetails.firstName;
+      listingData.lastName = listingDetails.lastName;
+      listingData.certifications = listingDetails.certifications;
+      listingData.fiEmail = listingDetails.fiEmail;
+      listingData.fiDescription = listingDetails.fiDescription;
+      listingData.serviceLocationsList = listingDetails.serviceLocationsList;
+      listingData.hourlyRate = listingDetails.hourlyRate;
+      listingData.aircraftProvided = listingDetails.aircraftProvided;
+      // Do not set salePrice for Flight Instructors.
+      delete listingData.salePrice;
+    } else if (category === 'Aviation Mechanic') {
+      listingData.amFirstName = listingDetails.amFirstName;
+      listingData.amLastName = listingDetails.amLastName;
+      listingData.amCertifications = listingDetails.amCertifications;
+      listingData.amEmail = listingDetails.amEmail;
+      listingData.amDescription = listingDetails.amDescription;
+      listingData.amServiceLocations = listingDetails.amServiceLocations;
     }
 
     const listingRef = await db.collection('listings').add(listingData);
@@ -455,12 +469,12 @@ app.put('/updateListing', authenticate, async (req, res) => {
       : listingDetails;
     const sanitizedListingDetails = sanitizeData(parsedListingDetails);
 
-    // Updated category requirements for Flight Schools
+    // Updated category requirements for Flight Schools and Flight Instructors
     const categoryRequirements = {
       'Aircraft for Sale': ['title', 'description', 'airportIdentifier'],
       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
       'Flight Schools': ['flightSchoolDetails'],
-      'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocations'],
+      'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocationsList'],
       'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
     };
 
@@ -472,6 +486,10 @@ app.put('/updateListing', authenticate, async (req, res) => {
 
     let freeListing = sanitizedListingDetails.isFreeListing === 'true' || sanitizedListingDetails.isFreeListing === true;
     if (sanitizedListingDetails.selectedPricing === 'FreeTrial') {
+      freeListing = true;
+    }
+    // FORCE freeListing for Flight Schools during update.
+    if (sanitizedListingDetails.category === 'Flight Schools') {
       freeListing = true;
     }
 
@@ -516,7 +534,7 @@ app.put('/updateListing', authenticate, async (req, res) => {
       finalSalePrice = 0;
       finalPackageCost = 0;
       finalPackageType = null;
-    } else {
+    } else if (sanitizedListingDetails.category !== 'Flight Instructors') {
       if (sanitizedListingDetails.salePrice && String(sanitizedListingDetails.salePrice).trim().toLowerCase() !== 'n/a') {
         const salePriceString = String(sanitizedListingDetails.salePrice).trim();
         const sanitizedSalePrice = salePriceString.replace(/[^0-9.]/g, '');
@@ -553,14 +571,33 @@ app.put('/updateListing', authenticate, async (req, res) => {
       packageCost: freeListing ? 0 : finalPackageCost,
       location: { lat: latitude, lng: longitude },
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-
-      // Updating the airportIdentifier if present
       airportIdentifier: sanitizedListingDetails.airportIdentifier || listingData.airportIdentifier,
     };
 
     // If there are new images, update them
     if (imageUrls.length > 0) {
       updateData.images = imageUrls;
+    }
+
+    // For Flight Instructors, update using hourlyRate instead of salePrice.
+    if (sanitizedListingDetails.category === 'Flight Instructors') {
+      updateData.firstName = sanitizedListingDetails.firstName;
+      updateData.lastName = sanitizedListingDetails.lastName;
+      updateData.certifications = sanitizedListingDetails.certifications;
+      updateData.fiEmail = sanitizedListingDetails.fiEmail;
+      updateData.fiDescription = sanitizedListingDetails.fiDescription;
+      updateData.serviceLocationsList = sanitizedListingDetails.serviceLocationsList;
+      updateData.hourlyRate = sanitizedListingDetails.hourlyRate;
+      updateData.aircraftProvided = sanitizedListingDetails.aircraftProvided;
+      // Do not update salePrice for Flight Instructors.
+      delete updateData.salePrice;
+    } else if (sanitizedListingDetails.category === 'Aviation Mechanic') {
+      updateData.amFirstName = sanitizedListingDetails.amFirstName;
+      updateData.amLastName = sanitizedListingDetails.amLastName;
+      updateData.amCertifications = sanitizedListingDetails.amCertifications;
+      updateData.amEmail = sanitizedListingDetails.amEmail;
+      updateData.amDescription = sanitizedListingDetails.amDescription;
+      updateData.amServiceLocations = sanitizedListingDetails.amServiceLocations;
     }
 
     await listingRef.update(updateData);
@@ -709,12 +746,8 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
     }
 
     // Create a PaymentIntent using destination charges.
-    // The total amount is calculated in CheckoutScreen (base fee plus fees).
-    // To split the funds:
-    //   Let B = base rental fee, then total = B * 1.1725.
-    //   Platform fee should be 23.25% of B, which is: (B * 0.2325) = total * (0.2325 / 1.1725).
     const platformFeePercentage = 0.2325; // 23.25% of base fee
-    const totalMultiplier = 1.1725; // total = base fee + fees
+    const totalMultiplier = 1.1725; // Total = base fee + fees
     const applicationFee = Math.round(amount * (platformFeePercentage / totalMultiplier));
 
     const paymentIntent = await stripe.paymentIntents.create({
@@ -913,82 +946,6 @@ app.get('/get-stripe-balance', authenticate, async (req, res) => {
 });
 
 // ===================================================================
-// UPDATED Withdraw Funds Endpoint (commented out)
-// ===================================================================
-// The following withdraw funds endpoint is currently commented out
-// in order to align with the new update to owner.js. This endpoint
-// processed payouts. With the new changes, withdrawal is now
-// informational only on the client-side.
-// Uncomment the code below if you decide to re-enable withdrawals.
-
-/*
-// app.post('/withdraw-funds', authenticate, async (req, res) => {
-//   try {
-//     const { ownerId, amount, email } = req.body;
-//     if (!ownerId || !amount || !email) {
-//       res.setHeader('Content-Type', 'application/json');
-//       return res.status(400).json({ error: 'Missing required fields: ownerId, amount, email' });
-//     }
-//
-//     // Fetch the owner's document
-//     const ownerRef = db.collection('users').doc(ownerId);
-//     const ownerDoc = await ownerRef.get();
-//     if (!ownerDoc.exists) {
-//       res.setHeader('Content-Type', 'application/json');
-//       return res.status(404).json({ error: 'Owner not found' });
-//     }
-//     const ownerData = ownerDoc.data();
-//     const connectedAccountId = ownerData.stripeAccountId;
-//     if (!connectedAccountId) {
-//       res.setHeader('Content-Type', 'application/json');
-//       return res.status(400).json({ error: 'Stripe account not connected' });
-//     }
-//
-//     // Check if the owner has sufficient availableBalance (amount is in cents)
-//     const currentBalance = ownerData.availableBalance || 0;
-//     if (currentBalance < amount) {
-//       res.setHeader('Content-Type', 'application/json');
-//       return res.status(400).json({ error: 'Insufficient funds for withdrawal' });
-//     }
-//
-//     // Deduct the withdrawal amount from availableBalance in Firestore via transaction
-//     await db.runTransaction(async (transaction) => {
-//       const ownerSnapshot = await transaction.get(ownerRef);
-//       const balance = ownerSnapshot.get('availableBalance') || 0;
-//       if (balance < amount) {
-//         throw new Error('Insufficient funds for withdrawal');
-//       }
-//       transaction.update(ownerRef, { availableBalance: admin.firestore.FieldValue.increment(-amount) });
-//     });
-//
-//     // Process the payout via Stripe
-//     let payout;
-//     try {
-//       payout = await stripe.payouts.create(
-//         { amount, currency: 'usd' },
-//         { stripeAccount: connectedAccountId }
-//       );
-//     } catch (payoutError) {
-//       // Roll back the balance deduction if payout fails
-//       await ownerRef.update({ availableBalance: admin.firestore.FieldValue.increment(amount) });
-//       throw payoutError;
-//     }
-//
-//     // *** NEW: Update the owner's totalWithdrawn field in Firestore ***
-//     await ownerRef.update({ totalWithdrawn: admin.firestore.FieldValue.increment(amount) });
-//
-//     res.setHeader('Content-Type', 'application/json');
-//     res.status(200).json({ message: 'Withdrawal processed successfully', payout });
-//   } catch (error) {
-//     const errorMessage = error.message || 'Internal Server Error';
-//     admin.logger.error('Error processing withdrawal:', error);
-//     res.setHeader('Content-Type', 'application/json');
-//     res.status(500).json({ error: errorMessage });
-//   }
-// });
-*/
-
-// ===================================================================
 // Firestore-Triggered Functions
 // ===================================================================
 
@@ -1010,7 +967,6 @@ exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapsho
         if (ownerData.fcmToken) tokens.push(ownerData.fcmToken);
       }
       const renterRef = db.collection('renters').doc(recipientId);
-      // getDoc is not a standard Firestore method in Node admin—assuming you have a helper or it’s a snippet
       const renterDoc = await getDoc(renterRef);
       if (renterDoc.exists) {
         const renterData = renterDoc.data();
@@ -1208,7 +1164,6 @@ exports.closeExpiredMessaging = onSchedule('every 1 hours', async (event) => {
     rentalRequestsSnapshot.forEach(docSnap => {
       const data = docSnap.data();
       if (data.rentalDate && !data.messagingClosed) {
-        // Assume rentalDate is stored as a string (MM/DD/YYYY) – adjust parsing as needed
         const rentalDate = new Date(data.rentalDate);
         if (rentalDate < now) {
           batch.update(docSnap.ref, { messagingClosed: true });
@@ -1229,13 +1184,9 @@ exports.closeExpiredMessaging = onSchedule('every 1 hours', async (event) => {
   }
 });
 
-// ===================================================================
-// NEW: Scheduled Function to Refresh Listings
-// ===================================================================
 exports.refreshListings = onSchedule('every 1 hours', async (event) => {
   try {
     const nowMillis = Date.now();
-    // Query listings with packageType Enhanced or Featured and order by createdAt descending
     const listingsQuery = db.collection('listings')
       .where('packageType', 'in', ['Enhanced', 'Featured'])
       .orderBy('createdAt', 'desc');
@@ -1250,7 +1201,6 @@ exports.refreshListings = onSchedule('every 1 hours', async (event) => {
       data.id = doc.id;
       listings.push(data);
     });
-    // Helper function to generate a random integer between min and max (inclusive)
     const randomBetween = (min, max) => {
       return Math.floor(Math.random() * (max - min + 1)) + min;
     };
@@ -1273,16 +1223,14 @@ exports.refreshListings = onSchedule('every 1 hours', async (event) => {
       if (nowMillis - lastRefreshMillis >= refreshInterval) {
         let newCreatedAtMillis = nowMillis;
         if (listing.packageType === 'Enhanced') {
-          // For Enhanced, if at least 30 listings exist, use the createdAt of the 30th listing as lower bound.
           if (listings.length >= 30) {
             const listing30 = listings[29];
             const index30Millis = listing30.createdAt && listing30.createdAt.toMillis ? listing30.createdAt.toMillis() : listing30.createdAt;
             newCreatedAtMillis = randomBetween(index30Millis, nowMillis);
           }
         } else if (listing.packageType === 'Featured') {
-          // For Featured, use the 15th listing as top bound and 50th as bottom bound if available.
           let topBound = nowMillis;
-          let bottomBound = nowMillis - 3600 * 1000; // fallback: 1 hour ago
+          let bottomBound = nowMillis - 3600 * 1000;
           if (listings.length >= 15) {
             const listing15 = listings[14];
             topBound = listing15.createdAt && listing15.createdAt.toMillis ? listing15.createdAt.toMillis() : listing15.createdAt;

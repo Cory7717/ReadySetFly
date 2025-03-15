@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Ready, Set, Fly!",
-    "slug": "Ready-Set-Fly",
+    "slug": "rsf_app",
     "version": "1.0.0",
     "scheme": "rsfapp",
     "orientation": "portrait",
@@ -30,6 +30,7 @@
     "jsEngine": "hermes",
     "extra": {
       "API_URL": "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api",
+      "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51PoTvh00cx1Ta1YEkbOV5Nh5cZhtiJbKT5ZYPfev3jVFJOJwSn6ep3BZMqGbZbXazgsW5WEw5Gkqh2OrG2vn6tvo00llA3yt0P",
       "eas": {
         "projectId": "e3d26a84-3e0e-4879-971f-dc5a82b1a37a"
       }

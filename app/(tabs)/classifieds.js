@@ -1,4 +1,3 @@
-// src/screens/Classifieds.js
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Text,
@@ -69,7 +68,6 @@ const formatPhoneNumber = (phone) => {
 const getMaxImages = (selectedCategory, selectedPricing) => {
   if (selectedCategory === 'Aviation Jobs') return 3;
   if (selectedCategory === 'Flight Schools') return 5;
-  // if (selectedCategory === 'Aviation Gear') return 5; // Aviation Gear allows up to 5 images
   if (selectedCategory === 'Aircraft for Sale') {
     if (selectedPricing === 'Basic') return 7;
     if (selectedPricing === 'Featured') return 14;
@@ -78,7 +76,7 @@ const getMaxImages = (selectedCategory, selectedPricing) => {
   return 1;
 };
 
-/** Helper function: Renders listing details UI based on category */
+/** Helper function: Renders full listing details UI based on category */
 const renderListingDetails = (item) => {
   if (item.category === 'Aviation Jobs') {
     return (
@@ -95,49 +93,50 @@ const renderListingDetails = (item) => {
       </View>
     );
   } else if (item.category === 'Flight Schools') {
+    // Read flight school details from the nested object
+    const details = item.flightSchoolDetails || {};
     return (
       <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
         <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}>
-          {item.flightSchoolName || 'No Flight School Name'}
+          {details.flightSchoolName || 'No Flight School Name'}
         </Text>
         <Text style={{ fontSize: 16, color: COLORS.gray, marginVertical: 5 }}>
-          {item.flightSchoolLocation || 'No Location Provided'}
+          {details.flightSchoolLocation || 'No Location Provided'}
         </Text>
         <Text style={{ fontSize: 14, color: COLORS.gray }}>
-          {item.flightSchoolDescription || 'No Description Provided'}
+          {details.flightSchoolDescription || 'No Description Provided'}
         </Text>
       </View>
     );
   } else if (item.category === 'Flight Instructors') {
     return (
-      <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}>
-          {item.firstName || 'No First Name'} {item.lastName || 'No Last Name'} - Flight Instructor
-        </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+      <View style={{ padding: 10, borderRadius: 10, backgroundColor: 'transparent', marginBottom: 10 }}>
+        {/* Removed duplicate display of the instructor's name.
+            The header in the full screen modal already renders the instructor's first and last name. */}
+        <Text style={{ fontSize: 16, color: COLORS.white, marginBottom: 5 }}>
           CFI Certification Number: {item.certifications || 'N/A'}
         </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
-          Flight Hours: {item.flightHours || 'N/A'}
+        <Text style={{ fontSize: 16, color: COLORS.white, marginBottom: 5 }}>
+          Flight Hours: {item.flightHours === "" ? 'N/A' : item.flightHours}
         </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
-          Cost per Hour: ${item.fiCostPerHour || 'N/A'}
+        <Text style={{ fontSize: 16, color: COLORS.white, marginBottom: 5 }}>
+          Hourly Rate: ${item.hourlyRate != null ? item.hourlyRate : 'N/A'}
         </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+        <Text style={{ fontSize: 16, color: COLORS.white, marginBottom: 5 }}>
           Aircraft Provided: {item.aircraftProvided ? 'Yes' : 'No'}
         </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+        <Text style={{ fontSize: 16, color: COLORS.white, marginBottom: 5 }}>
           Contact Email: {item.fiEmail || 'N/A'}
         </Text>
-        <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
+        <Text style={{ fontSize: 16, color: COLORS.white, marginBottom: 5 }}>
           Phone: {formatPhoneNumber(item.fiPhone)}
         </Text>
         <Text style={{ fontSize: 14, color: COLORS.gray }}>
-          {item.fiDescription || 'No Description Provided'}
+          {item.fiDescription || ''}
         </Text>
         {item.serviceLocationsList && item.serviceLocationsList.length > 0 && (
           <View style={{ marginTop: 8 }}>
-            <Text style={{ fontSize: 16, color: COLORS.black }}>Service Locations:</Text>
+            <Text style={{ fontSize: 16, color: COLORS.white }}>Service Locations:</Text>
             {item.serviceLocationsList.map((loc, index) => (
               <Text key={index} style={{ fontSize: 14, color: COLORS.gray }}>{loc}</Text>
             ))}
@@ -146,7 +145,7 @@ const renderListingDetails = (item) => {
       </View>
     );
   } else {
-    // Aircraft for Sale fallback (or any other category not specifically handled above).
+    // Aircraft for Sale fallback
     return (
       <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
         <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
@@ -166,86 +165,30 @@ const renderListingDetails = (item) => {
   }
 };
 
-/** GoogleAd Component: Renders a placeholder Google ad with an "Advertisement" label */
-const GoogleAd = () => {
-  return (
-    <View style={{
-      borderRadius: 10,
-      overflow: 'hidden',
-      backgroundColor: COLORS.white,
-      marginBottom: 20,
-      shadowColor: COLORS.black,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 2,
-      elevation: 3,
-      padding: 10,
-      position: 'relative'
-    }}>
-      <Text style={{
-         position: 'absolute',
-         top: 0,
-         left: 0,
-         backgroundColor: COLORS.red,
-         color: COLORS.white,
-         paddingHorizontal: 5,
-         fontSize: 10,
-         fontWeight: 'bold'
-      }}>Advertisement</Text>
-      <View style={{ height: 200, justifyContent: 'center', alignItems: 'center' }}>
-         <Text style={{ fontSize: 18, color: COLORS.gray }}>Google Ad Placeholder</Text>
+/** New helper: Renders an abbreviated version for Flight Instructors on the main card */
+const renderListingDetailsAbbreviated = (item) => {
+  if (item.category === 'Flight Instructors') {
+    return (
+      <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.black }}>
+          {item.firstName} {item.lastName}
+        </Text>
+        <Text style={{ fontSize: 14, color: COLORS.gray }}>
+          Hourly Rate: ${item.hourlyRate || 'N/A'}
+        </Text>
+        <Text style={{ fontSize: 14, color: COLORS.gray }}>
+          Phone: {formatPhoneNumber(item.fiPhone)}
+        </Text>
+        <Text style={{ fontSize: 14, color: COLORS.gray }}>
+          Email: {item.fiEmail || 'N/A'}
+        </Text>
       </View>
-    </View>
-  );
+    );
+  }
+  return renderListingDetails(item);
 };
 
-// Updated categories including new ones
-const categories = [
-  'Aircraft for Sale',
-  'Aviation Jobs',
-  'Flight Schools',
-  'Flight Instructors',
-  'Aviation Mechanic',
-  // 'Aviation Gear', // commented out
-];
-
-// Default pricing packages (used for Aircraft for Sale)
-const defaultPricingPackages = { Basic: 25, Featured: 70, Enhanced: 150 };
-
-// Pricing descriptions including new categories
-const pricingDescriptions = {
-  Basic: `Basic Package Includes:
-• 30-day listing
-• Add up to 5 images
-• Add up to 7 lines of listing description`,
-  Featured: `Featured Package Includes:
-• 46-day listing
-• Add up to 10 images
-• Add up to 12 lines of description
-• Listing will be periodically refreshed to keep closer to the top of the listing page`,
-  Enhanced: `Enhanced Package Includes:
-• 60-day listing
-• Add up to 20 images
-• Unlimited lines of aircraft description
-• Listing will frequently be refreshed to keep closer to the top of the listings page`,
-  'Flight Instructors': `Flight Instructor Package Includes:
-• 30-day listing
-• Designed for flight instructors
-• $30/month listing`,
-  'Aviation Mechanic': `Aviation Mechanic Package Includes:
-• 30-day listing
-• Designed for aviation mechanics
-• $30/month listing`,
-};
-
-const initialPricingModalState = Object.keys(pricingDescriptions).reduce((acc, key) => {
-  acc[key] = false;
-  return acc;
-}, {});
-
-// TEMPORARILY bypass payment (set to false when going live)
-const TEMPORARY_BYPASS_PAYMENT = true;
-
+/** FullScreenImageModal Component */
 const FullScreenImageModal = ({ visible, onRequestClose, imageUri }) => {
   const pinchScale = useRef(new Animated.Value(1)).current;
   const onPinchGestureEvent = Animated.event([{ nativeEvent: { scale: pinchScale } }], {
@@ -283,6 +226,7 @@ const FullScreenImageModal = ({ visible, onRequestClose, imageUri }) => {
   );
 };
 
+/** Classifieds Component */
 const Classifieds = () => {
   const auth = getAuth();
   const navigation = useNavigation();
@@ -321,8 +265,14 @@ const Classifieds = () => {
   const [makeModel, setMakeModel] = useState("");
 
   // Pricing packages state
-  const [pricingPackages, setPricingPackages] = useState(defaultPricingPackages);
-  const [pricingModalVisible, setPricingModalVisible] = useState(initialPricingModalState);
+  const [pricingPackages, setPricingPackages] = useState({ Basic: 25, Featured: 70, Enhanced: 150 });
+  const [pricingModalVisible, setPricingModalVisible] = useState({
+    Basic: false,
+    Featured: false,
+    Enhanced: false,
+    'Flight Instructors': false,
+    'Aviation Mechanic': false,
+  });
 
   // NEW: State for Broker Services Modal
   const [brokerModalVisible, setBrokerModalVisible] = useState(false);
@@ -334,7 +284,13 @@ const Classifieds = () => {
     setDetailsModalVisible(false);
     setModalVisible(false);
     setFullScreenModalVisible(false);
-    setPricingModalVisible(initialPricingModalState);
+    setPricingModalVisible({
+      Basic: false,
+      Featured: false,
+      Enhanced: false,
+      'Flight Instructors': false,
+      'Aviation Mechanic': false,
+    });
   };
 
   // -----------------------
@@ -354,7 +310,7 @@ const Classifieds = () => {
       setPricingPackages({ 'Aviation Mechanic': 30 });
       setSelectedPricing('Aviation Mechanic');
     } else {
-      setPricingPackages(defaultPricingPackages);
+      setPricingPackages({ Basic: 25, Featured: 70, Enhanced: 150 });
       setSelectedPricing('Basic');
     }
   }, [selectedCategory]);
@@ -539,6 +495,9 @@ const Classifieds = () => {
     );
   };
 
+  // -----------------------
+  // Updated: Render listing images without inner pressable wrapper
+  // -----------------------
   const renderListingImages = (item) => {
     return (
       <View style={{ position: 'relative' }}>
@@ -711,14 +670,18 @@ const Classifieds = () => {
   };
 
   // TEMPORARILY bypass payment for new listings (all categories)
-  // Option one: Do not group Flight School fields so that they remain as top-level keys
   const onSubmitMethod = (values) => {
     const listingDetails = {
       ...values,
       images,
       location: location ? { lat: location.coords.latitude, lng: location.coords.longitude } : {},
     };
-  
+
+    // For Flight Instructors, remove salePrice as it does not apply
+    if (listingDetails.category === 'Flight Instructors') {
+      delete listingDetails.salePrice;
+    }
+
     // For Flight Schools, nest flight school fields in a flightSchoolDetails object
     if (listingDetails.category === 'Flight Schools') {
       const {
@@ -729,22 +692,20 @@ const Classifieds = () => {
         flightSchoolDescription,
       } = listingDetails;
       listingDetails.flightSchoolDetails = {
-        flightSchoolEmail, // required field
+        flightSchoolEmail,
         ...(flightSchoolName ? { flightSchoolName } : {}),
         ...(flightSchoolLocation ? { flightSchoolLocation } : {}),
         ...(flightSchoolPhone ? { flightSchoolPhone } : {}),
         ...(flightSchoolDescription ? { flightSchoolDescription } : {}),
       };
-      // Optionally remove the top-level flight school fields
       delete listingDetails.flightSchoolName;
       delete listingDetails.flightSchoolLocation;
       delete listingDetails.flightSchoolEmail;
       delete listingDetails.flightSchoolPhone;
       delete listingDetails.flightSchoolDescription;
-      // Remove salePrice field for Flight Schools since it does not apply
       delete listingDetails.salePrice;
     }
-  
+
     if (editingListing) {
       console.log("Updating listing with payload:", { listingId: editingListing.id, listingDetails });
       getFirebaseIdToken().then((token) => {
@@ -779,7 +740,7 @@ const Classifieds = () => {
             Alert.alert('Error', 'Failed to update listing.');
           });
       });
-    } else if (TEMPORARY_BYPASS_PAYMENT) {
+    } else if (true /* TEMPORARY_BYPASS_PAYMENT */) {
       console.log("Posting listing automatically for free...");
       getFirebaseIdToken().then((token) => {
         fetch(`${API_URL}/createListing`, {
@@ -826,7 +787,6 @@ const Classifieds = () => {
       });
     }
   };
-  
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -997,7 +957,7 @@ const Classifieds = () => {
         </View>
 
         <FlatList
-          data={categories}
+          data={['Aircraft for Sale','Aviation Jobs','Flight Schools','Flight Instructors','Aviation Mechanic']}
           renderItem={({ item }) => (
             <TouchableOpacity
               key={item}
@@ -1082,32 +1042,44 @@ const Classifieds = () => {
                 <TouchableOpacity
                   onPress={() => handleListingPress(item)}
                   style={{ flex: 1, padding: 10 }}
-                  accessibilityLabel={`View details of listing ${item.title || 'No Title'}`}
+                  accessibilityLabel={`View details of listing ${
+                    item.category === 'Flight Instructors'
+                      ? `${item.firstName} ${item.lastName}`
+                      : item.title || 'Listing'
+                  }`}
                   accessibilityRole="button"
                 >
                   {item.images && item.images.length > 0 ? (
                     renderListingImages(item)
                   ) : (
-                    <Text style={{ textAlign: 'center', color: COLORS.gray, marginTop: 10, padding: 10 }}>
-                      No Images Available
-                    </Text>
+                    item.category !== 'Flight Instructors' && (
+                      <Text style={{ textAlign: 'center', color: COLORS.gray, marginTop: 10, padding: 10 }}>
+                        No Images Available
+                      </Text>
+                    )
                   )}
 
-                  <Text
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 'bold',
-                      color: COLORS.black,
-                      marginTop: 10,
-                    }}
-                  >
-                    {item.title ? item.title : 'No Title'}
-                  </Text>
-                  {renderListingDetails(item)}
+                  {item.category === 'Flight Instructors' ? (
+                    renderListingDetailsAbbreviated(item)
+                  ) : (
+                    <>
+                      <Text
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 'bold',
+                          color: COLORS.black,
+                          marginTop: 10,
+                        }}
+                      >
+                        {item.title ? item.title : 'No Title'}
+                      </Text>
+                      {renderListingDetails(item)}
+                    </>
+                  )}
                 </TouchableOpacity>
                 {renderEditAndDeleteButtons(item)}
               </View>
-              {(index + 1) % 17 === 0 && <GoogleAd key={`ad-${index}`} />}
+              {(index + 1) % 17 === 0 && <View><Text style={{ textAlign: 'center', color: COLORS.gray }}>Google Ad Placeholder</Text></View>}
             </React.Fragment>
           ))
         ) : (
@@ -1319,45 +1291,12 @@ const Classifieds = () => {
               >
                 <Ionicons name="close" size={30} color={COLORS.white} />
               </TouchableOpacity>
-
-              {selectedListing?.images && selectedListing.images.length > 0 ? (
-                <View style={{ position: 'relative' }}>
-                  <Animated.ScrollView
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
-                      useNativeDriver: false,
-                      listener: (event) => {
-                        const offsetX = event.nativeEvent.contentOffset.x;
-                        const index = Math.round(offsetX / (SCREEN_WIDTH - 32));
-                        setImageIndex(index);
-                      },
-                    })}
-                    scrollEventThrottle={16}
-                    style={{ height: 250, borderRadius: 10, overflow: 'hidden' }}
-                  >
-                    {selectedListing.images.map((image, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        activeOpacity={0.9}
-                        onPress={() => handleImagePress(image)}
-                        accessibilityLabel={`View Image ${index + 1}`}
-                        accessibilityRole="imagebutton"
-                      >
-                        <Image
-                          source={{ uri: image }}
-                          style={{ width: SCREEN_WIDTH - 32, height: 250, resizeMode: 'cover' }}
-                        />
-                      </TouchableOpacity>
-                    ))}
-                  </Animated.ScrollView>
-                  {renderPaginationDots()}
+              {/* Revert to scrollable images for Aircraft for Sale full screen listing */}
+              {selectedListing?.category === 'Aircraft for Sale' && selectedListing?.images && selectedListing.images.length > 0 && (
+                <View style={{ marginBottom: 16 }}>
+                  {renderListingImages(selectedListing)}
                 </View>
-              ) : (
-                <Text style={{ color: COLORS.white, marginTop: 20 }}>No Images Available</Text>
               )}
-
               <Text
                 style={{
                   color: COLORS.white,
@@ -1367,39 +1306,69 @@ const Classifieds = () => {
                   textAlign: 'center',
                 }}
               >
-                {selectedListing?.flightSchoolName || selectedListing?.title || 'No Title'}
+                {selectedListing?.category === 'Flight Schools'
+                  ? (selectedListing?.flightSchoolDetails?.flightSchoolName || 'No Flight School Name')
+                  : selectedListing?.category === 'Flight Instructors'
+                    ? `${selectedListing?.firstName} ${selectedListing?.lastName}`
+                    : (selectedListing?.flightSchoolName || selectedListing?.title || 'No Title')}
               </Text>
-              <View style={styles.centeredRow}>
-                <Ionicons name="location-outline" size={20} color={COLORS.gray} />
-                <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
-                  {selectedListing?.city || 'No City'}, {selectedListing?.state || 'No State'}
+
+              {selectedListing?.category === 'Flight Instructors' ? (
+                renderListingDetails(selectedListing)
+              ) : selectedListing?.category === 'Flight Schools' ? (
+                <>
+                  <View style={styles.centeredRow}>
+                    <Ionicons name="location-outline" size={20} color={COLORS.gray} />
+                    <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
+                      {selectedListing?.flightSchoolDetails?.flightSchoolLocation || 'No Location Provided'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
+                    Email: {selectedListing?.flightSchoolDetails?.flightSchoolEmail || 'N/A'}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Phone: {formatPhoneNumber(selectedListing?.flightSchoolDetails?.flightSchoolPhone)}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <View style={styles.centeredRow}>
+                    <Ionicons name="location-outline" size={20} color={COLORS.gray} />
+                    <Text style={{ fontSize: 16, color: COLORS.gray, marginLeft: 5 }}>
+                      {selectedListing?.city || 'No City'}, {selectedListing?.state || 'No State'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
+                    Email: {selectedListing?.email || 'N/A'}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Phone: {formatPhoneNumber(selectedListing?.phone)}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Tail Number: {selectedListing?.tailNumber || 'N/A'}
+                  </Text>
+                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                    Price: ${selectedListing?.salePrice != null ? Number(selectedListing.salePrice).toLocaleString() : 'N/A'}
+                  </Text>
+                </>
+              )}
+
+              {/* Only render the larger description block for listings that are NOT Flight Instructors */}
+              {selectedListing?.category !== 'Flight Instructors' && (
+                <Text
+                  style={{
+                    color: COLORS.white,
+                    fontSize: 18,
+                    marginTop: 20,
+                    textAlign: 'left',
+                    paddingHorizontal: 20,
+                  }}
+                >
+                  {selectedListing?.category === 'Flight Schools'
+                    ? (selectedListing?.flightSchoolDetails?.flightSchoolDescription || 'No Description Provided')
+                    : (selectedListing?.flightSchoolDescription || selectedListing?.description || 'No Description')}
                 </Text>
-              </View>
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
-                Email: {selectedListing?.email || 'N/A'}
-              </Text>
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                Phone: {formatPhoneNumber(selectedListing?.phone)}
-              </Text>
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                Tail Number: {selectedListing?.tailNumber || 'N/A'}
-              </Text>
-              <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                Price: ${selectedListing?.salePrice != null ? Number(selectedListing.salePrice).toLocaleString() : 'N/A'}
-              </Text>
-              <Text
-                style={{
-                  color: COLORS.white,
-                  fontSize: 18,
-                  marginTop: 20,
-                  textAlign: 'left',
-                  paddingHorizontal: 20,
-                }}
-              >
-                {selectedListing?.flightSchoolDescription ||
-                  selectedListing?.description ||
-                  'No Description'}
-              </Text>
+              )}
 
               <TouchableOpacity
                 style={{ marginTop: 20, backgroundColor: COLORS.primary, padding: 10, borderRadius: 10, alignItems: 'center' }}
@@ -1416,7 +1385,7 @@ const Classifieds = () => {
         </View>
       </Modal>
 
-      {Object.keys(pricingDescriptions).map((key) => (
+      {Object.keys(pricingModalVisible).map((key) => (
         <Modal
           key={key}
           visible={pricingModalVisible[key]}
@@ -1428,7 +1397,34 @@ const Classifieds = () => {
             <View style={{ width: '80%', backgroundColor: COLORS.white, borderRadius: 20, padding: 20, alignItems: 'center' }}>
               <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>{key} Package</Text>
               <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
-                {pricingDescriptions[key]}
+                {key === 'Basic' && pricingPackages.Basic === 25
+                  ? `Basic Package Includes:
+• 30-day listing
+• Add up to 5 images
+• Add up to 7 lines of listing description`
+                  : key === 'Featured'
+                  ? `Featured Package Includes:
+• 46-day listing
+• Add up to 10 images
+• Add up to 12 lines of description
+• Listing will be periodically refreshed to keep closer to the top of the listing page`
+                  : key === 'Enhanced'
+                  ? `Enhanced Package Includes:
+• 60-day listing
+• Add up to 20 images
+• Unlimited lines of aircraft description
+• Listing will frequently be refreshed to keep closer to the top of the listings page`
+                  : key === 'Flight Instructors'
+                  ? `Flight Instructor Package Includes:
+• 30-day listing
+• Designed for flight instructors
+• $30/month listing`
+                  : key === 'Aviation Mechanic'
+                  ? `Aviation Mechanic Package Includes:
+• 30-day listing
+• Designed for aviation mechanics
+• $30/month listing`
+                  : ''}
               </Text>
               <TouchableOpacity
                 onPress={() => setPricingModalVisible((prev) => ({ ...prev, [key]: false }))}
@@ -1493,7 +1489,7 @@ const Classifieds = () => {
                         ? editingListing.certifications || ''
                         : '',
                     flightHours: editingListing?.category === 'Flight Instructors' && editingListing?.flightHours != null
-                        ? String(editingListing.flightHours)
+                        ? String(editingListing?.flightHours)
                         : '',
                     fiEmail:
                       editingListing && editingListing.category === 'Flight Instructors'
@@ -1512,8 +1508,8 @@ const Classifieds = () => {
                         ? editingListing.serviceLocationsList || []
                         : [],
                     newServiceLocation: '',
-                    fiCostPerHour: editingListing?.category === 'Flight Instructors' && editingListing?.fiCostPerHour != null
-                        ? String(editingListing.fiCostPerHour)
+                    hourlyRate: editingListing?.category === 'Flight Instructors' && editingListing?.hourlyRate != null
+                        ? String(editingListing?.hourlyRate)
                         : '',
                     aircraftProvided:
                       editingListing && editingListing.category === 'Flight Instructors'
@@ -1550,21 +1546,21 @@ const Classifieds = () => {
                         ? editingListing.serviceLocations || ''
                         : '',
 
-                    // For Flight Schools, only include Flight School fields
+                    // For Flight Schools, use nested flightSchoolDetails if available
                     flightSchoolName: editingListing && editingListing.category === 'Flight Schools'
-                      ? editingListing.flightSchoolName || ''
+                      ? (editingListing.flightSchoolDetails?.flightSchoolName || '')
                       : '',
                     flightSchoolLocation: editingListing && editingListing.category === 'Flight Schools'
-                      ? editingListing.flightSchoolLocation || ''
+                      ? (editingListing.flightSchoolDetails?.flightSchoolLocation || '')
                       : '',
                     flightSchoolEmail: editingListing && editingListing.category === 'Flight Schools'
-                      ? editingListing.flightSchoolEmail || ''
+                      ? (editingListing.flightSchoolDetails?.flightSchoolEmail || '')
                       : '',
                     flightSchoolPhone: editingListing && editingListing.category === 'Flight Schools'
-                      ? editingListing.flightSchoolPhone || ''
+                      ? (editingListing.flightSchoolDetails?.flightSchoolPhone || '')
                       : '',
                     flightSchoolDescription: editingListing && editingListing.category === 'Flight Schools'
-                      ? editingListing.flightSchoolDescription || ''
+                      ? (editingListing.flightSchoolDetails?.flightSchoolDescription || '')
                       : '',
 
                     // For Aircraft for Sale and Aviation Jobs, only include these fields
@@ -1575,7 +1571,7 @@ const Classifieds = () => {
                       ? editingListing.tailNumber || ''
                       : '',
                     salePrice: editingListing?.category === 'Aircraft for Sale' && editingListing?.salePrice != null
-                      ? String(editingListing.salePrice)
+                      ? String(editingListing?.salePrice)
                       : '',
                     description: editingListing && editingListing.category === 'Aviation Jobs'
                       ? editingListing.description || ''
@@ -1606,10 +1602,10 @@ const Classifieds = () => {
                       ? editingListing.airportIdentifier || ''
                       : '',
                     lat: editingListing?.location?.lat != null
-                        ? String(editingListing.location.lat)
+                        ? String(editingListing?.location?.lat)
                         : (location?.coords?.latitude != null ? String(location.coords.latitude) : ''),
                     lng: editingListing?.location?.lng != null
-                        ? String(editingListing.location.lng)
+                        ? String(editingListing?.location?.lng)
                         : (location?.coords?.longitude != null ? String(location.coords.longitude) : ''),
                     selectedPricing: selectedPricing || 'Basic',
                     packageCost: selectedPricing ? pricingPackages[selectedPricing] || 0 : 0,
@@ -1632,9 +1628,9 @@ const Classifieds = () => {
                       if (!values.serviceLocationsList || values.serviceLocationsList.length === 0) {
                         errors.serviceLocationsList = 'At least one service location is required.';
                       }
-                      if (!values.fiCostPerHour) errors.fiCostPerHour = 'Cost per hour is required.';
-                      else if (isNaN(Number(values.fiCostPerHour))) {
-                        errors.fiCostPerHour = 'Cost per hour must be a valid number.';
+                      if (!values.hourlyRate) errors.hourlyRate = 'Hourly rate is required.';
+                      else if (isNaN(Number(values.hourlyRate))) {
+                        errors.hourlyRate = 'Hourly rate must be a valid number.';
                       }
                     } else if (category === 'Aviation Mechanic') {
                       if (!values.amFirstName) errors.amFirstName = 'First name is required.';
@@ -1657,7 +1653,6 @@ const Classifieds = () => {
                         errors.email = 'Invalid email address.';
                       }
                     } else if (category === 'Flight Schools') {
-                      // For Flight Schools, only require the email field.
                       if (!values.flightSchoolEmail) {
                         errors.flightSchoolEmail = 'Contact email is required.';
                       } else if (!/\S+@\S+\.\S+/.test(values.flightSchoolEmail)) {
@@ -1882,11 +1877,11 @@ const Classifieds = () => {
                             )}
                           />
                           <TextInput
-                            placeholder="Cost per Hour"
+                            placeholder="Hourly Rate"
                             placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange('fiCostPerHour')}
-                            onBlur={handleBlur('fiCostPerHour')}
-                            value={values.fiCostPerHour}
+                            onChangeText={handleChange('hourlyRate')}
+                            onBlur={handleBlur('hourlyRate')}
+                            value={values.hourlyRate}
                             keyboardType="numeric"
                             style={{
                               borderBottomWidth: 1,
@@ -1895,10 +1890,10 @@ const Classifieds = () => {
                               padding: 8,
                               color: COLORS.black,
                             }}
-                            accessibilityLabel="Cost per Hour Input"
+                            accessibilityLabel="Hourly Rate Input"
                           />
-                          {touched.fiCostPerHour && errors.fiCostPerHour && (
-                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.fiCostPerHour}</Text>
+                          {touched.hourlyRate && errors.hourlyRate && (
+                            <Text style={{ color: 'red', marginBottom: 8 }}>{errors.hourlyRate}</Text>
                           )}
                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                             <Text style={{ flex: 1, color: COLORS.black, fontSize: 16 }}>
@@ -2142,7 +2137,6 @@ const Classifieds = () => {
                         </>
                       ) : (
                         <>
-                          {/* For Aircraft for Sale (fallback) */}
                           {values.category === 'Aircraft for Sale' && (
                             <>
                               <TextInput
@@ -2162,7 +2156,7 @@ const Classifieds = () => {
                               />
                               {touched.title && errors.title && (
                                 <Text style={{ color: 'red', marginBottom: 8 }}>{errors.title}</Text>
-                              )}
+                              )}  
                               <TextInput
                                 placeholder="Aircraft Tail Number"
                                 placeholderTextColor={COLORS.gray}
