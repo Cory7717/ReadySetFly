@@ -25,8 +25,13 @@ import * as Yup from 'yup';
 // Configuration Constants
 const API_URL = 'https://us-central1-ready-set-fly-71506.cloudfunctions.net/api';
 
-// Pricing packages mapping for classifieds listings
-const PRICING_PACKAGES = { Basic: 25, Featured: 70, Enhanced: 150 };
+// Pricing packages mapping for classifieds listings (updated to include Charter Services)
+const PRICING_PACKAGES = { 
+  Basic: 25, 
+  Featured: 70, 
+  Enhanced: 150,
+  "Charter Services": 500 
+};
 
 // Helper function: calculates total amount (in cents) based on the pricing tier
 const calculateAmount = (pricingTier) => {
@@ -170,11 +175,11 @@ export default function ClassifiedsPaymentScreen() {
   const auth = getAuth();
   const user = auth.currentUser;
 
-  // Extract route parameters from classifieds.js
+  // Extract route parameters from classifieds.js (updated to include selectedCategory)
   const {
     listingDetails = {},
     selectedPricing: initialSelectedPricing = 'Basic',
-    // Note: amount is no longer passed from classifieds.js since we auto-calculate below.
+    selectedCategory = '',
     listingId: routeListingId = '',
   } = route.params || {};
 
@@ -290,81 +295,6 @@ export default function ClassifiedsPaymentScreen() {
 
   // Handle classifieds payment (and listing creation if needed)
   const handleClassifiedPayment = async (values) => {
-    // ===========================
-    // Aviation Gear Block (COMMENTED OUT)
-    // ===========================
-    /*
-    // === New block: Skip payment for Aviation Gear ===
-    if (listingDetails.category === 'Aviation Gear') {
-      try {
-        setLoading(true);
-        const token = await getFirebaseIdToken();
-        if (!token) {
-          throw new Error('Authentication token is missing for classifieds payment.');
-        }
-
-        let finalListingId = listingDetails.id || routeListingId;
-        if (!finalListingId) {
-          // Prepare listingDetails (perform any necessary transformations)
-          const preparedListing = {
-            ...listingDetails,
-          };
-          if (preparedListing.salePrice) {
-            preparedListing.salePrice = parseFloat(preparedListing.salePrice);
-          }
-          if (preparedListing.packageCost) {
-            preparedListing.packageCost = parseFloat(preparedListing.packageCost);
-          }
-
-          const createResponse = await fetch(`${API_URL}/createListing`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ listingDetails: preparedListing }),
-          });
-          if (!createResponse.ok) {
-            let errorData;
-            try {
-              errorData = await createResponse.json();
-            } catch (e) {
-              errorData = { error: 'Failed to create listing.' };
-            }
-            Alert.alert('Error', errorData.error || 'Failed to create listing.');
-            setLoading(false);
-            return;
-          }
-          const createData = await createResponse.json();
-          finalListingId = createData.listingId;
-          listingDetails.id = finalListingId;
-        }
-
-        Alert.alert(
-          'Payment was Successful',
-          'Your Aviation Gear listing has been posted!',
-          [
-            {
-              text: 'Close',
-              onPress: () => {
-                navigation.navigate('Classifieds', { refresh: true });
-              },
-            },
-          ],
-          { cancelable: false }
-        );
-        setIsOperationSuccess(true);
-      } catch (error) {
-        console.error('Classified payment error for Aviation Gear:', error);
-        Alert.alert('Error', 'Failed to post your Aviation Gear listing.');
-      } finally {
-        setLoading(false);
-      }
-      return; // Skip the rest of the payment flow
-    }
-    */
-
-    // === Existing payment logic for other categories ===
     if (values.cardholderName.trim() === '') {
       Alert.alert('Validation Error', 'Please enter the name on the credit card.');
       return;
@@ -388,6 +318,25 @@ export default function ClassifiedsPaymentScreen() {
         }
         if (preparedListing.packageCost) {
           preparedListing.packageCost = parseFloat(preparedListing.packageCost);
+        }
+        // If this is a Charter Services listing, update the payload to include required charter fields
+        if (preparedListing.category === "Charter Services") {
+          const { charterServiceEmail, charterServiceName, charterServiceLocation, charterServicePhone, charterServiceDescription, charterServiceAreas } = preparedListing;
+          preparedListing.charterServiceDetails = {
+            charterServiceEmail,
+            charterServiceName,
+            charterServiceLocation,
+            charterServicePhone,
+            charterServiceDescription,
+            charterServiceAreas,
+          };
+          delete preparedListing.charterServiceName;
+          delete preparedListing.charterServiceLocation;
+          delete preparedListing.charterServiceEmail;
+          delete preparedListing.charterServicePhone;
+          delete preparedListing.charterServiceDescription;
+          delete preparedListing.charterServiceAreas;
+          delete preparedListing.salePrice;
         }
 
         const createResponse = await fetch(`${API_URL}/createListing`, {

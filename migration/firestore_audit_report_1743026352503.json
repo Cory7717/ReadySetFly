@@ -1,0 +1,2734 @@
+{
+  "auditTimestamp": "2025-03-26T21:58:26.006Z",
+  "summary": {
+    "totalCollections": 46,
+    "totalDocuments": 220,
+    "totalIssues": 1262,
+    "issuesByType": {
+      "❗ Type mismatch for 'selectedAircraftIds'": 1,
+      "❗ Type mismatch for 'aircraftDetails'": 1,
+      "❗ Type mismatch for 'costPerHour'": 10,
+      "❗ Type mismatch for 'baseCost'": 10,
+      "❗ Type mismatch for 'commission'": 10,
+      "❗ Type mismatch for 'ownerPayout'": 10,
+      "❗ Type mismatch for 'rentalCost'": 35,
+      "❗ Type mismatch for 'totalCost'": 17,
+      "❗ Type mismatch for 'tailNumber'": 10,
+      "❗ Type mismatch for 'totalTimeOnFrame'": 10,
+      "❗ Type mismatch for 'images'": 21,
+      "❗ Type mismatch for 'availableDates'": 3,
+      "❗ Type mismatch for 'documents'": 2,
+      "❗ Type mismatch for 'insuranceDocuments'": 2,
+      "❗ Type mismatch for 'createdAt'": 122,
+      "❗ Type mismatch for 'minimumHours'": 2,
+      "❗ Type mismatch for 'currentAnnualPdf'": 1,
+      "❗ Type mismatch for 'insurancePdf'": 1,
+      "❗ Type mismatch for 'ratesPerHour'": 2,
+      "❗ Missing field 'rentalPeriod' (expected type": 9,
+      "❗ Missing field 'renterName' (expected type": 8,
+      "❗ Missing field 'ownerId' (expected type": 15,
+      "❗ Missing field 'rentalCost' (expected type": 4,
+      "❗ Missing field 'transactionFee' (expected type": 4,
+      "❗ Type mismatch for 'bookingFee'": 26,
+      "❗ Missing field 'salesTax' (expected type": 4,
+      "❗ Missing field 'rentalRequestId' (expected type": 23,
+      "❗ Type mismatch for 'rentalHours'": 71,
+      "❗ Type mismatch for 'rentalCostPerHour'": 29,
+      "❗ Missing field 'baseCost' (expected type": 3,
+      "❗ Missing field 'commission' (expected type": 3,
+      "❗ Type mismatch for 'rentalDate'": 1,
+      "❗ Missing field 'currentLocation' (expected type": 8,
+      "❗ Missing field 'hasMedicalCertificate' (expected type": 4,
+      "❗ Missing field 'hasRentersInsurance' (expected type": 4,
+      "❗ Missing field 'flightHours' (expected type": 4,
+      "❗ Missing field 'id' (expected type": 4,
+      "❗ Missing field 'status' (expected type": 21,
+      "❗ Missing field 'totalAmount' (expected type": 4,
+      "❗ Missing field 'messagingClosed' (expected type": 4,
+      "❗ Missing field 'address' (expected type": 11,
+      "❗ Missing field 'aircraftType' (expected type": 9,
+      "❗ Missing field 'contact' (expected type": 9,
+      "❗ Missing field 'name' (expected type": 8,
+      "❗ Missing field 'fullName' (expected type": 11,
+      "❗ Missing field 'certifications' (expected type": 9,
+      "❗ Missing field 'fcmToken' (expected type": 6,
+      "❗ Missing field 'email' (expected type": 10,
+      "❗ Missing field 'paymentStatus' (expected type": 4,
+      "❗ Missing field 'rating' (expected type": 4,
+      "❗ Missing field 'notified' (expected type": 4,
+      "⚠️ Unexpected field 'processingFee' (type": 1,
+      "⚠️ Unexpected field 'tax' (type": 1,
+      "⚠️ Unexpected field 'description' (type": 1,
+      "❗ Type mismatch for 'price'": 14,
+      "❗ Type mismatch for 'salePrice'": 14,
+      "❗ Type mismatch for 'packageType'": 14,
+      "❗ Type mismatch for 'packageCost'": 14,
+      "❗ Type mismatch for 'updatedAt'": 8,
+      "❗ Type mismatch for 'gearPrice'": 14,
+      "❗ Missing field 'flightSchoolName' (expected type": 1,
+      "❗ Type mismatch for 'flightSchoolDetails'": 1,
+      "❗ Type mismatch for 'serviceLocationsList'": 3,
+      "❗ Missing field 'charterServiceName' (expected type": 1,
+      "❗ Missing field 'charterServiceLocation' (expected type": 1,
+      "❗ Missing field 'charterServiceEmail' (expected type": 1,
+      "❗ Missing field 'charterServicePhone' (expected type": 1,
+      "❗ Missing field 'charterServicecDescription' (expected type": 1,
+      "❗ Missing field 'charterServiceAreas' (expected type": 1,
+      "❗ Type mismatch for 'charterServiceDetails'": 1,
+      "❗ Missing field 'charerServiceEmail' (expected type": 1,
+      "❗ Missing field 'charterServiceDescription' (expected type": 1,
+      "❗ Type mismatch for 'participants'": 11,
+      "❗ Type mismatch for 'rentalRequestId'": 6,
+      "❗ Type mismatch for 'timestamp'": 9,
+      "❗ Type mismatch for 'messages'": 1,
+      "❗ Type mismatch for 'migratedAt'": 2,
+      "❗ Missing field 'listingId' (expected type": 17,
+      "❗ Missing field 'renterId' (expected type": 22,
+      "❗ Missing field 'uid' (expected type": 6,
+      "⚠️ Unexpected field 'notificationId' (type": 1,
+      "⚠️ Unexpected field 'rentalRequestId' (type": 2,
+      "⚠️ Unexpected field 'message' (type": 1,
+      "⚠️ Unexpected field 'type' (type": 1,
+      "❗ Type mismatch for 'amount'": 1,
+      "❗ Type mismatch for 'rating'": 26,
+      "❗ Type mismatch for 'likes'": 13,
+      "❗ Type mismatch for 'comments'": 11,
+      "❗ Type mismatch for 'image'": 24,
+      "❗ Type mismatch for 'userName'": 1,
+      "❗ Type mismatch for 'renterName'": 24,
+      "❗ Type mismatch for 'transactionFee'": 25,
+      "❗ Type mismatch for 'salesTax'": 25,
+      "❗ Type mismatch for 'flightHours'": 25,
+      "❗ Type mismatch for 'totalAmount'": 25,
+      "❗ Missing field 'processingFee' (expected type": 28,
+      "❗ Missing field 'tax' (expected type": 28,
+      "❗ Missing field 'description' (expected type": 28,
+      "❗ Missing field 'receiverId' (expected type": 10,
+      "❗ Missing field 'participants' (expected type": 10,
+      "❗ Missing field 'timestamp' (expected type": 10,
+      "❗ Missing field 'timeStamp' (expected type": 10,
+      "❗ Missing field 'messages' (expected type": 10,
+      "❗ Type mismatch for 'senderName'": 2,
+      "❗ Missing field 'notificationId' (expected type": 9,
+      "❗ Missing field 'message' (expected type": 9,
+      "❗ Missing field 'type' (expected type": 11,
+      "❗ Missing field 'bookingFee' (expected type": 3,
+      "❗ Missing field 'totalCost' (expected type": 9,
+      "❗ Missing field 'rentalStatus' (expected type": 2,
+      "❗ Missing field 'createdAt' (expected type": 7,
+      "❗ Missing field 'confirmed' (expected type": 4,
+      "❗ Missing field 'renter' (expected type": 4,
+      "❗ Missing field 'fromUserName' (expected type": 4,
+      "❗ Missing field 'fromUserId' (expected type": 4,
+      "❗ Missing field 'postId' (expected type": 4,
+      "❗ Missing field 'toUserId' (expected type": 4,
+      "❗ Missing field 'read' (expected type": 4,
+      "❗ Missing field 'commentId' (expected type": 4,
+      "❗ Missing field 'airplaneModel' (expected type": 4,
+      "❗ Missing field 'rentalHours' (expected type": 4,
+      "⚠️ Unexpected field 'ownerName' (type": 1,
+      "❗ Missing field 'ownerName' (expected type": 1,
+      "⚠️ Unexpected field 'costPerHour' (type": 1,
+      "⚠️ Unexpected field 'senderId' (type": 1,
+      "⚠️ Unexpected field 'senderName' (type": 1,
+      "⚠️ Unexpected field 'airplaneModel' (type": 1,
+      "⚠️ Unexpected field 'updatedAt' (type": 1,
+      "❗ Missing field 'stripeAccountId' (expected type": 3,
+      "❗ Missing field 'stripeAccountStatus' (expected type": 3,
+      "❗ Missing field 'image' (expected type": 3,
+      "⚠️ Unexpected field 'displayName' (type": 2,
+      "⚠️ Unexpected field 'createdAt' (type": 1,
+      "⚠️ Unexpected field 'role' (type": 2,
+      "⚠️ Unexpected field 'currentMedical' (type": 1,
+      "⚠️ Unexpected field 'currentRentersInsurance' (type": 1,
+      "⚠️ Unexpected field 'totalFlightHours' (type": 1,
+      "⚠️ Schema definition missing for 'favorites'": 5,
+      "⚠️ Unexpected field 'rentalDate' (type": 1,
+      "❗ Missing field 'displayName' (expected type": 5,
+      "❗ Missing field 'role' (expected type": 5,
+      "⚠️ Unexpected field 'costData' (type": 1,
+      "⚠️ Unexpected field 'aircraftDetails' (type": 1,
+      "⚠️ Unexpected field 'profileData' (type": 1,
+      "❗ Missing field 'currentMedical' (expected type": 3,
+      "❗ Missing field 'currentRentersInsurance' (expected type": 3,
+      "❗ Missing field 'totalFlightHours' (expected type": 3,
+      "⚠️ Unexpected field 'stripeDetailsSubmitted' (type": 1,
+      "❗ Missing field 'stripeDetailsSubmitted' (expected type": 1
+    },
+    "collectionsAudited": [
+      "Category",
+      "Sliders",
+      "aircraftDetails",
+      "airplanes",
+      "airplanes/listingId/rentalRequests",
+      "bookings",
+      "listings",
+      "messages",
+      "migrationFlags",
+      "newListing",
+      "notifications",
+      "notifications/1duns3UKPPwNDUcV4dHB/renters",
+      "orders",
+      "ownerId",
+      "owners",
+      "payment-sheet",
+      "posts",
+      "rentalRequests",
+      "rentalRequests/3R8fuUGMFTkG0oanzY0d/messages",
+      "rentalRequests/Apumci7rbNdM0t5cwOgl/messages",
+      "rentalRequests/C3LKGFKohzUtKOiHzuWE/messages",
+      "rentalRequests/DX9kKYWJNmt2ygNTCVbM/messages",
+      "rentalRequests/JWiEzdGKQL3XDC13nVP9/messages",
+      "rentalRequests/PvMYBNTTPgQqaCYV6Zf9/messages",
+      "rentalRequests/lqDg4ovwiJuVRM5berQM/messages",
+      "rentalRequests/ojGBDRzAtKI5DMTlfz67/messages",
+      "rentalRequests/rjl9kxGcU5rddf0fOf3D/messages",
+      "rentalRequests/ylqYZ7eC6vYyTrdfdGRc/messages",
+      "renters",
+      "renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests",
+      "renters/renterId/notifications",
+      "renters/renterId/rentalRequests",
+      "users",
+      "users/08O5m7x11kG7lgPITLLs/owners",
+      "users/08O5m7x11kG7lgPITLLs/renters",
+      "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/favorites",
+      "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/notifications",
+      "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/owners",
+      "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/renters",
+      "users/2AAa3ntKG0SYxRjWPkFMRiuJV9W2/favorites",
+      "users/Bicov6dbPAYjqJKGZDtaO8aIXq22/favorites",
+      "users/Bicov6dbPAYjqJKGZDtaO8aIXq22/renters",
+      "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/favorites",
+      "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/owners",
+      "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/renters",
+      "your-collection"
+    ]
+  },
+  "details": {
+    "Category": {
+      "documentsWithIssues": []
+    },
+    "Sliders": {
+      "documentsWithIssues": []
+    },
+    "aircraftDetails": {
+      "documentsWithIssues": [
+        {
+          "path": "aircraftDetails/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "id": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "issues": [
+            "❗ Type mismatch for 'selectedAircraftIds': expected 'object', got 'array' in aircraftDetails/1Dj9eQwMcRWWXqtcGHNKEctgjW62"
+          ]
+        },
+        {
+          "path": "aircraftDetails/utSWq1Buu4eoRSMDQ9xy",
+          "id": "utSWq1Buu4eoRSMDQ9xy",
+          "issues": [
+            "❗ Type mismatch for 'aircraftDetails': expected 'object', got 'string' in aircraftDetails/utSWq1Buu4eoRSMDQ9xy"
+          ]
+        }
+      ]
+    },
+    "airplanes": {
+      "documentsWithIssues": [
+        {
+          "path": "airplanes/ANARb2zjDFHVY8n0LnwL",
+          "id": "ANARb2zjDFHVY8n0LnwL",
+          "issues": [
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/ANARb2zjDFHVY8n0LnwL",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/ANARb2zjDFHVY8n0LnwL",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/ANARb2zjDFHVY8n0LnwL",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/ANARb2zjDFHVY8n0LnwL",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/ANARb2zjDFHVY8n0LnwL",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/ANARb2zjDFHVY8n0LnwL",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/ANARb2zjDFHVY8n0LnwL",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/ANARb2zjDFHVY8n0LnwL"
+          ]
+        },
+        {
+          "path": "airplanes/FrMdWRmqRka57Loepb33",
+          "id": "FrMdWRmqRka57Loepb33",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in airplanes/FrMdWRmqRka57Loepb33",
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/FrMdWRmqRka57Loepb33",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/FrMdWRmqRka57Loepb33",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/FrMdWRmqRka57Loepb33",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/FrMdWRmqRka57Loepb33",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/FrMdWRmqRka57Loepb33",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/FrMdWRmqRka57Loepb33",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/FrMdWRmqRka57Loepb33",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/FrMdWRmqRka57Loepb33"
+          ]
+        },
+        {
+          "path": "airplanes/Frg8EA0D8Wg9Uogq2Kys",
+          "id": "Frg8EA0D8Wg9Uogq2Kys",
+          "issues": [
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/Frg8EA0D8Wg9Uogq2Kys",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/Frg8EA0D8Wg9Uogq2Kys",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/Frg8EA0D8Wg9Uogq2Kys",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/Frg8EA0D8Wg9Uogq2Kys",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/Frg8EA0D8Wg9Uogq2Kys",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/Frg8EA0D8Wg9Uogq2Kys",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/Frg8EA0D8Wg9Uogq2Kys",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/Frg8EA0D8Wg9Uogq2Kys"
+          ]
+        },
+        {
+          "path": "airplanes/QW1Z9RCqLETiuFqdePge",
+          "id": "QW1Z9RCqLETiuFqdePge",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'availableDates': expected 'object', got 'array' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/QW1Z9RCqLETiuFqdePge",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/QW1Z9RCqLETiuFqdePge"
+          ]
+        },
+        {
+          "path": "airplanes/YRzBtEwTg64HLg6fMfLo",
+          "id": "YRzBtEwTg64HLg6fMfLo",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'availableDates': expected 'object', got 'array' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'documents': expected 'object', got 'array' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'insuranceDocuments': expected 'object', got 'array' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/YRzBtEwTg64HLg6fMfLo",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/YRzBtEwTg64HLg6fMfLo"
+          ]
+        },
+        {
+          "path": "airplanes/cyqJCRZYLoeAnTEERwR2",
+          "id": "cyqJCRZYLoeAnTEERwR2",
+          "issues": [
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/cyqJCRZYLoeAnTEERwR2",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/cyqJCRZYLoeAnTEERwR2",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/cyqJCRZYLoeAnTEERwR2",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/cyqJCRZYLoeAnTEERwR2",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/cyqJCRZYLoeAnTEERwR2",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/cyqJCRZYLoeAnTEERwR2",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/cyqJCRZYLoeAnTEERwR2",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/cyqJCRZYLoeAnTEERwR2"
+          ]
+        },
+        {
+          "path": "airplanes/f83Hws1uB1PG3BBi7N2P",
+          "id": "f83Hws1uB1PG3BBi7N2P",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'string' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'string' in airplanes/f83Hws1uB1PG3BBi7N2P",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'string' in airplanes/f83Hws1uB1PG3BBi7N2P"
+          ]
+        },
+        {
+          "path": "airplanes/lXAaqxq9J1TJPYRqyjKr",
+          "id": "lXAaqxq9J1TJPYRqyjKr",
+          "issues": [
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/lXAaqxq9J1TJPYRqyjKr",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/lXAaqxq9J1TJPYRqyjKr",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/lXAaqxq9J1TJPYRqyjKr",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/lXAaqxq9J1TJPYRqyjKr",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/lXAaqxq9J1TJPYRqyjKr",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/lXAaqxq9J1TJPYRqyjKr",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/lXAaqxq9J1TJPYRqyjKr",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/lXAaqxq9J1TJPYRqyjKr"
+          ]
+        },
+        {
+          "path": "airplanes/listingId",
+          "id": "listingId",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in airplanes/listingId",
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in airplanes/listingId",
+            "❗ Type mismatch for 'minimumHours': expected 'string', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'currentAnnualPdf': expected 'object', got 'string' in airplanes/listingId",
+            "❗ Type mismatch for 'insurancePdf': expected 'object', got 'string' in airplanes/listingId",
+            "❗ Type mismatch for 'ratesPerHour': expected 'string', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/listingId",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/listingId"
+          ]
+        },
+        {
+          "path": "airplanes/ljEtSjpNHrnOOPxzibhX",
+          "id": "ljEtSjpNHrnOOPxzibhX",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'costPerHour': expected 'number', got 'integer' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'baseCost': expected 'number', got 'integer' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'commission': expected 'number', got 'integer' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'ownerPayout': expected 'number', got 'integer' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'availableDates': expected 'object', got 'array' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'documents': expected 'object', got 'array' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'insuranceDocuments': expected 'object', got 'array' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'tailNumber': expected 'number', got 'integer' in airplanes/ljEtSjpNHrnOOPxzibhX",
+            "❗ Type mismatch for 'totalTimeOnFrame': expected 'number', got 'integer' in airplanes/ljEtSjpNHrnOOPxzibhX"
+          ]
+        }
+      ]
+    },
+    "airplanes/listingId/rentalRequests": {
+      "documentsWithIssues": [
+        {
+          "path": "airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+          "id": "QCGFzqug1FI59HACotLU",
+          "issues": [
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Missing field 'renterName' (expected type: object)",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'rentalCost' (expected type: number)",
+            "❗ Missing field 'transactionFee' (expected type: number)",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+            "❗ Missing field 'salesTax' (expected type: number)",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+            "❗ Missing field 'baseCost' (expected type: string)",
+            "❗ Missing field 'commission' (expected type: string)",
+            "❗ Type mismatch for 'rentalDate': expected 'string', got 'timestamp' in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+            "❗ Missing field 'currentLocation' (expected type: string)",
+            "❗ Missing field 'hasMedicalCertificate' (expected type: boolean)",
+            "❗ Missing field 'hasRentersInsurance' (expected type: boolean)",
+            "❗ Missing field 'flightHours' (expected type: number)",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+            "❗ Missing field 'id' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'totalAmount' (expected type: number)",
+            "❗ Missing field 'messagingClosed' (expected type: boolean)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'name' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fcmToken' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'paymentStatus' (expected type: string)",
+            "❗ Missing field 'rating' (expected type: number)",
+            "❗ Missing field 'notified' (expected type: boolean)",
+            "⚠️ Unexpected field 'processingFee' (type: integer) in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+            "⚠️ Unexpected field 'tax' (type: integer) in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU",
+            "⚠️ Unexpected field 'description' (type: string) in airplanes/listingId/rentalRequests/QCGFzqug1FI59HACotLU"
+          ]
+        }
+      ]
+    },
+    "bookings": {
+      "documentsWithIssues": []
+    },
+    "listings": {
+      "documentsWithIssues": [
+        {
+          "path": "listings/37I8PzrS2hIzQuPb9ecu",
+          "id": "37I8PzrS2hIzQuPb9ecu",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/37I8PzrS2hIzQuPb9ecu",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/37I8PzrS2hIzQuPb9ecu",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/37I8PzrS2hIzQuPb9ecu",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/37I8PzrS2hIzQuPb9ecu",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/37I8PzrS2hIzQuPb9ecu",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/37I8PzrS2hIzQuPb9ecu",
+            "❗ Type mismatch for 'updatedAt': expected 'object', got 'timestamp' in listings/37I8PzrS2hIzQuPb9ecu",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/37I8PzrS2hIzQuPb9ecu"
+          ]
+        },
+        {
+          "path": "listings/5uWFZV3qeAhgm8NC1XVS",
+          "id": "5uWFZV3qeAhgm8NC1XVS",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/5uWFZV3qeAhgm8NC1XVS",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/5uWFZV3qeAhgm8NC1XVS",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/5uWFZV3qeAhgm8NC1XVS",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/5uWFZV3qeAhgm8NC1XVS",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/5uWFZV3qeAhgm8NC1XVS",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/5uWFZV3qeAhgm8NC1XVS",
+            "❗ Type mismatch for 'updatedAt': expected 'object', got 'timestamp' in listings/5uWFZV3qeAhgm8NC1XVS",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/5uWFZV3qeAhgm8NC1XVS"
+          ]
+        },
+        {
+          "path": "listings/7T4Xs7pLSChnuRMrzUuw",
+          "id": "7T4Xs7pLSChnuRMrzUuw",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/7T4Xs7pLSChnuRMrzUuw",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/7T4Xs7pLSChnuRMrzUuw",
+            "❗ Missing field 'flightSchoolName' (expected type: string)",
+            "❗ Type mismatch for 'flightSchoolDetails': expected 'string', got 'object' in listings/7T4Xs7pLSChnuRMrzUuw",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/7T4Xs7pLSChnuRMrzUuw",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/7T4Xs7pLSChnuRMrzUuw",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/7T4Xs7pLSChnuRMrzUuw",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/7T4Xs7pLSChnuRMrzUuw",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/7T4Xs7pLSChnuRMrzUuw"
+          ]
+        },
+        {
+          "path": "listings/CM9Wl4zSMczpEsZf1NZd",
+          "id": "CM9Wl4zSMczpEsZf1NZd",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/CM9Wl4zSMczpEsZf1NZd",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/CM9Wl4zSMczpEsZf1NZd",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/CM9Wl4zSMczpEsZf1NZd",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/CM9Wl4zSMczpEsZf1NZd",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/CM9Wl4zSMczpEsZf1NZd",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/CM9Wl4zSMczpEsZf1NZd",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/CM9Wl4zSMczpEsZf1NZd"
+          ]
+        },
+        {
+          "path": "listings/D35nByouuq4tDcMiPA2v",
+          "id": "D35nByouuq4tDcMiPA2v",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/D35nByouuq4tDcMiPA2v",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/D35nByouuq4tDcMiPA2v",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/D35nByouuq4tDcMiPA2v",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/D35nByouuq4tDcMiPA2v",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/D35nByouuq4tDcMiPA2v",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/D35nByouuq4tDcMiPA2v",
+            "❗ Type mismatch for 'updatedAt': expected 'object', got 'timestamp' in listings/D35nByouuq4tDcMiPA2v",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/D35nByouuq4tDcMiPA2v"
+          ]
+        },
+        {
+          "path": "listings/GCxznfAImksvdi5B6Awy",
+          "id": "GCxznfAImksvdi5B6Awy",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/GCxznfAImksvdi5B6Awy",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/GCxznfAImksvdi5B6Awy",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/GCxznfAImksvdi5B6Awy",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/GCxznfAImksvdi5B6Awy",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/GCxznfAImksvdi5B6Awy",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/GCxznfAImksvdi5B6Awy",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/GCxznfAImksvdi5B6Awy",
+            "❗ Type mismatch for 'serviceLocationsList': expected 'object', got 'array' in listings/GCxznfAImksvdi5B6Awy"
+          ]
+        },
+        {
+          "path": "listings/GWMPdd9zpnA14SiUwcRV",
+          "id": "GWMPdd9zpnA14SiUwcRV",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/GWMPdd9zpnA14SiUwcRV",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/GWMPdd9zpnA14SiUwcRV",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/GWMPdd9zpnA14SiUwcRV",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/GWMPdd9zpnA14SiUwcRV",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/GWMPdd9zpnA14SiUwcRV",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/GWMPdd9zpnA14SiUwcRV",
+            "❗ Type mismatch for 'updatedAt': expected 'object', got 'timestamp' in listings/GWMPdd9zpnA14SiUwcRV",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/GWMPdd9zpnA14SiUwcRV"
+          ]
+        },
+        {
+          "path": "listings/TnMzh68G8k47SP6IPQuz",
+          "id": "TnMzh68G8k47SP6IPQuz",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/TnMzh68G8k47SP6IPQuz",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/TnMzh68G8k47SP6IPQuz",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/TnMzh68G8k47SP6IPQuz",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/TnMzh68G8k47SP6IPQuz",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/TnMzh68G8k47SP6IPQuz",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/TnMzh68G8k47SP6IPQuz",
+            "❗ Type mismatch for 'updatedAt': expected 'object', got 'timestamp' in listings/TnMzh68G8k47SP6IPQuz",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/TnMzh68G8k47SP6IPQuz"
+          ]
+        },
+        {
+          "path": "listings/UyU1upZA0gOeQPhuf4wu",
+          "id": "UyU1upZA0gOeQPhuf4wu",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/UyU1upZA0gOeQPhuf4wu",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/UyU1upZA0gOeQPhuf4wu",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/UyU1upZA0gOeQPhuf4wu",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/UyU1upZA0gOeQPhuf4wu",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/UyU1upZA0gOeQPhuf4wu",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/UyU1upZA0gOeQPhuf4wu",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/UyU1upZA0gOeQPhuf4wu",
+            "❗ Missing field 'charterServiceName' (expected type: string)",
+            "❗ Missing field 'charterServiceLocation' (expected type: string)",
+            "❗ Missing field 'charterServiceEmail' (expected type: string)",
+            "❗ Missing field 'charterServicePhone' (expected type: string)",
+            "❗ Missing field 'charterServicecDescription' (expected type: string)",
+            "❗ Missing field 'charterServiceAreas' (expected type: string)",
+            "❗ Type mismatch for 'charterServiceDetails': expected 'string', got 'object' in listings/UyU1upZA0gOeQPhuf4wu",
+            "❗ Missing field 'charerServiceEmail' (expected type: string)",
+            "❗ Missing field 'charterServiceDescription' (expected type: string)"
+          ]
+        },
+        {
+          "path": "listings/X7FEVJa25aEBb9HZ1xO0",
+          "id": "X7FEVJa25aEBb9HZ1xO0",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/X7FEVJa25aEBb9HZ1xO0",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/X7FEVJa25aEBb9HZ1xO0",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/X7FEVJa25aEBb9HZ1xO0",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/X7FEVJa25aEBb9HZ1xO0",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/X7FEVJa25aEBb9HZ1xO0",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/X7FEVJa25aEBb9HZ1xO0",
+            "❗ Type mismatch for 'updatedAt': expected 'object', got 'timestamp' in listings/X7FEVJa25aEBb9HZ1xO0",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/X7FEVJa25aEBb9HZ1xO0"
+          ]
+        },
+        {
+          "path": "listings/jpqwwRkXU9csi69QFV2K",
+          "id": "jpqwwRkXU9csi69QFV2K",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/jpqwwRkXU9csi69QFV2K",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/jpqwwRkXU9csi69QFV2K",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/jpqwwRkXU9csi69QFV2K",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/jpqwwRkXU9csi69QFV2K",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/jpqwwRkXU9csi69QFV2K",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/jpqwwRkXU9csi69QFV2K",
+            "❗ Type mismatch for 'updatedAt': expected 'object', got 'timestamp' in listings/jpqwwRkXU9csi69QFV2K",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/jpqwwRkXU9csi69QFV2K"
+          ]
+        },
+        {
+          "path": "listings/kCDhNZdIazTDiDVcttQI",
+          "id": "kCDhNZdIazTDiDVcttQI",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/kCDhNZdIazTDiDVcttQI",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/kCDhNZdIazTDiDVcttQI",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/kCDhNZdIazTDiDVcttQI",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/kCDhNZdIazTDiDVcttQI",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/kCDhNZdIazTDiDVcttQI",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/kCDhNZdIazTDiDVcttQI",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/kCDhNZdIazTDiDVcttQI",
+            "❗ Type mismatch for 'serviceLocationsList': expected 'object', got 'array' in listings/kCDhNZdIazTDiDVcttQI"
+          ]
+        },
+        {
+          "path": "listings/nmfTcSQ422ua7msTZDe7",
+          "id": "nmfTcSQ422ua7msTZDe7",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/nmfTcSQ422ua7msTZDe7",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/nmfTcSQ422ua7msTZDe7",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/nmfTcSQ422ua7msTZDe7",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/nmfTcSQ422ua7msTZDe7",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/nmfTcSQ422ua7msTZDe7",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/nmfTcSQ422ua7msTZDe7",
+            "❗ Type mismatch for 'updatedAt': expected 'object', got 'timestamp' in listings/nmfTcSQ422ua7msTZDe7",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/nmfTcSQ422ua7msTZDe7"
+          ]
+        },
+        {
+          "path": "listings/pnVzPW2ljxnMY0Vu5NjY",
+          "id": "pnVzPW2ljxnMY0Vu5NjY",
+          "issues": [
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in listings/pnVzPW2ljxnMY0Vu5NjY",
+            "❗ Type mismatch for 'price': expected 'number', got 'integer' in listings/pnVzPW2ljxnMY0Vu5NjY",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in listings/pnVzPW2ljxnMY0Vu5NjY",
+            "❗ Type mismatch for 'salePrice': expected 'number', got 'integer' in listings/pnVzPW2ljxnMY0Vu5NjY",
+            "❗ Type mismatch for 'packageType': expected 'object', got 'string' in listings/pnVzPW2ljxnMY0Vu5NjY",
+            "❗ Type mismatch for 'packageCost': expected 'number', got 'integer' in listings/pnVzPW2ljxnMY0Vu5NjY",
+            "❗ Type mismatch for 'gearPrice': expected 'number', got 'integer' in listings/pnVzPW2ljxnMY0Vu5NjY",
+            "❗ Type mismatch for 'serviceLocationsList': expected 'object', got 'array' in listings/pnVzPW2ljxnMY0Vu5NjY"
+          ]
+        }
+      ]
+    },
+    "messages": {
+      "documentsWithIssues": [
+        {
+          "path": "messages/05XZL9blGAEbGuQUfjvt",
+          "id": "05XZL9blGAEbGuQUfjvt",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/05XZL9blGAEbGuQUfjvt",
+            "❗ Type mismatch for 'rentalRequestId': expected 'string', got 'null' in messages/05XZL9blGAEbGuQUfjvt",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/05XZL9blGAEbGuQUfjvt"
+          ]
+        },
+        {
+          "path": "messages/1w5vPOSI8DkoedkVHWAd",
+          "id": "1w5vPOSI8DkoedkVHWAd",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/1w5vPOSI8DkoedkVHWAd"
+          ]
+        },
+        {
+          "path": "messages/901BKVa4OsjxuBKnZEi9",
+          "id": "901BKVa4OsjxuBKnZEi9",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/901BKVa4OsjxuBKnZEi9",
+            "❗ Type mismatch for 'rentalRequestId': expected 'string', got 'null' in messages/901BKVa4OsjxuBKnZEi9",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/901BKVa4OsjxuBKnZEi9"
+          ]
+        },
+        {
+          "path": "messages/Cenkr3JAlvTfxmx8TiAl",
+          "id": "Cenkr3JAlvTfxmx8TiAl",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/Cenkr3JAlvTfxmx8TiAl",
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/Cenkr3JAlvTfxmx8TiAl",
+            "❗ Type mismatch for 'messages': expected 'object', got 'array' in messages/Cenkr3JAlvTfxmx8TiAl"
+          ]
+        },
+        {
+          "path": "messages/PtfFfsfZhRndjJfKbv9U",
+          "id": "PtfFfsfZhRndjJfKbv9U",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/PtfFfsfZhRndjJfKbv9U",
+            "❗ Type mismatch for 'rentalRequestId': expected 'string', got 'null' in messages/PtfFfsfZhRndjJfKbv9U",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/PtfFfsfZhRndjJfKbv9U"
+          ]
+        },
+        {
+          "path": "messages/T7iz6tV5uUAtGnWSrMy2",
+          "id": "T7iz6tV5uUAtGnWSrMy2",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/T7iz6tV5uUAtGnWSrMy2"
+          ]
+        },
+        {
+          "path": "messages/YIuLf5bn6uBSFCw2l121",
+          "id": "YIuLf5bn6uBSFCw2l121",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/YIuLf5bn6uBSFCw2l121"
+          ]
+        },
+        {
+          "path": "messages/YpWWy1WYQWApZRU5RFAo",
+          "id": "YpWWy1WYQWApZRU5RFAo",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/YpWWy1WYQWApZRU5RFAo"
+          ]
+        },
+        {
+          "path": "messages/aC0ePb00yMzUdCOgM5pl",
+          "id": "aC0ePb00yMzUdCOgM5pl",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/aC0ePb00yMzUdCOgM5pl"
+          ]
+        },
+        {
+          "path": "messages/cXNr9NmSoDBtT0oAjGAY",
+          "id": "cXNr9NmSoDBtT0oAjGAY",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/cXNr9NmSoDBtT0oAjGAY",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/cXNr9NmSoDBtT0oAjGAY"
+          ]
+        },
+        {
+          "path": "messages/f9ua0jTqkIfSmKCTOjYn",
+          "id": "f9ua0jTqkIfSmKCTOjYn",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/f9ua0jTqkIfSmKCTOjYn",
+            "❗ Type mismatch for 'rentalRequestId': expected 'string', got 'null' in messages/f9ua0jTqkIfSmKCTOjYn",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/f9ua0jTqkIfSmKCTOjYn"
+          ]
+        },
+        {
+          "path": "messages/l3OOsvGscdoZc8le2szs",
+          "id": "l3OOsvGscdoZc8le2szs",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/l3OOsvGscdoZc8le2szs",
+            "❗ Type mismatch for 'rentalRequestId': expected 'string', got 'null' in messages/l3OOsvGscdoZc8le2szs",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/l3OOsvGscdoZc8le2szs"
+          ]
+        },
+        {
+          "path": "messages/lGUMf29XmPAudJeFlmFY",
+          "id": "lGUMf29XmPAudJeFlmFY",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/lGUMf29XmPAudJeFlmFY",
+            "❗ Type mismatch for 'rentalRequestId': expected 'string', got 'null' in messages/lGUMf29XmPAudJeFlmFY",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/lGUMf29XmPAudJeFlmFY"
+          ]
+        },
+        {
+          "path": "messages/lyf9B7kkoMhiWLsNbTrd",
+          "id": "lyf9B7kkoMhiWLsNbTrd",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/lyf9B7kkoMhiWLsNbTrd"
+          ]
+        },
+        {
+          "path": "messages/nOO1xw1insRAMXp2vKUg",
+          "id": "nOO1xw1insRAMXp2vKUg",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/nOO1xw1insRAMXp2vKUg"
+          ]
+        },
+        {
+          "path": "messages/sVKIAFvDspOuhasEnBlf",
+          "id": "sVKIAFvDspOuhasEnBlf",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in messages/sVKIAFvDspOuhasEnBlf",
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/sVKIAFvDspOuhasEnBlf"
+          ]
+        },
+        {
+          "path": "messages/vXGCUUNp7NOr3ddF7NX3",
+          "id": "vXGCUUNp7NOr3ddF7NX3",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/vXGCUUNp7NOr3ddF7NX3",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/vXGCUUNp7NOr3ddF7NX3"
+          ]
+        },
+        {
+          "path": "messages/x93Su0ue6pQPTOL7FtwQ",
+          "id": "x93Su0ue6pQPTOL7FtwQ",
+          "issues": [
+            "❗ Type mismatch for 'participants': expected 'object', got 'array' in messages/x93Su0ue6pQPTOL7FtwQ",
+            "❗ Type mismatch for 'timestamp': expected 'object', got 'timestamp' in messages/x93Su0ue6pQPTOL7FtwQ"
+          ]
+        }
+      ]
+    },
+    "migrationFlags": {
+      "documentsWithIssues": [
+        {
+          "path": "migrationFlags/rentalRequestsAndAirplanesMigration",
+          "id": "rentalRequestsAndAirplanesMigration",
+          "issues": [
+            "❗ Type mismatch for 'migratedAt': expected 'object', got 'timestamp' in migrationFlags/rentalRequestsAndAirplanesMigration"
+          ]
+        },
+        {
+          "path": "migrationFlags/rentalRequestsMigration",
+          "id": "rentalRequestsMigration",
+          "issues": [
+            "❗ Type mismatch for 'migratedAt': expected 'object', got 'timestamp' in migrationFlags/rentalRequestsMigration"
+          ]
+        }
+      ]
+    },
+    "newListing": {
+      "documentsWithIssues": [
+        {
+          "path": "newListing/g7NF56DulZRy1vT1v5Hv",
+          "id": "g7NF56DulZRy1vT1v5Hv",
+          "issues": [
+            "❗ Type mismatch for 'minimumHours': expected 'number', got 'integer' in newListing/g7NF56DulZRy1vT1v5Hv",
+            "❗ Type mismatch for 'ratesPerHour': expected 'number', got 'integer' in newListing/g7NF56DulZRy1vT1v5Hv"
+          ]
+        }
+      ]
+    },
+    "notifications": {
+      "documentsWithIssues": [
+        {
+          "path": "notifications/1duns3UKPPwNDUcV4dHB",
+          "id": "1duns3UKPPwNDUcV4dHB",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/1duns3UKPPwNDUcV4dHB",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/1duns3UKPPwNDUcV4dHB"
+          ]
+        },
+        {
+          "path": "notifications/4BWSZsEaYRm7Ax8t1pRs",
+          "id": "4BWSZsEaYRm7Ax8t1pRs",
+          "issues": [
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/4BWSZsEaYRm7Ax8t1pRs"
+          ]
+        },
+        {
+          "path": "notifications/5gu9R7ufOXSFR9gonzzd",
+          "id": "5gu9R7ufOXSFR9gonzzd",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/5gu9R7ufOXSFR9gonzzd",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/5gu9R7ufOXSFR9gonzzd"
+          ]
+        },
+        {
+          "path": "notifications/7yhnjfaJX6Rtd64t60kG",
+          "id": "7yhnjfaJX6Rtd64t60kG",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/7yhnjfaJX6Rtd64t60kG",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/7yhnjfaJX6Rtd64t60kG"
+          ]
+        },
+        {
+          "path": "notifications/D6ZsF2MjkbXcMZxB8WPe",
+          "id": "D6ZsF2MjkbXcMZxB8WPe",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/D6ZsF2MjkbXcMZxB8WPe",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/D6ZsF2MjkbXcMZxB8WPe"
+          ]
+        },
+        {
+          "path": "notifications/E7v6Vf1tWKym0gUPPn1r",
+          "id": "E7v6Vf1tWKym0gUPPn1r",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/E7v6Vf1tWKym0gUPPn1r",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/E7v6Vf1tWKym0gUPPn1r"
+          ]
+        },
+        {
+          "path": "notifications/FtOwVSbFjzDWmsmLmPxC",
+          "id": "FtOwVSbFjzDWmsmLmPxC",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/FtOwVSbFjzDWmsmLmPxC",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/FtOwVSbFjzDWmsmLmPxC"
+          ]
+        },
+        {
+          "path": "notifications/H1tcgWGPcsoqNkpqveIC",
+          "id": "H1tcgWGPcsoqNkpqveIC",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/H1tcgWGPcsoqNkpqveIC",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/H1tcgWGPcsoqNkpqveIC"
+          ]
+        },
+        {
+          "path": "notifications/HT8eMGwPWlA6JRkV6uJH",
+          "id": "HT8eMGwPWlA6JRkV6uJH",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/HT8eMGwPWlA6JRkV6uJH",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/HT8eMGwPWlA6JRkV6uJH"
+          ]
+        },
+        {
+          "path": "notifications/IQUeAwr6RF5K4P7o4OR0",
+          "id": "IQUeAwr6RF5K4P7o4OR0",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/IQUeAwr6RF5K4P7o4OR0",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/IQUeAwr6RF5K4P7o4OR0"
+          ]
+        },
+        {
+          "path": "notifications/IYsvjvremFAJoUHjkdSn",
+          "id": "IYsvjvremFAJoUHjkdSn",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/IYsvjvremFAJoUHjkdSn",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/IYsvjvremFAJoUHjkdSn"
+          ]
+        },
+        {
+          "path": "notifications/Jog1wUVB4cOfc8r3pPjb",
+          "id": "Jog1wUVB4cOfc8r3pPjb",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/Jog1wUVB4cOfc8r3pPjb",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/Jog1wUVB4cOfc8r3pPjb"
+          ]
+        },
+        {
+          "path": "notifications/KgTZKMgMGN5CGxtmyJvc",
+          "id": "KgTZKMgMGN5CGxtmyJvc",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/KgTZKMgMGN5CGxtmyJvc",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/KgTZKMgMGN5CGxtmyJvc"
+          ]
+        },
+        {
+          "path": "notifications/MwguPq8aRWb2NwZthNQC",
+          "id": "MwguPq8aRWb2NwZthNQC",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/MwguPq8aRWb2NwZthNQC",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/MwguPq8aRWb2NwZthNQC"
+          ]
+        },
+        {
+          "path": "notifications/NNmhdigs3k6p8TV1Exfd",
+          "id": "NNmhdigs3k6p8TV1Exfd",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/NNmhdigs3k6p8TV1Exfd",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/NNmhdigs3k6p8TV1Exfd"
+          ]
+        },
+        {
+          "path": "notifications/OhlYFfNCRcqej3f2Dyxa",
+          "id": "OhlYFfNCRcqej3f2Dyxa",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/OhlYFfNCRcqej3f2Dyxa",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/OhlYFfNCRcqej3f2Dyxa"
+          ]
+        },
+        {
+          "path": "notifications/OsoyopgC0j3Em7fXzLzf",
+          "id": "OsoyopgC0j3Em7fXzLzf",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/OsoyopgC0j3Em7fXzLzf",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/OsoyopgC0j3Em7fXzLzf"
+          ]
+        },
+        {
+          "path": "notifications/P8kaRSlb1XIZUfa1JR8I",
+          "id": "P8kaRSlb1XIZUfa1JR8I",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/P8kaRSlb1XIZUfa1JR8I",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/P8kaRSlb1XIZUfa1JR8I"
+          ]
+        },
+        {
+          "path": "notifications/RagNm0e4xedmAJIMnwDd",
+          "id": "RagNm0e4xedmAJIMnwDd",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/RagNm0e4xedmAJIMnwDd",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/RagNm0e4xedmAJIMnwDd"
+          ]
+        },
+        {
+          "path": "notifications/TbFiyAejNaWuby11bAgO",
+          "id": "TbFiyAejNaWuby11bAgO",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/TbFiyAejNaWuby11bAgO",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/TbFiyAejNaWuby11bAgO"
+          ]
+        },
+        {
+          "path": "notifications/UNZ0VRHfe4q6yPTiaXxw",
+          "id": "UNZ0VRHfe4q6yPTiaXxw",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/UNZ0VRHfe4q6yPTiaXxw",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/UNZ0VRHfe4q6yPTiaXxw"
+          ]
+        },
+        {
+          "path": "notifications/VaqTfVnBrxiwFJKSvu3K",
+          "id": "VaqTfVnBrxiwFJKSvu3K",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/VaqTfVnBrxiwFJKSvu3K",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/VaqTfVnBrxiwFJKSvu3K"
+          ]
+        },
+        {
+          "path": "notifications/XOQctk8NIznqHZx1rOaE",
+          "id": "XOQctk8NIznqHZx1rOaE",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/XOQctk8NIznqHZx1rOaE",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/XOQctk8NIznqHZx1rOaE"
+          ]
+        },
+        {
+          "path": "notifications/XgcDHQsFQ2ElkCeQAtOD",
+          "id": "XgcDHQsFQ2ElkCeQAtOD",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/XgcDHQsFQ2ElkCeQAtOD",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/XgcDHQsFQ2ElkCeQAtOD"
+          ]
+        },
+        {
+          "path": "notifications/Z58RC3EHM7BRdFJfSBNZ",
+          "id": "Z58RC3EHM7BRdFJfSBNZ",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/Z58RC3EHM7BRdFJfSBNZ",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/Z58RC3EHM7BRdFJfSBNZ"
+          ]
+        },
+        {
+          "path": "notifications/h1O2TGlrsAdVgdhcXVaf",
+          "id": "h1O2TGlrsAdVgdhcXVaf",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/h1O2TGlrsAdVgdhcXVaf",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/h1O2TGlrsAdVgdhcXVaf"
+          ]
+        },
+        {
+          "path": "notifications/hjjPHEHqw9V0ybygh9FY",
+          "id": "hjjPHEHqw9V0ybygh9FY",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/hjjPHEHqw9V0ybygh9FY",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/hjjPHEHqw9V0ybygh9FY"
+          ]
+        },
+        {
+          "path": "notifications/hn7vBrWkQpMbFlXPAzpN",
+          "id": "hn7vBrWkQpMbFlXPAzpN",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/hn7vBrWkQpMbFlXPAzpN",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/hn7vBrWkQpMbFlXPAzpN"
+          ]
+        },
+        {
+          "path": "notifications/iCq18CJXw2RN45DJrvpf",
+          "id": "iCq18CJXw2RN45DJrvpf",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/iCq18CJXw2RN45DJrvpf",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/iCq18CJXw2RN45DJrvpf"
+          ]
+        },
+        {
+          "path": "notifications/nPF6bvs3TvUKaxFYlXhx",
+          "id": "nPF6bvs3TvUKaxFYlXhx",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/nPF6bvs3TvUKaxFYlXhx",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/nPF6bvs3TvUKaxFYlXhx"
+          ]
+        },
+        {
+          "path": "notifications/nv1Xcv0257himuPRG4GX",
+          "id": "nv1Xcv0257himuPRG4GX",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/nv1Xcv0257himuPRG4GX",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/nv1Xcv0257himuPRG4GX"
+          ]
+        },
+        {
+          "path": "notifications/oMpWGit73ylde4dWxvQM",
+          "id": "oMpWGit73ylde4dWxvQM",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/oMpWGit73ylde4dWxvQM",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/oMpWGit73ylde4dWxvQM"
+          ]
+        },
+        {
+          "path": "notifications/stZzlos2F85MKnlQnMh8",
+          "id": "stZzlos2F85MKnlQnMh8",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/stZzlos2F85MKnlQnMh8",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/stZzlos2F85MKnlQnMh8"
+          ]
+        },
+        {
+          "path": "notifications/tS58Zi3x9NetlH2sPRp2",
+          "id": "tS58Zi3x9NetlH2sPRp2",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/tS58Zi3x9NetlH2sPRp2",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/tS58Zi3x9NetlH2sPRp2"
+          ]
+        },
+        {
+          "path": "notifications/uzeTzw1e9WRFFiVpcOoC",
+          "id": "uzeTzw1e9WRFFiVpcOoC",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/uzeTzw1e9WRFFiVpcOoC",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/uzeTzw1e9WRFFiVpcOoC"
+          ]
+        },
+        {
+          "path": "notifications/v2Amuv8uTOeu3MaLqA2v",
+          "id": "v2Amuv8uTOeu3MaLqA2v",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/v2Amuv8uTOeu3MaLqA2v",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/v2Amuv8uTOeu3MaLqA2v"
+          ]
+        },
+        {
+          "path": "notifications/wfimWhkLDsBolWOlcAfe",
+          "id": "wfimWhkLDsBolWOlcAfe",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/wfimWhkLDsBolWOlcAfe",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/wfimWhkLDsBolWOlcAfe"
+          ]
+        },
+        {
+          "path": "notifications/wpE2XZLQ05UfiRmTjEf8",
+          "id": "wpE2XZLQ05UfiRmTjEf8",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/wpE2XZLQ05UfiRmTjEf8",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/wpE2XZLQ05UfiRmTjEf8"
+          ]
+        },
+        {
+          "path": "notifications/x0CUqsJcriv4WhAvZLhF",
+          "id": "x0CUqsJcriv4WhAvZLhF",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/x0CUqsJcriv4WhAvZLhF",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/x0CUqsJcriv4WhAvZLhF"
+          ]
+        },
+        {
+          "path": "notifications/xHmvhjEofyxSiLtV2jD5",
+          "id": "xHmvhjEofyxSiLtV2jD5",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/xHmvhjEofyxSiLtV2jD5",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/xHmvhjEofyxSiLtV2jD5"
+          ]
+        },
+        {
+          "path": "notifications/y1HBXlo2z6WIo5GHh8FK",
+          "id": "y1HBXlo2z6WIo5GHh8FK",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/y1HBXlo2z6WIo5GHh8FK",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/y1HBXlo2z6WIo5GHh8FK"
+          ]
+        },
+        {
+          "path": "notifications/yteMWUcwQ9cCWZN1krEQ",
+          "id": "yteMWUcwQ9cCWZN1krEQ",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/yteMWUcwQ9cCWZN1krEQ",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in notifications/yteMWUcwQ9cCWZN1krEQ"
+          ]
+        }
+      ]
+    },
+    "notifications/1duns3UKPPwNDUcV4dHB/renters": {
+      "documentsWithIssues": [
+        {
+          "path": "notifications/1duns3UKPPwNDUcV4dHB/renters/KCjv7ESDnpX21JtGoBLu",
+          "id": "KCjv7ESDnpX21JtGoBLu",
+          "issues": [
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Type mismatch for 'totalCost': expected 'string', got 'integer' in notifications/1duns3UKPPwNDUcV4dHB/renters/KCjv7ESDnpX21JtGoBLu",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in notifications/1duns3UKPPwNDUcV4dHB/renters/KCjv7ESDnpX21JtGoBLu",
+            "❗ Missing field 'name' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fcmToken' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'currentLocation' (expected type: string)",
+            "❗ Missing field 'uid' (expected type: string)",
+            "⚠️ Unexpected field 'notificationId' (type: string) in notifications/1duns3UKPPwNDUcV4dHB/renters/KCjv7ESDnpX21JtGoBLu",
+            "⚠️ Unexpected field 'rentalRequestId' (type: string) in notifications/1duns3UKPPwNDUcV4dHB/renters/KCjv7ESDnpX21JtGoBLu",
+            "⚠️ Unexpected field 'message' (type: string) in notifications/1duns3UKPPwNDUcV4dHB/renters/KCjv7ESDnpX21JtGoBLu",
+            "⚠️ Unexpected field 'type' (type: string) in notifications/1duns3UKPPwNDUcV4dHB/renters/KCjv7ESDnpX21JtGoBLu"
+          ]
+        }
+      ]
+    },
+    "orders": {
+      "documentsWithIssues": [
+        {
+          "path": "orders/8YC4dzfJ5aiBknKNTfow",
+          "id": "8YC4dzfJ5aiBknKNTfow",
+          "issues": [
+            "❗ Type mismatch for 'amount': expected 'number', got 'integer' in orders/8YC4dzfJ5aiBknKNTfow",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in orders/8YC4dzfJ5aiBknKNTfow"
+          ]
+        }
+      ]
+    },
+    "ownerId": {
+      "documentsWithIssues": []
+    },
+    "owners": {
+      "documentsWithIssues": []
+    },
+    "payment-sheet": {
+      "documentsWithIssues": []
+    },
+    "posts": {
+      "documentsWithIssues": [
+        {
+          "path": "posts/17glybByz4nhLnoQ8QC1",
+          "id": "17glybByz4nhLnoQ8QC1",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/17glybByz4nhLnoQ8QC1",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/17glybByz4nhLnoQ8QC1",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/17glybByz4nhLnoQ8QC1",
+            "❗ Type mismatch for 'images': expected 'object', got 'array' in posts/17glybByz4nhLnoQ8QC1"
+          ]
+        },
+        {
+          "path": "posts/6xR5eWOmm104HjNVSguV",
+          "id": "6xR5eWOmm104HjNVSguV",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/6xR5eWOmm104HjNVSguV",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/6xR5eWOmm104HjNVSguV"
+          ]
+        },
+        {
+          "path": "posts/9hSjTWboyv51YawcybPm",
+          "id": "9hSjTWboyv51YawcybPm",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/9hSjTWboyv51YawcybPm",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/9hSjTWboyv51YawcybPm"
+          ]
+        },
+        {
+          "path": "posts/B17OngrVSdicbnn1AIG2",
+          "id": "B17OngrVSdicbnn1AIG2",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'string' in posts/B17OngrVSdicbnn1AIG2",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/B17OngrVSdicbnn1AIG2"
+          ]
+        },
+        {
+          "path": "posts/DHr7dyj5Y6Pk8PraFhwP",
+          "id": "DHr7dyj5Y6Pk8PraFhwP",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/DHr7dyj5Y6Pk8PraFhwP",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/DHr7dyj5Y6Pk8PraFhwP"
+          ]
+        },
+        {
+          "path": "posts/EM7Aw4tStkUNEyYD6y3f",
+          "id": "EM7Aw4tStkUNEyYD6y3f",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/EM7Aw4tStkUNEyYD6y3f",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/EM7Aw4tStkUNEyYD6y3f"
+          ]
+        },
+        {
+          "path": "posts/Er9W8OwXFSafyPwv3gat",
+          "id": "Er9W8OwXFSafyPwv3gat",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/Er9W8OwXFSafyPwv3gat",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/Er9W8OwXFSafyPwv3gat"
+          ]
+        },
+        {
+          "path": "posts/Gj4dsTeuPjcSCnurKbwh",
+          "id": "Gj4dsTeuPjcSCnurKbwh",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'string' in posts/Gj4dsTeuPjcSCnurKbwh",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/Gj4dsTeuPjcSCnurKbwh",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/Gj4dsTeuPjcSCnurKbwh"
+          ]
+        },
+        {
+          "path": "posts/H8FTZm4SHzmI4WqxUUOd",
+          "id": "H8FTZm4SHzmI4WqxUUOd",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/H8FTZm4SHzmI4WqxUUOd",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/H8FTZm4SHzmI4WqxUUOd"
+          ]
+        },
+        {
+          "path": "posts/LAgciqz96DVXIaOpezWo",
+          "id": "LAgciqz96DVXIaOpezWo",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'string' in posts/LAgciqz96DVXIaOpezWo",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/LAgciqz96DVXIaOpezWo",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/LAgciqz96DVXIaOpezWo",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/LAgciqz96DVXIaOpezWo"
+          ]
+        },
+        {
+          "path": "posts/Oafja5HfJ7DKWbs82hRM",
+          "id": "Oafja5HfJ7DKWbs82hRM",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/Oafja5HfJ7DKWbs82hRM",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/Oafja5HfJ7DKWbs82hRM"
+          ]
+        },
+        {
+          "path": "posts/QXDmyF09cnWKs6BspSCq",
+          "id": "QXDmyF09cnWKs6BspSCq",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'string' in posts/QXDmyF09cnWKs6BspSCq",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/QXDmyF09cnWKs6BspSCq",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/QXDmyF09cnWKs6BspSCq"
+          ]
+        },
+        {
+          "path": "posts/Uafz1rOqJy699hznAYcV",
+          "id": "Uafz1rOqJy699hznAYcV",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/Uafz1rOqJy699hznAYcV",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/Uafz1rOqJy699hznAYcV",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/Uafz1rOqJy699hznAYcV",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/Uafz1rOqJy699hznAYcV"
+          ]
+        },
+        {
+          "path": "posts/W5LHN9kdY5sYRYLxYOfc",
+          "id": "W5LHN9kdY5sYRYLxYOfc",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/W5LHN9kdY5sYRYLxYOfc",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/W5LHN9kdY5sYRYLxYOfc"
+          ]
+        },
+        {
+          "path": "posts/cF4qwgK2UsvMxERBaN7b",
+          "id": "cF4qwgK2UsvMxERBaN7b",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/cF4qwgK2UsvMxERBaN7b",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/cF4qwgK2UsvMxERBaN7b"
+          ]
+        },
+        {
+          "path": "posts/cHWpfcJ02bNLKOpLxLu7",
+          "id": "cHWpfcJ02bNLKOpLxLu7",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'string' in posts/cHWpfcJ02bNLKOpLxLu7",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/cHWpfcJ02bNLKOpLxLu7"
+          ]
+        },
+        {
+          "path": "posts/h8dMUN09bB3TzmAxEzUJ",
+          "id": "h8dMUN09bB3TzmAxEzUJ",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'string' in posts/h8dMUN09bB3TzmAxEzUJ",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/h8dMUN09bB3TzmAxEzUJ",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/h8dMUN09bB3TzmAxEzUJ",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/h8dMUN09bB3TzmAxEzUJ"
+          ]
+        },
+        {
+          "path": "posts/hi53Pkvmi1qoVqrIKBxm",
+          "id": "hi53Pkvmi1qoVqrIKBxm",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/hi53Pkvmi1qoVqrIKBxm",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/hi53Pkvmi1qoVqrIKBxm",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/hi53Pkvmi1qoVqrIKBxm",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/hi53Pkvmi1qoVqrIKBxm"
+          ]
+        },
+        {
+          "path": "posts/iVxKOCAVkssHBqvGxqNf",
+          "id": "iVxKOCAVkssHBqvGxqNf",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'string' in posts/iVxKOCAVkssHBqvGxqNf",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/iVxKOCAVkssHBqvGxqNf",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/iVxKOCAVkssHBqvGxqNf",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/iVxKOCAVkssHBqvGxqNf"
+          ]
+        },
+        {
+          "path": "posts/lI54LdzRq5e4GeV59LqT",
+          "id": "lI54LdzRq5e4GeV59LqT",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/lI54LdzRq5e4GeV59LqT",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/lI54LdzRq5e4GeV59LqT",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/lI54LdzRq5e4GeV59LqT",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/lI54LdzRq5e4GeV59LqT"
+          ]
+        },
+        {
+          "path": "posts/mDnAbxbnJN12ObfoGQLj",
+          "id": "mDnAbxbnJN12ObfoGQLj",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/mDnAbxbnJN12ObfoGQLj",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/mDnAbxbnJN12ObfoGQLj"
+          ]
+        },
+        {
+          "path": "posts/pVpV1ke32wh6hunDL7Fv",
+          "id": "pVpV1ke32wh6hunDL7Fv",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/pVpV1ke32wh6hunDL7Fv",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/pVpV1ke32wh6hunDL7Fv",
+            "❗ Type mismatch for 'userName': expected 'string', got 'null' in posts/pVpV1ke32wh6hunDL7Fv",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/pVpV1ke32wh6hunDL7Fv",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/pVpV1ke32wh6hunDL7Fv"
+          ]
+        },
+        {
+          "path": "posts/qSmsXGUwdeH6olnIyIK4",
+          "id": "qSmsXGUwdeH6olnIyIK4",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/qSmsXGUwdeH6olnIyIK4",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/qSmsXGUwdeH6olnIyIK4",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/qSmsXGUwdeH6olnIyIK4",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/qSmsXGUwdeH6olnIyIK4"
+          ]
+        },
+        {
+          "path": "posts/tHwjxMORm17LfcxTfeeT",
+          "id": "tHwjxMORm17LfcxTfeeT",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'string' in posts/tHwjxMORm17LfcxTfeeT",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/tHwjxMORm17LfcxTfeeT",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/tHwjxMORm17LfcxTfeeT",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/tHwjxMORm17LfcxTfeeT"
+          ]
+        },
+        {
+          "path": "posts/uHwIMnBunBTFDHxJBOGf",
+          "id": "uHwIMnBunBTFDHxJBOGf",
+          "issues": [
+            "❗ Type mismatch for 'image': expected 'object', got 'null' in posts/uHwIMnBunBTFDHxJBOGf",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/uHwIMnBunBTFDHxJBOGf"
+          ]
+        },
+        {
+          "path": "posts/yhcwriNkvrfKJG9EFZR7",
+          "id": "yhcwriNkvrfKJG9EFZR7",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in posts/yhcwriNkvrfKJG9EFZR7",
+            "❗ Type mismatch for 'likes': expected 'object', got 'array' in posts/yhcwriNkvrfKJG9EFZR7",
+            "❗ Type mismatch for 'comments': expected 'object', got 'array' in posts/yhcwriNkvrfKJG9EFZR7"
+          ]
+        }
+      ]
+    },
+    "rentalRequests": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/0D2VHLMXz8W6jGA914bl",
+          "id": "0D2VHLMXz8W6jGA914bl",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/0D2VHLMXz8W6jGA914bl",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/1R26YCLZiq1nhYCnL8D9",
+          "id": "1R26YCLZiq1nhYCnL8D9",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/1R26YCLZiq1nhYCnL8D9",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/3R8fuUGMFTkG0oanzY0d",
+          "id": "3R8fuUGMFTkG0oanzY0d",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/3R8fuUGMFTkG0oanzY0d",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/AcOC23HID5p8cVz1taNl",
+          "id": "AcOC23HID5p8cVz1taNl",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/AcOC23HID5p8cVz1taNl",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/Apumci7rbNdM0t5cwOgl",
+          "id": "Apumci7rbNdM0t5cwOgl",
+          "issues": [
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/Apumci7rbNdM0t5cwOgl",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/C3LKGFKohzUtKOiHzuWE",
+          "id": "C3LKGFKohzUtKOiHzuWE",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/C3LKGFKohzUtKOiHzuWE",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+          "id": "DX9kKYWJNmt2ygNTCVbM",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/DX9kKYWJNmt2ygNTCVbM",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/JWiEzdGKQL3XDC13nVP9",
+          "id": "JWiEzdGKQL3XDC13nVP9",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/JWiEzdGKQL3XDC13nVP9",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/KOhEdXifrbPal0JXCw87",
+          "id": "KOhEdXifrbPal0JXCw87",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/KOhEdXifrbPal0JXCw87",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/LfH0J6ptKQyESIqKajHG",
+          "id": "LfH0J6ptKQyESIqKajHG",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/LfH0J6ptKQyESIqKajHG",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/O43d77vfSaV50eTFruJ0",
+          "id": "O43d77vfSaV50eTFruJ0",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/O43d77vfSaV50eTFruJ0",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+          "id": "PjhOaxEfW31HYlrpD7Kj",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/PjhOaxEfW31HYlrpD7Kj",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+          "id": "PvMYBNTTPgQqaCYV6Zf9",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/Smpwc9G4619RSdlOTJTs",
+          "id": "Smpwc9G4619RSdlOTJTs",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/Smpwc9G4619RSdlOTJTs",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/UdDBnfyfGT3tmsndClTC",
+          "id": "UdDBnfyfGT3tmsndClTC",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/UdDBnfyfGT3tmsndClTC",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/bzn51XSMA6ni3jt6MyaM",
+          "id": "bzn51XSMA6ni3jt6MyaM",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/bzn51XSMA6ni3jt6MyaM",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+          "id": "fgEjvsNcvAEzs1ZDzsKv",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/fgEjvsNcvAEzs1ZDzsKv",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+          "id": "gWODYHKC0ZrhRNGmT4hI",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/gWODYHKC0ZrhRNGmT4hI",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/jz9AzYg3oagHYpFqqm7i",
+          "id": "jz9AzYg3oagHYpFqqm7i",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/jz9AzYg3oagHYpFqqm7i",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/kb7JWPV1HYCIhSRODQJK",
+          "id": "kb7JWPV1HYCIhSRODQJK",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/kb7JWPV1HYCIhSRODQJK",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/lqDg4ovwiJuVRM5berQM",
+          "id": "lqDg4ovwiJuVRM5berQM",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'null' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/lqDg4ovwiJuVRM5berQM",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/ojGBDRzAtKI5DMTlfz67",
+          "id": "ojGBDRzAtKI5DMTlfz67",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/ojGBDRzAtKI5DMTlfz67",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/pSybHTfFmGjP79z9tDQU",
+          "id": "pSybHTfFmGjP79z9tDQU",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/pSybHTfFmGjP79z9tDQU",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/rjl9kxGcU5rddf0fOf3D",
+          "id": "rjl9kxGcU5rddf0fOf3D",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/rjl9kxGcU5rddf0fOf3D",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+          "id": "ylqYZ7eC6vYyTrdfdGRc",
+          "issues": [
+            "❗ Type mismatch for 'renterName': expected 'object', got 'string' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'rentalCost': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'transactionFee': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'bookingFee': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'salesTax': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'flightHours': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'totalAmount': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Type mismatch for 'rating': expected 'number', got 'integer' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/3R8fuUGMFTkG0oanzY0d/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/3R8fuUGMFTkG0oanzY0d/messages/Zt74TC48dwhz9cbppSXB",
+          "id": "Zt74TC48dwhz9cbppSXB",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/3R8fuUGMFTkG0oanzY0d/messages/Zt74TC48dwhz9cbppSXB",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/Apumci7rbNdM0t5cwOgl/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/Apumci7rbNdM0t5cwOgl/messages/B6N6Zj8ycPDrqux0sD0t",
+          "id": "B6N6Zj8ycPDrqux0sD0t",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/Apumci7rbNdM0t5cwOgl/messages/B6N6Zj8ycPDrqux0sD0t",
+            "❗ Type mismatch for 'senderName': expected 'string', got 'null' in rentalRequests/Apumci7rbNdM0t5cwOgl/messages/B6N6Zj8ycPDrqux0sD0t",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/C3LKGFKohzUtKOiHzuWE/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/C3LKGFKohzUtKOiHzuWE/messages/ZZqGa7rb8UrB2WAwygkp",
+          "id": "ZZqGa7rb8UrB2WAwygkp",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/C3LKGFKohzUtKOiHzuWE/messages/ZZqGa7rb8UrB2WAwygkp",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/DX9kKYWJNmt2ygNTCVbM/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/DX9kKYWJNmt2ygNTCVbM/messages/GwpEomifKjFdLXwkthSM",
+          "id": "GwpEomifKjFdLXwkthSM",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/DX9kKYWJNmt2ygNTCVbM/messages/GwpEomifKjFdLXwkthSM",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/JWiEzdGKQL3XDC13nVP9/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/JWiEzdGKQL3XDC13nVP9/messages/pqx7zHjYBtK7HvidnD0j",
+          "id": "pqx7zHjYBtK7HvidnD0j",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/JWiEzdGKQL3XDC13nVP9/messages/pqx7zHjYBtK7HvidnD0j",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/PvMYBNTTPgQqaCYV6Zf9/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/PvMYBNTTPgQqaCYV6Zf9/messages/wUYDns3Bssf4XessFghy",
+          "id": "wUYDns3Bssf4XessFghy",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/PvMYBNTTPgQqaCYV6Zf9/messages/wUYDns3Bssf4XessFghy",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/lqDg4ovwiJuVRM5berQM/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/lqDg4ovwiJuVRM5berQM/messages/XJjtvTmUy5JfI2UcER97",
+          "id": "XJjtvTmUy5JfI2UcER97",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/lqDg4ovwiJuVRM5berQM/messages/XJjtvTmUy5JfI2UcER97",
+            "❗ Type mismatch for 'senderName': expected 'string', got 'null' in rentalRequests/lqDg4ovwiJuVRM5berQM/messages/XJjtvTmUy5JfI2UcER97",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/ojGBDRzAtKI5DMTlfz67/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/ojGBDRzAtKI5DMTlfz67/messages/DoqT5Dtu4bE8fdpWSRJZ",
+          "id": "DoqT5Dtu4bE8fdpWSRJZ",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/ojGBDRzAtKI5DMTlfz67/messages/DoqT5Dtu4bE8fdpWSRJZ",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/rjl9kxGcU5rddf0fOf3D/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/rjl9kxGcU5rddf0fOf3D/messages/tfzd7F7Dlkxt1KOF3Rac",
+          "id": "tfzd7F7Dlkxt1KOF3Rac",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/rjl9kxGcU5rddf0fOf3D/messages/tfzd7F7Dlkxt1KOF3Rac",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "rentalRequests/ylqYZ7eC6vYyTrdfdGRc/messages": {
+      "documentsWithIssues": [
+        {
+          "path": "rentalRequests/ylqYZ7eC6vYyTrdfdGRc/messages/GDkFt6EI3LJoWpb0Zitq",
+          "id": "GDkFt6EI3LJoWpb0Zitq",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in rentalRequests/ylqYZ7eC6vYyTrdfdGRc/messages/GDkFt6EI3LJoWpb0Zitq",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'receiverId' (expected type: string)",
+            "❗ Missing field 'participants' (expected type: object)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'timestamp' (expected type: object)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'timeStamp' (expected type: string)",
+            "❗ Missing field 'messages' (expected type: object)",
+            "❗ Missing field 'renterId' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "renters": {
+      "documentsWithIssues": [
+        {
+          "path": "renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "id": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "issues": [
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)"
+          ]
+        },
+        {
+          "path": "renters/Bicov6dbPAYjqJKGZDtaO8aIXq22",
+          "id": "Bicov6dbPAYjqJKGZDtaO8aIXq22",
+          "issues": [
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)"
+          ]
+        },
+        {
+          "path": "renters/QgtjOhlOXCOqixvFOPpXHwxjGzO2",
+          "id": "QgtjOhlOXCOqixvFOPpXHwxjGzO2",
+          "issues": [
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)"
+          ]
+        },
+        {
+          "path": "renters/renterId",
+          "id": "renterId",
+          "issues": [
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)"
+          ]
+        },
+        {
+          "path": "renters/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "issues": [
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests": {
+      "documentsWithIssues": [
+        {
+          "path": "renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests/JQUzchJDMBD2nEkzGZw4",
+          "id": "JQUzchJDMBD2nEkzGZw4",
+          "issues": [
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Missing field 'renterName' (expected type: object)",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'rentalCost' (expected type: number)",
+            "❗ Missing field 'transactionFee' (expected type: number)",
+            "❗ Missing field 'bookingFee' (expected type: number)",
+            "❗ Missing field 'salesTax' (expected type: number)",
+            "❗ Missing field 'totalCost' (expected type: number)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests/JQUzchJDMBD2nEkzGZw4",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests/JQUzchJDMBD2nEkzGZw4",
+            "❗ Missing field 'rentalStatus' (expected type: string)",
+            "❗ Missing field 'baseCost' (expected type: string)",
+            "❗ Missing field 'commission' (expected type: string)",
+            "❗ Missing field 'currentLocation' (expected type: string)",
+            "❗ Missing field 'hasMedicalCertificate' (expected type: boolean)",
+            "❗ Missing field 'hasRentersInsurance' (expected type: boolean)",
+            "❗ Missing field 'flightHours' (expected type: number)",
+            "❗ Missing field 'createdAt' (expected type: object)",
+            "❗ Missing field 'id' (expected type: string)",
+            "❗ Missing field 'totalAmount' (expected type: number)",
+            "❗ Missing field 'messagingClosed' (expected type: boolean)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'name' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fcmToken' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'paymentStatus' (expected type: string)",
+            "❗ Missing field 'rating' (expected type: number)",
+            "❗ Missing field 'notified' (expected type: boolean)",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        },
+        {
+          "path": "renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests/Jzjm9wsub8RyyG2oUJwd",
+          "id": "Jzjm9wsub8RyyG2oUJwd",
+          "issues": [
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Missing field 'renterName' (expected type: object)",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'rentalCost' (expected type: number)",
+            "❗ Missing field 'transactionFee' (expected type: number)",
+            "❗ Missing field 'bookingFee' (expected type: number)",
+            "❗ Missing field 'salesTax' (expected type: number)",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'string' in renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests/Jzjm9wsub8RyyG2oUJwd",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests/Jzjm9wsub8RyyG2oUJwd",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62/rentalRequests/Jzjm9wsub8RyyG2oUJwd",
+            "❗ Missing field 'rentalStatus' (expected type: string)",
+            "❗ Missing field 'currentLocation' (expected type: string)",
+            "❗ Missing field 'hasMedicalCertificate' (expected type: boolean)",
+            "❗ Missing field 'hasRentersInsurance' (expected type: boolean)",
+            "❗ Missing field 'flightHours' (expected type: number)",
+            "❗ Missing field 'createdAt' (expected type: object)",
+            "❗ Missing field 'id' (expected type: string)",
+            "❗ Missing field 'totalAmount' (expected type: number)",
+            "❗ Missing field 'messagingClosed' (expected type: boolean)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'name' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fcmToken' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'paymentStatus' (expected type: string)",
+            "❗ Missing field 'rating' (expected type: number)",
+            "❗ Missing field 'notified' (expected type: boolean)",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "renters/renterId/notifications": {
+      "documentsWithIssues": [
+        {
+          "path": "renters/renterId/notifications/nb6EBh02jDyN0Q2uIRyM",
+          "id": "nb6EBh02jDyN0Q2uIRyM",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in renters/renterId/notifications/nb6EBh02jDyN0Q2uIRyM",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'confirmed' (expected type: boolean)",
+            "❗ Missing field 'renter' (expected type: object)",
+            "❗ Missing field 'fromUserName' (expected type: string)",
+            "❗ Missing field 'fromUserId' (expected type: string)",
+            "❗ Missing field 'postId' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)",
+            "❗ Missing field 'toUserId' (expected type: string)",
+            "❗ Missing field 'read' (expected type: boolean)",
+            "❗ Missing field 'commentId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'airplaneModel' (expected type: string)",
+            "❗ Missing field 'rentalHours' (expected type: number)",
+            "❗ Missing field 'renterName' (expected type: string)",
+            "❗ Missing field 'totalCost' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "⚠️ Unexpected field 'ownerName' (type: string) in renters/renterId/notifications/nb6EBh02jDyN0Q2uIRyM",
+            "⚠️ Unexpected field 'rentalRequestId' (type: string) in renters/renterId/notifications/nb6EBh02jDyN0Q2uIRyM"
+          ]
+        },
+        {
+          "path": "renters/renterId/notifications/{notificationId}",
+          "id": "{notificationId}",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in renters/renterId/notifications/{notificationId}",
+            "❗ Missing field 'ownerId' (expected type: string)",
+            "❗ Missing field 'confirmed' (expected type: boolean)",
+            "❗ Missing field 'renter' (expected type: object)",
+            "❗ Missing field 'fromUserName' (expected type: string)",
+            "❗ Missing field 'fromUserId' (expected type: string)",
+            "❗ Missing field 'postId' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)",
+            "❗ Missing field 'toUserId' (expected type: string)",
+            "❗ Missing field 'read' (expected type: boolean)",
+            "❗ Missing field 'commentId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'airplaneModel' (expected type: string)",
+            "❗ Missing field 'rentalHours' (expected type: number)",
+            "❗ Missing field 'renterName' (expected type: string)",
+            "❗ Missing field 'totalCost' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'ownerName' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "renters/renterId/rentalRequests": {
+      "documentsWithIssues": [
+        {
+          "path": "renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+          "id": "lqHRiGNp6rzwuqjVC0xs",
+          "issues": [
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Missing field 'renterName' (expected type: object)",
+            "❗ Missing field 'rentalCost' (expected type: number)",
+            "❗ Missing field 'transactionFee' (expected type: number)",
+            "❗ Missing field 'bookingFee' (expected type: number)",
+            "❗ Missing field 'salesTax' (expected type: number)",
+            "❗ Type mismatch for 'totalCost': expected 'number', got 'integer' in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Type mismatch for 'rentalHours': expected 'number', got 'integer' in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+            "❗ Type mismatch for 'rentalCostPerHour': expected 'number', got 'integer' in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+            "❗ Missing field 'baseCost' (expected type: string)",
+            "❗ Missing field 'commission' (expected type: string)",
+            "❗ Missing field 'currentLocation' (expected type: string)",
+            "❗ Missing field 'hasMedicalCertificate' (expected type: boolean)",
+            "❗ Missing field 'hasRentersInsurance' (expected type: boolean)",
+            "❗ Missing field 'flightHours' (expected type: number)",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+            "❗ Missing field 'id' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'totalAmount' (expected type: number)",
+            "❗ Missing field 'messagingClosed' (expected type: boolean)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'name' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fcmToken' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'paymentStatus' (expected type: string)",
+            "❗ Missing field 'rating' (expected type: number)",
+            "❗ Missing field 'notified' (expected type: boolean)",
+            "❗ Missing field 'processingFee' (expected type: integer)",
+            "❗ Missing field 'tax' (expected type: integer)",
+            "❗ Missing field 'description' (expected type: string)",
+            "⚠️ Unexpected field 'costPerHour' (type: integer) in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+            "⚠️ Unexpected field 'senderId' (type: string) in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+            "⚠️ Unexpected field 'senderName' (type: string) in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+            "⚠️ Unexpected field 'airplaneModel' (type: string) in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs",
+            "⚠️ Unexpected field 'updatedAt' (type: timestamp) in renters/renterId/rentalRequests/lqHRiGNp6rzwuqjVC0xs"
+          ]
+        }
+      ]
+    },
+    "users": {
+      "documentsWithIssues": [
+        {
+          "path": "users/2AAa3ntKG0SYxRjWPkFMRiuJV9W2",
+          "id": "2AAa3ntKG0SYxRjWPkFMRiuJV9W2",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in users/2AAa3ntKG0SYxRjWPkFMRiuJV9W2"
+          ]
+        },
+        {
+          "path": "users/QgtjOhlOXCOqixvFOPpXHwxjGzO2",
+          "id": "QgtjOhlOXCOqixvFOPpXHwxjGzO2",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in users/QgtjOhlOXCOqixvFOPpXHwxjGzO2"
+          ]
+        },
+        {
+          "path": "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "issues": [
+            "⚠️ Unexpected field 'stripeDetailsSubmitted' (type: null) in users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2"
+          ]
+        },
+        {
+          "path": "users/wugeeOo8cFl3fnTJ65HC",
+          "id": "wugeeOo8cFl3fnTJ65HC",
+          "issues": [
+            "❗ Missing field 'stripeDetailsSubmitted' (expected type: null)"
+          ]
+        }
+      ]
+    },
+    "users/08O5m7x11kG7lgPITLLs/owners": {
+      "documentsWithIssues": [
+        {
+          "path": "users/08O5m7x11kG7lgPITLLs/owners/e153r3eC0ckvkI5kshjm",
+          "id": "e153r3eC0ckvkI5kshjm",
+          "issues": [
+            "❗ Missing field 'stripeAccountId' (expected type: string)",
+            "❗ Missing field 'stripeAccountStatus' (expected type: string)",
+            "❗ Missing field 'image' (expected type: string)",
+            "⚠️ Unexpected field 'displayName' (type: string) in users/08O5m7x11kG7lgPITLLs/owners/e153r3eC0ckvkI5kshjm",
+            "⚠️ Unexpected field 'createdAt' (type: timestamp) in users/08O5m7x11kG7lgPITLLs/owners/e153r3eC0ckvkI5kshjm",
+            "⚠️ Unexpected field 'role' (type: string) in users/08O5m7x11kG7lgPITLLs/owners/e153r3eC0ckvkI5kshjm"
+          ]
+        }
+      ]
+    },
+    "users/08O5m7x11kG7lgPITLLs/renters": {
+      "documentsWithIssues": [
+        {
+          "path": "users/08O5m7x11kG7lgPITLLs/renters/Onh8AufOlsggzNiPW0Pc",
+          "id": "Onh8AufOlsggzNiPW0Pc",
+          "issues": [
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Missing field 'totalCost' (expected type: string)",
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in users/08O5m7x11kG7lgPITLLs/renters/Onh8AufOlsggzNiPW0Pc",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fcmToken' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)",
+            "⚠️ Unexpected field 'displayName' (type: string) in users/08O5m7x11kG7lgPITLLs/renters/Onh8AufOlsggzNiPW0Pc",
+            "⚠️ Unexpected field 'role' (type: string) in users/08O5m7x11kG7lgPITLLs/renters/Onh8AufOlsggzNiPW0Pc",
+            "⚠️ Unexpected field 'currentMedical' (type: boolean) in users/08O5m7x11kG7lgPITLLs/renters/Onh8AufOlsggzNiPW0Pc",
+            "⚠️ Unexpected field 'currentRentersInsurance' (type: boolean) in users/08O5m7x11kG7lgPITLLs/renters/Onh8AufOlsggzNiPW0Pc",
+            "⚠️ Unexpected field 'totalFlightHours' (type: string) in users/08O5m7x11kG7lgPITLLs/renters/Onh8AufOlsggzNiPW0Pc"
+          ]
+        }
+      ]
+    },
+    "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/favorites": {
+      "documentsWithIssues": [
+        {
+          "path": "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/favorites/QiKEwrR8xr9FOkmXfLzp",
+          "id": "QiKEwrR8xr9FOkmXfLzp",
+          "issues": [
+            "⚠️ Schema definition missing for 'favorites'"
+          ]
+        }
+      ]
+    },
+    "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/notifications": {
+      "documentsWithIssues": [
+        {
+          "path": "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/notifications/H7xoOHbmUEz4ISjTYigK",
+          "id": "H7xoOHbmUEz4ISjTYigK",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/notifications/H7xoOHbmUEz4ISjTYigK",
+            "❗ Missing field 'confirmed' (expected type: boolean)",
+            "❗ Missing field 'renter' (expected type: object)",
+            "❗ Missing field 'fromUserName' (expected type: string)",
+            "❗ Missing field 'fromUserId' (expected type: string)",
+            "❗ Missing field 'postId' (expected type: string)",
+            "❗ Missing field 'toUserId' (expected type: string)",
+            "❗ Missing field 'read' (expected type: boolean)",
+            "❗ Missing field 'commentId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'airplaneModel' (expected type: string)",
+            "❗ Missing field 'rentalHours' (expected type: number)",
+            "❗ Missing field 'renterName' (expected type: string)",
+            "❗ Missing field 'totalCost' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "⚠️ Unexpected field 'rentalDate' (type: string) in users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/notifications/H7xoOHbmUEz4ISjTYigK"
+          ]
+        },
+        {
+          "path": "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/notifications/yg1Jvzl2lJOoWAA8Mcxd",
+          "id": "yg1Jvzl2lJOoWAA8Mcxd",
+          "issues": [
+            "❗ Type mismatch for 'createdAt': expected 'object', got 'timestamp' in users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/notifications/yg1Jvzl2lJOoWAA8Mcxd",
+            "❗ Missing field 'confirmed' (expected type: boolean)",
+            "❗ Missing field 'renter' (expected type: object)",
+            "❗ Missing field 'fromUserName' (expected type: string)",
+            "❗ Missing field 'fromUserId' (expected type: string)",
+            "❗ Missing field 'postId' (expected type: string)",
+            "❗ Missing field 'toUserId' (expected type: string)",
+            "❗ Missing field 'read' (expected type: boolean)",
+            "❗ Missing field 'commentId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'airplaneModel' (expected type: string)",
+            "❗ Missing field 'rentalHours' (expected type: number)",
+            "❗ Missing field 'renterName' (expected type: string)",
+            "❗ Missing field 'totalCost' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/owners": {
+      "documentsWithIssues": [
+        {
+          "path": "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/owners/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "id": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "issues": [
+            "❗ Missing field 'stripeAccountId' (expected type: string)",
+            "❗ Missing field 'stripeAccountStatus' (expected type: string)",
+            "❗ Missing field 'uid' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'image' (expected type: string)",
+            "❗ Missing field 'displayName' (expected type: string)",
+            "❗ Missing field 'createdAt' (expected type: timestamp)",
+            "❗ Missing field 'role' (expected type: string)",
+            "⚠️ Unexpected field 'costData' (type: object) in users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/owners/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+            "⚠️ Unexpected field 'aircraftDetails' (type: object) in users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/owners/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+            "⚠️ Unexpected field 'profileData' (type: object) in users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/owners/1Dj9eQwMcRWWXqtcGHNKEctgjW62"
+          ]
+        }
+      ]
+    },
+    "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/renters": {
+      "documentsWithIssues": [
+        {
+          "path": "users/1Dj9eQwMcRWWXqtcGHNKEctgjW62/renters/1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "id": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "issues": [
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Missing field 'totalCost' (expected type: string)",
+            "❗ Missing field 'createdAt' (expected type: object)",
+            "❗ Missing field 'name' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'currentLocation' (expected type: string)",
+            "❗ Missing field 'uid' (expected type: string)",
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)",
+            "❗ Missing field 'displayName' (expected type: string)",
+            "❗ Missing field 'role' (expected type: string)",
+            "❗ Missing field 'currentMedical' (expected type: boolean)",
+            "❗ Missing field 'currentRentersInsurance' (expected type: boolean)",
+            "❗ Missing field 'totalFlightHours' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "users/2AAa3ntKG0SYxRjWPkFMRiuJV9W2/favorites": {
+      "documentsWithIssues": [
+        {
+          "path": "users/2AAa3ntKG0SYxRjWPkFMRiuJV9W2/favorites/v2wZhokUGxVb5CaM0VIs",
+          "id": "v2wZhokUGxVb5CaM0VIs",
+          "issues": [
+            "⚠️ Schema definition missing for 'favorites'"
+          ]
+        }
+      ]
+    },
+    "users/Bicov6dbPAYjqJKGZDtaO8aIXq22/favorites": {
+      "documentsWithIssues": [
+        {
+          "path": "users/Bicov6dbPAYjqJKGZDtaO8aIXq22/favorites/IhJhyZOOBEjSEc1wV5d8",
+          "id": "IhJhyZOOBEjSEc1wV5d8",
+          "issues": [
+            "⚠️ Schema definition missing for 'favorites'"
+          ]
+        }
+      ]
+    },
+    "users/Bicov6dbPAYjqJKGZDtaO8aIXq22/renters": {
+      "documentsWithIssues": [
+        {
+          "path": "users/Bicov6dbPAYjqJKGZDtaO8aIXq22/renters/Bicov6dbPAYjqJKGZDtaO8aIXq22",
+          "id": "Bicov6dbPAYjqJKGZDtaO8aIXq22",
+          "issues": [
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Missing field 'totalCost' (expected type: string)",
+            "❗ Missing field 'createdAt' (expected type: object)",
+            "❗ Missing field 'name' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'currentLocation' (expected type: string)",
+            "❗ Missing field 'uid' (expected type: string)",
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)",
+            "❗ Missing field 'displayName' (expected type: string)",
+            "❗ Missing field 'role' (expected type: string)",
+            "❗ Missing field 'currentMedical' (expected type: boolean)",
+            "❗ Missing field 'currentRentersInsurance' (expected type: boolean)",
+            "❗ Missing field 'totalFlightHours' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/favorites": {
+      "documentsWithIssues": [
+        {
+          "path": "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/favorites/7P9RcnLyz1LVGxwVIz4Z",
+          "id": "7P9RcnLyz1LVGxwVIz4Z",
+          "issues": [
+            "⚠️ Schema definition missing for 'favorites'"
+          ]
+        },
+        {
+          "path": "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/favorites/GdHPNL3FX5yp84oqJhvp",
+          "id": "GdHPNL3FX5yp84oqJhvp",
+          "issues": [
+            "⚠️ Schema definition missing for 'favorites'"
+          ]
+        }
+      ]
+    },
+    "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/owners": {
+      "documentsWithIssues": [
+        {
+          "path": "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/owners/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "issues": [
+            "❗ Missing field 'stripeAccountId' (expected type: string)",
+            "❗ Missing field 'stripeAccountStatus' (expected type: string)",
+            "❗ Missing field 'uid' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'image' (expected type: string)",
+            "❗ Missing field 'displayName' (expected type: string)",
+            "❗ Missing field 'createdAt' (expected type: timestamp)",
+            "❗ Missing field 'role' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/renters": {
+      "documentsWithIssues": [
+        {
+          "path": "users/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2/renters/sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "id": "sVxwEr8JHVMAvyqQqZ6sbLbU0Um2",
+          "issues": [
+            "❗ Missing field 'listingId' (expected type: string)",
+            "❗ Missing field 'renterId' (expected type: string)",
+            "❗ Missing field 'status' (expected type: string)",
+            "❗ Missing field 'rentalPeriod' (expected type: string)",
+            "❗ Missing field 'totalCost' (expected type: string)",
+            "❗ Missing field 'createdAt' (expected type: object)",
+            "❗ Missing field 'name' (expected type: string)",
+            "❗ Missing field 'email' (expected type: string)",
+            "❗ Missing field 'contact' (expected type: string)",
+            "❗ Missing field 'address' (expected type: string)",
+            "❗ Missing field 'aircraftType' (expected type: string)",
+            "❗ Missing field 'certifications' (expected type: string)",
+            "❗ Missing field 'fullName' (expected type: string)",
+            "❗ Missing field 'currentLocation' (expected type: string)",
+            "❗ Missing field 'uid' (expected type: string)",
+            "❗ Missing field 'notificationId' (expected type: string)",
+            "❗ Missing field 'rentalRequestId' (expected type: string)",
+            "❗ Missing field 'message' (expected type: string)",
+            "❗ Missing field 'type' (expected type: string)",
+            "❗ Missing field 'displayName' (expected type: string)",
+            "❗ Missing field 'role' (expected type: string)",
+            "❗ Missing field 'currentMedical' (expected type: boolean)",
+            "❗ Missing field 'currentRentersInsurance' (expected type: boolean)",
+            "❗ Missing field 'totalFlightHours' (expected type: string)"
+          ]
+        }
+      ]
+    },
+    "your-collection": {
+      "documentsWithIssues": []
+    }
+  }
+}

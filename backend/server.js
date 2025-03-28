@@ -32,7 +32,7 @@ if (!admin.logger) {
 // =====================
 // Configuration Constants
 // =====================
-const ALLOWED_PACKAGES = ['Basic', 'Featured', 'Enhanced']; // Note: 'FreeTrial' is handled separately.
+const ALLOWED_PACKAGES = ['Basic', 'Featured', 'Enhanced', 'Charter Services']; // Note: 'FreeTrial' is handled separately.
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = Stripe(stripeSecretKey);
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -104,13 +104,13 @@ app.post(
             } else {
               await rentalRequestRef.update({
                 paymentStatus: 'succeeded',
-                status: 'active',
+                rentalStatus: 'active',
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               });
               admin.logger.info(`Rental request ${rentalRequestId} updated to active.`);
             }
 
-            // *** NEW: Update the owner's availableBalance with net funds ***
+            // Mark payment as complete and update available balance if needed.
             const totalAmount = paymentIntent.amount; // in cents
             const platformFeePercentage = 0.2325; // 23.25% of base fee
             const totalMultiplier = 1.1725; // Total = base fee + fees
@@ -153,6 +153,18 @@ app.post(
         case 'payout.paid': {
           const payout = event.data.object;
           admin.logger.info(`Payout paid: ${payout.id}`);
+          // NEW: Update the owner's totalWithdrawn and adjust availableBalance accordingly.
+          // We assume that payout.metadata.ownerId is set when the payout is created.
+          const ownerId = payout.metadata && payout.metadata.ownerId;
+          if (ownerId) {
+            await db.collection('users').doc(ownerId).update({
+              totalWithdrawn: admin.firestore.FieldValue.increment(payout.amount),
+              availableBalance: admin.firestore.FieldValue.increment(-payout.amount)
+            });
+            admin.logger.info(`Owner ${ownerId} totalWithdrawn incremented by ${payout.amount} cents.`);
+          } else {
+            admin.logger.warn('Payout does not include an ownerId in its metadata.');
+          }
           break;
         }
         default:
@@ -210,7 +222,7 @@ const sanitizeData = (data) => {
 };
 
 const calculateTotalCost = (packageType) => {
-  const packagePrices = { Basic: 2500, Featured: 7000, Enhanced: 15000 };
+  const packagePrices = { Basic: 2500, Featured: 7000, Enhanced: 15000, "Charter Services": 50000 };
   return packagePrices[packageType] || 2500;
 };
 
@@ -277,27 +289,14 @@ app.post('/createListing', authenticate, async (req, res) => {
       airportIdentifier
     } = sanitizeData(listingDetails);
 
-    // Updated category requirements for Flight Schools and Flight Instructors
+    // Updated category requirements for Flight Schools, Flight Instructors, and Charter Services
     const categoryRequirements = {
       'Aircraft for Sale': ['title', 'description', 'airportIdentifier'],
       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
       'Flight Schools': ['flightSchoolDetails'],
-      'Flight Instructors': [
-        'firstName',
-        'lastName',
-        'certifications',
-        'fiEmail',
-        'fiDescription',
-        'serviceLocationsList'
-      ],
-      'Aviation Mechanic': [
-        'amFirstName',
-        'amLastName',
-        'amCertifications',
-        'amEmail',
-        'amDescription',
-        'amServiceLocations',
-      ],
+      'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocationsList'],
+      'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
+      'Charter Services': ['charterServiceDetails'],
     };
 
     const requiredFields = categoryRequirements[category];
@@ -317,6 +316,7 @@ app.post('/createListing', authenticate, async (req, res) => {
     }
 
     let finalRequiredFields = [...requiredFields];
+    // For Aircraft for Sale, require salePrice and selectedPricing if not a free listing.
     if (category === 'Aircraft for Sale' && !freeListing) {
       finalRequiredFields.push('salePrice', 'selectedPricing');
     }
@@ -328,37 +328,33 @@ app.post('/createListing', authenticate, async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
     }
-    // For Flight Schools, only the flightSchoolDetails object is expected.
-    // Ensure that flightSchoolDetails exists and has a non-empty flightSchoolEmail.
+    // For Flight Schools, ensure that flightSchoolDetails exists and has a non-empty flightSchoolEmail.
     if (category === 'Flight Schools') {
       if (
         !listingDetails.flightSchoolDetails ||
         !listingDetails.flightSchoolDetails.flightSchoolEmail
       ) {
-        admin.logger.warn('Missing required field: flightSchoolDetails.flightSchoolEmail');
         res.setHeader('Content-Type', 'application/json');
         return res.status(400).json({ error: 'Missing required field: flightSchoolDetails.flightSchoolEmail' });
       }
     }
-    if (!lat || !lng) {
-      admin.logger.warn('Missing location data in request');
-      res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: 'Missing location data (lat, lng)' });
+    // NEW: For Charter Services, verify that charterServiceDetails exists with required keys.
+    if (category === 'Charter Services') {
+      if (
+        !listingDetails.charterServiceDetails ||
+        !listingDetails.charterServiceDetails.charterServiceName ||
+        !listingDetails.charterServiceDetails.charterServiceLocation ||
+        !listingDetails.charterServiceDetails.charterServiceEmail
+      ) {
+        admin.logger.warn(`Missing required fields in charterServiceDetails for category Charter Services`);
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: 'Missing required fields: charterServiceName, charterServiceLocation, charterServiceEmail' });
+      }
     }
-    const latitude = parseFloat(lat);
-    const longitude = parseFloat(lng);
-    if (isNaN(latitude) || isNaN(longitude)) {
-      admin.logger.warn('Invalid location numbers');
-      res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({
-        error: "Invalid location data. 'lat' and 'lng' must be numbers.",
-      });
-    }
-
     let finalSalePrice = 0;
     let finalPackageCost = 0;
-    // Only process salePrice if the category is NOT Flight Instructors.
-    if (category !== 'Flight Instructors') {
+    // Only process salePrice if the category is NOT Flight Instructors and NOT Charter Services.
+    if (category !== 'Flight Instructors' && category !== 'Charter Services') {
       if (freeListing) {
         finalSalePrice = 0;
         finalPackageCost = 0;
@@ -380,7 +376,6 @@ app.post('/createListing', authenticate, async (req, res) => {
         finalPackageCost = calculateTotalCost(selectedPricing);
       }
     }
-    // For Flight Instructors, salePrice remains 0.
     const imageUrls = Array.isArray(images) ? images : [];
     const listingData = {
       title: title || '',
@@ -400,7 +395,7 @@ app.post('/createListing', authenticate, async (req, res) => {
       isFreeListing: freeListing,
       packageType: freeListing ? null : selectedPricing,
       packageCost: freeListing ? 0 : finalPackageCost,
-      location: { lat: latitude, lng: longitude },
+      location: { lat: parseFloat(lat), lng: parseFloat(lng) },
       images: imageUrls,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       ownerId: req.user.uid,
@@ -408,11 +403,7 @@ app.post('/createListing', authenticate, async (req, res) => {
       airportIdentifier: airportIdentifier || '',
     };
 
-    if (freeListing && selectedPricing === 'FreeTrial') {
-      listingData.trialExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
-    }
-
-    // For Flight Instructors, remove salePrice and add hourlyRate
+    // For Flight Instructors, remove salePrice and add additional fields.
     if (category === 'Flight Instructors') {
       listingData.firstName = listingDetails.firstName;
       listingData.lastName = listingDetails.lastName;
@@ -422,7 +413,7 @@ app.post('/createListing', authenticate, async (req, res) => {
       listingData.serviceLocationsList = listingDetails.serviceLocationsList;
       listingData.hourlyRate = listingDetails.hourlyRate;
       listingData.aircraftProvided = listingDetails.aircraftProvided;
-      // Do not set salePrice for Flight Instructors.
+      listingData.profileImage = listingDetails.profileImage || '';
       delete listingData.salePrice;
     } else if (category === 'Aviation Mechanic') {
       listingData.amFirstName = listingDetails.amFirstName;
@@ -431,6 +422,14 @@ app.post('/createListing', authenticate, async (req, res) => {
       listingData.amEmail = listingDetails.amEmail;
       listingData.amDescription = listingDetails.amDescription;
       listingData.amServiceLocations = listingDetails.amServiceLocations;
+    }
+    // NEW: For Charter Services, add the charterServiceDetails field.
+    if (category === 'Charter Services') {
+      listingData.charterServiceDetails = listingDetails.charterServiceDetails || {};
+    }
+
+    if (freeListing && selectedPricing === 'FreeTrial') {
+      listingData.trialExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000));
     }
 
     const listingRef = await db.collection('listings').add(listingData);
@@ -469,13 +468,14 @@ app.put('/updateListing', authenticate, async (req, res) => {
       : listingDetails;
     const sanitizedListingDetails = sanitizeData(parsedListingDetails);
 
-    // Updated category requirements for Flight Schools and Flight Instructors
+    // Updated category requirements for Flight Schools, Flight Instructors, and Charter Services
     const categoryRequirements = {
       'Aircraft for Sale': ['title', 'description', 'airportIdentifier'],
       'Aviation Jobs': ['companyName', 'jobTitle', 'jobDescription'],
       'Flight Schools': ['flightSchoolDetails'],
       'Flight Instructors': ['firstName', 'lastName', 'certifications', 'fiEmail', 'fiDescription', 'serviceLocationsList'],
       'Aviation Mechanic': ['amFirstName', 'amLastName', 'amCertifications', 'amEmail', 'amDescription', 'amServiceLocations'],
+      'Charter Services': ['charterServiceDetails'],
     };
 
     const reqCategoryRequirements = categoryRequirements[sanitizedListingDetails.category];
@@ -493,10 +493,6 @@ app.put('/updateListing', authenticate, async (req, res) => {
       freeListing = true;
     }
 
-    if (!freeListing && (!sanitizedListingDetails.selectedPricing || (!ALLOWED_PACKAGES.includes(sanitizedListingDetails.selectedPricing) && sanitizedListingDetails.selectedPricing !== 'FreeTrial'))) {
-      res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: 'Invalid or missing selectedPricing.' });
-    }
     let finalRequiredFields = [...reqCategoryRequirements];
     if (sanitizedListingDetails.category === 'Aircraft for Sale' && !freeListing) {
       finalRequiredFields.push('salePrice', 'selectedPricing');
@@ -514,6 +510,18 @@ app.put('/updateListing', authenticate, async (req, res) => {
       ) {
         res.setHeader('Content-Type', 'application/json');
         return res.status(400).json({ error: 'Missing required field: flightSchoolDetails.flightSchoolEmail' });
+      }
+    }
+    // NEW: For Charter Services, ensure that charterServiceDetails exists and contains the required keys.
+    if (sanitizedListingDetails.category === 'Charter Services') {
+      if (
+        !sanitizedListingDetails.charterServiceDetails ||
+        !sanitizedListingDetails.charterServiceDetails.charterServiceName ||
+        !sanitizedListingDetails.charterServiceDetails.charterServiceLocation ||
+        !sanitizedListingDetails.charterServiceDetails.charterServiceEmail
+      ) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: 'Missing required fields: charterServiceName, charterServiceLocation, charterServiceEmail' });
       }
     }
     if (!sanitizedListingDetails.lat || !sanitizedListingDetails.lng) {
@@ -534,7 +542,7 @@ app.put('/updateListing', authenticate, async (req, res) => {
       finalSalePrice = 0;
       finalPackageCost = 0;
       finalPackageType = null;
-    } else if (sanitizedListingDetails.category !== 'Flight Instructors') {
+    } else if (sanitizedListingDetails.category !== 'Flight Instructors' && sanitizedListingDetails.category !== 'Charter Services') {
       if (sanitizedListingDetails.salePrice && String(sanitizedListingDetails.salePrice).trim().toLowerCase() !== 'n/a') {
         const salePriceString = String(sanitizedListingDetails.salePrice).trim();
         const sanitizedSalePrice = salePriceString.replace(/[^0-9.]/g, '');
@@ -574,12 +582,7 @@ app.put('/updateListing', authenticate, async (req, res) => {
       airportIdentifier: sanitizedListingDetails.airportIdentifier || listingData.airportIdentifier,
     };
 
-    // If there are new images, update them
-    if (imageUrls.length > 0) {
-      updateData.images = imageUrls;
-    }
-
-    // For Flight Instructors, update using hourlyRate instead of salePrice.
+    // For Flight Instructors, update using hourlyRate instead of salePrice and update profileImage.
     if (sanitizedListingDetails.category === 'Flight Instructors') {
       updateData.firstName = sanitizedListingDetails.firstName;
       updateData.lastName = sanitizedListingDetails.lastName;
@@ -589,7 +592,7 @@ app.put('/updateListing', authenticate, async (req, res) => {
       updateData.serviceLocationsList = sanitizedListingDetails.serviceLocationsList;
       updateData.hourlyRate = sanitizedListingDetails.hourlyRate;
       updateData.aircraftProvided = sanitizedListingDetails.aircraftProvided;
-      // Do not update salePrice for Flight Instructors.
+      updateData.profileImage = sanitizedListingDetails.profileImage;
       delete updateData.salePrice;
     } else if (sanitizedListingDetails.category === 'Aviation Mechanic') {
       updateData.amFirstName = sanitizedListingDetails.amFirstName;
@@ -598,6 +601,15 @@ app.put('/updateListing', authenticate, async (req, res) => {
       updateData.amEmail = sanitizedListingDetails.amEmail;
       updateData.amDescription = sanitizedListingDetails.amDescription;
       updateData.amServiceLocations = sanitizedListingDetails.amServiceLocations;
+    }
+    // NEW: For Charter Services, update charterServiceDetails.
+    if (sanitizedListingDetails.category === 'Charter Services') {
+      updateData.charterServiceDetails = sanitizedListingDetails.charterServiceDetails || {};
+    }
+
+    // If there are new images, update them
+    if (imageUrls.length > 0) {
+      updateData.images = imageUrls;
     }
 
     await listingRef.update(updateData);
@@ -925,7 +937,7 @@ app.post('/retrieve-connected-account', authenticate, async (req, res) => {
   }
 });
 
-// NEW: Get Stripe Balance Endpoint
+// NEW: Get Stripe Balance Endpoint (Updated to return pending deposit amount)
 app.get('/get-stripe-balance', authenticate, async (req, res) => {
   try {
     // Retrieve the owner's document using the UID from the decoded token
@@ -937,9 +949,16 @@ app.get('/get-stripe-balance', authenticate, async (req, res) => {
     if (!ownerData.stripeAccountId) {
       return res.status(400).json({ error: 'Stripe account not connected' });
     }
-    // IMPORTANT: Retrieve the connected account’s balance with correct parameters
+    // Retrieve the connected account’s balance with correct parameters
     const balance = await stripe.balance.retrieve({}, { stripeAccount: ownerData.stripeAccountId });
-    return res.status(200).json({ balance });
+    // Sum up the amounts in the pending array (in cents)
+    let pendingAmount = 0;
+    if (balance.pending && Array.isArray(balance.pending)) {
+      for (const pending of balance.pending) {
+        pendingAmount += pending.amount;
+      }
+    }
+    return res.status(200).json({ pendingAmount });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -967,7 +986,7 @@ exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapsho
         if (ownerData.fcmToken) tokens.push(ownerData.fcmToken);
       }
       const renterRef = db.collection('renters').doc(recipientId);
-      const renterDoc = await getDoc(renterRef);
+      const renterDoc = await renterRef.get();
       if (renterDoc.exists) {
         const renterData = renterDoc.data();
         if (renterData.fcmToken) tokens.push(renterData.fcmToken);
@@ -1018,7 +1037,7 @@ exports.onListingDeleted = onDocumentDeleted('listings/{listingId}', async (snap
           await storageBucket.file(filePath).delete();
           admin.logger.info(`Deleted image at: ${filePath}`);
         } catch (err) {
-          admin.logger.error(`Error deleting image ${filePath}:`, err);
+          admin.logger.error(`Could not delete image ${filePath}:`, err);
         }
       } else {
         admin.logger.warn(`Could not extract file path from ${imageUrl}`);
@@ -1116,7 +1135,7 @@ exports.handleAircraftDetailsUpdate = onDocumentUpdated('aircraftDetails/{ownerI
         await db.collection('aircraftDetails').doc(ownerId).update({ selectedAircraftIds: updatedSelectedIds });
         admin.logger.info(`Removed invalid selectedAircraftIds for ownerId: ${ownerId}`);
       } catch (error) {
-        admin.logger.error(`Error removing invalid selectedAircraftIds for ownerId ${ownerId}:`, error);
+        admin.logger.error(`Error removing invalid selectedAircraftIds for ownerId: ${ownerId}:`, error);
       }
     }
   }
@@ -1166,7 +1185,7 @@ exports.closeExpiredMessaging = onSchedule('every 1 hours', async (event) => {
       if (data.rentalDate && !data.messagingClosed) {
         const rentalDate = new Date(data.rentalDate);
         if (rentalDate < now) {
-          batch.update(docSnap.ref, { messagingClosed: true });
+          batch.update(docSnap.ref, { messagingClosed: true, rentalStatus: 'completed' });
           updateCount++;
         }
       }
@@ -1290,3 +1309,35 @@ exports.api = onRequest(
 // app.listen(PORT, () => {
 //   console.log(`Server is running on port ${PORT}`);
 // });
+exports.cleanupApprovalNotificationsOnActiveRental = onDocumentUpdated('rentalRequests/{rentalRequestId}', async (snapshot, context) => {
+  const beforeData = snapshot.before.data();
+  const afterData = snapshot.after.data();
+
+  // If the rentalStatus changes to "active" (and wasn't already active)
+  if (beforeData.rentalStatus !== 'active' && afterData.rentalStatus === 'active') {
+    const rentalRequestId = context.params.rentalRequestId;
+    const renterId = afterData.renterId;
+    if (!renterId) {
+      admin.logger.warn(`No renterId found for rentalRequestId: ${rentalRequestId}`);
+      return null;
+    }
+    // Query the renter's notifications that correspond to this rentalRequestId
+    const notificationsRef = db.collection('renters').doc(renterId).collection('notifications');
+    const notifSnapshot = await notificationsRef.where('rentalRequestId', '==', rentalRequestId).get();
+    
+    if (notifSnapshot.empty) {
+      admin.logger.info(`No notifications found for rentalRequestId: ${rentalRequestId}`);
+      return null;
+    }
+    
+    const batch = db.batch();
+    notifSnapshot.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+    });
+    
+    await batch.commit();
+    admin.logger.info(`Cleaned up approval notifications for rentalRequestId: ${rentalRequestId}`);
+  }
+  
+  return null;
+});

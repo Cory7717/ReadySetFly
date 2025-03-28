@@ -269,14 +269,14 @@ const Home = ({ route, navigation }) => {
     return () => unsubscribeAuth();
   }, []);
 
-  // Fetch user role from Firestore
+  // Fetch user role from Firestore (updated to read "profileType")
   useEffect(() => {
     if (user) {
       const userDocRef = doc(db, "users", user.uid);
       getDoc(userDocRef)
         .then((docSnapshot) => {
           if (docSnapshot.exists()) {
-            setUserRole(docSnapshot.data().accountType);
+            setUserRole(docSnapshot.data().profileType);
           }
         })
         .catch((error) => {
@@ -429,7 +429,13 @@ const Home = ({ route, navigation }) => {
     console.log("Selected Listing ID:", selectedListing?.id);
 
     // Restrict rental requests to users with role "Renter" or "Both"
-    if (!(userRole === "Renter" || userRole === "Both")) {
+    if (
+      !(
+        userRole &&
+        (userRole.trim().toLowerCase() === "renter" ||
+          userRole.trim().toLowerCase() === "both")
+      )
+    ) {
       Alert.alert("Access Denied", "Only renters can send rental requests.");
       return;
     }

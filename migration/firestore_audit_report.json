@@ -106,18 +106,18 @@
           "issues": []
         },
         {
-          "id": "ZxhFmyNhdQIbfGVifQv3",
-          "path": "ZxhFmyNhdQIbfGVifQv3",
+          "id": "cyqJCRZYLoeAnTEERwR2",
+          "path": "cyqJCRZYLoeAnTEERwR2",
+          "issues": []
+        },
+        {
+          "id": "f83Hws1uB1PG3BBi7N2P",
+          "path": "f83Hws1uB1PG3BBi7N2P",
           "issues": [
             "❗ Field 'costPerHour' has type 'string', expected 'number'",
             "❗ Field 'tailNumber' has type 'string', expected 'number'",
             "❗ Field 'totalTimeOnFrame' has type 'string', expected 'number'"
           ]
-        },
-        {
-          "id": "cyqJCRZYLoeAnTEERwR2",
-          "path": "cyqJCRZYLoeAnTEERwR2",
-          "issues": []
         },
         {
           "id": "lXAaqxq9J1TJPYRqyjKr",
@@ -189,6 +189,15 @@
           ]
         },
         {
+          "id": "7T4Xs7pLSChnuRMrzUuw",
+          "path": "7T4Xs7pLSChnuRMrzUuw",
+          "issues": [
+            "❗ Missing field 'flightSchoolName'",
+            "❗ Field 'flightSchoolDetails' has type 'object', expected 'string'",
+            "❗ Field 'packageType' has type 'string', expected 'object'"
+          ]
+        },
+        {
           "id": "CM9Wl4zSMczpEsZf1NZd",
           "path": "CM9Wl4zSMczpEsZf1NZd",
           "issues": [
@@ -203,10 +212,32 @@
           ]
         },
         {
+          "id": "GCxznfAImksvdi5B6Awy",
+          "path": "GCxznfAImksvdi5B6Awy",
+          "issues": [
+            "❗ Field 'packageType' has type 'string', expected 'object'"
+          ]
+        },
+        {
+          "id": "GWMPdd9zpnA14SiUwcRV",
+          "path": "GWMPdd9zpnA14SiUwcRV",
+          "issues": [
+            "❗ Field 'packageType' has type 'string', expected 'object'"
+          ]
+        },
+        {
           "id": "TnMzh68G8k47SP6IPQuz",
           "path": "TnMzh68G8k47SP6IPQuz",
           "issues": [
             "❗ Field 'packageType' has type 'string', expected 'object'"
+          ]
+        },
+        {
+          "id": "UyU1upZA0gOeQPhuf4wu",
+          "path": "UyU1upZA0gOeQPhuf4wu",
+          "issues": [
+            "❗ Field 'packageType' has type 'string', expected 'object'",
+            "❗ Field 'charterServiceDetails' has type 'object', expected 'string'"
           ]
         },
         {
@@ -224,8 +255,22 @@
           ]
         },
         {
+          "id": "kCDhNZdIazTDiDVcttQI",
+          "path": "kCDhNZdIazTDiDVcttQI",
+          "issues": [
+            "❗ Field 'packageType' has type 'string', expected 'object'"
+          ]
+        },
+        {
           "id": "nmfTcSQ422ua7msTZDe7",
           "path": "nmfTcSQ422ua7msTZDe7",
+          "issues": [
+            "❗ Field 'packageType' has type 'string', expected 'object'"
+          ]
+        },
+        {
+          "id": "pnVzPW2ljxnMY0Vu5NjY",
+          "path": "pnVzPW2ljxnMY0Vu5NjY",
           "issues": [
             "❗ Field 'packageType' has type 'string', expected 'object'"
           ]
@@ -312,6 +357,13 @@
           "issues": []
         },
         {
+          "id": "f9ua0jTqkIfSmKCTOjYn",
+          "path": "f9ua0jTqkIfSmKCTOjYn",
+          "issues": [
+            "❗ Field 'rentalRequestId' has type 'object', expected 'string'"
+          ]
+        },
+        {
           "id": "l3OOsvGscdoZc8le2szs",
           "path": "l3OOsvGscdoZc8le2szs",
           "issues": [
@@ -353,6 +405,11 @@
         {
           "id": "vXGCUUNp7NOr3ddF7NX3",
           "path": "vXGCUUNp7NOr3ddF7NX3",
+          "issues": []
+        },
+        {
+          "id": "x93Su0ue6pQPTOL7FtwQ",
+          "path": "x93Su0ue6pQPTOL7FtwQ",
           "issues": []
         }
       ]
@@ -827,10 +884,19 @@
           ]
         },
         {
+          "id": "1R26YCLZiq1nhYCnL8D9",
+          "path": "1R26YCLZiq1nhYCnL8D9",
+          "issues": [
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
+        },
+        {
           "id": "3R8fuUGMFTkG0oanzY0d",
           "path": "3R8fuUGMFTkG0oanzY0d",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
@@ -844,32 +910,53 @@
         {
           "id": "Apumci7rbNdM0t5cwOgl",
           "path": "Apumci7rbNdM0t5cwOgl",
-          "issues": []
+          "issues": [
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
         },
         {
           "id": "C3LKGFKohzUtKOiHzuWE",
           "path": "C3LKGFKohzUtKOiHzuWE",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "DX9kKYWJNmt2ygNTCVbM",
           "path": "DX9kKYWJNmt2ygNTCVbM",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "JWiEzdGKQL3XDC13nVP9",
           "path": "JWiEzdGKQL3XDC13nVP9",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "KOhEdXifrbPal0JXCw87",
           "path": "KOhEdXifrbPal0JXCw87",
+          "issues": [
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
+        },
+        {
+          "id": "LfH0J6ptKQyESIqKajHG",
+          "path": "LfH0J6ptKQyESIqKajHG",
+          "issues": [
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
+        },
+        {
+          "id": "O43d77vfSaV50eTFruJ0",
+          "path": "O43d77vfSaV50eTFruJ0",
           "issues": [
             "❗ Field 'renterName' has type 'string', expected 'object'",
             "❗ Field 'totalCost' has type 'string', expected 'number'"
@@ -887,68 +974,103 @@
           "id": "PvMYBNTTPgQqaCYV6Zf9",
           "path": "PvMYBNTTPgQqaCYV6Zf9",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "Smpwc9G4619RSdlOTJTs",
           "path": "Smpwc9G4619RSdlOTJTs",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
+        },
+        {
+          "id": "UdDBnfyfGT3tmsndClTC",
+          "path": "UdDBnfyfGT3tmsndClTC",
+          "issues": [
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "bzn51XSMA6ni3jt6MyaM",
           "path": "bzn51XSMA6ni3jt6MyaM",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "fgEjvsNcvAEzs1ZDzsKv",
           "path": "fgEjvsNcvAEzs1ZDzsKv",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "gWODYHKC0ZrhRNGmT4hI",
           "path": "gWODYHKC0ZrhRNGmT4hI",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "jz9AzYg3oagHYpFqqm7i",
           "path": "jz9AzYg3oagHYpFqqm7i",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
+        },
+        {
+          "id": "kb7JWPV1HYCIhSRODQJK",
+          "path": "kb7JWPV1HYCIhSRODQJK",
+          "issues": [
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "lqDg4ovwiJuVRM5berQM",
           "path": "lqDg4ovwiJuVRM5berQM",
-          "issues": []
+          "issues": [
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
         },
         {
           "id": "ojGBDRzAtKI5DMTlfz67",
           "path": "ojGBDRzAtKI5DMTlfz67",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
+          ]
+        },
+        {
+          "id": "pSybHTfFmGjP79z9tDQU",
+          "path": "pSybHTfFmGjP79z9tDQU",
+          "issues": [
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "rjl9kxGcU5rddf0fOf3D",
           "path": "rjl9kxGcU5rddf0fOf3D",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         },
         {
           "id": "ylqYZ7eC6vYyTrdfdGRc",
           "path": "ylqYZ7eC6vYyTrdfdGRc",
           "issues": [
-            "❗ Field 'renterName' has type 'string', expected 'object'"
+            "❗ Field 'renterName' has type 'string', expected 'object'",
+            "❗ Field 'totalCost' has type 'string', expected 'number'"
           ]
         }
       ]
@@ -964,6 +1086,11 @@
         {
           "id": "Bicov6dbPAYjqJKGZDtaO8aIXq22",
           "path": "Bicov6dbPAYjqJKGZDtaO8aIXq22",
+          "issues": []
+        },
+        {
+          "id": "QgtjOhlOXCOqixvFOPpXHwxjGzO2",
+          "path": "QgtjOhlOXCOqixvFOPpXHwxjGzO2",
           "issues": []
         },
         {
@@ -987,8 +1114,18 @@
           "issues": []
         },
         {
+          "id": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "path": "1Dj9eQwMcRWWXqtcGHNKEctgjW62",
+          "issues": []
+        },
+        {
           "id": "1kTTh0QKU7Y9FhA3f6D4axZOa6L2",
           "path": "1kTTh0QKU7Y9FhA3f6D4axZOa6L2",
+          "issues": []
+        },
+        {
+          "id": "2AAa3ntKG0SYxRjWPkFMRiuJV9W2",
+          "path": "2AAa3ntKG0SYxRjWPkFMRiuJV9W2",
           "issues": []
         },
         {
@@ -999,6 +1136,11 @@
         {
           "id": "Bicov6dbPAYjqJKGZDtaO8aIXq22",
           "path": "Bicov6dbPAYjqJKGZDtaO8aIXq22",
+          "issues": []
+        },
+        {
+          "id": "QgtjOhlOXCOqixvFOPpXHwxjGzO2",
+          "path": "QgtjOhlOXCOqixvFOPpXHwxjGzO2",
           "issues": []
         },
         {
@@ -1046,8 +1188,8 @@
   ],
   "summary": {
     "totalCollections": 19,
-    "totalDocuments": 171,
-    "totalIssues": 51,
+    "totalDocuments": 189,
+    "totalIssues": 88,
     "issuesByType": {
       "❗ Field 'aircraftDetails' has type 'string', expected 'object'": 1,
       "❗ Field 'costPerHour' has type 'string', expected 'number'": 1,
@@ -1057,12 +1199,15 @@
       "❗ Field 'currentAnnualPdf' has type 'string', expected 'object'": 1,
       "❗ Field 'insurancePdf' has type 'string', expected 'object'": 1,
       "❗ Field 'ratesPerHour' has type 'number', expected 'string'": 1,
-      "❗ Field 'packageType' has type 'string', expected 'object'": 8,
-      "❗ Field 'rentalRequestId' has type 'object', expected 'string'": 5,
+      "❗ Field 'packageType' has type 'string', expected 'object'": 14,
+      "❗ Missing field 'flightSchoolName'": 1,
+      "❗ Field 'flightSchoolDetails' has type 'object', expected 'string'": 1,
+      "❗ Field 'charterServiceDetails' has type 'object', expected 'string'": 1,
+      "❗ Field 'rentalRequestId' has type 'object', expected 'string'": 6,
       "❗ Field 'image' has type 'string', expected 'object'": 8,
       "❗ Field 'userName' has type 'object', expected 'string'": 1,
-      "❗ Field 'renterName' has type 'string', expected 'object'": 17,
-      "❗ Field 'totalCost' has type 'string', expected 'number'": 4
+      "❗ Field 'renterName' has type 'string', expected 'object'": 23,
+      "❗ Field 'totalCost' has type 'string', expected 'number'": 25
     }
   }
 }

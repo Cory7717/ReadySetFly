@@ -118,7 +118,25 @@
       "gearEmail": "string",
       "gearState": "string",
       "publiclyViewable": "boolean",
-      "airportIdentifier": "string"
+      "airportIdentifier": "string",
+      "firstName": "string",
+      "lastName": "string",
+      "certifications": "string",
+      "fiEmail": "string",
+      "fiDescription": "string",
+      "serviceLocationsList": "object",
+      "hourlyRate": "string",
+      "aircraftProvided": "boolean",
+      "profileImage": "string",
+      "charterServiceName": "string",
+      "charterServiceLocation": "string",
+      "charterServiceEmail": "string",
+      "charterServicePhone": "string",
+      "charterServicecDescription": "string",
+      "charterServiceAreas": "string",
+      "charterServiceDetails": "string",
+      "charerServiceEmail": "string",
+      "charterServiceDescription": "string"
     }
   },
   "messages": {
@@ -182,7 +200,10 @@
       "renterName": "string",
       "totalCost": "string",
       "status": "string",
-      "listingId": "string"
+      "listingId": "string",
+      "ownerName": "string",
+      "rentalRequestId": "string",
+      "rentalDate": "string"
     }
   },
   "orders": {
@@ -213,7 +234,13 @@
       "contact": "string",
       "email": "string",
       "address": "string",
-      "image": "string"
+      "image": "string",
+      "displayName": "string",
+      "createdAt": "timestamp",
+      "role": "string",
+      "costData": "object",
+      "aircraftDetails": "object",
+      "profileData": "object"
     }
   },
   "payment-sheet": {
@@ -261,7 +288,26 @@
       "id": "string",
       "status": "string",
       "totalAmount": "number",
-      "messagingClosed": "boolean"
+      "messagingClosed": "boolean",
+      "address": "string",
+      "aircraftType": "string",
+      "contact": "string",
+      "name": "string",
+      "fullName": "string",
+      "certifications": "string",
+      "fcmToken": "string",
+      "email": "string",
+      "paymentStatus": "string",
+      "rating": "number",
+      "notified": "boolean",
+      "processingFee": "integer",
+      "tax": "integer",
+      "description": "string",
+      "costPerHour": "integer",
+      "senderId": "string",
+      "senderName": "string",
+      "airplaneModel": "string",
+      "updatedAt": "timestamp"
     }
   },
   "renters": {
@@ -280,7 +326,17 @@
       "certifications": "string",
       "fcmToken": "string",
       "fullName": "string",
-      "currentLocation": "string"
+      "currentLocation": "string",
+      "uid": "string",
+      "notificationId": "string",
+      "rentalRequestId": "string",
+      "message": "string",
+      "type": "string",
+      "displayName": "string",
+      "role": "string",
+      "currentMedical": "boolean",
+      "currentRentersInsurance": "boolean",
+      "totalFlightHours": "string"
     }
   },
   "users": {
@@ -307,7 +363,9 @@
       "location": "string",
       "profileType": "string",
       "createdAt": "object",
-      "stripeAccountStatus": "string"
+      "stripeAccountStatus": "string",
+      "phoneNumber": "string",
+      "stripeDetailsSubmitted": "null"
     }
   },
   "your-collection": {

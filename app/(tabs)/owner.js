@@ -185,6 +185,9 @@ const OwnerProfile = ({ ownerId }) => {
   const [faqModalVisible, setFaqModalVisible] = useState(false);
   const [investModalVisible, setInvestModalVisible] = useState(false);
 
+  // NEW: New state for Privacy Policy Modal
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+
   // NEW: New state for account type ("Owner", "Renter", or "Both")
   const [userRole, setUserRole] = useState("");
 
@@ -204,7 +207,8 @@ const OwnerProfile = ({ ownerId }) => {
     }
   }, [user]);
 
-  // NEW: Prevent access to this screen if the user is only a "Renter"
+  // NEW: Prevent access to this screen if the user is solely a "Renter"
+  // This updated check now allows users with account type "Both" to access the owner screen.
   useEffect(() => {
     if (userRole && userRole === "Renter") {
       Alert.alert(
@@ -219,15 +223,18 @@ const OwnerProfile = ({ ownerId }) => {
   const [manageRentalModalVisible, setManageRentalModalVisible] = useState(false);
   // NEW: State for Connected Account Modal (to be opened when "View Connected Account" is pressed)
   const [connectedAccountModalVisible, setConnectedAccountModalVisible] = useState(false);
-  // NEW: State for live balance retrieved from Stripe
+  // NEW: State for live balance retrieved from Stripe – now we expect pending deposit amount
   const [liveBalance, setLiveBalance] = useState(null);
 
   // NEW: State for Update Profile Modal (newly added)
   const [updateProfileModalVisible, setUpdateProfileModalVisible] = useState(false);
 
-  // ... (other state definitions remain unchanged)
+  // Update initial profileData to check providerData if displayName isn’t directly set.
   const [profileData, setProfileData] = useState({
-    fullName: user?.displayName || "",
+    fullName:
+      user?.displayName ||
+      (user?.providerData && user.providerData[0]?.displayName) ||
+      "",
     contact: "",
     address: "",
     email: user?.email || "",
@@ -283,6 +290,7 @@ const OwnerProfile = ({ ownerId }) => {
   const [activeRentals, setActiveRentals] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedListingDetails, setSelectedListingDetails] = useState(null);
+  // NEW: Messaging states
   const [messageInput, setMessageInput] = useState("");
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -405,7 +413,10 @@ const OwnerProfile = ({ ownerId }) => {
         setProfileData((prev) => ({
           ...prev,
           email: user.email || "",
-          fullName: user.displayName || "",
+          fullName:
+            user?.displayName ||
+            (user?.providerData && user.providerData[0]?.displayName) ||
+            "",
         }));
         setAvailableBalance(0);
         setTotalWithdrawn(0);
@@ -479,7 +490,8 @@ const OwnerProfile = ({ ownerId }) => {
     }
   }, [costData, resolvedOwnerId]);
 
-  // NEW: Fetch live Stripe balance when Payment Information modal opens
+  // NEW: Fetch live Stripe balance when Payment Information modal opens.
+  // Instead of expecting a "latestPayment" field, we now get the pending deposit amount.
   useEffect(() => {
     const fetchStripeBalance = async () => {
       try {
@@ -493,7 +505,8 @@ const OwnerProfile = ({ ownerId }) => {
         });
         const data = await response.json();
         if (response.ok) {
-          setLiveBalance(data.balance);
+          // We now expect data.pendingAmount from the server (in cents)
+          setLiveBalance(data.pendingAmount);
         } else {
           console.error("Error fetching live balance:", data.error);
         }
@@ -1678,7 +1691,9 @@ const OwnerProfile = ({ ownerId }) => {
               <View>
                 <Text style={{ fontSize: 14, color: "#fff" }}>Welcome</Text>
                 <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>
-                  {profileData.fullName || user?.displayName || "User"}
+                  {profileData.fullName ||
+                    (user?.providerData && user.providerData[0]?.displayName) ||
+                    "User"}
                 </Text>
               </View>
             </View>
@@ -1694,7 +1709,7 @@ const OwnerProfile = ({ ownerId }) => {
         >
           <CustomButton
             onPress={() => setWithdrawModalVisible(true)}
-            title={`Most Recent Payment: $${liveBalance && liveBalance.available && liveBalance.available[0] ? (liveBalance.available[0].amount / 100).toFixed(2) : (availableBalance / 100).toFixed(2)}`}
+            title={`Most Recent Payment: $${liveBalance ? (liveBalance / 100).toFixed(2) : (availableBalance / 100).toFixed(2)}`}
             backgroundColor="#000"
             style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 24 }}
             textStyle={{ fontSize: 16, fontWeight: "bold" }}
@@ -1735,6 +1750,14 @@ const OwnerProfile = ({ ownerId }) => {
             <Text style={{ marginTop: 4, textAlign: "center", fontSize: 12 }}>
               Invest in R S F?
             </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setPrivacyModalVisible(true)}
+            style={{ alignItems: "center" }}
+            accessibilityLabel="Privacy Policy"
+          >
+            <Ionicons name="lock-closed-outline" size={36} color="#3182ce" />
+            <Text style={{ marginTop: 4 }}>Privacy Policy</Text>
           </TouchableOpacity>
         </View>
 
@@ -2637,132 +2660,80 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* Rental Request Message Modal */}
+      {/* Updated Messaging Modal */}
       <Modal
         visible={messageModalVisible}
         animationType="slide"
         transparent={true}
+        presentationStyle="overFullScreen"
         onRequestClose={() => setMessageModalVisible(false)}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.messageModalContainer}
         >
-          <View
-            style={{
-              width: "88%",
-              height: "80%",
-              backgroundColor: "#fff",
-              borderRadius: 8,
-              padding: 24,
-            }}
-          >
+          <View style={styles.messagesHeader}>
             <TouchableOpacity
               onPress={() => setMessageModalVisible(false)}
-              style={{ position: "absolute", top: 16, right: 16 }}
+              style={styles.closeModalButton}
               accessibilityLabel="Close messages"
               accessibilityRole="button"
             >
-              <Ionicons name="close-circle" size={32} color="#2d3748" />
+              <Ionicons name="arrow-back" size={24} color="#2d3748" />
             </TouchableOpacity>
-
-            {messages.length > 0 ? (
-              <FlatList
-                data={messages}
-                keyExtractor={(item, index) =>
-                  `${item.senderId}_${item.createdAt?.seconds}_${item.createdAt?.nanoseconds}_${index}`
-                }
-                renderItem={({ item }) => (
-                  <View
-                    style={{
-                      padding: 12,
-                      borderRadius: 8,
-                      marginBottom: 8,
-                      maxWidth: "75%",
-                      alignSelf:
-                        item.senderId === user.uid ? "flex-end" : "flex-start",
-                      backgroundColor:
-                        item.senderId === user.uid ? "#3182ce" : "#e2e8f0",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontWeight: "bold",
-                        color: item.senderId === user.uid ? "#fff" : "#000",
-                      }}
-                    >
-                      {item.senderName}:
-                    </Text>
-                    <Text
-                      style={{
-                        color: item.senderId === user.uid ? "#fff" : "#000",
-                      }}
-                    >
-                      {item.text}
-                    </Text>
-                    <Text
-                      style={{ fontSize: 10, color: "#a0aec0", marginTop: 4 }}
-                    >
-                      {item.createdAt
-                        ? item.createdAt.toDate
-                          ? item.createdAt.toDate().toLocaleString()
-                          : new Date(item.createdAt).toLocaleString()
-                        : "N/A"}
-                    </Text>
-                  </View>
-                )}
-                style={{ flex: 1 }}
-              />
-            ) : (
-              <Text style={{ color: "#a0aec0", textAlign: "center" }}>
-                No messages yet.
-              </Text>
-            )}
-
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginTop: 16,
-              }}
-            >
-              <TextInput
-                placeholder="Type your message..."
-                value={messageInput}
-                onChangeText={(text) => setMessageInput(text)}
-                style={{
-                  flex: 1,
-                  borderWidth: 1,
-                  borderColor: "#ccc",
-                  borderRadius: 8,
-                  padding: 12,
-                  marginRight: 8,
-                }}
-                keyboardType="default"
-                autoCapitalize="none"
-                accessibilityLabel="Type a message"
-              />
-              <TouchableOpacity
-                onPress={sendMessage}
-                style={{
-                  backgroundColor: "#3182ce",
-                  padding: 12,
-                  borderRadius: 8,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                accessibilityLabel="Send message"
-                accessibilityRole="button"
-              >
-                <Ionicons name="send" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.messagesTitle}>Messages</Text>
+            <View style={{ width: 24 }} />
           </View>
-        </View>
+
+          <FlatList
+            data={messages}
+            keyExtractor={(item, index) =>
+              `${item.senderId}_${item.createdAt?.seconds}_${item.createdAt?.nanoseconds}_${index}`
+            }
+            renderItem={({ item }) => (
+              <View
+                style={[
+                  styles.chatBubble,
+                  item.senderId === user.uid
+                    ? styles.chatBubbleRight
+                    : styles.chatBubbleLeft,
+                ]}
+              >
+                <Text style={styles.chatSenderName}>{item.senderName}:</Text>
+                <Text style={styles.chatMessageText}>{item.text}</Text>
+                <Text style={styles.chatTimestamp}>
+                  {item.createdAt
+                    ? item.createdAt.toDate
+                      ? item.createdAt.toDate().toLocaleString()
+                      : new Date(item.createdAt).toLocaleString()
+                    : "N/A"}
+                </Text>
+              </View>
+            )}
+            contentContainerStyle={styles.messagesList}
+            style={{ flex: 1, width: "100%" }}
+          />
+
+          <View style={styles.messageInputContainer}>
+            <TextInput
+              placeholder="Type your message..."
+              value={messageInput}
+              onChangeText={(text) => setMessageInput(text)}
+              style={styles.messageTextInput}
+              keyboardType="default"
+              autoCapitalize="none"
+              accessibilityLabel="Type a message"
+            />
+            <TouchableOpacity
+              onPress={sendMessage}
+              style={styles.sendButton}
+              accessibilityLabel="Send message"
+              accessibilityRole="button"
+            >
+              <Ionicons name="send" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* View More Active Rentals Modal */}
@@ -3235,7 +3206,7 @@ const OwnerProfile = ({ ownerId }) => {
               />
 
               <Text style={{ fontSize: 16, marginBottom: 16 }}>
-                Live Balance: ${ liveBalance && liveBalance.available && liveBalance.available[0] ? (liveBalance.available[0].amount / 100).toFixed(2) : (availableBalance / 100).toFixed(2) }
+                Live Balance: ${ liveBalance ? (liveBalance / 100).toFixed(2) : (availableBalance / 100).toFixed(2) }
               </Text>
 
               <Text style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}>
@@ -3407,7 +3378,6 @@ const OwnerProfile = ({ ownerId }) => {
           </View>
         </View>
       </Modal>
-
       {/* FAQ Modal */}
       <Modal
         visible={faqModalVisible}
@@ -3432,9 +3402,48 @@ const OwnerProfile = ({ ownerId }) => {
             }}
           >
             <ModalHeader title="FAQ" onClose={() => setFaqModalVisible(false)} />
-            <Text style={{ marginBottom: 16 }}>
-              Here are some frequently asked questions. (Placeholder content)
-            </Text>
+            <ScrollView style={{ maxHeight: 400 }}>
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                1. Will my insurance company allow this, and will my costs increase?
+              </Text>
+              <Text style={{ marginBottom: 8 }}>
+                <Text style={{ fontWeight: "bold" }}>Insurance Approval:</Text> Yes. Most insurance carriers allow owners to rent their planes—similar to a flight school lease-back or flying club arrangement.
+                {"\n"}<Text style={{ fontWeight: "bold" }}>Cost Impact:</Text> Your costs may rise, but not dramatically.
+                {"\n"}<Text style={{ fontWeight: "bold" }}>Next Steps:</Text> Contact your insurance company for a quote. Look for links to approved providers in the app and on our website.
+              </Text>
+
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                2. Does the FAA allow this?
+              </Text>
+              <Text style={{ marginBottom: 8 }}>
+                <Text style={{ fontWeight: "bold" }}>FAA Guidelines:</Text> Yes. The FAA permits private owners to lease their planes to licensed pilots.
+                {"\n"}<Text style={{ fontWeight: "bold" }}>Important Note:</Text> Do not charge for flights beyond the lease transaction; doing so could trigger FAA regulations.
+              </Text>
+
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                3. What if a renter damages or makes my aircraft less clean?
+              </Text>
+              <Text style={{ marginBottom: 8 }}>
+                <Text style={{ fontWeight: "bold" }}>Preventive Measures:</Text> The app includes an “Owner’s Portal” with pre- and post-rental walk-around checklists and photo uploads. A $500 credit card hold is added on top of the rental fare. Owners can claim this if any issues arise.
+                {"\n"}<Text style={{ fontWeight: "bold" }}>Community Trust:</Text> We believe in the aviation community’s commitment to safety and proper care.
+              </Text>
+
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                4. Why should I trust a stranger with my plane?
+              </Text>
+              <Text style={{ marginBottom: 8 }}>
+                <Text style={{ fontWeight: "bold" }}>Renter Verification:</Text> Renters must upload their current log book, medical certificate, certifications, and non-owner insurance policy.
+                {"\n"}<Text style={{ fontWeight: "bold" }}>Owner Options:</Text> You can upload your aircraft’s maintenance records, insurance details, and avionics package. Set a minimum flight hour requirement (e.g., 150 hours) to filter renters automatically. Optionally, require a CFI checkout (renter’s expense) without mandating a specific instructor.
+                {"\n"}<Text style={{ fontWeight: "bold" }}>Reputation System:</Text> Our “Star Rating” system lets both parties rate each other, helping you decide if a renter meets your trust criteria.
+              </Text>
+
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                5. Do I need to perform a 100-hour inspection if I lease my aircraft?
+              </Text>
+              <Text style={{ marginBottom: 8 }}>
+                <Text style={{ fontWeight: "bold" }}>No, You’re Not Required:</Text> A 100-hour inspection is not necessary unless you mandate a CFI checkout and specify the CFI. If the renter chooses their own CFI, the inspection requirement does not apply.
+              </Text>
+            </ScrollView>
             <CustomButton
               onPress={() => setFaqModalVisible(false)}
               title="Close"
@@ -3490,8 +3499,151 @@ const OwnerProfile = ({ ownerId }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Privacy Policy Modal */}
+      <Modal
+        visible={privacyModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setPrivacyModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "88%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+              maxHeight: "80%",
+            }}
+          >
+            <ModalHeader
+              title="Privacy Policy & Sensitive Data Policy"
+              onClose={() => setPrivacyModalVisible(false)}
+            />
+            <ScrollView style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                Effective Date: March 17th, 2025
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application. We are committed to protecting your personal data and ensuring your privacy.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                1. Information We Collect: We may collect personal information, such as your name, email address, contact details, and usage data. Sensitive data is handled with strict security measures.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                2. How We Use Your Information: Your data is used to provide and improve our services, communicate with you, and comply with legal obligations.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                3. Data Sharing and Disclosure: We do not sell your personal data. Information may be shared with trusted partners only as necessary to perform services or as required by law.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                4. Security: We implement a variety of security measures to maintain the safety of your personal information.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                5. Your Rights: You have the right to access, update, or request deletion of your personal information. Please contact us to exercise these rights.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                6. Changes to This Policy: We may update this Privacy Policy from time to time. Any changes will be posted in the application.
+              </Text>
+            </ScrollView>
+            <CustomButton
+              onPress={() => setPrivacyModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
+              accessibilityLabel="Close Privacy Policy"
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 export default OwnerProfile;
+  
+/* -------------------
+   Messaging Modal Styles
+------------------- */
+const styles = {
+  messageModalContainer: {
+    flex: 1,
+    backgroundColor: "#f7fafc",
+  },
+  messagesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  closeModalButton: {
+    padding: 8,
+  },
+  messagesTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  chatBubble: {
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 4,
+    maxWidth: "80%",
+  },
+  chatBubbleLeft: {
+    backgroundColor: "#edf2f7",
+    alignSelf: "flex-start",
+  },
+  chatBubbleRight: {
+    backgroundColor: "#3182ce",
+    alignSelf: "flex-end",
+  },
+  chatSenderName: {
+    fontWeight: "bold",
+    color: "#2d3748",
+    marginBottom: 4,
+  },
+  chatMessageText: {
+    color: "#2d3748",
+  },
+  chatTimestamp: {
+    fontSize: 10,
+    color: "#a0aec0",
+    marginTop: 4,
+    textAlign: "right",
+  },
+  messagesList: {
+    padding: 16,
+  },
+  messageInputContainer: {
+    flexDirection: "row",
+    padding: 16,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderColor: "#e2e8f0",
+    alignItems: "center",
+  },
+  messageTextInput: {
+    flex: 1,
+    backgroundColor: "#edf2f7",
+    padding: 12,
+    borderRadius: 20,
+    marginRight: 8,
+    color: "#2d3748",
+  },
+  sendButton: {
+    backgroundColor: "#3182ce",
+    padding: 12,
+    borderRadius: 20,
+  },
+};

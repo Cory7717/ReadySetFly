@@ -146,32 +146,33 @@ export default function CheckoutScreen() {
     rentalHours = 1,
     rentalRequestId: routeRentalRequestId = '',
     ownerId: routeOwnerId = '',
-    listingDetails = {},
-    selectedPricing: initialSelectedPricing = '',
+    listingDetails = {}, // Kept original name
+    selectedPricing: initialSelectedPricing = '', // Kept original name
   } = route.params || {};
 
   console.log("CheckoutScreen (Rental) received params:", route.params);
 
-  // Local state
+  // Local state (Original)
   const [loading, setLoading] = useState(false);
-  const [isOperationSuccess, setIsOperationSuccess] = useState(false);
+  const [isOperationSuccess, setIsOperationSuccess] = useState(false); // Kept, though less used now
   const [cardholderName, setCardholderName] = useState(user?.displayName || '');
   const [totalAmount, setTotalAmount] = useState(0);
-  const [selectedPricing, setSelectedPricing] = useState(initialSelectedPricing);
+  const [selectedPricing, setSelectedPricing] = useState(initialSelectedPricing); // Kept, though maybe less relevant for rentals
   const [rentalRequestId, setRentalRequestId] = useState(routeRentalRequestId || '');
   const [ownerId, setOwnerId] = useState(routeOwnerId || '');
-  // New state to control confirmation modal visibility
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  // Removed showConfirmationModal state - no longer used here
+  // const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
-  // Animation
+  // Animation (Original)
   const bounceValue = useRef(new Animated.Value(0)).current;
   const displayTotal = (totalAmount / 100).toFixed(2);
 
+  // Original useEffects
   useEffect(() => {
-    console.log("CheckoutScreen (Rental) useEffect triggered");
+    console.log("CheckoutScreen useEffect triggered");
     startBouncing();
     validateParamsAndSetAmount();
-  }, [costPerHour, rentalHours, navigation]);
+  }, [costPerHour, rentalHours, navigation]); // Original dependencies
 
   const validateParamsAndSetAmount = () => {
     if (isNaN(costPerHour) || costPerHour <= 0) {
@@ -206,7 +207,7 @@ export default function CheckoutScreen() {
     ).start();
   };
 
-  // Updated calculation: Tax is now computed on the baseAmount only.
+  // Original calculateRentalTotal
   const calculateRentalTotal = (costHr, hours) => {
     const baseAmount = costHr * hours;
     const bookingFee = baseAmount * 0.06;
@@ -216,6 +217,7 @@ export default function CheckoutScreen() {
     setTotalAmount(totalCents);
   };
 
+  // Original getFirebaseIdToken
   const getFirebaseIdToken = async () => {
     try {
       if (user) {
@@ -232,10 +234,11 @@ export default function CheckoutScreen() {
     }
   };
 
-  // Create a rental request document in Firestore
+  // Original createRentalRequest (if needed)
   const createRentalRequest = async () => {
     try {
-      const actualListingId = listingDetails.id;
+      // Original logic used listingDetails.id - ensure this is passed correctly if needed
+      const actualListingId = listingDetails.id; 
       if (!actualListingId) {
         Alert.alert('Error', 'Listing information is missing.');
         return null;
@@ -247,10 +250,12 @@ export default function CheckoutScreen() {
         costPerHour: parseFloat(costPerHour),
         rentalHours: parseFloat(rentalHours),
         createdAt: serverTimestamp(),
+        // Add ownerId here if needed during creation
+        ownerId: ownerId, 
       };
       const rentalRequestRef = await addDoc(collection(db, 'rentalRequests'), rentalRequestData);
       const newRentalRequestId = rentalRequestRef.id;
-      setRentalRequestId(newRentalRequestId);
+      setRentalRequestId(newRentalRequestId); // Update state if needed
       console.log(`Rental Request Created with ID: ${newRentalRequestId}`);
       return newRentalRequestId;
     } catch (error) {
@@ -260,33 +265,49 @@ export default function CheckoutScreen() {
     }
   };
 
-  // Handle rental payment (owner info passed to server)
+  // *** MODIFIED: handleRentalPayment function ***
   const handleRentalPayment = async (values) => {
     if (values.cardholderName.trim() === '') {
       Alert.alert('Validation Error', 'Please enter the name on the credit card.');
       return;
     }
+    // Ensure ownerId is available before proceeding
+    if (!ownerId) {
+        Alert.alert('Error', 'Cannot process payment: Owner information missing.');
+        console.error("ownerId is missing in handleRentalPayment");
+        return;
+    }
+    
     try {
       setLoading(true);
-      let currentRentalRequestId = rentalRequestId;
+      let currentRentalRequestId = rentalRequestId; 
+      
+      // If rentalRequestId wasn't passed via params, attempt to create it
+      // Note: This might indicate a flow issue if it's expected to always exist here
       if (!currentRentalRequestId) {
-        currentRentalRequestId = await createRentalRequest();
+        console.warn("rentalRequestId not found in params, attempting to create...");
+        currentRentalRequestId = await createRentalRequest(); 
         if (!currentRentalRequestId) {
           setLoading(false);
-          return;
+          return; // Stop if creation failed
         }
       }
+
       const endpoint = '/create-rental-payment-intent';
       const body = {
         rentalRequestId: currentRentalRequestId,
-        ownerId, // Include ownerId in the request body
+        ownerId: ownerId, // Use state variable ownerId
         amount: totalAmount,
         renterId: user.uid,
       };
+
       const token = await getFirebaseIdToken();
       if (!token) {
-        throw new Error('Authentication token is missing for rental payment.');
+        // Error handled in getFirebaseIdToken
+        setLoading(false);
+        return; 
       }
+
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: {
@@ -295,6 +316,7 @@ export default function CheckoutScreen() {
         },
         body: JSON.stringify(body),
       });
+
       let data;
       try {
         data = await response.json();
@@ -305,11 +327,13 @@ export default function CheckoutScreen() {
         setLoading(false);
         return;
       }
+
       if (!response.ok) {
         Alert.alert('Error', data.error || 'Failed to create payment intent.');
         setLoading(false);
         return;
       }
+
       const clientSecret = data.clientSecret;
       if (!clientSecret) {
         console.error("Error: Client secret is missing for rental payment.");
@@ -317,26 +341,41 @@ export default function CheckoutScreen() {
         setLoading(false);
         return;
       }
+
+      // Confirm the payment with Stripe
       const { error, paymentIntent } = await confirmPayment(clientSecret, {
         paymentMethodType: 'Card',
         billingDetails: { name: values.cardholderName.trim() },
-      });      
+      });
+
       if (error) {
         Alert.alert('Payment failed', error.message);
+        setLoading(false); // Stop loading on failure
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Instead of navigating to ConfirmationScreen, navigate back to the renter's main screen
-        // and pass parameters to auto-open the chat modal with the owner.
-        setIsOperationSuccess(true);
-        setShowConfirmationModal(true);
+        // --- START: Key Change ---
+        console.log("Payment Succeeded on CheckoutScreen for rental:", currentRentalRequestId);
+        setLoading(false); // Stop loading indicator immediately
+
+        // Navigate back to renter screen, passing confirmation info
+        navigation.navigate('renter', { 
+            paymentSuccessFor: currentRentalRequestId, 
+            ownerId: ownerId // Pass ownerId back too
+        }); 
+        // --- END: Key Change --- (Removed local modal and reset logic)
+      } else {
+         // Handle other potential statuses if necessary
+         Alert.alert('Payment Status Unknown', 'Payment status could not be confirmed.');
+         setLoading(false);
       }
     } catch (error) {
       console.error('Rental payment error:', error);
       Alert.alert('Error', 'Payment processing failed for your rental.');
-    } finally {
-      setLoading(false);
-    }
+      setLoading(false); // Ensure loading stops on catch
+    } 
+    // Removed finally block that reset loading prematurely
   };
 
+  // Original handleFormSubmit
   const handleFormSubmit = (values) => {
     if (loading) {
       console.warn("Operation is already in progress.");
@@ -345,6 +384,7 @@ export default function CheckoutScreen() {
     handleRentalPayment(values);
   };
 
+  // Original handleCancel
   const handleCancel = () => {
     if (!loading) {
       navigation.goBack();
@@ -353,6 +393,7 @@ export default function CheckoutScreen() {
     }
   };
 
+  // Original JSX structure
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -445,36 +486,14 @@ export default function CheckoutScreen() {
         </View>
       </ScrollView>
 
-      <Modal
+      {/* Removed original confirmation Modal */}
+      {/* <Modal
         visible={showConfirmationModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowConfirmationModal(false)}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ width: '80%', backgroundColor: COLORS.white, padding: 20, borderRadius: 10, alignItems: 'center' }}>
-            <Ionicons name="checkmark-circle-outline" size={80} color={COLORS.green} />
-            <Text style={{ fontSize: 22, fontWeight: 'bold', marginVertical: 10 }}>Payment Successful</Text>
-            <Text style={{ fontSize: 16, textAlign: 'center' }}>
-              Your payment of ${displayTotal} has been processed successfully. A receipt has been sent to your registered email.
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                setShowConfirmationModal(false);
-                // Instead of navigating to ConfirmationScreen, reset the navigation to the renter's main screen.
-                // Pass parameters (e.g. autoOpenChat and ownerId) so the main screen auto-opens the chat modal.
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'renter', params: { autoOpenChat: true, ownerId, rentalRequestId } }],
-                });
-              }}
-              style={[styles.payButton, { marginTop: 20 }]}
-            >
-              <Text style={styles.payButtonText}>Continue</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        // ... other props ...
+      > 
+         // ... content ... 
+      </Modal> 
+      */}
     </KeyboardAvoidingView>
   );
 }

@@ -18,6 +18,7 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   signInWithEmailAndPassword,
+  updateProfile, // Added updateProfile import to update Firebase user displayName
 } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { app } from "../../firebaseConfig"; // Adjust the path to your firebaseConfig.js
@@ -98,11 +99,17 @@ const SignUp = () => {
       );
       const user = userCredential.user;
 
-      // Save profile data to Firestore
+      // Update the Firebase user's displayName using firstName and lastName
+      await updateProfile(user, {
+        displayName: `${profileData.firstName} ${profileData.lastName}`,
+      });
+
+      // Save profile data to Firestore, including a fullName field for consistency
       await setDoc(doc(db, "users", user.uid), {
         email: profileData.email,
         firstName: profileData.firstName,
         lastName: profileData.lastName,
+        fullName: `${profileData.firstName} ${profileData.lastName}`,
         phoneNumber: profileData.phoneNumber,
         profileType: profileData.profileType,
         createdAt: new Date(),
