@@ -310,8 +310,6 @@ const renderListingImages = (item, isMainCard = false, imagePressHandler) => {
     </View>
   );
 };
-
-/** Classifieds Component */
 const Classifieds = () => {
   const auth = getAuth();
   const navigation = useNavigation();
@@ -2147,6 +2145,17 @@ const Classifieds = () => {
                             style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
                             accessibilityLabel="Phone Number Input"
                           />
+                          {/* NEW: Image Upload for Aviation Jobs */}
+                          <View style={{ marginBottom: 16 }}>
+                            {images.length > 0 && (
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
+                                {images.map((img, index) => (
+                                  <Image key={index} source={{ uri: img }} style={{ width: 100, height: 100, borderRadius: 8, marginRight: 8 }} />
+                                ))}
+                              </ScrollView>
+                            )}
+                            {renderImageUploadButton()}
+                          </View>
                         </>
                       ) : values.category === "Flight Schools" ? (
                         <>
@@ -2213,6 +2222,17 @@ const Classifieds = () => {
                           {touched.flightSchoolDescription && errors.flightSchoolDescription && (
                             <Text style={{ color: "red", marginBottom: 8 }}>{errors.flightSchoolDescription}</Text>
                           )}
+                          {/* NEW: Image Upload for Flight Schools */}
+                          <View style={{ marginBottom: 16 }}>
+                            {images.length > 0 && (
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
+                                {images.map((img, index) => (
+                                  <Image key={index} source={{ uri: img }} style={{ width: 100, height: 100, borderRadius: 8, marginRight: 8 }} />
+                                ))}
+                              </ScrollView>
+                            )}
+                            {renderImageUploadButton()}
+                          </View>
                         </>
                       ) : values.category === "Charter Services" ? (
                         <>
@@ -2276,6 +2296,9 @@ const Classifieds = () => {
                             style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black, textAlignVertical: "top" }}
                             accessibilityLabel="Charter Service Description Input"
                           />
+                          {touched.charterServiceDescription && errors.charterServiceDescription && (
+                            <Text style={{ color: "red", marginBottom: 8 }}>{errors.charterServiceDescription}</Text>
+                          )}
                           <TextInput
                             placeholder="Charter Service Areas (e.g. Regions or States)"
                             placeholderTextColor={COLORS.gray}
@@ -2401,6 +2424,17 @@ const Classifieds = () => {
                             style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 16, padding: 8, color: COLORS.black }}
                             accessibilityLabel="Phone Number Input"
                           />
+                          {/* NEW: Image Upload for Aircraft for Sale */}
+                          <View style={{ marginBottom: 16 }}>
+                            {images.length > 0 && (
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
+                                {images.map((img, index) => (
+                                  <Image key={index} source={{ uri: img }} style={{ width: 100, height: 100, borderRadius: 8, marginRight: 8 }} />
+                                ))}
+                              </ScrollView>
+                            )}
+                            {renderImageUploadButton()}
+                          </View>
                         </>
                       )}
                       <TextInput value={values.selectedPricing} editable={false} style={{ display: "none" }} />
@@ -2613,7 +2647,6 @@ const Classifieds = () => {
     </SafeAreaView>
   );
 };
-
 const AppNavigator = () => (
   <NavigationContainer independent={true}>
     <Stack.Navigator initialRouteName="Classifieds">
