@@ -1716,6 +1716,14 @@ const OwnerProfile = ({ ownerId }) => {
           />
         </View>
 
+              {/* Owner's Lounge */}
+      <View style={{ alignItems: 'center', marginBottom: 16 }}>
+        <Text style={{ fontSize: 32, fontWeight: 'bold', textAlign: 'center' }}>
+          Owner's Lounge
+        </Text>
+      </View>
+
+
         {/* New Icons Row */}
         <View
           style={{

@@ -702,6 +702,7 @@ app.post('/create-classified-payment-intent', authenticate, async (req, res) => 
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
+      receipt_email: req.user.email, // Added to send receipt email
       metadata: {
         listingId: finalListingId,
         ownerId: listingData.ownerId,
@@ -770,6 +771,7 @@ app.post('/create-rental-payment-intent', authenticate, async (req, res) => {
         destination: connectedAccountId,
       },
       application_fee_amount: applicationFee,
+      receipt_email: req.user.email, // Added to send receipt email
       metadata: { rentalRequestId, ownerId, renterId: req.user.uid },
     });
     res.setHeader('Content-Type', 'application/json');

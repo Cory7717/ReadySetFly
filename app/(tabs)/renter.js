@@ -138,6 +138,16 @@ const renter = () => {
   // *** NEW STATE FOR POST-PAYMENT FLOW ***
   const [processingPaymentSuccess, setProcessingPaymentSuccess] = useState(null);
 
+  // NEW STATE for Past Rental Modal details
+  const [pastRentalModalVisible, setPastRentalModalVisible] = useState(false);
+  const [selectedPastRental, setSelectedPastRental] = useState(null);
+
+  // NEW: Function to close Past Rental Modal and reset its state
+  const closePastRentalModal = () => {
+    setPastRentalModalVisible(false);
+    setSelectedPastRental(null);
+  };
+
   // Request notification permissions on component mount (Original)
   useEffect(() => {
     (async () => {
@@ -761,7 +771,7 @@ const renter = () => {
   // -------------------------
   // Payment Navigation (Original - requires ownerId parameter)
   // -------------------------
-  const navigateToCheckout = async (rentalRequestId, costPerHour, rentalHours, ownerIdParam) => { // Add ownerIdParam
+  const navigateToCheckout = async (rentalRequestId, costPerHour, rentalHours, ownerIdParam) => {
       if (isProcessingPayment) {
           console.warn("Payment is already being processed.");
           return;
@@ -773,7 +783,7 @@ const renter = () => {
           Alert.alert("Error", "No rental request selected.");
           return;
       }
-      if (!ownerIdParam) { // Validate ownerIdParam
+      if (!ownerIdParam) {
           setIsProcessingPayment(false);
           Alert.alert("Error", "Owner information missing for payment.");
           console.error("Missing ownerId when navigating to checkout for rental:", rentalRequestId);
@@ -790,13 +800,13 @@ const renter = () => {
                   rentalRequestId,
                   costPerHour,
                   rentalHours,
-                  ownerId: ownerIdParam, // Pass ownerId
+                  ownerId: ownerIdParam,
               },
           });
       } catch (error) {
           console.error("Error navigating to CheckoutScreen:", error);
           Alert.alert("Error", "Failed to navigate to payment screen.");
-          setIsProcessingPayment(false); // Reset on error
+          setIsProcessingPayment(false);
       } 
   };
 
@@ -815,7 +825,7 @@ const renter = () => {
 
               const rentalRequestRef = doc(db, "rentalRequests", rentalRequestId);
               if (rentalRequestListenerRef.current) {
-                  rentalRequestListenerRef.current(); // Detach previous listener
+                  rentalRequestListenerRef.current();
               }
 
               const rentalRequestSnap = await getDoc(rentalRequestRef);
@@ -834,7 +844,7 @@ const renter = () => {
               let ownerName = "N/A";
               if (rentalRequestData.ownerId) {
                   try {
-                      const ownerDocRef = doc(db, "users", rentalRequestData.ownerId); // Check 'users' collection
+                      const ownerDocRef = doc(db, "users", rentalRequestData.ownerId);
                       const ownerDoc = await getDoc(ownerDocRef);
                       if (ownerDoc.exists()) {
                           ownerName = ownerDoc.data().fullName || "N/A"; 
@@ -948,9 +958,9 @@ const renter = () => {
       const computedTotalCost = calculateTotalCost(rentalCostPerHourVal, rentalHoursVal);
       setTotalCost(computedTotalCost);
 
-      setCurrentChatOwnerId(rentalRequestData.ownerId); // Set owner ID for potential chat
+      setCurrentChatOwnerId(rentalRequestData.ownerId);
 
-      setActiveRentalModalVisible(true); // Show the active rental modal
+      setActiveRentalModalVisible(true);
       setIsRentalRequestLoading(false);
     } catch (error) {
       console.error("Error handling active rental press:", error);
@@ -960,15 +970,12 @@ const renter = () => {
   };
 
   // -------------------------
-  // Handle Past Rental Press (Original - requires definition before use)
+  // Handle Past Rental Press (Modified to open a full-screen modal with listing and payment details)
   // -------------------------
   const handlePastRentalPress = (rental) => {
     try {
-      console.log("Past rental pressed:", rental);
-      Alert.alert(
-        "Past Rental",
-        `This is a past rental for: ${rental.listing?.aircraftModel || "No aircraft model"}`
-      );
+      setSelectedPastRental(rental);
+      setPastRentalModalVisible(true);
     } catch (error) {
       console.error("Error handling past rental press:", error);
     }
@@ -1444,6 +1451,11 @@ const renter = () => {
             </ImageBackground>
           </View>
 
+          {/* New Centered Large Text */}
+          <View>
+            <Text style={styles.renterLoungeText}>Renter's Lounge</Text>
+          </View>
+
           {/* Navigation Buttons */}
           <View style={styles.navigationButtonsContainer}>
             <TouchableOpacity
@@ -1485,7 +1497,7 @@ const renter = () => {
           </View>
 
           {/* Recent Searches Section */}
-          <View style={styles.sectionContainer}>
+          {/* <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Recent Searches</Text>
             <View style={styles.recentSearchesRow}>
               <View style={styles.recentSearchBox}>
@@ -1497,7 +1509,7 @@ const renter = () => {
                 <Text style={styles.recentSearchDetails}>2 guests · 9/18/23-9/25/23</Text>
               </View>
             </View>
-          </View>
+          </View> */}
 
           {/* Past Rentals Section */}
           <View style={styles.sectionContainer}>
@@ -2040,6 +2052,128 @@ const renter = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {/* Past Rental Details Modal */}
+      <Modal
+        visible={pastRentalModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closePastRentalModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "#fff",
+              padding: 20,
+              borderRadius: 10,
+              maxHeight: "85%",
+            }}
+          >
+            <ModalHeader
+              title="Past Rental Details"
+              onClose={closePastRentalModal}
+            />
+            <ScrollView>
+              {/* Listing Preview Card */}
+              {selectedPastRental && selectedPastRental.listing && (
+                <TouchableOpacity
+                  style={styles.listingCard}
+                  onPress={() => {
+                    // Navigate to home.js with the listingId (if available)
+                    const listingId =
+                      selectedPastRental.listingId ||
+                      selectedPastRental.listing.id;
+                    if (listingId) {
+                      router.push({
+                        pathname: "/home",
+                        params: { listingId },
+                      });
+                    } else {
+                      Alert.alert("Error", "Listing not available.");
+                    }
+                  }}
+                >
+                  <Image
+                    source={{
+                      uri:
+                        selectedPastRental.listing.images &&
+                        selectedPastRental.listing.images[0]
+                          ? selectedPastRental.listing.images[0]
+                          : "https://via.placeholder.com/150",
+                    }}
+                    style={styles.listingImage}
+                  />
+                  <Text style={styles.listingTitle}>
+                    {selectedPastRental.listing.aircraftModel || "View Listing"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Rental & Payment Details */}
+              <Text style={styles.detailLabel}>Aircraft Model:</Text>
+              <Text style={styles.detailValue}>
+                {selectedPastRental?.listing?.aircraftModel || "N/A"}
+              </Text>
+              <Text style={styles.detailLabel}>Tail Number:</Text>
+              <Text style={styles.detailValue}>
+                {selectedPastRental?.listing?.tailNumber || "N/A"}
+              </Text>
+              <Text style={styles.detailLabel}>Rental Hours:</Text>
+              <Text style={styles.detailValue}>
+                {selectedPastRental?.rentalHours || "N/A"}
+              </Text>
+              <Text style={styles.detailLabel}>Rental Date:</Text>
+              <Text style={styles.detailValue}>
+                {selectedPastRental?.rentalDate || "N/A"}
+              </Text>
+              <Text style={[styles.detailLabel, { marginTop: 15 }]}>
+                Payment Details:
+              </Text>
+              {selectedPastRental?.listing &&
+              selectedPastRental?.rentalHours &&
+              !isNaN(parseFloat(selectedPastRental.listing.costPerHour)) ? (
+                (() => {
+                  const costPerHour = parseFloat(selectedPastRental.listing.costPerHour) || 0;
+                  const hours = parseFloat(selectedPastRental.rentalHours) || 0;
+                  const pastCost = calculateTotalCost(costPerHour, hours);
+                  return (
+                    <View style={{ marginTop: 8 }}>
+                      <Text style={styles.detailValue}>
+                        Rental Cost (${costPerHour}/hr * {selectedPastRental.rentalHours} hours): $
+                        {safeToFixed(pastCost.rentalCost)}
+                      </Text>
+                      <Text style={styles.detailValue}>
+                        Booking Fee (6%): ${safeToFixed(pastCost.bookingFee)}
+                      </Text>
+                      <Text style={styles.detailValue}>
+                        Transaction Fee (3%): ${safeToFixed(pastCost.transactionFee)}
+                      </Text>
+                      <Text style={styles.detailValue}>
+                        Sales Tax (8.25%): ${safeToFixed(pastCost.salesTax)}
+                      </Text>
+                      <Text style={styles.detailTotalCostText}>
+                        Total Paid: ${safeToFixed(pastCost.total)}
+                      </Text>
+                    </View>
+                  );
+                })()
+              ) : (
+                <Text style={styles.detailValue}>
+                  Payment details not available.
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* FAQ Modal */}
       <Modal
@@ -2048,15 +2182,22 @@ const renter = () => {
         transparent={true}
         onRequestClose={() => setFaqModalVisible(false)}
       >
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalContainer} >
-             <View style={styles.modalContent}>
-                 <ModalHeader title="FAQ" onClose={() => setFaqModalVisible(false)} />
-                 <ScrollView contentContainerStyle={{paddingBottom: 20}}>
-                    <Text>FAQ content goes here.</Text> 
-                 </ScrollView>
-                 <CustomButton onPress={() => setFaqModalVisible(false)} title="Close" backgroundColor="#3182ce" />
-             </View>
-          </KeyboardAvoidingView>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <ModalHeader title="FAQ" onClose={() => setFaqModalVisible(false)} />
+            <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+              <Text>FAQ content goes here.</Text>
+            </ScrollView>
+            <CustomButton
+              onPress={() => setFaqModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
+            />
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Invest Modal */}
@@ -2066,13 +2207,33 @@ const renter = () => {
         transparent={true}
         onRequestClose={() => setInvestModalVisible(false)}
       >
-          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", }}>
-              <View style={{ width: "88%", backgroundColor: "#fff", borderRadius: 8, padding: 24, }}>
-                  <ModalHeader title="Invest in Ready Set Fly?" onClose={() => setInvestModalVisible(false)} />
-                  <Text style={{ marginBottom: 16 }}> Interested in investing in Ready Set Fly? Contact us at{" "} <Text style={{ color: "#3182ce", textDecorationLine: "underline" }} onPress={() => Linking.openURL( "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready,%20Set,%20Fly!" ) } > coryarmer@gmail.com </Text>{" "} for more details. </Text>
-                  <CustomButton onPress={() => setInvestModalVisible(false)} title="Close" backgroundColor="#3182ce" />
-              </View>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View style={{ width: "88%", backgroundColor: "#fff", borderRadius: 8, padding: 24 }}>
+            <ModalHeader title="Invest in Ready Set Fly?" onClose={() => setInvestModalVisible(false)} />
+            <Text style={{ marginBottom: 16 }}>
+              Interested in investing in Ready Set Fly? Contact us at{" "}
+              <Text
+                style={{ color: "#3182ce", textDecorationLine: "underline" }}
+                onPress={() =>
+                  Linking.openURL(
+                    "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready,%20Set,%20Fly!"
+                  )
+                }
+              >
+                coryarmer@gmail.com
+              </Text>{" "}
+              for more details.
+            </Text>
+            <CustomButton onPress={() => setInvestModalVisible(false)} title="Close" backgroundColor="#3182ce" />
           </View>
+        </View>
       </Modal>
 
       {/* Privacy Policy Modal */}
@@ -2082,22 +2243,48 @@ const renter = () => {
         transparent={true}
         onRequestClose={() => setPrivacyModalVisible(false)}
       >
-           <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", }}>
-              <View style={{ width: "88%", backgroundColor: "#fff", borderRadius: 8, padding: 24, maxHeight: "80%", }}>
-                  <ModalHeader title="Privacy Policy & Sensitive Data Policy" onClose={() => setPrivacyModalVisible(false)} />
-                  <ScrollView style={{ marginBottom: 16 }}>
-                      <Text style={{ fontSize: 14, marginBottom: 8 }}> Effective Date: March 17th, 2025 </Text>
-                      <Text style={{ fontSize: 14, marginBottom: 8 }}> This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application. We are committed to protecting your personal data and ensuring your privacy. </Text>
-                      <Text style={{ fontSize: 14, marginBottom: 8 }}> 1. Information We Collect: We may collect personal information, such as your name, email address, contact details, and usage data. Sensitive data is handled with strict security measures. </Text>
-                      <Text style={{ fontSize: 14, marginBottom: 8 }}> 2. How We Use Your Information: Your data is used to provide and improve our services, communicate with you, and comply with legal obligations. </Text>
-                      <Text style={{ fontSize: 14, marginBottom: 8 }}> 3. Data Sharing and Disclosure: We do not sell your personal data. Information may be shared with trusted partners only as necessary to perform services or as required by law. </Text>
-                      <Text style={{ fontSize: 14, marginBottom: 8 }}> 4. Security: We implement a variety of security measures to maintain the safety of your personal information. </Text>
-                      <Text style={{ fontSize: 14, marginBottom: 8 }}> 5. Your Rights: You have the right to access, update, or request deletion of your personal information. Please contact us to exercise these rights. </Text>
-                      <Text style={{ fontSize: 14, marginBottom: 8 }}> 6. Changes to This Policy: We may update this Privacy Policy from time to time. Any changes will be posted in the application. </Text>
-                  </ScrollView>
-                  <CustomButton onPress={() => setPrivacyModalVisible(false)} title="Close" backgroundColor="#3182ce" accessibilityLabel="Close Privacy Policy" />
-              </View>
-           </View>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View style={{ width: "88%", backgroundColor: "#fff", borderRadius: 8, padding: 24, maxHeight: "80%" }}>
+            <ModalHeader title="Privacy Policy & Sensitive Data Policy" onClose={() => setPrivacyModalVisible(false)} />
+            <ScrollView style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>Effective Date: March 17th, 2025</Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application. We are committed to protecting your personal data and ensuring your privacy.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                1. Information We Collect: We may collect personal information, such as your name, email address, contact details, and usage data. Sensitive data is handled with strict security measures.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                2. How We Use Your Information: Your data is used to provide and improve our services, communicate with you, and comply with legal obligations.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                3. Data Sharing and Disclosure: We do not sell your personal data. Information may be shared with trusted partners only as necessary to perform services or as required by law.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                4. Security: We implement a variety of security measures to maintain the safety of your personal information.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                5. Your Rights: You have the right to access, update, or request deletion of your personal information. Please contact us to exercise these rights.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                6. Changes to This Policy: We may update this Privacy Policy from time to time. Any changes will be posted in the application.
+              </Text>
+            </ScrollView>
+            <CustomButton
+              onPress={() => setPrivacyModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
+              accessibilityLabel="Close Privacy Policy"
+            />
+          </View>
+        </View>
       </Modal>
 
       {/* Floating Chat Bubble Icon */}
@@ -2116,7 +2303,7 @@ const renter = () => {
 export default renter;
 
 // -------------------
-// Styles (Original styles)
+// Styles (Original styles plus new renterLoungeText style and listing preview styles)
 // -------------------
 const styles = StyleSheet.create({
   container: {
@@ -2644,5 +2831,31 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  renterLoungeText: {
+    fontSize: 28,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginVertical: 16,
+    color: "#2d3748",
+  },
+  listingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#edf2f7",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  listingImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  listingTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2d3748",
   },
 });
