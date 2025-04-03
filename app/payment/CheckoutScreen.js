@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { CardField, useConfirmPayment } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebaseConfig'; 
@@ -132,8 +132,8 @@ const styles = StyleSheet.create({
 });
 
 export default function CheckoutScreen() {
-  const navigation = useNavigation();
-  const route = useRoute();
+  const router = useRouter();
+  const params = useLocalSearchParams();
   const { confirmPayment } = useConfirmPayment();
 
   // Firebase Auth
@@ -148,9 +148,9 @@ export default function CheckoutScreen() {
     ownerId: routeOwnerId = '',
     listingDetails = {}, // Kept original name
     selectedPricing: initialSelectedPricing = '', // Kept original name
-  } = route.params || {};
+  } = params || {};
 
-  console.log("CheckoutScreen (Rental) received params:", route.params);
+  console.log("CheckoutScreen (Rental) received params:", params);
 
   // Local state (Original)
   const [loading, setLoading] = useState(false);
@@ -161,7 +161,6 @@ export default function CheckoutScreen() {
   const [rentalRequestId, setRentalRequestId] = useState(routeRentalRequestId || '');
   const [ownerId, setOwnerId] = useState(routeOwnerId || '');
   // Removed showConfirmationModal state - no longer used here
-  // const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
   // Animation (Original)
   const bounceValue = useRef(new Animated.Value(0)).current;
@@ -172,17 +171,17 @@ export default function CheckoutScreen() {
     console.log("CheckoutScreen useEffect triggered");
     startBouncing();
     validateParamsAndSetAmount();
-  }, [costPerHour, rentalHours, navigation]); // Original dependencies
+  }, [costPerHour, rentalHours, router]);
 
   const validateParamsAndSetAmount = () => {
     if (isNaN(costPerHour) || costPerHour <= 0) {
       Alert.alert('Invalid Cost Per Hour', 'Please provide a valid cost per hour.');
-      navigation.goBack();
+      router.back();
       return;
     }
     if (isNaN(rentalHours) || rentalHours <= 0) {
       Alert.alert('Invalid Rental Hours', 'Please provide valid rental hours.');
-      navigation.goBack();
+      router.back();
       return;
     }
     calculateRentalTotal(parseFloat(costPerHour), parseFloat(rentalHours));
@@ -237,7 +236,6 @@ export default function CheckoutScreen() {
   // Original createRentalRequest (if needed)
   const createRentalRequest = async () => {
     try {
-      // Original logic used listingDetails.id - ensure this is passed correctly if needed
       const actualListingId = listingDetails.id; 
       if (!actualListingId) {
         Alert.alert('Error', 'Listing information is missing.');
@@ -250,12 +248,11 @@ export default function CheckoutScreen() {
         costPerHour: parseFloat(costPerHour),
         rentalHours: parseFloat(rentalHours),
         createdAt: serverTimestamp(),
-        // Add ownerId here if needed during creation
         ownerId: ownerId, 
       };
       const rentalRequestRef = await addDoc(collection(db, 'rentalRequests'), rentalRequestData);
       const newRentalRequestId = rentalRequestRef.id;
-      setRentalRequestId(newRentalRequestId); // Update state if needed
+      setRentalRequestId(newRentalRequestId);
       console.log(`Rental Request Created with ID: ${newRentalRequestId}`);
       return newRentalRequestId;
     } catch (error) {
@@ -271,39 +268,35 @@ export default function CheckoutScreen() {
       Alert.alert('Validation Error', 'Please enter the name on the credit card.');
       return;
     }
-    // Ensure ownerId is available before proceeding
     if (!ownerId) {
-        Alert.alert('Error', 'Cannot process payment: Owner information missing.');
-        console.error("ownerId is missing in handleRentalPayment");
-        return;
+      Alert.alert('Error', 'Cannot process payment: Owner information missing.');
+      console.error("ownerId is missing in handleRentalPayment");
+      return;
     }
     
     try {
       setLoading(true);
       let currentRentalRequestId = rentalRequestId; 
       
-      // If rentalRequestId wasn't passed via params, attempt to create it
-      // Note: This might indicate a flow issue if it's expected to always exist here
       if (!currentRentalRequestId) {
         console.warn("rentalRequestId not found in params, attempting to create...");
         currentRentalRequestId = await createRentalRequest(); 
         if (!currentRentalRequestId) {
           setLoading(false);
-          return; // Stop if creation failed
+          return;
         }
       }
 
       const endpoint = '/create-rental-payment-intent';
       const body = {
         rentalRequestId: currentRentalRequestId,
-        ownerId: ownerId, // Use state variable ownerId
+        ownerId: ownerId,
         amount: totalAmount,
         renterId: user.uid,
       };
 
       const token = await getFirebaseIdToken();
       if (!token) {
-        // Error handled in getFirebaseIdToken
         setLoading(false);
         return; 
       }
@@ -342,7 +335,6 @@ export default function CheckoutScreen() {
         return;
       }
 
-      // Confirm the payment with Stripe
       const { error, paymentIntent } = await confirmPayment(clientSecret, {
         paymentMethodType: 'Card',
         billingDetails: { name: values.cardholderName.trim() },
@@ -350,29 +342,23 @@ export default function CheckoutScreen() {
 
       if (error) {
         Alert.alert('Payment failed', error.message);
-        setLoading(false); // Stop loading on failure
+        setLoading(false);
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // --- START: Key Change ---
         console.log("Payment Succeeded on CheckoutScreen for rental:", currentRentalRequestId);
-        setLoading(false); // Stop loading indicator immediately
-
-        // Navigate back to renter screen, passing confirmation info
-        navigation.navigate('renter', { 
-            paymentSuccessFor: currentRentalRequestId, 
-            ownerId: ownerId // Pass ownerId back too
-        }); 
-        // --- END: Key Change --- (Removed local modal and reset logic)
+        setLoading(false);
+        router.replace({
+          pathname: '/renter',
+          params: { paymentSuccessFor: currentRentalRequestId, ownerId: ownerId },
+        });
       } else {
-         // Handle other potential statuses if necessary
          Alert.alert('Payment Status Unknown', 'Payment status could not be confirmed.');
          setLoading(false);
       }
     } catch (error) {
       console.error('Rental payment error:', error);
       Alert.alert('Error', 'Payment processing failed for your rental.');
-      setLoading(false); // Ensure loading stops on catch
-    } 
-    // Removed finally block that reset loading prematurely
+      setLoading(false);
+    }
   };
 
   // Original handleFormSubmit
@@ -387,13 +373,12 @@ export default function CheckoutScreen() {
   // Original handleCancel
   const handleCancel = () => {
     if (!loading) {
-      navigation.goBack();
+      router.back();
     } else {
       Alert.alert('Please wait', 'Operation is in progress. Please wait until it finishes.');
     }
   };
 
-  // Original JSX structure
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -410,7 +395,7 @@ export default function CheckoutScreen() {
           <Ionicons name="close-outline" size={28} color={COLORS.red} />
         </TouchableOpacity>
         <View style={styles.content}>
-          <Animated.View style={[styles.animatedContainer, { transform: [{ translateY: bounceValue }] }]}>
+          <Animated.View style={[styles.animatedContainer, { transform: [{ translateY: bounceValue }] }]} >
             <Ionicons
               name={isOperationSuccess ? "checkmark-circle-outline" : "card-outline"}
               size={80}
@@ -485,15 +470,6 @@ export default function CheckoutScreen() {
           </Formik>
         </View>
       </ScrollView>
-
-      {/* Removed original confirmation Modal */}
-      {/* <Modal
-        visible={showConfirmationModal}
-        // ... other props ...
-      > 
-         // ... content ... 
-      </Modal> 
-      */}
     </KeyboardAvoidingView>
   );
 }

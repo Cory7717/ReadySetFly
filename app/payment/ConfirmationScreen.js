@@ -96,7 +96,7 @@ const ConfirmationScreen = () => {
             Thank you for your payment. Your rental request is now active.
           </Text>
           <Text style={styles.detail}>
-            Paid At: {paidAt ? new Date(paidAt.seconds * 1000).toLocaleString() : "N/A"}
+            Paid At: {paidAt ? new Date(paidAt.seconds * 3000).toLocaleString() : "N/A"}
           </Text>
           <TouchableOpacity style={styles.button} onPress={handleContinueMessaging}>
             <Text style={styles.buttonText}>Continue Messaging</Text>

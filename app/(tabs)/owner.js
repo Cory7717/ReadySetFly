@@ -180,11 +180,100 @@ const OwnerProfile = ({ ownerId }) => {
   const user = auth.currentUser; // Get current Firebase user
   const stripe = useStripe();
   const resolvedOwnerId = ownerId || user?.uid; // Resolve ownerId or default to Firebase user ID
+  const [pendingDeletion, setPendingDeletion] = useState(null);
+  const [deleteTimer, setDeleteTimer] = useState(null);
+
+  // Add this helper component (you can place it near the top of OwnerProfile)
+  const ParticipantName = ({ participantId }) => {
+    const [name, setName] = useState("");
+
+    useEffect(() => {
+      if (!participantId) {
+        // If no participantId is provided, set a fallback name.
+        setName("Unknown");
+        return;
+      }
+
+      const fetchName = async () => {
+        try {
+          const userDocRef = doc(db, "users", participantId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            if (userData.firstName && userData.lastName) {
+              setName(`${userData.firstName} ${userData.lastName}`);
+            } else {
+              setName(userData.fullName || participantId);
+            }
+          } else {
+            setName(participantId);
+          }
+        } catch (error) {
+          console.error("Error fetching participant name:", error);
+          setName(participantId);
+        }
+      };
+
+      fetchName();
+    }, [participantId]);
+
+    return <Text>{name}</Text>;
+  };
+
+  const ParticipantDate = ({ participantId }) => {
+    const [date, setDate] = useState(null);
+
+    useEffect(() => {
+      if (!participantId) return;
+      const fetchDate = async () => {
+        try {
+          const userDocRef = doc(db, "users", participantId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            // Assuming a Firestore timestamp is stored in createdAt:
+            if (userData.createdAt && userData.createdAt.toDate) {
+              setDate(userData.createdAt.toDate());
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching participant date:", error);
+        }
+      };
+      fetchDate();
+    }, [participantId]);
+
+    return date ? (
+      <Text style={{ fontSize: 12, color: "#718096" }}>
+        {date.toLocaleDateString()}
+      </Text>
+    ) : null;
+  };
+
+  const fetchChatThreads = async () => {
+    try {
+      const messagesRef = collection(db, "messages");
+      const q = query(
+        messagesRef,
+        where("participants", "array-contains", resolvedOwnerId)
+      );
+      const snapshot = await getDocs(q);
+      const threads = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      setChatThreads(threads);
+    } catch (error) {
+      console.error("Error fetching chat threads:", error);
+      Alert.alert("Error", "Failed to load chat threads.");
+    }
+  };
 
   // NEW: New state for FAQ and Invest modals
   const [faqModalVisible, setFaqModalVisible] = useState(false);
   const [investModalVisible, setInvestModalVisible] = useState(false);
 
+  const [chatListModalVisible, setChatListModalVisible] = useState(false);
   // NEW: New state for Privacy Policy Modal
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
 
@@ -220,14 +309,17 @@ const OwnerProfile = ({ ownerId }) => {
   }, [userRole]);
 
   // New state for Manage Rental Modal
-  const [manageRentalModalVisible, setManageRentalModalVisible] = useState(false);
+  const [manageRentalModalVisible, setManageRentalModalVisible] =
+    useState(false);
   // NEW: State for Connected Account Modal (to be opened when "View Connected Account" is pressed)
-  const [connectedAccountModalVisible, setConnectedAccountModalVisible] = useState(false);
+  const [connectedAccountModalVisible, setConnectedAccountModalVisible] =
+    useState(false);
   // NEW: State for live balance retrieved from Stripe – now we expect pending deposit amount
   const [liveBalance, setLiveBalance] = useState(null);
 
   // NEW: State for Update Profile Modal (newly added)
-  const [updateProfileModalVisible, setUpdateProfileModalVisible] = useState(false);
+  const [updateProfileModalVisible, setUpdateProfileModalVisible] =
+    useState(false);
 
   // Update initial profileData to check providerData if displayName isn’t directly set.
   const [profileData, setProfileData] = useState({
@@ -323,10 +415,12 @@ const OwnerProfile = ({ ownerId }) => {
   const [isStripeConnected, setIsStripeConnected] = useState(false);
 
   // New state for Connect Stripe Modal
-  const [connectStripeModalVisible, setConnectStripeModalVisible] = useState(false);
+  const [connectStripeModalVisible, setConnectStripeModalVisible] =
+    useState(false);
 
   // NEW: State for Existing Stripe Account Modal
-  const [existingStripeModalVisible, setExistingStripeModalVisible] = useState(false);
+  const [existingStripeModalVisible, setExistingStripeModalVisible] =
+    useState(false);
 
   // NEW: State for Stripe Info Modal
   const [stripeInfoModalVisible, setStripeInfoModalVisible] = useState(false);
@@ -554,7 +648,8 @@ const OwnerProfile = ({ ownerId }) => {
         const { accountLinkUrl } = data;
         Linking.openURL(accountLinkUrl);
       } else {
-        let errMsg = data.error || "Failed to connect Stripe account. Please try again.";
+        let errMsg =
+          data.error || "Failed to connect Stripe account. Please try again.";
         if (
           errMsg.includes(
             "destination account needs to have at least one of the following capabilities enabled"
@@ -663,7 +758,7 @@ const OwnerProfile = ({ ownerId }) => {
 
   /**
    * Function to handle withdrawal.
-   * 
+   *
    * Note: availableBalance and totalWithdrawn are stored in cents.
    * When displaying, we convert them to dollars.
    */
@@ -738,8 +833,7 @@ const OwnerProfile = ({ ownerId }) => {
                 Notifications.scheduleNotificationAsync({
                   content: {
                     title: "New Rental Request",
-                    body:
-                      "You have received a new rental request. Check your Incoming Rental Requests for details.",
+                    body: "You have received a new rental request. Check your Incoming Rental Requests for details.",
                     data: { rentalRequestId: change.doc.id },
                   },
                   trigger: null,
@@ -773,9 +867,7 @@ const OwnerProfile = ({ ownerId }) => {
               let commission = requestData.commission;
               if (!baseCost && listingDetails) {
                 const costPerHour = parseFloat(listingDetails.costPerHour);
-                baseCost = (
-                  parseFloat(rentalHours) * costPerHour
-                ).toFixed(2);
+                baseCost = (parseFloat(rentalHours) * costPerHour).toFixed(2);
                 commission = (baseCost * 0.06).toFixed(2);
               }
 
@@ -828,11 +920,21 @@ const OwnerProfile = ({ ownerId }) => {
       .toFixed(2);
   };
 
+  // End of Part 1
   /**
    * Function to handle sending messages in chat threads.
    */
   const sendMessage = async () => {
     if (!messageInput.trim()) return;
+
+    // Guard clause to ensure there is a valid chat thread ID
+    if (!selectedChatThreadId) {
+      Alert.alert(
+        "Error",
+        "No chat thread selected. Please open a chat from an active rental."
+      );
+      return;
+    }
 
     const messageData = {
       senderId: user.uid,
@@ -842,8 +944,7 @@ const OwnerProfile = ({ ownerId }) => {
     };
 
     try {
-      const chatThreadId = selectedChatThreadId;
-      const chatDocRef = doc(db, "messages", chatThreadId);
+      const chatDocRef = doc(db, "messages", selectedChatThreadId);
       const chatDoc = await getDoc(chatDocRef);
       if (chatDoc.exists()) {
         const chatData = chatDoc.data();
@@ -851,7 +952,6 @@ const OwnerProfile = ({ ownerId }) => {
           messages: [...(chatData.messages || []), messageData],
         });
       }
-
       setMessageInput("");
       setMessages((prevMessages) => [...prevMessages, messageData]);
     } catch (error) {
@@ -865,20 +965,82 @@ const OwnerProfile = ({ ownerId }) => {
    */
   const openMessageModal = async (chatThreadId = null) => {
     try {
-      setMessageModalVisible(true);
-      setSelectedChatThreadId(chatThreadId);
-      if (chatThreadId) {
-        const chatDocRef = doc(db, "messages", chatThreadId);
-        const chatDoc = await getDoc(chatDocRef);
-        if (chatDoc.exists()) {
-          const chatData = chatDoc.data();
-          setMessages(chatData.messages || []);
+      let threadId = chatThreadId;
+      // If no thread ID is provided, try using the one stored in state
+      if (!threadId) {
+        if (selectedChatThreadId) {
+          threadId = selectedChatThreadId;
+        } else {
+          // Auto-create a chat thread if there's an active rental request
+          if (!selectedRequest || !selectedRequest.renterId) {
+            Alert.alert("Error", "No active rental selected to start a chat.");
+            return;
+          }
+          const renterId = selectedRequest.renterId;
+          const newChatThread = {
+            participants: [resolvedOwnerId, renterId],
+            ownerId: resolvedOwnerId,
+            renterId: renterId,
+            rentalRequestId: selectedRequest.id,
+            messages: [],
+            createdAt: serverTimestamp(),
+          };
+          const chatDocRef = await addDoc(
+            collection(db, "messages"),
+            newChatThread
+          );
+          threadId = chatDocRef.id;
+          setSelectedChatThreadId(threadId);
         }
       }
+
+      // Now, fetch the chat thread data
+      const chatDocRef = doc(db, "messages", threadId);
+      const chatDoc = await getDoc(chatDocRef);
+      if (chatDoc.exists()) {
+        const chatData = chatDoc.data();
+        setMessages(chatData.messages || []);
+      } else {
+        Alert.alert("Error", "Chat thread not found.");
+        return;
+      }
+      setMessageModalVisible(true);
     } catch (error) {
       console.error("Error opening message modal:", error);
       Alert.alert("Error", "Failed to open messages.");
     }
+  };
+
+  // Function to handle deletion with an undo option
+  const handleDeleteChatThread = (thread) => {
+    // Clear any existing timer if needed
+    if (deleteTimer) {
+      clearTimeout(deleteTimer);
+    }
+    // Mark this thread as pending deletion so it is temporarily removed from the list
+    setPendingDeletion(thread);
+    // Start a 10-second timer to permanently delete the thread
+    const timer = setTimeout(async () => {
+      try {
+        await deleteDoc(doc(db, "messages", thread.id));
+        // Optionally log or notify that deletion succeeded
+      } catch (error) {
+        console.error("Error deleting chat thread:", error);
+        Alert.alert("Error", "Failed to delete chat thread.");
+      }
+      setPendingDeletion(null);
+      setDeleteTimer(null);
+    }, 10000);
+    setDeleteTimer(timer);
+  };
+
+  // Function to undo the deletion
+  const handleUndoDelete = () => {
+    if (deleteTimer) {
+      clearTimeout(deleteTimer);
+      setDeleteTimer(null);
+    }
+    setPendingDeletion(null);
   };
 
   /**
@@ -919,15 +1081,15 @@ const OwnerProfile = ({ ownerId }) => {
 
       const baseCost = (parseFloat(rentalHours) * costPerHour).toFixed(2);
       const commission = (baseCost * 0.06).toFixed(2);
-      const totalCost = (
-        parseFloat(baseCost) - parseFloat(commission)
-      ).toFixed(2);
+      const totalCost = (parseFloat(baseCost) - parseFloat(commission)).toFixed(
+        2
+      );
 
       const batch = writeBatch(db);
 
       const rentalRequestRef = doc(db, "rentalRequests", request.id);
       batch.update(rentalRequestRef, {
-        status: "active",
+        rentalStatus: "active",
         rentalDate: request.rentalDate,
         baseCost,
         commission,
@@ -960,7 +1122,9 @@ const OwnerProfile = ({ ownerId }) => {
 
       Alert.alert(
         "Request Approved",
-        `The rental request for ${formatDate(request.rentalDate)} has been approved. A notification has been sent to the renter to complete the payment.`
+        `The rental request for ${formatDate(
+          request.rentalDate
+        )} has been approved. A notification has been sent to the renter to complete the payment.`
       );
 
       setRentalRequestModalVisible(false);
@@ -997,7 +1161,7 @@ const OwnerProfile = ({ ownerId }) => {
 
       const rentalRequestRef = doc(db, "rentalRequests", request.id);
       batch.update(rentalRequestRef, {
-        status: "denied",
+        rentalStatus: "denied",
       });
 
       const notificationRef = collection(
@@ -1093,8 +1257,13 @@ const OwnerProfile = ({ ownerId }) => {
       return;
     }
     try {
-      await updateDoc(doc(db, "rentalRequests", selectedRequest.id), { status: "ended" });
-      Alert.alert("Rental Ended", "The rental has been ended and moved to Past Rentals.");
+      await updateDoc(doc(db, "rentalRequests", selectedRequest.id), {
+        rentalStatus: "ended",
+      });
+      Alert.alert(
+        "Rental Ended",
+        "The rental has been ended and moved to Past Rentals."
+      );
       setManageRentalModalVisible(false);
       setRentalRequestModalVisible(false);
     } catch (error) {
@@ -1111,9 +1280,19 @@ const OwnerProfile = ({ ownerId }) => {
       const now = new Date();
       for (const rental of activeRentals) {
         if (!rental.rentalDate) continue;
-        const rentalDateObj = rental.rentalDate.toDate ? rental.rentalDate.toDate() : new Date(rental.rentalDate);
-        const rentalDay = new Date(rentalDateObj.getFullYear(), rentalDateObj.getMonth(), rentalDateObj.getDate());
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const rentalDateObj = rental.rentalDate.toDate
+          ? rental.rentalDate.toDate()
+          : new Date(rental.rentalDate);
+        const rentalDay = new Date(
+          rentalDateObj.getFullYear(),
+          rentalDateObj.getMonth(),
+          rentalDateObj.getDate()
+        );
+        const today = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
         if (today > rentalDay) {
           try {
             const rentalRef = doc(db, "rentalRequests", rental.id);
@@ -1186,7 +1365,7 @@ const OwnerProfile = ({ ownerId }) => {
       const q = query(
         rentalsRef,
         where("ownerId", "==", resolvedOwnerId),
-        where("status", "==", "active"),
+        where("rentalStatus", "==", "active"),
         orderBy("createdAt", "desc"),
         limit(ACTIVE_RENTALS_PAGE_SIZE)
       );
@@ -1232,7 +1411,7 @@ const OwnerProfile = ({ ownerId }) => {
       const q = query(
         rentalsRef,
         where("ownerId", "==", resolvedOwnerId),
-        where("status", "==", "active"),
+        where("rentalStatus", "==", "active"),
         orderBy("createdAt", "desc"),
         startAfter(lastActiveRentalDoc),
         limit(ACTIVE_RENTALS_PAGE_SIZE)
@@ -1302,11 +1481,21 @@ const OwnerProfile = ({ ownerId }) => {
       const loanTerm = parseFloat(removeCommas(costData.loanTerm));
       const insuranceCost = parseFloat(removeCommas(costData.insuranceCost));
       const hangarCost = parseFloat(removeCommas(costData.hangarCost));
-      const annualRegistrationFees = parseFloat(removeCommas(costData.annualRegistrationFees));
-      const maintenanceReserve = parseFloat(removeCommas(costData.maintenanceReserve));
-      const fuelCostPerHour = parseFloat(removeCommas(costData.fuelCostPerHour));
-      const consumablesCostPerHour = parseFloat(removeCommas(costData.consumablesCostPerHour));
-      const rentalHoursPerYear = parseFloat(removeCommas(costData.rentalHoursPerYear));
+      const annualRegistrationFees = parseFloat(
+        removeCommas(costData.annualRegistrationFees)
+      );
+      const maintenanceReserve = parseFloat(
+        removeCommas(costData.maintenanceReserve)
+      );
+      const fuelCostPerHour = parseFloat(
+        removeCommas(costData.fuelCostPerHour)
+      );
+      const consumablesCostPerHour = parseFloat(
+        removeCommas(costData.consumablesCostPerHour)
+      );
+      const rentalHoursPerYear = parseFloat(
+        removeCommas(costData.rentalHoursPerYear)
+      );
 
       const monthlyInterestRate = interestRate / 100 / 12;
       const numberOfPayments = loanTerm * 12;
@@ -1690,7 +1879,9 @@ const OwnerProfile = ({ ownerId }) => {
             >
               <View>
                 <Text style={{ fontSize: 14, color: "#fff" }}>Welcome</Text>
-                <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>
+                <Text
+                  style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}
+                >
                   {profileData.fullName ||
                     (user?.providerData && user.providerData[0]?.displayName) ||
                     "User"}
@@ -1709,20 +1900,29 @@ const OwnerProfile = ({ ownerId }) => {
         >
           <CustomButton
             onPress={() => setWithdrawModalVisible(true)}
-            title={`Most Recent Payment: $${liveBalance ? (liveBalance / 100).toFixed(2) : (availableBalance / 100).toFixed(2)}`}
+            title={`Most Recent Payment: $${
+              liveBalance
+                ? (liveBalance / 100).toFixed(2)
+                : (availableBalance / 100).toFixed(2)
+            }`}
             backgroundColor="#000"
-            style={{ paddingHorizontal: 16, paddingVertical: 12, borderRadius: 24 }}
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderRadius: 24,
+            }}
             textStyle={{ fontSize: 16, fontWeight: "bold" }}
           />
         </View>
 
-              {/* Owner's Lounge */}
-      <View style={{ alignItems: 'center', marginBottom: 16 }}>
-        <Text style={{ fontSize: 32, fontWeight: 'bold', textAlign: 'center' }}>
-          Owner's Lounge
-        </Text>
-      </View>
-
+        {/* Owner's Lounge */}
+        <View style={{ alignItems: "center", marginBottom: 16 }}>
+          <Text
+            style={{ fontSize: 32, fontWeight: "bold", textAlign: "center" }}
+          >
+            Owner's Lounge
+          </Text>
+        </View>
 
         {/* New Icons Row */}
         <View
@@ -1812,10 +2012,12 @@ const OwnerProfile = ({ ownerId }) => {
                   </Text>
                   <Text style={{ fontSize: 16, marginBottom: 4 }}>
                     Recommended Rental Cost Per Hour: $
-                    {Number(parseFloat(costData.costPerHour) * 1.15).toLocaleString(
-                      "en-US",
-                      { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                    )}
+                    {Number(
+                      parseFloat(costData.costPerHour) * 1.15
+                    ).toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </Text>
                   <Text style={{ fontSize: 16, marginBottom: 4 }}>
                     Total Fixed Costs per Year: $
@@ -1853,7 +2055,11 @@ const OwnerProfile = ({ ownerId }) => {
                   <Section title="Loan Details">
                     <CustomTextInput
                       placeholder="Loan Amount ($)"
-                      value={costData.loanAmount ? formatNumber(costData.loanAmount) : ""}
+                      value={
+                        costData.loanAmount
+                          ? formatNumber(costData.loanAmount)
+                          : ""
+                      }
                       onChangeText={(value) =>
                         handleNumericChange("loanAmount", value)
                       }
@@ -1863,7 +2069,11 @@ const OwnerProfile = ({ ownerId }) => {
                     />
                     <CustomTextInput
                       placeholder="Interest Rate (%)"
-                      value={costData.interestRate ? formatNumber(costData.interestRate) : ""}
+                      value={
+                        costData.interestRate
+                          ? formatNumber(costData.interestRate)
+                          : ""
+                      }
                       onChangeText={(value) =>
                         handleNumericChange("interestRate", value)
                       }
@@ -1873,7 +2083,9 @@ const OwnerProfile = ({ ownerId }) => {
                     />
                     <CustomTextInput
                       placeholder="Loan Term (years)"
-                      value={costData.loanTerm ? formatNumber(costData.loanTerm) : ""}
+                      value={
+                        costData.loanTerm ? formatNumber(costData.loanTerm) : ""
+                      }
                       onChangeText={(value) =>
                         handleNumericChange("loanTerm", value)
                       }
@@ -1882,14 +2094,19 @@ const OwnerProfile = ({ ownerId }) => {
                       accessibilityLabel="Loan Term input"
                     />
                     <Text style={{ fontSize: 16, color: "#4a5568" }}>
-                      Financing Expense: ${parseFloat(costData.financingExpense || 0).toFixed(2)}
+                      Financing Expense: $
+                      {parseFloat(costData.financingExpense || 0).toFixed(2)}
                     </Text>
                   </Section>
 
                   <Section title="Annual Costs">
                     <CustomTextInput
                       placeholder="Insurance Cost ($)"
-                      value={costData.insuranceCost ? formatNumber(costData.insuranceCost) : ""}
+                      value={
+                        costData.insuranceCost
+                          ? formatNumber(costData.insuranceCost)
+                          : ""
+                      }
                       onChangeText={(value) =>
                         handleNumericChange("insuranceCost", value)
                       }
@@ -1899,7 +2116,11 @@ const OwnerProfile = ({ ownerId }) => {
                     />
                     <CustomTextInput
                       placeholder="Hangar Cost ($)"
-                      value={costData.hangarCost ? formatNumber(costData.hangarCost) : ""}
+                      value={
+                        costData.hangarCost
+                          ? formatNumber(costData.hangarCost)
+                          : ""
+                      }
                       onChangeText={(value) =>
                         handleNumericChange("hangarCost", value)
                       }
@@ -1940,7 +2161,11 @@ const OwnerProfile = ({ ownerId }) => {
                   <Section title="Operational Costs">
                     <CustomTextInput
                       placeholder="Fuel Cost Per Hour ($)"
-                      value={costData.fuelCostPerHour ? formatNumber(costData.fuelCostPerHour) : ""}
+                      value={
+                        costData.fuelCostPerHour
+                          ? formatNumber(costData.fuelCostPerHour)
+                          : ""
+                      }
                       onChangeText={(value) =>
                         handleNumericChange("fuelCostPerHour", value)
                       }
@@ -2008,7 +2233,9 @@ const OwnerProfile = ({ ownerId }) => {
           </View>
         ) : (
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-            <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
+            <Text
+              style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}
+            >
               Connect Your Stripe Account
             </Text>
             <Text style={{ marginBottom: 16 }}>
@@ -2020,7 +2247,11 @@ const OwnerProfile = ({ ownerId }) => {
               accessibilityLabel="What is Stripe?"
               accessibilityRole="button"
             >
-              <Ionicons name="information-circle-outline" size={36} color="#3182ce" />
+              <Ionicons
+                name="information-circle-outline"
+                size={36}
+                color="#3182ce"
+              />
             </TouchableOpacity>
             <CustomButton
               onPress={() => setConnectStripeModalVisible(true)}
@@ -2213,10 +2444,7 @@ const OwnerProfile = ({ ownerId }) => {
                                   "The listing has been removed."
                                 );
                               } catch (error) {
-                                console.error(
-                                  "Error removing listing:",
-                                  error
-                                );
+                                console.error("Error removing listing:", error);
                                 Alert.alert(
                                   "Error",
                                   "Failed to remove the listing."
@@ -2407,7 +2635,7 @@ const OwnerProfile = ({ ownerId }) => {
                     <Text>Renter: {item.renterName}</Text>
                     <Text>Total Cost: ${item.baseCost}</Text>
                     <Text>Rental Date: {formatDate(item.rentalDate)}</Text>
-                    <Text>Status: {item.status}</Text>
+                    <Text>Status: {item.rentalStatus}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => handleDeleteActiveRental(item.id)}
@@ -2518,11 +2746,15 @@ const OwnerProfile = ({ ownerId }) => {
                     {selectedRequest.rentalHours}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: "bold" }}>Current Medical: </Text>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Current Medical:{" "}
+                    </Text>
                     {selectedRequest.currentMedical}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: "bold" }}>Current Renter's Insurance: </Text>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Current Renter's Insurance:{" "}
+                    </Text>
                     {selectedRequest.currentRentersInsurance}
                   </Text>
 
@@ -2537,7 +2769,9 @@ const OwnerProfile = ({ ownerId }) => {
                     {selectedListingDetails.costPerHour}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: "bold" }}>Number of Hours: </Text>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Number of Hours:{" "}
+                    </Text>
                     {selectedRequest.rentalHours}
                   </Text>
                   <Text style={{ fontSize: 16 }}>
@@ -2561,7 +2795,7 @@ const OwnerProfile = ({ ownerId }) => {
                   </Text>
                   <Text style={{ fontSize: 16 }}>
                     <Text style={{ fontWeight: "bold" }}>Status: </Text>
-                    {selectedRequest.status}
+                    {selectedRequest.rentalStatus}
                   </Text>
                 </View>
 
@@ -2591,7 +2825,7 @@ const OwnerProfile = ({ ownerId }) => {
                   </View>
                 )}
 
-                {selectedRequest.status === "active" && (
+                {selectedRequest.rentalStatus === "active" && (
                   <CustomButton
                     onPress={() => setManageRentalModalVisible(true)}
                     title="Manage Rental"
@@ -2807,7 +3041,7 @@ const OwnerProfile = ({ ownerId }) => {
                     <Text>Renter: {item.renterName}</Text>
                     <Text>Total Cost: ${item.baseCost}</Text>
                     <Text>Rental Date: {formatDate(item.rentalDate)}</Text>
-                    <Text>Status: {item.status}</Text>
+                    <Text>Status: {item.rentalStatus}</Text>
                   </TouchableOpacity>
                 )}
                 ListFooterComponent={
@@ -3075,7 +3309,11 @@ const OwnerProfile = ({ ownerId }) => {
               accessibilityLabel="What is Stripe?"
               accessibilityRole="button"
             >
-              <Ionicons name="information-circle-outline" size={24} color="#3182ce" />
+              <Ionicons
+                name="information-circle-outline"
+                size={24}
+                color="#3182ce"
+              />
             </TouchableOpacity>
             <Text style={{ marginBottom: 16 }}>
               Please provide your full name and email address to connect your
@@ -3147,7 +3385,9 @@ const OwnerProfile = ({ ownerId }) => {
               onClose={() => setExistingStripeModalVisible(false)}
             />
             <Text style={{ marginBottom: 16 }}>
-              Enter your full name and email address OR your Stripe Account ID (e.g. acct_1QybOf00DkRxUhnr) to retrieve your existing Stripe account data.
+              Enter your full name and email address OR your Stripe Account ID
+              (e.g. acct_1QybOf00DkRxUhnr) to retrieve your existing Stripe
+              account data.
             </Text>
             <CustomTextInput
               placeholder="Full Name"
@@ -3214,11 +3454,16 @@ const OwnerProfile = ({ ownerId }) => {
               />
 
               <Text style={{ fontSize: 16, marginBottom: 16 }}>
-                Live Balance: ${ liveBalance ? (liveBalance / 100).toFixed(2) : (availableBalance / 100).toFixed(2) }
+                Live Balance: $
+                {liveBalance
+                  ? (liveBalance / 100).toFixed(2)
+                  : (availableBalance / 100).toFixed(2)}
               </Text>
 
-              <Text style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}>
-                Total Earned YTD: ${ (totalWithdrawn / 100).toFixed(2) }
+              <Text
+                style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}
+              >
+                Total Earned YTD: ${(totalWithdrawn / 100).toFixed(2)}
               </Text>
 
               <CustomButton
@@ -3268,7 +3513,11 @@ const OwnerProfile = ({ ownerId }) => {
               onClose={() => setStripeInfoModalVisible(false)}
             />
             <Text style={{ marginBottom: 16 }}>
-              Stripe is a payment processing platform that allows you to securely handle payments and transfers. Connecting your Stripe account enables you to receive payments directly to your bank account. For more information, tap Press Connect Stripe Account and it will direct you to the Stripe website for more details.
+              Stripe is a payment processing platform that allows you to
+              securely handle payments and transfers. Connecting your Stripe
+              account enables you to receive payments directly to your bank
+              account. For more information, tap Press Connect Stripe Account
+              and it will direct you to the Stripe website for more details.
             </Text>
             <CustomButton
               onPress={() => setStripeInfoModalVisible(false)}
@@ -3409,47 +3658,90 @@ const OwnerProfile = ({ ownerId }) => {
               padding: 24,
             }}
           >
-            <ModalHeader title="FAQ" onClose={() => setFaqModalVisible(false)} />
+            <ModalHeader
+              title="FAQ"
+              onClose={() => setFaqModalVisible(false)}
+            />
             <ScrollView style={{ maxHeight: 400 }}>
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
-                1. Will my insurance company allow this, and will my costs increase?
+                1. Will my insurance company allow this, and will my costs
+                increase?
               </Text>
               <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>Insurance Approval:</Text> Yes. Most insurance carriers allow owners to rent their planes—similar to a flight school lease-back or flying club arrangement.
-                {"\n"}<Text style={{ fontWeight: "bold" }}>Cost Impact:</Text> Your costs may rise, but not dramatically.
-                {"\n"}<Text style={{ fontWeight: "bold" }}>Next Steps:</Text> Contact your insurance company for a quote. Look for links to approved providers in the app and on our website.
+                <Text style={{ fontWeight: "bold" }}>Insurance Approval:</Text>{" "}
+                Yes. Most insurance carriers allow owners to rent their
+                planes—similar to a flight school lease-back or flying club
+                arrangement.
+                {"\n"}
+                <Text style={{ fontWeight: "bold" }}>Cost Impact:</Text> Your
+                costs may rise, but not dramatically.
+                {"\n"}
+                <Text style={{ fontWeight: "bold" }}>Next Steps:</Text> Contact
+                your insurance company for a quote. Look for links to approved
+                providers in the app and on our website.
               </Text>
 
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
                 2. Does the FAA allow this?
               </Text>
               <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>FAA Guidelines:</Text> Yes. The FAA permits private owners to lease their planes to licensed pilots.
-                {"\n"}<Text style={{ fontWeight: "bold" }}>Important Note:</Text> Do not charge for flights beyond the lease transaction; doing so could trigger FAA regulations.
+                <Text style={{ fontWeight: "bold" }}>FAA Guidelines:</Text> Yes.
+                The FAA permits private owners to lease their planes to licensed
+                pilots.
+                {"\n"}
+                <Text style={{ fontWeight: "bold" }}>Important Note:</Text> Do
+                not charge for flights beyond the lease transaction; doing so
+                could trigger FAA regulations.
               </Text>
 
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
                 3. What if a renter damages or makes my aircraft less clean?
               </Text>
               <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>Preventive Measures:</Text> The app includes an “Owner’s Portal” with pre- and post-rental walk-around checklists and photo uploads. A $500 credit card hold is added on top of the rental fare. Owners can claim this if any issues arise.
-                {"\n"}<Text style={{ fontWeight: "bold" }}>Community Trust:</Text> We believe in the aviation community’s commitment to safety and proper care.
+                <Text style={{ fontWeight: "bold" }}>Preventive Measures:</Text>{" "}
+                The app includes an “Owner’s Portal” with pre- and post-rental
+                walk-around checklists and photo uploads. A $500 credit card
+                hold is added on top of the rental fare. Owners can claim this
+                if any issues arise.
+                {"\n"}
+                <Text style={{ fontWeight: "bold" }}>Community Trust:</Text> We
+                believe in the aviation community’s commitment to safety and
+                proper care.
               </Text>
 
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
                 4. Why should I trust a stranger with my plane?
               </Text>
               <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>Renter Verification:</Text> Renters must upload their current log book, medical certificate, certifications, and non-owner insurance policy.
-                {"\n"}<Text style={{ fontWeight: "bold" }}>Owner Options:</Text> You can upload your aircraft’s maintenance records, insurance details, and avionics package. Set a minimum flight hour requirement (e.g., 150 hours) to filter renters automatically. Optionally, require a CFI checkout (renter’s expense) without mandating a specific instructor.
-                {"\n"}<Text style={{ fontWeight: "bold" }}>Reputation System:</Text> Our “Star Rating” system lets both parties rate each other, helping you decide if a renter meets your trust criteria.
+                <Text style={{ fontWeight: "bold" }}>Renter Verification:</Text>{" "}
+                Renters must upload their current log book, medical certificate,
+                certifications, and non-owner insurance policy.
+                {"\n"}
+                <Text style={{ fontWeight: "bold" }}>Owner Options:</Text> You
+                can upload your aircraft’s maintenance records, insurance
+                details, and avionics package. Set a minimum flight hour
+                requirement (e.g., 150 hours) to filter renters automatically.
+                Optionally, require a CFI checkout (renter’s expense) without
+                mandating a specific instructor.
+                {"\n"}
+                <Text style={{ fontWeight: "bold" }}>
+                  Reputation System:
+                </Text>{" "}
+                Our “Star Rating” system lets both parties rate each other,
+                helping you decide if a renter meets your trust criteria.
               </Text>
 
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
-                5. Do I need to perform a 100-hour inspection if I lease my aircraft?
+                5. Do I need to perform a 100-hour inspection if I lease my
+                aircraft?
               </Text>
               <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>No, You’re Not Required:</Text> A 100-hour inspection is not necessary unless you mandate a CFI checkout and specify the CFI. If the renter chooses their own CFI, the inspection requirement does not apply.
+                <Text style={{ fontWeight: "bold" }}>
+                  No, You’re Not Required:
+                </Text>{" "}
+                A 100-hour inspection is not necessary unless you mandate a CFI
+                checkout and specify the CFI. If the renter chooses their own
+                CFI, the inspection requirement does not apply.
               </Text>
             </ScrollView>
             <CustomButton
@@ -3484,7 +3776,10 @@ const OwnerProfile = ({ ownerId }) => {
               padding: 24,
             }}
           >
-            <ModalHeader title="Invest in Ready Set Fly?" onClose={() => setInvestModalVisible(false)} />
+            <ModalHeader
+              title="Invest in Ready Set Fly?"
+              onClose={() => setInvestModalVisible(false)}
+            />
             <Text style={{ marginBottom: 16 }}>
               Interested in investing in Ready Set Fly? Contact us at{" "}
               <Text
@@ -3541,25 +3836,39 @@ const OwnerProfile = ({ ownerId }) => {
                 Effective Date: March 17th, 2025
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application. We are committed to protecting your personal data and ensuring your privacy.
+                This Privacy Policy explains how we collect, use, disclose, and
+                safeguard your information when you use our application. We are
+                committed to protecting your personal data and ensuring your
+                privacy.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                1. Information We Collect: We may collect personal information, such as your name, email address, contact details, and usage data. Sensitive data is handled with strict security measures.
+                1. Information We Collect: We may collect personal information,
+                such as your name, email address, contact details, and usage
+                data. Sensitive data is handled with strict security measures.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                2. How We Use Your Information: Your data is used to provide and improve our services, communicate with you, and comply with legal obligations.
+                2. How We Use Your Information: Your data is used to provide and
+                improve our services, communicate with you, and comply with
+                legal obligations.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                3. Data Sharing and Disclosure: We do not sell your personal data. Information may be shared with trusted partners only as necessary to perform services or as required by law.
+                3. Data Sharing and Disclosure: We do not sell your personal
+                data. Information may be shared with trusted partners only as
+                necessary to perform services or as required by law.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                4. Security: We implement a variety of security measures to maintain the safety of your personal information.
+                4. Security: We implement a variety of security measures to
+                maintain the safety of your personal information.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                5. Your Rights: You have the right to access, update, or request deletion of your personal information. Please contact us to exercise these rights.
+                5. Your Rights: You have the right to access, update, or request
+                deletion of your personal information. Please contact us to
+                exercise these rights.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                6. Changes to This Policy: We may update this Privacy Policy from time to time. Any changes will be posted in the application.
+                6. Changes to This Policy: We may update this Privacy Policy
+                from time to time. Any changes will be posted in the
+                application.
               </Text>
             </ScrollView>
             <CustomButton
@@ -3571,12 +3880,132 @@ const OwnerProfile = ({ ownerId }) => {
           </View>
         </View>
       </Modal>
+      <Modal
+        visible={chatListModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setChatListModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 20,
+              maxHeight: "80%",
+            }}
+          >
+            <ModalHeader
+              title="Your Chats"
+              onClose={() => setChatListModalVisible(false)}
+            />
+            <FlatList
+              // Filter out the thread pending deletion so it isn’t shown while undo is available
+              data={chatThreads.filter(
+                (thread) => !pendingDeletion || thread.id !== pendingDeletion.id
+              )}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => {
+                // Safely retrieve the other participant's ID
+                const otherParticipantId =
+                  Array.isArray(item.participants) &&
+                  item.participants.find((p) => p !== resolvedOwnerId);
+                return (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingVertical: 12,
+                      borderBottomWidth: 1,
+                      borderColor: "#e2e8f0",
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        setChatListModalVisible(false);
+                        openMessageModal(item.id);
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, fontWeight: "bold" }}>
+                        Chat with{" "}
+                        <ParticipantName
+                          participantId={otherParticipantId || "Unknown"}
+                        />
+                      </Text>
+                      <ParticipantDate
+                        participantId={otherParticipantId || "Unknown"}
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handleDeleteChatThread(item)}
+                    >
+                      <Text
+                        style={{ color: "red", fontSize: 14, marginLeft: 8 }}
+                      >
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }}
+            />
+
+            {/* If a thread is pending deletion, show the undo option */}
+            {pendingDeletion && (
+              <View style={{ marginTop: 16, alignItems: "center" }}>
+                <Text style={{ color: "#2d3748", marginBottom: 8 }}>
+                  Chat deleted.
+                </Text>
+                <TouchableOpacity onPress={handleUndoDelete}>
+                  <Text style={{ color: "#3182ce", fontSize: 16 }}>Undo</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <CustomButton
+              onPress={() => {
+                setChatListModalVisible(false);
+                openMessageModal(); // Auto-create a new chat thread if none selected.
+              }}
+              title="Start New Chat"
+              backgroundColor="#3182ce"
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* -- Floating Chat Bubble Icon -- */}
+      <TouchableOpacity
+        style={styles.chatBubbleIcon}
+        onPress={async () => {
+          await fetchChatThreads();
+          setChatListModalVisible(true);
+        }}
+        accessibilityLabel="Open chat list"
+        accessibilityRole="button"
+      >
+        <Ionicons name="chatbubble-ellipses" size={32} color="white" />
+      </TouchableOpacity>
+
+      {/* -- End of Floating Chat Bubble Icon -- */}
     </View>
   );
 };
 
 export default OwnerProfile;
-  
+
 /* -------------------
    Messaging Modal Styles
 ------------------- */
@@ -3653,5 +4082,21 @@ const styles = {
     backgroundColor: "#3182ce",
     padding: 12,
     borderRadius: 20,
+  },
+  // ADDED: Style for floating chat bubble icon
+  chatBubbleIcon: {
+    position: "absolute",
+    bottom: 32,
+    right: 32,
+    backgroundColor: "#3182ce",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
 };

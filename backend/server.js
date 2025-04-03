@@ -104,7 +104,7 @@ app.post(
             } else {
               await rentalRequestRef.update({
                 paymentStatus: 'succeeded',
-                rentalStatus: 'active',
+                rentalStatus: 'active',  // <-- Use rentalStatus here
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               });
               admin.logger.info(`Rental request ${rentalRequestId} updated to active.`);
@@ -311,7 +311,7 @@ app.post('/createListing', authenticate, async (req, res) => {
       freeListing = true;
     }
     // FORCE freeListing for Flight Schools since salePrice is not applicable.
-    if (category === 'Flight Schools') {
+    if (category === 'Flight Schools' || category === 'Aviation Jobs') {
       freeListing = true;
     }
 
@@ -399,7 +399,7 @@ app.post('/createListing', authenticate, async (req, res) => {
       images: imageUrls,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       ownerId: req.user.uid,
-      status: 'pending',
+      rentalStatus: 'pending',  // Use rentalStatus for rental requests
       airportIdentifier: airportIdentifier || '',
     };
 
@@ -492,6 +492,11 @@ app.put('/updateListing', authenticate, async (req, res) => {
     if (sanitizedListingDetails.category === 'Flight Schools') {
       freeListing = true;
     }
+    // FORCE freeListing for Aviation Jobs during update.
+    if (sanitizedListingDetails.category === 'Aviation Jobs') {
+      freeListing = true;
+    }
+    
 
     let finalRequiredFields = [...reqCategoryRequirements];
     if (sanitizedListingDetails.category === 'Aircraft for Sale' && !freeListing) {
@@ -524,12 +529,20 @@ app.put('/updateListing', authenticate, async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields: charterServiceName, charterServiceLocation, charterServiceEmail' });
       }
     }
+    // Modified location check: Use incoming lat/lng if available; otherwise, fall back to existing listingData.location.
+    let latitude, longitude;
     if (!sanitizedListingDetails.lat || !sanitizedListingDetails.lng) {
-      res.setHeader('Content-Type', 'application/json');
-      return res.status(400).json({ error: 'Missing location data (lat, lng)' });
+      if (listingData.location && listingData.location.lat && listingData.location.lng) {
+        latitude = parseFloat(listingData.location.lat);
+        longitude = parseFloat(listingData.location.lng);
+      } else {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: 'Missing location data (lat, lng)' });
+      }
+    } else {
+      latitude = parseFloat(sanitizedListingDetails.lat);
+      longitude = parseFloat(sanitizedListingDetails.lng);
     }
-    const latitude = parseFloat(sanitizedListingDetails.lat);
-    const longitude = parseFloat(sanitizedListingDetails.lng);
     if (isNaN(latitude) || isNaN(longitude)) {
       res.setHeader('Content-Type', 'application/json');
       return res.status(400).json({ error: "Invalid location data. 'lat' and 'lng' must be numbers." });
@@ -1158,7 +1171,8 @@ exports.scheduledCleanupOrphanedRentalRequests = onSchedule('every 24 hours', as
         const requestData = requestDoc.data();
         const createdAt = requestData.createdAt;
         const thirtyDaysAgo = admin.firestore.Timestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-        if (createdAt && createdAt.toDate() < thirtyDaysAgo.toDate() && requestData.status !== 'active') {
+        // Check rentalStatus instead of status
+        if (createdAt && createdAt.toDate() < thirtyDaysAgo.toDate() && requestData.rentalStatus !== 'active') {
           rentalBatch.delete(requestDoc.ref);
           totalDeletions++;
         }

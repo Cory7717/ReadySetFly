@@ -59,9 +59,74 @@ import MessagesScreen from "../screens/MessagesScreen";
 
 import * as Notifications from "expo-notifications";
 
-const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
+const API_URL =
+  "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
 
 import { db, auth } from "../../firebaseConfig";
+
+const ParticipantName = ({ participantId }) => {
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (!participantId) {
+      setName("Unknown");
+      return;
+    }
+    const fetchName = async () => {
+      try {
+        const userDocRef = doc(db, "users", participantId);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          if (userData.firstName && userData.lastName) {
+            setName(`${userData.firstName} ${userData.lastName}`);
+          } else {
+            setName(userData.fullName || participantId);
+          }
+        } else {
+          setName(participantId);
+        }
+      } catch (error) {
+        console.error("Error fetching participant name:", error);
+        setName(participantId);
+      }
+    };
+
+    fetchName();
+  }, [participantId]);
+
+  return <Text>{name}</Text>;
+};
+
+const ParticipantDate = ({ participantId }) => {
+  const [date, setDate] = useState(null);
+
+  useEffect(() => {
+    if (!participantId) return;
+    const fetchDate = async () => {
+      try {
+        const userDocRef = doc(db, "users", participantId);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          // Assuming a Firestore timestamp is stored in createdAt
+          if (userData.createdAt && userData.createdAt.toDate) {
+            setDate(userData.createdAt.toDate());
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching participant date:", error);
+      }
+    };
+    fetchDate();
+  }, [participantId]);
+
+  return date ? (
+    <Text style={{ fontSize: 12, color: "#718096" }}>
+      {date.toLocaleDateString()}
+    </Text>
+  ) : null;
+};
 
 // -----------------------------------------------------------------------------
 // Move safeToFixed to a top-level function declaration so it is hoisted and
@@ -130,13 +195,11 @@ const renter = () => {
   const navigation = useNavigation(); // Get navigation object
 
   // New state to track if the payment flow has already been handled (Original)
-  // NOTE: This specific flag `paymentHandled` is less useful with the new flow,
-  // but kept as per the request to keep other logic the same.
-  // The new `processingPaymentSuccess` state manages the immediate post-payment action.
   const [paymentHandled, setPaymentHandled] = useState(false);
 
   // *** NEW STATE FOR POST-PAYMENT FLOW ***
-  const [processingPaymentSuccess, setProcessingPaymentSuccess] = useState(null);
+  const [processingPaymentSuccess, setProcessingPaymentSuccess] =
+    useState(null);
 
   // NEW STATE for Past Rental Modal details
   const [pastRentalModalVisible, setPastRentalModalVisible] = useState(false);
@@ -166,10 +229,13 @@ const renter = () => {
   // -------------------------
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] = useState(false);
+  const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] =
+    useState(false);
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
-  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
-  const [allNotificationsModalVisible, setAllNotificationsModalVisible] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] =
+    useState(false);
+  const [allNotificationsModalVisible, setAllNotificationsModalVisible] =
+    useState(false);
   const [faqModalVisible, setFaqModalVisible] = useState(false);
   const [investModalVisible, setInvestModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
@@ -201,6 +267,7 @@ const renter = () => {
   const [notifications, setNotifications] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [selectedChatThreadId, setSelectedChatThreadId] = useState(null);
   const [selectedRentalRequest, setSelectedRentalRequest] = useState(null);
   const [isRentalRequestLoading, setIsRentalRequestLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState(null);
@@ -230,66 +297,189 @@ const renter = () => {
   const [currentChatOwnerId, setCurrentChatOwnerId] = useState(null);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [activeRentalModalVisible, setActiveRentalModalVisible] = useState(false);
+  const [activeRentalModalVisible, setActiveRentalModalVisible] =
+    useState(false);
   const processedRentalsRef = useRef([]);
   const rentalRequestListenerRef = useRef(null);
   const [favoritesListings, setFavoritesListings] = useState([]);
+  const [chatListModalVisible, setChatListModalVisible] = useState(false);
+  const [chatThreads, setChatThreads] = useState([]);
+  const [pendingDeletion, setPendingDeletion] = useState(null);
+  const [deleteTimer, setDeleteTimer] = useState(null);
 
   // --- Helper Functions ---
+  const fetchChatThreads = async () => {
+    try {
+      const messagesRef = collection(db, "messages");
+      const q = query(
+        messagesRef,
+        where("participants", "array-contains", renterId)
+      );
+      const snapshot = await getDocs(q);
+      const threads = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      setChatThreads(threads);
+    } catch (error) {
+      console.error("Error fetching chat threads:", error);
+      Alert.alert("Error", "Failed to load chat threads.");
+    }
+  };
+
+  const openMessageModal = async (chatThreadId = null) => {
+    try {
+      let threadId = chatThreadId;
+      // If no thread ID is provided, use one stored in state if available.
+      if (!threadId) {
+        if (selectedChatThreadId) {
+          threadId = selectedChatThreadId;
+        } else {
+          // Ensure owner info is available before creating a new thread.
+          if (!currentChatOwnerId) {
+            Alert.alert(
+              "Error",
+              "Owner information is missing. Cannot open chat."
+            );
+            return;
+          }
+          // Use the current rental request's ID (if available) for context.
+          const rentalRequestId = selectedRentalRequest?.id || null;
+          const newChatThread = {
+            participants: [renterId, currentChatOwnerId],
+            rentalRequestId, // Associate with a rental request if available.
+            messages: [],
+            createdAt: serverTimestamp(),
+          };
+          const chatDocRef = await addDoc(
+            collection(db, "messages"),
+            newChatThread
+          );
+          threadId = chatDocRef.id;
+          setSelectedChatThreadId(threadId);
+        }
+      }
+      // Fetch the latest chat messages.
+      const chatDocRef = doc(db, "messages", threadId);
+      const chatDocSnap = await getDoc(chatDocRef);
+      if (chatDocSnap.exists()) {
+        const chatData = chatDocSnap.data();
+        setMessages(chatData.messages || []);
+      } else {
+        Alert.alert("Error", "Chat thread not found.");
+        return;
+      }
+      // Open the messaging modal.
+      setMessagesModalVisible(true);
+    } catch (error) {
+      console.error("Error opening message modal:", error);
+      Alert.alert("Error", "Failed to open messages.");
+    }
+  };
+
+  // Function to handle deletion with an undo option
+  const handleDeleteChatThread = (thread) => {
+    if (deleteTimer) {
+      clearTimeout(deleteTimer);
+    }
+    setPendingDeletion(thread);
+    const timer = setTimeout(async () => {
+      try {
+        await deleteDoc(doc(db, "messages", thread.id));
+      } catch (error) {
+        console.error("Error deleting chat thread:", error);
+        Alert.alert("Error", "Failed to delete chat thread.");
+      }
+      setPendingDeletion(null);
+      setDeleteTimer(null);
+    }, 10000);
+    setDeleteTimer(timer);
+  };
+
+  // Function to undo the deletion
+  const handleUndoDelete = () => {
+    if (deleteTimer) {
+      clearTimeout(deleteTimer);
+      setDeleteTimer(null);
+    }
+    setPendingDeletion(null);
+  };
 
   // *** NEW: Added fetchListingDetails function definition ***
   const fetchListingDetails = async (listingId) => {
-      try {
-          if (!listingId) {
-              console.warn(`WorkspaceListingDetails called with missing listingId.`);
-              return null;
-          }
-          const listingDocRef = doc(db, "airplanes", listingId);
-          const listingDoc = await getDoc(listingDocRef);
-          if (listingDoc.exists()) {
-              const listingData = listingDoc.data();
-              // Basic validation: Ensure ownerId exists
-              if (!listingData.ownerId) {
-                  console.warn(`Listing ID: ${listingId} is missing 'ownerId'. Cannot process.`);
-                  return null; 
-              }
-              return listingData;
-          } else {
-              console.warn(`No listing found for listingId: ${listingId}`);
-              return null;
-          }
-      } catch (error) {
-          console.error("Error fetching listing details in renter.js:", error);
-          return null; 
+    try {
+      if (!listingId) {
+        console.warn(`WorkspaceListingDetails called with missing listingId.`);
+        return null;
       }
+      const listingDocRef = doc(db, "airplanes", listingId);
+      const listingDoc = await getDoc(listingDocRef);
+      if (listingDoc.exists()) {
+        const listingData = listingDoc.data();
+        if (!listingData.ownerId) {
+          console.warn(
+            `Listing ID: ${listingId} is missing 'ownerId'. Cannot process.`
+          );
+          return null;
+        }
+        return listingData;
+      } else {
+        console.warn(`No listing found for listingId: ${listingId}`);
+        return null;
+      }
+    } catch (error) {
+      console.error("Error fetching listing details in renter.js:", error);
+      return null;
+    }
   };
 
   // *** NEW: Added closeAllOpenModals function definition ***
   const closeAllOpenModals = () => {
-      setNotificationModalVisible(false);
-      setAllNotificationsModalVisible(false);
-      setProfileModalVisible(false);
-      setFaqModalVisible(false);
-      setInvestModalVisible(false);
-      setPrivacyModalVisible(false);
-      setActiveRentalModalVisible(false); // Ensure active rental modal is closed too
-      setMessagesModalVisible(false); // Ensure messages modal is closed
-      // Reset related states if needed
-      setSelectedNotification(null);
-      setSelectedRentalRequest(null);
-      setSelectedListing(null);
+    setNotificationModalVisible(false);
+    setAllNotificationsModalVisible(false);
+    setProfileModalVisible(false);
+    setFaqModalVisible(false);
+    setInvestModalVisible(false);
+    setPrivacyModalVisible(false);
+    setActiveRentalModalVisible(false);
+    setMessagesModalVisible(false);
+    setSelectedNotification(null);
+    setSelectedRentalRequest(null);
+    setSelectedListing(null);
+    setTotalCost({
+      rentalCost: "0.00",
+      bookingFee: "0.00",
+      transactionFee: "0.00",
+      salesTax: "0.00",
+      total: "0.00",
+    });
+    setPaymentComplete(false);
+    if (rentalRequestListenerRef.current) {
+      rentalRequestListenerRef.current();
+      rentalRequestListenerRef.current = null;
+    }
   };
 
   // (Original calculateTotalCost function - unchanged)
   const calculateTotalCost = (rentalCostPerHour, rentalHours) => {
     if (isNaN(rentalCostPerHour) || isNaN(rentalHours) || rentalHours <= 0) {
-        console.warn("Invalid input for calculateTotalCost", rentalCostPerHour, rentalHours);
-        return { rentalCost: "0.00", bookingFee: "0.00", transactionFee: "0.00", salesTax: "0.00", total: "0.00" };
+      console.warn(
+        "Invalid input for calculateTotalCost",
+        rentalCostPerHour,
+        rentalHours
+      );
+      return {
+        rentalCost: "0.00",
+        bookingFee: "0.00",
+        transactionFee: "0.00",
+        salesTax: "0.00",
+        total: "0.00",
+      };
     }
     const rentalTotalCost = rentalCostPerHour * rentalHours;
     const bookingFee = rentalTotalCost * 0.06;
     const transactionFee = rentalTotalCost * 0.03;
-    const salesTax = rentalTotalCost * 0.0825; // Tax calculated on base rental cost
+    const salesTax = rentalTotalCost * 0.0825;
     const total = rentalTotalCost + bookingFee + transactionFee + salesTax;
     return {
       rentalCost: rentalTotalCost.toFixed(2),
@@ -307,8 +497,7 @@ const renter = () => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setRenter(user);
-        // Original logic used 'renters' collection - kept as is, but 'users' might be intended target now
-        const renterDocRef = doc(db, "renters", user.uid); 
+        const renterDocRef = doc(db, "renters", user.uid);
         const renterDocSnap = await getDoc(renterDocRef);
         if (!renterDocSnap.exists()) {
           await setDoc(renterDocRef, {
@@ -329,67 +518,48 @@ const renter = () => {
   const renterId = renter?.uid;
 
   // -------------------------
-  // *** NEW: useEffect to Handle Post-Payment Navigation ***
+  // *** MODIFIED: useEffect to Handle Post-Payment Navigation ***
   // -------------------------
   useEffect(() => {
-      if (params?.paymentSuccessFor && params.paymentSuccessFor !== processingPaymentSuccess) {
-          const rentalId = params.paymentSuccessFor;
-          const ownerIdForChat = params.ownerId;
-
-          console.log(`Handling payment success for rental: ${rentalId}`);
-          setProcessingPaymentSuccess(rentalId); 
-
-          Alert.alert("Payment Successful!", "Your rental is now active.");
-
-          closeAllOpenModals(); 
-
-          const checkRentalActive = () => {
-              const updatedRental = rentals.find(r => r.id === rentalId && r.rentalStatus === 'active');
-              
-              if (updatedRental) {
-                  console.log("Found updated active rental:", updatedRental);
-                  
-                  fetchListingDetails(updatedRental.listingId).then(listingData => {
-                      if (listingData) {
-                          setSelectedRentalRequest(updatedRental);
-                          setSelectedListing(listingData);
-                          
-                          const costDetails = calculateTotalCost(parseFloat(listingData.costPerHour), parseFloat(updatedRental.rentalHours));
-                          setTotalCost(costDetails);
-
-                          setCurrentChatOwnerId(ownerIdForChat); 
-                          
-                          setActiveRentalModalVisible(true); 
-
-                      } else {
-                          Alert.alert("Error", "Could not load listing details for the active rental. Chat is available.");
-                          setCurrentChatOwnerId(ownerIdForChat);
-                      }
-                  }).catch(err => {
-                      console.error("Error fetching listing details post-payment:", err);
-                      Alert.alert("Error", "Failed to fetch listing details. Chat is available.");
-                      setCurrentChatOwnerId(ownerIdForChat);
-                  });
-
-              } else {
-                  console.warn(`Rental ${rentalId} not found in 'active' state immediately after payment.`);
-                  Alert.alert("Processing", "Rental details are updating. You can access chat shortly via the main screen.");
-                  setCurrentChatOwnerId(ownerIdForChat); 
-              }
-          };
-
-          setTimeout(checkRentalActive, 1000); // Delay to allow Firestore to update rental status
-
-          navigation.setParams({ paymentSuccessFor: null, ownerId: null }); 
+    if (
+      params?.paymentSuccessFor &&
+      params.paymentSuccessFor !== processingPaymentSuccess
+    ) {
+      const rentalId = params.paymentSuccessFor;
+      const ownerIdForChat = params.ownerId;
+  
+      console.log(`Handling payment success for rental: ${rentalId}`);
+      setProcessingPaymentSuccess(rentalId);
+  
+      // Update rental request status to "active"
+      (async () => {
+        try {
+          const rentalRequestRef = doc(db, "rentalRequests", rentalId);
+          await updateDoc(rentalRequestRef, { rentalStatus: "active" });
+          console.log("Rental status updated to active");
+        } catch (error) {
+          console.error("Error updating rental status:", error);
+        }
+      })();
+  
+      Alert.alert("Payment Successful!", "Your rental is now active.", [
+        { text: "OK", onPress: () => closeAllOpenModals() },
+      ]);
+  
+      // Clear parameters to avoid re-triggering the effect
+      navigation.setParams({ paymentSuccessFor: null, ownerId: null });
+    }
+  
+    return () => {
+      if (
+        navigation.isFocused() &&
+        params?.paymentSuccessFor !== processingPaymentSuccess
+      ) {
+        setProcessingPaymentSuccess(null);
       }
-
-       return () => {
-           if (navigation.isFocused() && params?.paymentSuccessFor !== processingPaymentSuccess) {
-               setProcessingPaymentSuccess(null);
-           }
-       };
-
-  }, [params, rentals, navigation, processingPaymentSuccess]);
+    };
+  }, [params, navigation, processingPaymentSuccess]);
+  
 
   // -------------------------
   // Fetch Profile on Mount (Original - unchanged, reads from 'users')
@@ -398,7 +568,7 @@ const renter = () => {
     if (renterId && !profileData.firstName) {
       (async () => {
         try {
-          const profileDocRef = doc(db, "users", renterId); // Reads from 'users'
+          const profileDocRef = doc(db, "users", renterId);
           const profileDocSnap = await getDoc(profileDocRef);
           if (profileDocSnap.exists()) {
             const data = profileDocSnap.data();
@@ -428,7 +598,11 @@ const renter = () => {
   useEffect(() => {
     const migrateData = async () => {
       try {
-        const migrationFlagRef = doc(db, "migrationFlags", "rentalRequestsMigration");
+        const migrationFlagRef = doc(
+          db,
+          "migrationFlags",
+          "rentalRequestsMigration"
+        );
         const migrationFlagSnap = await getDoc(migrationFlagRef);
         if (migrationFlagSnap.exists() && migrationFlagSnap.data().migrated) {
           console.log("Data migration already completed.");
@@ -443,7 +617,13 @@ const renter = () => {
           const data = docSnap.data();
           const updates = {};
 
-          ["rentalCost", "bookingFee", "transactionFee", "salesTax", "totalCost"].forEach((field) => {
+          [
+            "rentalCost",
+            "bookingFee",
+            "transactionFee",
+            "salesTax",
+            "totalCost",
+          ].forEach((field) => {
             if (data[field] === undefined) {
               updates[field] = 0;
               migrationCount += 1;
@@ -503,7 +683,9 @@ const renter = () => {
           const data = docSnap.data();
           if (!data.notified) {
             const title =
-              data.rentalStatus === "approved" ? "Rental Approved" : "Rental Denied";
+              data.rentalStatus === "approved"
+                ? "Rental Approved"
+                : "Rental Denied";
             const body =
               data.rentalStatus === "approved"
                 ? "Your rental request has been approved."
@@ -548,8 +730,16 @@ const renter = () => {
         for (const docSnap of snapshot.docs) {
           const rentalId = docSnap.id;
           try {
-            const notificationsRef = collection(db, "renters", renterId, "notifications");
-            const notifQuery = query(notificationsRef, where("rentalRequestId", "==", rentalId));
+            const notificationsRef = collection(
+              db,
+              "renters",
+              renterId,
+              "notifications"
+            );
+            const notifQuery = query(
+              notificationsRef,
+              where("rentalRequestId", "==", rentalId)
+            );
             const notifSnapshot = await getDocs(notifQuery);
 
             notifSnapshot.docs.forEach(async (notifDoc) => {
@@ -557,10 +747,17 @@ const renter = () => {
             });
 
             // Update local state
-            setNotifications((prev) => prev.filter((n) => n.rentalRequestId !== rentalId));
-            setAllNotifications((prev) => prev.filter((n) => n.rentalRequestId !== rentalId));
+            setNotifications((prev) =>
+              prev.filter((n) => n.rentalRequestId !== rentalId)
+            );
+            setAllNotifications((prev) =>
+              prev.filter((n) => n.rentalRequestId !== rentalId)
+            );
           } catch (error) {
-            console.error("Error cleaning up notifications for active rental:", error);
+            console.error(
+              "Error cleaning up notifications for active rental:",
+              error
+            );
           }
         }
       },
@@ -668,7 +865,12 @@ const renter = () => {
     if (!isAuthChecked || !renterId) return; // Guard clause
 
     const rentalRequestsRef = collection(db, "rentalRequests");
-    const notificationsRef = collection(db, "renters", renterId, "notifications");
+    const notificationsRef = collection(
+      db,
+      "renters",
+      renterId,
+      "notifications"
+    );
 
     const rentalRequestsQueryInstance = query(
       rentalRequestsRef,
@@ -702,28 +904,34 @@ const renter = () => {
           let ownerName = "N/A"; // Default owner name
           if (requestData.ownerId) {
             try {
-                // ** Correction: Read from 'users' collection **
-                const ownerDocRef = doc(db, "users", requestData.ownerId); 
-                const ownerDoc = await getDoc(ownerDocRef);
-                if (ownerDoc.exists()) {
-                    ownerName = ownerDoc.data().fullName || ownerDoc.data().displayName || "N/A"; 
-                } else {
-                    console.warn(`Owner user doc not found for ${requestData.ownerId}`);
-                }
+              const ownerDocRef = doc(db, "users", requestData.ownerId);
+              const ownerDoc = await getDoc(ownerDocRef);
+              if (ownerDoc.exists()) {
+                ownerName =
+                  ownerDoc.data().fullName ||
+                  ownerDoc.data().displayName ||
+                  "N/A";
+              } else {
+                console.warn(
+                  `Owner user doc not found for ${requestData.ownerId}`
+                );
+              }
             } catch (error) {
-                console.error("Error fetching owner details:", error);
+              console.error("Error fetching owner details:", error);
             }
           }
-          
+
           // ** Fetch and attach listing details **
-          const listingDetails = await fetchListingDetails(requestData.listingId);
+          const listingDetails = await fetchListingDetails(
+            requestData.listingId
+          );
 
           active.push({
             id: docSnap.id,
             ...requestData,
             ownerName, // Add owner name
             listingDetails: listingDetails, // Attach the fetched listing data
-            aircraftModel: listingDetails?.aircraftModel || 'N/A' // Convenience field
+            aircraftModel: listingDetails?.aircraftModel || "N/A", // Convenience field
           });
         }
 
@@ -754,7 +962,9 @@ const renter = () => {
 
         const lastVisible = snapshot.docs[snapshot.docs.length - 1];
         setNotificationsLastDoc(lastVisible);
-        setHasMoreNotifications(snapshot.docs.length === NOTIFICATIONS_PAGE_SIZE); // Update hasMoreNotifications flag
+        setHasMoreNotifications(
+          snapshot.docs.length === NOTIFICATIONS_PAGE_SIZE
+        ); // Update hasMoreNotifications flag
       },
       (error) => {
         console.error("Error fetching notifications:", error);
@@ -771,149 +981,190 @@ const renter = () => {
   // -------------------------
   // Payment Navigation (Original - requires ownerId parameter)
   // -------------------------
-  const navigateToCheckout = async (rentalRequestId, costPerHour, rentalHours, ownerIdParam) => {
-      if (isProcessingPayment) {
-          console.warn("Payment is already being processed.");
-          return;
-      }
-      setIsProcessingPayment(true);
+  const navigateToCheckout = async (
+    rentalRequestId,
+    costPerHour,
+    rentalHours,
+    ownerIdParam
+  ) => {
+    if (isProcessingPayment) {
+      console.warn("Payment is already being processed.");
+      return;
+    }
+    setIsProcessingPayment(true);
 
-      if (!rentalRequestId) {
-          setIsProcessingPayment(false);
-          Alert.alert("Error", "No rental request selected.");
-          return;
-      }
-      if (!ownerIdParam) {
-          setIsProcessingPayment(false);
-          Alert.alert("Error", "Owner information missing for payment.");
-          console.error("Missing ownerId when navigating to checkout for rental:", rentalRequestId);
-          return;
-      }
+    if (!rentalRequestId) {
+      setIsProcessingPayment(false);
+      Alert.alert("Error", "No rental request selected.");
+      return;
+    }
+    if (!ownerIdParam) {
+      setIsProcessingPayment(false);
+      Alert.alert("Error", "Owner information missing for payment.");
+      console.error(
+        "Missing ownerId when navigating to checkout for rental:",
+        rentalRequestId
+      );
+      return;
+    }
 
-      try {
-          console.log(`Navigating to CheckoutScreen with Rental Request ID: ${rentalRequestId}`);
-          console.log(`Cost Per Hour: ${costPerHour}, Rental Hours: ${rentalHours}, Owner ID: ${ownerIdParam}`);
+    try {
+      console.log(
+        `Navigating to CheckoutScreen with Rental Request ID: ${rentalRequestId}`
+      );
+      console.log(
+        `Cost Per Hour: ${costPerHour}, Rental Hours: ${rentalHours}, Owner ID: ${ownerIdParam}`
+      );
 
-          router.push({
-              pathname: "/payment/CheckoutScreen",
-              params: {
-                  rentalRequestId,
-                  costPerHour,
-                  rentalHours,
-                  ownerId: ownerIdParam,
-              },
-          });
-      } catch (error) {
-          console.error("Error navigating to CheckoutScreen:", error);
-          Alert.alert("Error", "Failed to navigate to payment screen.");
-          setIsProcessingPayment(false);
-      } 
+      router.push({
+        pathname: "/payment/CheckoutScreen",
+        params: {
+          rentalRequestId,
+          costPerHour,
+          rentalHours,
+          ownerId: ownerIdParam,
+        },
+      });
+    } catch (error) {
+      console.error("Error navigating to CheckoutScreen:", error);
+      Alert.alert("Error", "Failed to navigate to payment screen.");
+      setIsProcessingPayment(false);
+    }
   };
 
   // -------------------------
   // Handling Notification Press (Original - slightly adapted for clarity and ownerId)
   // -------------------------
   const handleNotificationPress = async (notification) => {
-      try {
-          if (!notification) throw new Error("Notification object is undefined.");
-          const rentalRequestId = notification.rentalRequestId || notification.rentalRequest; 
-          
-          if (rentalRequestId) {
-              console.log("Notification has rentalRequestId:", rentalRequestId);
-              setIsRentalRequestLoading(true);
-              setPaymentComplete(false); 
+    try {
+      if (!notification) throw new Error("Notification object is undefined.");
+      const rentalRequestId =
+        notification.rentalRequestId || notification.rentalRequest;
 
-              const rentalRequestRef = doc(db, "rentalRequests", rentalRequestId);
-              if (rentalRequestListenerRef.current) {
-                  rentalRequestListenerRef.current();
-              }
+      if (rentalRequestId) {
+        console.log("Notification has rentalRequestId:", rentalRequestId);
+        setIsRentalRequestLoading(true);
+        setPaymentComplete(false);
 
-              const rentalRequestSnap = await getDoc(rentalRequestRef);
-              if (!rentalRequestSnap.exists()) {
-                  Alert.alert("Error", "Rental request not found.");
-                  setIsRentalRequestLoading(false);
-                  closeAllOpenModals();
-                  return;
-              }
+        const rentalRequestRef = doc(db, "rentalRequests", rentalRequestId);
+        if (rentalRequestListenerRef.current) {
+          rentalRequestListenerRef.current();
+        }
 
-              const rentalRequestData = rentalRequestSnap.data();
-              console.log("Rental Request Data:", rentalRequestData);
-
-              setPaymentComplete(rentalRequestData.paymentStatus === "succeeded" || rentalRequestData.rentalStatus === "active");
-
-              let ownerName = "N/A";
-              if (rentalRequestData.ownerId) {
-                  try {
-                      const ownerDocRef = doc(db, "users", rentalRequestData.ownerId);
-                      const ownerDoc = await getDoc(ownerDocRef);
-                      if (ownerDoc.exists()) {
-                          ownerName = ownerDoc.data().fullName || "N/A"; 
-                      }
-                  } catch (e) { console.error("Error fetching owner name", e); }
-              }
-              
-              const updatedRentalRequestData = { ...rentalRequestData, ownerName };
-              setSelectedRentalRequest(updatedRentalRequestData);
-
-              const listingData = await fetchListingDetails(rentalRequestData.listingId);
-              if (!listingData) {
-                  Alert.alert("Error", "Associated listing not found.");
-                  setIsRentalRequestLoading(false);
-                  closeAllOpenModals();
-                  return;
-              }
-              setSelectedListing(listingData);
-
-              const rentalHoursVal = parseFloat(rentalRequestData.rentalHours);
-              const rentalCostPerHourVal = parseFloat(listingData.costPerHour);
-
-              if (isNaN(rentalCostPerHourVal) || isNaN(rentalHoursVal)) {
-                  Alert.alert("Error", "Rental cost information is invalid.");
-                  setIsRentalRequestLoading(false);
-                  closeAllOpenModals();
-                  return;
-              }
-
-              const computedTotalCost = calculateTotalCost(rentalCostPerHourVal, rentalHoursVal);
-              setTotalCost(computedTotalCost);
-
-              rentalRequestListenerRef.current = onSnapshot(
-                  rentalRequestRef,
-                  (docSnap) => {
-                      if (docSnap.exists()) {
-                          const data = docSnap.data();
-                          setSelectedRentalRequest(prev => ({ ...prev, ...data })); 
-                          setPaymentComplete(data.paymentStatus === "succeeded" || data.rentalStatus === "active");
-                      } else {
-                          console.warn(`Rental request ${rentalRequestId} deleted while modal open.`);
-                          closeModal(); 
-                          Alert.alert("Request Deleted", "This rental request is no longer available.");
-                      }
-                  },
-                  (error) => {
-                      console.error("Error listening to rental request in modal:", error);
-                  }
-              );
-
-              setSelectedNotification(notification);
-              setNotificationModalVisible(true); 
-              setIsRentalRequestLoading(false);
-
-          } else {
-              console.log("Notification pressed without rentalRequestId:", notification);
-              setSelectedNotification(notification);
-              setSelectedRentalRequest(null);
-              setSelectedListing(null);
-              setTotalCost({ rentalCost: "0.00", bookingFee: "0.00", transactionFee: "0.00", salesTax: "0.00", total: "0.00" });
-              setPaymentComplete(false);
-              setNotificationModalVisible(true); 
-          }
-      } catch (error) {
-          console.error("Error handling notification press:", error);
-          Alert.alert("Error", `Failed to process notification: ${error.message}`);
+        const rentalRequestSnap = await getDoc(rentalRequestRef);
+        if (!rentalRequestSnap.exists()) {
+          Alert.alert("Error", "Rental request not found.");
           setIsRentalRequestLoading(false);
           closeAllOpenModals();
+          return;
+        }
+
+        const rentalRequestData = rentalRequestSnap.data();
+        console.log("Rental Request Data:", rentalRequestData);
+
+        setCurrentChatOwnerId(rentalRequestData.ownerId);
+
+        setPaymentComplete(
+          rentalRequestData.paymentStatus === "succeeded" ||
+            rentalRequestData.rentalStatus === "active"
+        );
+
+        let ownerName = "N/A";
+        if (rentalRequestData.ownerId) {
+          try {
+            const ownerDocRef = doc(db, "users", rentalRequestData.ownerId);
+            const ownerDoc = await getDoc(ownerDocRef);
+            if (ownerDoc.exists()) {
+              ownerName = ownerDoc.data().fullName || "N/A";
+            }
+          } catch (e) {
+            console.error("Error fetching owner name", e);
+          }
+        }
+
+        const updatedRentalRequestData = { ...rentalRequestData, ownerName };
+        setSelectedRentalRequest(updatedRentalRequestData);
+
+        const listingData = await fetchListingDetails(
+          rentalRequestData.listingId
+        );
+        if (!listingData) {
+          Alert.alert("Error", "Associated listing not found.");
+          setIsRentalRequestLoading(false);
+          closeAllOpenModals();
+          return;
+        }
+        setSelectedListing(listingData);
+
+        const rentalHoursVal = parseFloat(rentalRequestData.rentalHours);
+        const rentalCostPerHourVal = parseFloat(listingData.costPerHour);
+
+        if (isNaN(rentalCostPerHourVal) || isNaN(rentalHoursVal)) {
+          Alert.alert("Error", "Rental cost information is invalid.");
+          setIsRentalRequestLoading(false);
+          closeAllOpenModals();
+          return;
+        }
+
+        const computedTotalCost = calculateTotalCost(
+          rentalCostPerHourVal,
+          rentalHoursVal
+        );
+        setTotalCost(computedTotalCost);
+
+        rentalRequestListenerRef.current = onSnapshot(
+          rentalRequestRef,
+          (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              setSelectedRentalRequest((prev) => ({ ...prev, ...data }));
+              setPaymentComplete(
+                data.paymentStatus === "succeeded" ||
+                  data.rentalStatus === "active"
+              );
+            } else {
+              console.warn(
+                `Rental request ${rentalRequestId} deleted while modal open.`
+              );
+              closeModal();
+              Alert.alert(
+                "Request Deleted",
+                "This rental request is no longer available."
+              );
+            }
+          },
+          (error) => {
+            console.error("Error listening to rental request in modal:", error);
+          }
+        );
+
+        setSelectedNotification(notification);
+        setNotificationModalVisible(true);
+        setIsRentalRequestLoading(false);
+      } else {
+        console.log(
+          "Notification pressed without rentalRequestId:",
+          notification
+        );
+        setSelectedNotification(notification);
+        setSelectedRentalRequest(null);
+        setSelectedListing(null);
+        setTotalCost({
+          rentalCost: "0.00",
+          bookingFee: "0.00",
+          transactionFee: "0.00",
+          salesTax: "0.00",
+          total: "0.00",
+        });
+        setPaymentComplete(false);
+        setNotificationModalVisible(true);
       }
+    } catch (error) {
+      console.error("Error handling notification press:", error);
+      Alert.alert("Error", `Failed to process notification: ${error.message}`);
+      setIsRentalRequestLoading(false);
+      closeAllOpenModals();
+    }
   };
 
   // -------------------------
@@ -938,7 +1189,9 @@ const renter = () => {
       const rentalRequestData = rentalRequestSnap.data();
       setSelectedRentalRequest(rentalRequestData);
 
-      const listingData = await fetchListingDetails(rentalRequestData.listingId);
+      const listingData = await fetchListingDetails(
+        rentalRequestData.listingId
+      );
       if (!listingData) {
         Alert.alert("Error", "Associated listing not found.");
         setIsRentalRequestLoading(false);
@@ -955,7 +1208,10 @@ const renter = () => {
         return;
       }
 
-      const computedTotalCost = calculateTotalCost(rentalCostPerHourVal, rentalHoursVal);
+      const computedTotalCost = calculateTotalCost(
+        rentalCostPerHourVal,
+        rentalHoursVal
+      );
       setTotalCost(computedTotalCost);
 
       setCurrentChatOwnerId(rentalRequestData.ownerId);
@@ -985,71 +1241,77 @@ const renter = () => {
   // Render Functions (Defined within component scope for access to handlers)
   // -------------------------
   const renderRentalItem = ({ item }) => (
-      <TouchableOpacity
-          style={styles.rentalBox}
-          onPress={() => handleActiveRentalPress(item)}
-          accessibilityLabel={`View details for rental: ${item.aircraftModel}`}
-          accessibilityRole="button"
-      >
-          <Text style={styles.rentalAircraftModel}>
-              {item.aircraftModel || "N/A"} 
-          </Text>
-          <Text style={styles.rentalStatus}>{item.rentalStatus === 'active' ? 'Active' : 'Approved - Payment Pending'}</Text>
-          <Text style={styles.rentalTotalCost}>
-              Total Cost: ${safeToFixed(item.totalCost)} 
-          </Text>
-      </TouchableOpacity>
+    <TouchableOpacity
+      style={styles.rentalBox}
+      onPress={() => handleActiveRentalPress(item)}
+      accessibilityLabel={`View details for rental: ${item.aircraftModel}`}
+      accessibilityRole="button"
+    >
+      <Text style={styles.rentalAircraftModel}>
+        {item.aircraftModel || "N/A"}
+      </Text>
+      <Text style={styles.rentalStatus}>
+        {item.rentalStatus === "active"
+          ? "Active"
+          : "Approved - Payment Pending"}
+      </Text>
+      <Text style={styles.rentalTotalCost}>
+        Total Cost: ${safeToFixed(item.totalCost)}
+      </Text>
+    </TouchableOpacity>
   );
 
   const renderPastRentalItem = ({ item }) => (
-      <TouchableOpacity
-          style={styles.rentalBox}
-          onPress={() => handlePastRentalPress(item)}
-          accessibilityLabel={`Access past rental: ${item.listing?.aircraftModel || "Listing"}`}
-          accessibilityRole="button"
-      >
-          <Text style={styles.rentalAircraftModel}>
-              {item.listing?.aircraftModel || "Listing"}
-          </Text>
-          <Text style={styles.rentalStatus}>Completed</Text> 
-          <Text style={styles.rentalTotalCost}>
-              Total Cost: ${safeToFixed(item.totalCost)}
-          </Text>
-      </TouchableOpacity>
+    <TouchableOpacity
+      style={styles.rentalBox}
+      onPress={() => handlePastRentalPress(item)}
+      accessibilityLabel={`Access past rental: ${
+        item.listing?.aircraftModel || "Listing"
+      }`}
+      accessibilityRole="button"
+    >
+      <Text style={styles.rentalAircraftModel}>
+        {item.listing?.aircraftModel || "Listing"}
+      </Text>
+      <Text style={styles.rentalStatus}>Completed</Text>
+      <Text style={styles.rentalTotalCost}>
+        Total Cost: ${safeToFixed(item.totalCost)}
+      </Text>
+    </TouchableOpacity>
   );
 
   const renderFavoriteItem = ({ item }) => (
-      <View style={styles.favoriteCard}>
-          <TouchableOpacity
-              style={styles.favoriteRemoveButton}
-              onPress={() => removeFavorite(item)}
-              accessibilityLabel="Remove favorite listing"
-              accessibilityRole="button"
-          >
-              <Ionicons name="close-circle" size={20} color="#FF0000" />
-          </TouchableOpacity>
-          <TouchableOpacity
-              onPress={() =>
-                  router.push({
-                      pathname: "/home",
-                      params: { listingId: item.id },
-                  })
-              }
-              accessibilityLabel={`View favorite listing: ${item.year} ${item.make}`}
-              accessibilityRole="button"
-          >
-              <ImageBackground
-                  source={{ uri: item.images && item.images[0] }}
-                  style={styles.favoriteImage}
-                  imageStyle={{ borderTopLeftRadius: 8, borderTopRightRadius: 8 }}
-              />
-              <View style={styles.favoriteInfo}>
-                  <Text style={styles.favoriteTitle} numberOfLines={1}>
-                      {`${item.year} ${item.make}`}
-                  </Text>
-              </View>
-          </TouchableOpacity>
-      </View>
+    <View style={styles.favoriteCard}>
+      <TouchableOpacity
+        style={styles.favoriteRemoveButton}
+        onPress={() => removeFavorite(item)}
+        accessibilityLabel="Remove favorite listing"
+        accessibilityRole="button"
+      >
+        <Ionicons name="close-circle" size={20} color="#FF0000" />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: "/home",
+            params: { listingId: item.id },
+          })
+        }
+        accessibilityLabel={`View favorite listing: ${item.year} ${item.make}`}
+        accessibilityRole="button"
+      >
+        <ImageBackground
+          source={{ uri: item.images && item.images[0] }}
+          style={styles.favoriteImage}
+          imageStyle={{ borderTopLeftRadius: 8, borderTopRightRadius: 8 }}
+        />
+        <View style={styles.favoriteInfo}>
+          <Text style={styles.favoriteTitle} numberOfLines={1}>
+            {`${item.year} ${item.make}`}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 
   // -------------------------
@@ -1074,32 +1336,51 @@ const renter = () => {
         const data = docSnap.data();
         if (data.rentalDate) {
           let rentalDateObj;
-          if (typeof data.rentalDate === 'string' && data.rentalDate.includes('/')) {
-              const parts = data.rentalDate.split("/");
-              let year = parts[2];
-              if (year.length === 2) year = "20" + year; 
-              rentalDateObj = new Date(year, parseInt(parts[0]) - 1, parseInt(parts[1])); 
-          } else if (typeof data.rentalDate === 'string' && data.rentalDate.includes('-')) {
-              rentalDateObj = new Date(data.rentalDate);
+          if (
+            typeof data.rentalDate === "string" &&
+            data.rentalDate.includes("/")
+          ) {
+            const parts = data.rentalDate.split("/");
+            let year = parts[2];
+            if (year.length === 2) year = "20" + year;
+            rentalDateObj = new Date(
+              year,
+              parseInt(parts[0]) - 1,
+              parseInt(parts[1])
+            );
+          } else if (
+            typeof data.rentalDate === "string" &&
+            data.rentalDate.includes("-")
+          ) {
+            rentalDateObj = new Date(data.rentalDate);
           } else if (data.rentalDate.toDate) {
-               rentalDateObj = data.rentalDate.toDate();
+            rentalDateObj = data.rentalDate.toDate();
           } else {
-               console.warn(`Unrecognized rentalDate format for ${docSnap.id}:`, data.rentalDate);
-               return; 
+            console.warn(
+              `Unrecognized rentalDate format for ${docSnap.id}:`,
+              data.rentalDate
+            );
+            return;
           }
 
           rentalDateObj.setHours(23, 59, 59, 999);
 
           if (now > rentalDateObj) {
-              batch.update(docSnap.ref, { rentalStatus: "completed" }); 
-              console.log(`Scheduling rental ${docSnap.id} to be marked as completed.`);
-              needsCommit = true;
+            batch.update(docSnap.ref, { rentalStatus: "completed" });
+            console.log(
+              `Scheduling rental ${docSnap.id} to be marked as completed.`
+            );
+            needsCommit = true;
           }
         }
       });
 
       if (needsCommit) {
-        batch.commit().catch(error => console.error("Error batch updating rental status:", error));
+        batch
+          .commit()
+          .catch((error) =>
+            console.error("Error batch updating rental status:", error)
+          );
       }
     });
 
@@ -1111,16 +1392,22 @@ const renter = () => {
   // -------------------------
   const closeModal = useCallback(() => {
     setNotificationModalVisible(false);
-    if (selectedNotification || selectedRentalRequest) { 
-        setSelectedNotification(null);
-        setSelectedRentalRequest(null);
-        setSelectedListing(null);
-        setTotalCost({ rentalCost: "0.00", bookingFee: "0.00", transactionFee: "0.00", salesTax: "0.00", total: "0.00" });
-        setPaymentComplete(false);
+    if (selectedNotification || selectedRentalRequest) {
+      setSelectedNotification(null);
+      setSelectedRentalRequest(null);
+      setSelectedListing(null);
+      setTotalCost({
+        rentalCost: "0.00",
+        bookingFee: "0.00",
+        transactionFee: "0.00",
+        salesTax: "0.00",
+        total: "0.00",
+      });
+      setPaymentComplete(false);
     }
     if (rentalRequestListenerRef.current) {
-        rentalRequestListenerRef.current();
-        rentalRequestListenerRef.current = null;
+      rentalRequestListenerRef.current();
+      rentalRequestListenerRef.current = null;
     }
   }, [selectedNotification, selectedRentalRequest]);
 
@@ -1138,7 +1425,12 @@ const renter = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              const notificationsRef = collection(db, "renters", renterId, "notifications");
+              const notificationsRef = collection(
+                db,
+                "renters",
+                renterId,
+                "notifications"
+              );
               const snapshot = await getDocs(notificationsRef);
 
               if (snapshot.empty) {
@@ -1214,13 +1506,15 @@ const renter = () => {
   const showDatePicker = () => setDatePickerVisibility(true);
   const hideDatePicker = () => setDatePickerVisibility(false);
   const handleConfirm = (date) => {
-    const formattedDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+    const formattedDate = `${
+      date.getMonth() + 1
+    }/${date.getDate()}/${date.getFullYear()}`;
     setRentalDate(formattedDate);
     hideDatePicker();
   };
 
   // -------------------------
-  // Messaging (Original - unchanged)
+  // Messaging (Original - unchanged except for reverting status check)
   // -------------------------
   const sendMessage = async () => {
     if (!messageText.trim()) {
@@ -1228,26 +1522,36 @@ const renter = () => {
       return;
     }
 
-    if (selectedRentalRequest && selectedRentalRequest.rentalStatus === "completed") {
-      Alert.alert("Chat Disabled", "Chatting about a completed rental is no longer available.");
+    // Reverted: Check rentalStatus (not status)
+    if (
+      selectedRentalRequest &&
+      selectedRentalRequest.rentalStatus === "completed"
+    ) {
+      Alert.alert(
+        "Chat Disabled",
+        "Chatting about a completed rental is no longer available."
+      );
       return;
     }
-    
+
     if (!currentChatOwnerId) {
-        Alert.alert("Error", "Cannot send message: Owner information missing.");
-        return;
+      Alert.alert("Error", "Cannot send message: Owner information missing.");
+      return;
     }
 
     try {
-      const rentalRequestIdForMsg = selectedRentalRequest?.id || selectedNotification?.rentalRequestId || null;
+      const rentalRequestIdForMsg =
+        selectedRentalRequest?.id ||
+        selectedNotification?.rentalRequestId ||
+        null;
 
       await addDoc(collection(db, "messages"), {
         senderId: renterId,
         senderName: renter.displayName || "User",
         text: messageText.trim(),
         timestamp: serverTimestamp(),
-        participants: [renterId, currentChatOwnerId], 
-        rentalRequestId: rentalRequestIdForMsg, 
+        participants: [renterId, currentChatOwnerId],
+        rentalRequestId: rentalRequestIdForMsg,
       });
       setMessageText("");
     } catch (error) {
@@ -1282,9 +1586,9 @@ const renter = () => {
       type: ["application/pdf", "image/*"],
     });
 
-    if (result.assets && result.assets.length > 0) { 
+    if (result.assets && result.assets.length > 0) {
       setProfileData({ ...profileData, [field]: result.assets[0].uri });
-    } else if (!result.canceled && result.uri) { 
+    } else if (!result.canceled && result.uri) {
       setProfileData({ ...profileData, [field]: result.uri });
     }
   };
@@ -1341,7 +1645,10 @@ const renter = () => {
   const getCurrentLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Denied", "Permission to access location was denied.");
+      Alert.alert(
+        "Permission Denied",
+        "Permission to access location was denied."
+      );
       return;
     }
     let location = await Location.getCurrentPositionAsync({});
@@ -1376,7 +1683,7 @@ const renter = () => {
       const messagesRef = collection(db, "messages");
       const messagesQueryInstance = query(
         messagesRef,
-        where("participants", "array-contains", renterId), 
+        where("participants", "array-contains", renterId),
         orderBy("timestamp", "asc")
       );
 
@@ -1421,7 +1728,9 @@ const renter = () => {
         </View>
       ) : renterId ? (
         <ScrollView
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {}} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => {}} />
+          }
           contentContainerStyle={{ paddingBottom: 16 }}
         >
           {/* Header Section */}
@@ -1473,7 +1782,11 @@ const renter = () => {
               accessibilityLabel="Edit profile"
               accessibilityRole="button"
             >
-              <Ionicons name="person-circle-outline" size={32} color="#3182ce" />
+              <Ionicons
+                name="person-circle-outline"
+                size={32}
+                color="#3182ce"
+              />
               <Text>Profile</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1483,7 +1796,9 @@ const renter = () => {
               accessibilityRole="button"
             >
               <Ionicons name="rocket-outline" size={32} color="#3182ce" />
-              <Text style={{ textAlign: "center", fontSize: 12 }}>Invest in R.S.F?</Text>
+              <Text style={{ textAlign: "center", fontSize: 12 }}>
+                Invest in R.S.F?
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navigationButton}
@@ -1495,21 +1810,6 @@ const renter = () => {
               <Text>Privacy Policy</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Recent Searches Section */}
-          {/* <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Recent Searches</Text>
-            <View style={styles.recentSearchesRow}>
-              <View style={styles.recentSearchBox}>
-                <Text>Van Nuys Airport</Text>
-                <Text style={styles.recentSearchDetails}>3 guests · 9/10/23-9/17/23</Text>
-              </View>
-              <View style={styles.recentSearchBox}>
-                <Text>Santa Monica Airport</Text>
-                <Text style={styles.recentSearchDetails}>2 guests · 9/18/23-9/25/23</Text>
-              </View>
-            </View>
-          </View> */}
 
           {/* Past Rentals Section */}
           <View style={styles.sectionContainer}>
@@ -1523,7 +1823,9 @@ const renter = () => {
                 showsHorizontalScrollIndicator={false}
               />
             ) : (
-              <Text style={styles.noActiveRentalsText}>No past rentals available.</Text>
+              <Text style={styles.noActiveRentalsText}>
+                No past rentals available.
+              </Text>
             )}
           </View>
 
@@ -1544,71 +1846,101 @@ const renter = () => {
           {/* Active Rentals Section */}
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Active Rentals</Text>
-            {rentals.filter(r => r.rentalStatus === 'active').length > 0 ? (
+            {rentals.filter((r) => r.rentalStatus === "active").length > 0 ? (
               <>
                 <FlatList
-                  data={rentals.filter(r => r.rentalStatus === 'active')}
+                  data={rentals.filter((r) => r.rentalStatus === "active")}
                   keyExtractor={(item, index) => `${item.id}_${index}`}
                   renderItem={renderRentalItem}
                   scrollEnabled={false}
                 />
               </>
             ) : (
-              <Text style={styles.noActiveRentalsText}>No active rentals at the moment.</Text>
+              <Text style={styles.noActiveRentalsText}>
+                No active rentals at the moment.
+              </Text>
             )}
           </View>
 
           {/* Notifications Section */}
           <View style={styles.sectionContainer}>
-             <Text style={styles.sectionTitle}>Notifications</Text>
-             {notifications.filter(n => !rentals.some(r => r.id === n.rentalRequestId && r.rentalStatus === 'active')).length > 0 ? (
-                 <FlatList
-                    data={notifications.filter(n => !rentals.some(r => r.id === n.rentalRequestId && r.rentalStatus === 'active')).slice(0, 3)}
-                    keyExtractor={(item, index) => `${item.id}_${index}`}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={styles.notificationBox}
-                            onPress={() => {
-                                handleNotificationPress(item);
-                            }}
-                            accessibilityLabel={`View details for notification: ${typeof item.message === "string" ? item.message : JSON.stringify(item.message)}`}
-                            accessibilityRole="button"
-                        >
-                            <Text style={styles.notificationMessageText}>
-                              {typeof item.message === "string" ? item.message : JSON.stringify(item.message)}
-                            </Text>
-                            <Text style={styles.notificationDateText}>
-                                {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString() : "N/A"}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                    scrollEnabled={false}
-                 />
-             ) : (
-                 <Text style={styles.noNotificationsText}>No new notifications.</Text>
-             )}
-             {allNotifications.length > 0 && (
-                 <TouchableOpacity
-                     onPress={removeAllNotifications}
-                     style={styles.removeAllNotificationsButton}
-                     accessibilityLabel="Remove all notifications"
-                     accessibilityRole="button"
-                 >
-                     <Text style={styles.removeAllNotificationsButtonText}>Remove All</Text>
-                 </TouchableOpacity>
-             )}
-             {allNotifications.length > 3 && (
-                 <TouchableOpacity
-                     onPress={() => setAllNotificationsModalVisible(true)}
-                     style={styles.viewAllNotificationsButton}
-                     accessibilityLabel="View all notifications"
-                     accessibilityRole="button"
-                 >
-                     <Text style={styles.viewAllNotificationsButtonText}>View All</Text>
-                 </TouchableOpacity>
-             )}
+            <Text style={styles.sectionTitle}>Notifications</Text>
+            {notifications.filter(
+              (n) =>
+                !rentals.some(
+                  (r) =>
+                    r.id === n.rentalRequestId && r.rentalStatus === "active"
+                )
+            ).length > 0 ? (
+              <FlatList
+                data={notifications
+                  .filter(
+                    (n) =>
+                      !rentals.some(
+                        (r) =>
+                          r.id === n.rentalRequestId &&
+                          r.rentalStatus === "active"
+                      )
+                  )
+                  .slice(0, 3)}
+                keyExtractor={(item, index) => `${item.id}_${index}`}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.notificationBox}
+                    onPress={() => {
+                      handleNotificationPress(item);
+                    }}
+                    accessibilityLabel={`View details for notification: ${
+                      typeof item.message === "string"
+                        ? item.message
+                        : JSON.stringify(item.message)
+                    }`}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.notificationMessageText}>
+                      {typeof item.message === "string"
+                        ? item.message
+                        : JSON.stringify(item.message)}
+                    </Text>
+                    <Text style={styles.notificationDateText}>
+                      {item.createdAt?.toDate
+                        ? item.createdAt.toDate().toLocaleString()
+                        : "N/A"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                scrollEnabled={false}
+              />
+            ) : (
+              <Text style={styles.noNotificationsText}>
+                No new notifications.
+              </Text>
+            )}
+            {allNotifications.length > 0 && (
+              <TouchableOpacity
+                onPress={removeAllNotifications}
+                style={styles.removeAllNotificationsButton}
+                accessibilityLabel="Remove all notifications"
+                accessibilityRole="button"
+              >
+                <Text style={styles.removeAllNotificationsButtonText}>
+                  Remove All
+                </Text>
+              </TouchableOpacity>
+            )}
+            {allNotifications.length > 3 && (
+              <TouchableOpacity
+                onPress={() => setAllNotificationsModalVisible(true)}
+                style={styles.viewAllNotificationsButton}
+                accessibilityLabel="View all notifications"
+                accessibilityRole="button"
+              >
+                <Text style={styles.viewAllNotificationsButtonText}>
+                  View All
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-
         </ScrollView>
       ) : (
         <View style={styles.notAuthenticatedContainer}>
@@ -1637,7 +1969,10 @@ const renter = () => {
             </Text>
           </View>
           {profileData.image && (
-            <Image source={{ uri: profileData.image }} style={styles.profileImage} />
+            <Image
+              source={{ uri: profileData.image }}
+              style={styles.profileImage}
+            />
           )}
         </View>
       )}
@@ -1646,94 +1981,115 @@ const renter = () => {
 
       {/* Profile Modal */}
       <Modal
-          visible={profileModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setProfileModalVisible(false)}
+        visible={profileModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setProfileModalVisible(false)}
       >
-          <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              style={styles.modalContainer}
-          >
-              <ScrollView contentContainerStyle={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Edit Profile</Text>
-                  <TouchableOpacity
-                      onPress={pickImage}
-                      style={styles.profileImageUpload}
-                      accessibilityLabel="Upload profile image"
-                      accessibilityRole="button"
-                  >
-                      {profileData.image ? (
-                          <Image source={{ uri: profileData.image }} style={styles.profileImagePreview} />
-                      ) : (
-                          <Ionicons name="person-circle-outline" size={100} color="#ccc" />
-                      )}
-                      <Text style={styles.uploadText}>Upload Profile Image</Text>
-                  </TouchableOpacity>
-                  <TextInput
-                      placeholder="First Name"
-                      value={profileData.firstName}
-                      onChangeText={(text) => setProfileData({ ...profileData, firstName: text })}
-                      style={styles.modalInput}
-                  />
-                  <TextInput
-                      placeholder="Last Name"
-                      value={profileData.lastName}
-                      onChangeText={(text) => setProfileData({ ...profileData, lastName: text })}
-                      style={styles.modalInput}
-                  />
-                  <TouchableOpacity
-                      onPress={() => pickDocument("insurance")}
-                      style={styles.uploadButton}
-                      accessibilityLabel="Upload renters insurance"
-                      accessibilityRole="button"
-                  >
-                      <Text style={styles.uploadButtonText}> 
-                          {profileData.insurance ? "Renters Insurance Uploaded" : "Upload Renters Insurance"}
-                      </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                      onPress={() => pickDocument("pilotLicense")}
-                      style={styles.uploadButton}
-                      accessibilityLabel="Upload pilots license"
-                      accessibilityRole="button"
-                  >
-                      <Text style={styles.uploadButtonText}>
-                          {profileData.pilotLicense ? "Pilots License Uploaded" : "Upload Pilots License"}
-                      </Text>
-                  </TouchableOpacity>
-                   <TouchableOpacity
-                      onPress={() => pickDocument("medical")}
-                      style={styles.uploadButton}
-                      accessibilityLabel="Upload current medical"
-                      accessibilityRole="button"
-                  >
-                      <Text style={styles.uploadButtonText}>
-                          {profileData.medical ? "Medical Document Uploaded" : "Upload Current Medical"}
-                      </Text>
-                  </TouchableOpacity>
-                  <TextInput
-                      placeholder="Type of aircraft certified in"
-                      value={profileData.aircraftType}
-                      onChangeText={(text) => setProfileData({ ...profileData, aircraftType: text })}
-                      style={styles.modalInput}
-                  />
-                  <TextInput
-                      placeholder="Certifications (e.g., IFR)"
-                      value={profileData.certifications}
-                      onChangeText={(text) => setProfileData({ ...profileData, certifications: text })}
-                      style={styles.modalInput}
-                  />
-                  <TouchableOpacity
-                      onPress={() => handleProfileSubmit(profileData)}
-                      style={styles.saveButton}
-                      accessibilityLabel="Save profile"
-                      accessibilityRole="button"
-                  >
-                      <Text style={styles.saveButtonText}>Save</Text>
-                  </TouchableOpacity>
-              </ScrollView>
-          </KeyboardAvoidingView>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <TouchableOpacity
+              onPress={pickImage}
+              style={styles.profileImageUpload}
+              accessibilityLabel="Upload profile image"
+              accessibilityRole="button"
+            >
+              {profileData.image ? (
+                <Image
+                  source={{ uri: profileData.image }}
+                  style={styles.profileImagePreview}
+                />
+              ) : (
+                <Ionicons
+                  name="person-circle-outline"
+                  size={100}
+                  color="#ccc"
+                />
+              )}
+              <Text style={styles.uploadText}>Upload Profile Image</Text>
+            </TouchableOpacity>
+            <TextInput
+              placeholder="First Name"
+              value={profileData.firstName}
+              onChangeText={(text) =>
+                setProfileData({ ...profileData, firstName: text })
+              }
+              style={styles.modalInput}
+            />
+            <TextInput
+              placeholder="Last Name"
+              value={profileData.lastName}
+              onChangeText={(text) =>
+                setProfileData({ ...profileData, lastName: text })
+              }
+              style={styles.modalInput}
+            />
+            <TouchableOpacity
+              onPress={() => pickDocument("insurance")}
+              style={styles.uploadButton}
+              accessibilityLabel="Upload renters insurance"
+              accessibilityRole="button"
+            >
+              <Text style={styles.uploadButtonText}>
+                {profileData.insurance
+                  ? "Renters Insurance Uploaded"
+                  : "Upload Renters Insurance"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => pickDocument("pilotLicense")}
+              style={styles.uploadButton}
+              accessibilityLabel="Upload pilots license"
+              accessibilityRole="button"
+            >
+              <Text style={styles.uploadButtonText}>
+                {profileData.pilotLicense
+                  ? "Pilots License Uploaded"
+                  : "Upload Pilots License"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => pickDocument("medical")}
+              style={styles.uploadButton}
+              accessibilityLabel="Upload current medical"
+              accessibilityRole="button"
+            >
+              <Text style={styles.uploadButtonText}>
+                {profileData.medical
+                  ? "Medical Document Uploaded"
+                  : "Upload Current Medical"}
+              </Text>
+            </TouchableOpacity>
+            <TextInput
+              placeholder="Type of aircraft certified in"
+              value={profileData.aircraftType}
+              onChangeText={(text) =>
+                setProfileData({ ...profileData, aircraftType: text })
+              }
+              style={styles.modalInput}
+            />
+            <TextInput
+              placeholder="Certifications (e.g., IFR)"
+              value={profileData.certifications}
+              onChangeText={(text) =>
+                setProfileData({ ...profileData, certifications: text })
+              }
+              style={styles.modalInput}
+            />
+            <TouchableOpacity
+              onPress={() => handleProfileSubmit(profileData)}
+              style={styles.saveButton}
+              accessibilityLabel="Save profile"
+              accessibilityRole="button"
+            >
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Messages Modal */}
@@ -1770,24 +2126,34 @@ const renter = () => {
               <View
                 style={[
                   styles.chatBubble,
-                  item.senderId === renterId ? styles.chatBubbleRight : styles.chatBubbleLeft, 
+                  item.senderId === renterId
+                    ? styles.chatBubbleRight
+                    : styles.chatBubbleLeft,
                 ]}
               >
                 <Text style={styles.chatSenderName}>{item.senderName}:</Text>
                 <Text style={styles.chatMessageText}>
-                  {typeof item.text === "string" ? item.text : JSON.stringify(item.text)}
+                  {typeof item.text === "string"
+                    ? item.text
+                    : JSON.stringify(item.text)}
                 </Text>
                 <Text style={styles.chatTimestamp}>
-                  {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleString() : "Sending..."}
+                  {item.timestamp?.toDate
+                    ? item.timestamp.toDate().toLocaleString()
+                    : "Sending..."}
                 </Text>
               </View>
             )}
             contentContainerStyle={styles.messagesList}
             style={{ flex: 1, width: "100%" }}
             inverted
-            ref={ref => this.flatList = ref}
-            onContentSizeChange={() => this.flatList.scrollToOffset({ animated: false, offset: 0 })}
-            onLayout={() => this.flatList.scrollToOffset({ animated: false, offset: 0 })}
+            ref={(ref) => (this.flatList = ref)}
+            onContentSizeChange={() =>
+              this.flatList.scrollToOffset({ animated: false, offset: 0 })
+            }
+            onLayout={() =>
+              this.flatList.scrollToOffset({ animated: false, offset: 0 })
+            }
           />
 
           <View style={styles.messageInputContainer}>
@@ -1832,116 +2198,178 @@ const renter = () => {
               accessibilityLabel="Close notification"
               accessibilityRole="button"
             >
-              <Ionicons name="close-circle" size={32} color="#2d3748" /> 
+              <Ionicons name="close-circle" size={32} color="#2d3748" />
             </TouchableOpacity>
 
             {isRentalRequestLoading ? (
-              <ActivityIndicator size="large" color="#3182ce" style={{ marginTop: 20 }} />
+              <ActivityIndicator
+                size="large"
+                color="#3182ce"
+                style={{ marginTop: 20 }}
+              />
             ) : selectedRentalRequest ? (
               <ScrollView contentContainerStyle={{ padding: 16 }}>
-                <Text style={styles.notificationDetailsTitle}>Rental Request Details</Text>
+                <Text style={styles.notificationDetailsTitle}>
+                  Rental Request Details
+                </Text>
                 <View style={styles.notificationDetailBox}>
-                    <Text style={styles.detailLabel}>Message:</Text>
-                    <Text style={styles.detailValue}>{selectedNotification?.message || "Rental Request"}</Text>
+                  <Text style={styles.detailLabel}>Message:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedNotification?.message || "Rental Request"}
+                  </Text>
                 </View>
                 <View style={styles.notificationDetailBox}>
-                    <Text style={styles.detailLabel}>From:</Text>
-                    <Text style={styles.detailValue}>{selectedRentalRequest.ownerName || "N/A"}</Text>
+                  <Text style={styles.detailLabel}>From:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedRentalRequest.ownerName || "N/A"}
+                  </Text>
                 </View>
                 <View style={styles.notificationDetailBox}>
-                    <Text style={styles.detailLabel}>Date:</Text>
-                    <Text style={styles.detailValue}>{selectedRentalRequest.rentalDate || "N/A"}</Text>
+                  <Text style={styles.detailLabel}>Date:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedRentalRequest.rentalDate || "N/A"}
+                  </Text>
                 </View>
                 {selectedRentalRequest && selectedListing && (
-                    <View style={styles.notificationDetailBox}>
-                        <Text style={styles.detailLabel}>Rental Details:</Text>
-                        <Text style={styles.detailValue}>Aircraft Model: {selectedListing.aircraftModel || "N/A"}</Text>
-                        <Text style={styles.detailValue}>Tail Number: {selectedListing.tailNumber || "N/A"}</Text>
-                        <Text style={styles.detailValue}>Rental Hours: {selectedRentalRequest.rentalHours || "N/A"}</Text>
-                        <Text style={styles.detailValue}>Rental Date: {selectedRentalRequest.rentalDate || "N/A"}</Text>
-                        {totalCost ? (
-                            <View style={{ marginTop: 8 }}>
-                                <Text style={styles.detailLabel}>Cost Breakdown:</Text>
-                                <Text style={styles.detailValue}>Rental Cost (${selectedListing.costPerHour}/hr * {selectedRentalRequest.rentalHours} hours): ${safeToFixed(totalCost.rentalCost)}</Text>
-                                <Text style={styles.detailValue}>Booking Fee (6%): ${safeToFixed(totalCost.bookingFee)}</Text>
-                                <Text style={styles.detailValue}>Transaction Fee (3%): ${safeToFixed(totalCost.transactionFee)}</Text>
-                                <Text style={styles.detailValue}>Sales Tax (8.25%): ${safeToFixed(totalCost.salesTax)}</Text>
-                                <Text style={styles.detailTotalCostText}>Total Cost: ${safeToFixed(totalCost.total)}</Text>
-                            </View>
-                        ) : (
-                            <Text style={styles.detailValue}>Total Cost: N/A</Text>
-                        )}
-                    </View>
+                  <View style={styles.notificationDetailBox}>
+                    <Text style={styles.detailLabel}>Rental Details:</Text>
+                    <Text style={styles.detailValue}>
+                      Aircraft Model: {selectedListing.aircraftModel || "N/A"}
+                    </Text>
+                    <Text style={styles.detailValue}>
+                      Tail Number: {selectedListing.tailNumber || "N/A"}
+                    </Text>
+                    <Text style={styles.detailValue}>
+                      Rental Hours: {selectedRentalRequest.rentalHours || "N/A"}
+                    </Text>
+                    <Text style={styles.detailValue}>
+                      Rental Date: {selectedRentalRequest.rentalDate || "N/A"}
+                    </Text>
+                    {totalCost ? (
+                      <View style={{ marginTop: 8 }}>
+                        <Text style={styles.detailLabel}>Cost Breakdown:</Text>
+                        <Text style={styles.detailValue}>
+                          Rental Cost (${selectedListing.costPerHour}/hr *{" "}
+                          {selectedRentalRequest.rentalHours} hours): $
+                          {safeToFixed(totalCost.rentalCost)}
+                        </Text>
+                        <Text style={styles.detailValue}>
+                          Booking Fee (6%): ${safeToFixed(totalCost.bookingFee)}
+                        </Text>
+                        <Text style={styles.detailValue}>
+                          Transaction Fee (3%): $
+                          {safeToFixed(totalCost.transactionFee)}
+                        </Text>
+                        <Text style={styles.detailValue}>
+                          Sales Tax (8.25%): ${safeToFixed(totalCost.salesTax)}
+                        </Text>
+                        <Text style={styles.detailTotalCostText}>
+                          Total Cost: ${safeToFixed(totalCost.total)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.detailValue}>Total Cost: N/A</Text>
+                    )}
+                  </View>
                 )}
 
                 {!paymentComplete ? (
-                    <TouchableOpacity
-                        onPress={() => {
-                           const ownerIdForCheckout = selectedRentalRequest?.ownerId; 
-                           if (!ownerIdForCheckout) {
-                               Alert.alert("Error", "Cannot proceed to payment: Owner information is missing.");
-                               return;
-                           }
-                           navigateToCheckout(
-                               selectedNotification?.rentalRequestId || selectedRentalRequest.id,
-                               parseFloat(selectedListing.costPerHour),
-                               parseFloat(selectedRentalRequest.rentalHours),
-                               ownerIdForCheckout
-                           );
-                        }}
-                        style={[styles.proceedToPayButton, isProcessingPayment && styles.disabledButton]}
-                        accessibilityLabel="Proceed to payment"
-                        accessibilityRole="button"
-                        disabled={isProcessingPayment}
-                    >
-                        {isProcessingPayment ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <Text style={styles.proceedToPayButtonText}>Proceed to Pay</Text>
-                        )}
-                    </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const ownerIdForCheckout = selectedRentalRequest?.ownerId;
+                      if (!ownerIdForCheckout) {
+                        Alert.alert(
+                          "Error",
+                          "Cannot proceed to payment: Owner information is missing."
+                        );
+                        return;
+                      }
+                      navigateToCheckout(
+                        selectedNotification?.rentalRequestId ||
+                          selectedRentalRequest.id,
+                        parseFloat(selectedListing.costPerHour),
+                        parseFloat(selectedRentalRequest.rentalHours),
+                        ownerIdForCheckout
+                      );
+                    }}
+                    style={[
+                      styles.proceedToPayButton,
+                      { marginTop: 20, backgroundColor: "#38a169" },
+                    ]}
+                    accessibilityLabel="Proceed to payment"
+                    accessibilityRole="button"
+                    disabled={isProcessingPayment}
+                  >
+                    {isProcessingPayment ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.proceedToPayButtonText}>
+                        Proceed to Pay
+                      </Text>
+                    )}
+                  </TouchableOpacity>
                 ) : (
-                    <View style={{ alignItems: "center", marginVertical: 16 }}>
-                        <Text style={{ fontSize: 18, color: "#38a169", marginBottom: 8 }}>Payment Completed. Rental is now active.</Text>
-                        <TouchableOpacity
-                            onPress={() => {
-                                closeModal();
-                                handleActiveRentalPress(selectedRentalRequest);
-                            }}
-                            style={styles.closeNotificationModalButton}
-                            accessibilityLabel="Manage Rental"
-                            accessibilityRole="button"
-                        >
-                            <Text style={styles.closeNotificationModalButtonText}>Manage Rental</Text>
-                        </TouchableOpacity>
-                    </View>
+                  <View style={{ alignItems: "center", marginVertical: 16 }}>
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        color: "#38a169",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Payment Completed. Rental is now active.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        closeModal();
+                        handleActiveRentalPress(selectedRentalRequest);
+                      }}
+                      style={styles.closeNotificationModalButton}
+                      accessibilityLabel="Manage Rental"
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.closeNotificationModalButtonText}>
+                        Manage Rental
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </ScrollView>
             ) : selectedNotification ? (
               <ScrollView contentContainerStyle={{ padding: 16 }}>
-                 <Text style={styles.notificationDetailsTitle}>Notification Details</Text>
-                 <View style={styles.notificationDetailBox}>
-                    <Text style={styles.detailLabel}>Message:</Text>
-                    <Text style={styles.detailValue}>{selectedNotification.message}</Text>
-                 </View>
-                 <View style={styles.notificationDetailBox}>
-                    <Text style={styles.detailLabel}>From:</Text>
-                    <Text style={styles.detailValue}>{selectedNotification.ownerName || "System"}</Text> 
-                 </View>
-                 <View style={styles.notificationDetailBox}>
-                    <Text style={styles.detailLabel}>Date:</Text>
-                    <Text style={styles.detailValue}>
-                        {selectedNotification.createdAt?.toDate ? selectedNotification.createdAt.toDate().toLocaleString() : "N/A"}
-                    </Text>
-                 </View>
-                 <TouchableOpacity
-                    onPress={closeModal}
-                    style={styles.closeNotificationModalButton}
-                    accessibilityLabel="Close notification modal"
-                    accessibilityRole="button"
-                 >
-                    <Text style={styles.closeNotificationModalButtonText}>Close</Text>
-                 </TouchableOpacity>
+                <Text style={styles.notificationDetailsTitle}>
+                  Notification Details
+                </Text>
+                <View style={styles.notificationDetailBox}>
+                  <Text style={styles.detailLabel}>Message:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedNotification.message}
+                  </Text>
+                </View>
+                <View style={styles.notificationDetailBox}>
+                  <Text style={styles.detailLabel}>From:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedNotification.ownerName || "System"}
+                  </Text>
+                </View>
+                <View style={styles.notificationDetailBox}>
+                  <Text style={styles.detailLabel}>Date:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedNotification.createdAt?.toDate
+                      ? selectedNotification.createdAt.toDate().toLocaleString()
+                      : "N/A"}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={closeModal}
+                  style={styles.closeNotificationModalButton}
+                  accessibilityLabel="Close notification modal"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.closeNotificationModalButtonText}>
+                    Close
+                  </Text>
+                </TouchableOpacity>
               </ScrollView>
             ) : (
               <ActivityIndicator size="large" color="#3182ce" />
@@ -1963,8 +2391,11 @@ const renter = () => {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.allNotificationsModalContainer}>
-              <ModalHeader title="All Notifications" onClose={() => setAllNotificationsModalVisible(false)} />
-              
+              <ModalHeader
+                title="All Notifications"
+                onClose={() => setAllNotificationsModalVisible(false)}
+              />
+
               {allNotifications.length > 0 ? (
                 <FlatList
                   data={allNotifications}
@@ -1974,31 +2405,47 @@ const renter = () => {
                       style={styles.notificationBox}
                       onPress={() => {
                         handleNotificationPress(item);
-                        setAllNotificationsModalVisible(false); 
+                        setAllNotificationsModalVisible(false);
                       }}
-                      accessibilityLabel={`View notification: ${typeof item.message === "string" ? item.message : JSON.stringify(item.message)}`}
+                      accessibilityLabel={`View notification: ${
+                        typeof item.message === "string"
+                          ? item.message
+                          : JSON.stringify(item.message)
+                      }`}
                       accessibilityRole="button"
                     >
                       <Text style={styles.notificationMessageText}>
-                        {typeof item.message === "string" ? item.message : JSON.stringify(item.message)}
+                        {typeof item.message === "string"
+                          ? item.message
+                          : JSON.stringify(item.message)}
                       </Text>
                       <Text style={styles.notificationDateText}>
-                        {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString() : "N/A"}
+                        {item.createdAt?.toDate
+                          ? item.createdAt.toDate().toLocaleString()
+                          : "N/A"}
                       </Text>
                     </TouchableOpacity>
                   )}
                   ListFooterComponent={
                     hasMoreNotifications ? (
-                      <ActivityIndicator size="large" color="#3182ce" style={{ marginVertical: 16 }} />
+                      <ActivityIndicator
+                        size="large"
+                        color="#3182ce"
+                        style={{ marginVertical: 16 }}
+                      />
                     ) : (
-                      <Text style={styles.noMoreNotificationsText}>No more notifications to load.</Text>
+                      <Text style={styles.noMoreNotificationsText}>
+                        No more notifications to load.
+                      </Text>
                     )
                   }
                   onEndReached={fetchMoreNotifications}
                   onEndReachedThreshold={0.5}
                 />
               ) : (
-                <Text style={styles.noNotificationsText}>No notifications available.</Text>
+                <Text style={styles.noNotificationsText}>
+                  No notifications available.
+                </Text>
               )}
             </View>
           </View>
@@ -2014,37 +2461,112 @@ const renter = () => {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
         >
-          <View style={{ width: "90%", backgroundColor: "#fff", padding: 20, borderRadius: 10, maxHeight: '85%' }}> 
-            <ModalHeader title="Active Rental Details" onClose={() => setActiveRentalModalVisible(false)} /> 
-            
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "#fff",
+              padding: 20,
+              borderRadius: 10,
+              maxHeight: "85%",
+            }}
+          >
+            <ModalHeader
+              title="Active Rental Details"
+              onClose={() => setActiveRentalModalVisible(false)}
+            />
+
             {selectedListing && selectedRentalRequest ? (
               <ScrollView>
-                <Text style={styles.detailValue}>Aircraft Model: {selectedListing.aircraftModel || "N/A"}</Text>
-                <Text style={styles.detailValue}>Tail Number: {selectedListing.tailNumber || "N/A"}</Text>
-                <Text style={styles.detailValue}>Rental Hours: {selectedRentalRequest.rentalHours || "N/A"}</Text>
-                <Text style={styles.detailValue}>Rental Date: {selectedRentalRequest.rentalDate || "N/A"}</Text>
-                
-                <Text style={[styles.detailLabel, {marginTop: 15}]}>Cost Breakdown:</Text>
-                <Text style={styles.detailValue}>Rental Cost: ${safeToFixed(totalCost.rentalCost)}</Text>
-                <Text style={styles.detailValue}>Booking Fee: ${safeToFixed(totalCost.bookingFee)}</Text>
-                <Text style={styles.detailValue}>Transaction Fee: ${safeToFixed(totalCost.transactionFee)}</Text>
-                <Text style={styles.detailValue}>Sales Tax: ${safeToFixed(totalCost.salesTax)}</Text>
-                <Text style={styles.detailTotalCostText}>Total Cost: ${safeToFixed(totalCost.total)}</Text>
+                <Text style={styles.detailValue}>
+                  Aircraft Model: {selectedListing.aircraftModel || "N/A"}
+                </Text>
+                <Text style={styles.detailValue}>
+                  Tail Number: {selectedListing.tailNumber || "N/A"}
+                </Text>
+                <Text style={styles.detailValue}>
+                  Rental Hours: {selectedRentalRequest.rentalHours || "N/A"}
+                </Text>
+                <Text style={styles.detailValue}>
+                  Rental Date: {selectedRentalRequest.rentalDate || "N/A"}
+                </Text>
 
-                <TouchableOpacity 
+                <Text style={[styles.detailLabel, { marginTop: 15 }]}>
+                  Cost Breakdown:
+                </Text>
+                <Text style={styles.detailValue}>
+                  Rental Cost: ${safeToFixed(totalCost.rentalCost)}
+                </Text>
+                <Text style={styles.detailValue}>
+                  Booking Fee: ${safeToFixed(totalCost.bookingFee)}
+                </Text>
+                <Text style={styles.detailValue}>
+                  Transaction Fee: ${safeToFixed(totalCost.transactionFee)}
+                </Text>
+                <Text style={styles.detailValue}>
+                  Sales Tax: ${safeToFixed(totalCost.salesTax)}
+                </Text>
+                <Text style={styles.detailTotalCostText}>
+                  Total Cost: ${safeToFixed(totalCost.total)}
+                </Text>
+
+                {/* Proceed to Pay Button added here if payment is not complete */}
+                {!paymentComplete && (
+                  <TouchableOpacity
                     onPress={() => {
-                        setActiveRentalModalVisible(false);
-                        setMessagesModalVisible(true);
-                    }} 
-                    style={[styles.proceedToPayButton, { marginTop: 20, backgroundColor: '#3182ce' }]}
-                    accessibilityLabel="Open Chat with Owner"
+                      const ownerIdForCheckout = selectedRentalRequest?.ownerId;
+                      if (!ownerIdForCheckout) {
+                        Alert.alert(
+                          "Error",
+                          "Cannot proceed to payment: Owner information is missing."
+                        );
+                        return;
+                      }
+                      navigateToCheckout(
+                        selectedRentalRequest?.id,
+                        parseFloat(selectedListing.costPerHour),
+                        parseFloat(selectedRentalRequest.rentalHours),
+                        ownerIdForCheckout
+                      );
+                    }}
+                    style={[
+                      styles.proceedToPayButton,
+                      { marginTop: 20, backgroundColor: "#38a169" },
+                    ]}
+                    accessibilityLabel="Proceed to Pay"
                     accessibilityRole="button"
-                >
-                    <Text style={styles.proceedToPayButtonText}>Open Chat</Text>
-                </TouchableOpacity>
+                    disabled={isProcessingPayment}
+                  >
+                    {isProcessingPayment ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.proceedToPayButtonText}>
+                        Proceed to Pay
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
 
+                <TouchableOpacity
+                  onPress={() => {
+                    setActiveRentalModalVisible(false);
+                    setMessagesModalVisible(true);
+                  }}
+                  style={[
+                    styles.proceedToPayButton,
+                    { marginTop: 20, backgroundColor: "#3182ce" },
+                  ]}
+                  accessibilityLabel="Open Chat with Owner"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.proceedToPayButtonText}>Open Chat</Text>
+                </TouchableOpacity>
               </ScrollView>
             ) : (
               <ActivityIndicator size="large" color="#3182ce" />
@@ -2087,7 +2609,6 @@ const renter = () => {
                 <TouchableOpacity
                   style={styles.listingCard}
                   onPress={() => {
-                    // Navigate to home.js with the listingId (if available)
                     const listingId =
                       selectedPastRental.listingId ||
                       selectedPastRental.listing.id;
@@ -2141,20 +2662,23 @@ const renter = () => {
               selectedPastRental?.rentalHours &&
               !isNaN(parseFloat(selectedPastRental.listing.costPerHour)) ? (
                 (() => {
-                  const costPerHour = parseFloat(selectedPastRental.listing.costPerHour) || 0;
+                  const costPerHour =
+                    parseFloat(selectedPastRental.listing.costPerHour) || 0;
                   const hours = parseFloat(selectedPastRental.rentalHours) || 0;
                   const pastCost = calculateTotalCost(costPerHour, hours);
                   return (
                     <View style={{ marginTop: 8 }}>
                       <Text style={styles.detailValue}>
-                        Rental Cost (${costPerHour}/hr * {selectedPastRental.rentalHours} hours): $
+                        Rental Cost (${costPerHour}/hr *{" "}
+                        {selectedPastRental.rentalHours} hours): $
                         {safeToFixed(pastCost.rentalCost)}
                       </Text>
                       <Text style={styles.detailValue}>
                         Booking Fee (6%): ${safeToFixed(pastCost.bookingFee)}
                       </Text>
                       <Text style={styles.detailValue}>
-                        Transaction Fee (3%): ${safeToFixed(pastCost.transactionFee)}
+                        Transaction Fee (3%): $
+                        {safeToFixed(pastCost.transactionFee)}
                       </Text>
                       <Text style={styles.detailValue}>
                         Sales Tax (8.25%): ${safeToFixed(pastCost.salesTax)}
@@ -2187,7 +2711,10 @@ const renter = () => {
           style={styles.modalContainer}
         >
           <View style={styles.modalContent}>
-            <ModalHeader title="FAQ" onClose={() => setFaqModalVisible(false)} />
+            <ModalHeader
+              title="FAQ"
+              onClose={() => setFaqModalVisible(false)}
+            />
             <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
               <Text>FAQ content goes here.</Text>
             </ScrollView>
@@ -2215,8 +2742,18 @@ const renter = () => {
             alignItems: "center",
           }}
         >
-          <View style={{ width: "88%", backgroundColor: "#fff", borderRadius: 8, padding: 24 }}>
-            <ModalHeader title="Invest in Ready Set Fly?" onClose={() => setInvestModalVisible(false)} />
+          <View
+            style={{
+              width: "88%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+            }}
+          >
+            <ModalHeader
+              title="Invest in Ready Set Fly?"
+              onClose={() => setInvestModalVisible(false)}
+            />
             <Text style={{ marginBottom: 16 }}>
               Interested in investing in Ready Set Fly? Contact us at{" "}
               <Text
@@ -2231,7 +2768,11 @@ const renter = () => {
               </Text>{" "}
               for more details.
             </Text>
-            <CustomButton onPress={() => setInvestModalVisible(false)} title="Close" backgroundColor="#3182ce" />
+            <CustomButton
+              onPress={() => setInvestModalVisible(false)}
+              title="Close"
+              backgroundColor="#3182ce"
+            />
           </View>
         </View>
       </Modal>
@@ -2251,30 +2792,57 @@ const renter = () => {
             alignItems: "center",
           }}
         >
-          <View style={{ width: "88%", backgroundColor: "#fff", borderRadius: 8, padding: 24, maxHeight: "80%" }}>
-            <ModalHeader title="Privacy Policy & Sensitive Data Policy" onClose={() => setPrivacyModalVisible(false)} />
+          <View
+            style={{
+              width: "88%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 24,
+              maxHeight: "80%",
+            }}
+          >
+            <ModalHeader
+              title="Privacy Policy & Sensitive Data Policy"
+              onClose={() => setPrivacyModalVisible(false)}
+            />
             <ScrollView style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>Effective Date: March 17th, 2025</Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application. We are committed to protecting your personal data and ensuring your privacy.
+                Effective Date: March 17th, 2025
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                1. Information We Collect: We may collect personal information, such as your name, email address, contact details, and usage data. Sensitive data is handled with strict security measures.
+                This Privacy Policy explains how we collect, use, disclose, and
+                safeguard your information when you use our application. We are
+                committed to protecting your personal data and ensuring your
+                privacy.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                2. How We Use Your Information: Your data is used to provide and improve our services, communicate with you, and comply with legal obligations.
+                1. Information We Collect: We may collect personal information,
+                such as your name, email address, contact details, and usage
+                data. Sensitive data is handled with strict security measures.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                3. Data Sharing and Disclosure: We do not sell your personal data. Information may be shared with trusted partners only as necessary to perform services or as required by law.
+                2. How We Use Your Information: Your data is used to provide and
+                improve our services, communicate with you, and comply with
+                legal obligations.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                4. Security: We implement a variety of security measures to maintain the safety of your personal information.
+                3. Data Sharing and Disclosure: We do not sell your personal
+                data. Information may be shared with trusted partners only as
+                necessary to perform services or as required by law.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                5. Your Rights: You have the right to access, update, or request deletion of your personal information. Please contact us to exercise these rights.
+                4. Security: We implement a variety of security measures to
+                maintain the safety of your personal information.
               </Text>
               <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                6. Changes to This Policy: We may update this Privacy Policy from time to time. Any changes will be posted in the application.
+                5. Your Rights: You have the right to access, update, or request
+                deletion of your personal information. Please contact us to
+                exercise these rights.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 8 }}>
+                6. Changes to This Policy: We may update this Privacy Policy
+                from time to time. Any changes will be posted in the
+                application.
               </Text>
             </ScrollView>
             <CustomButton
@@ -2287,11 +2855,116 @@ const renter = () => {
         </View>
       </Modal>
 
-      {/* Floating Chat Bubble Icon */}
+      <Modal
+        visible={chatListModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setChatListModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "#fff",
+              borderRadius: 8,
+              padding: 20,
+              maxHeight: "80%",
+            }}
+          >
+            <ModalHeader
+              title="Your Chats"
+              onClose={() => setChatListModalVisible(false)}
+            />
+            <FlatList
+              data={chatThreads.filter(
+                (thread) => !pendingDeletion || thread.id !== pendingDeletion.id
+              )}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => {
+                const otherParticipant =
+                  Array.isArray(item.participants) &&
+                  item.participants.find((p) => p !== renterId);
+                return (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingVertical: 12,
+                      borderBottomWidth: 1,
+                      borderColor: "#e2e8f0",
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        setChatListModalVisible(false);
+                        openMessageModal(item.id);
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, fontWeight: "bold" }}>
+                        Chat with{" "}
+                        <ParticipantName
+                          participantId={otherParticipant || "Unknown"}
+                        />
+                      </Text>
+                      <ParticipantDate
+                        participantId={otherParticipant || "Unknown"}
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handleDeleteChatThread(item)}
+                    >
+                      <Text
+                        style={{ color: "red", fontSize: 14, marginLeft: 8 }}
+                      >
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }}
+            />
+
+            {pendingDeletion && (
+              <View style={{ marginTop: 16, alignItems: "center" }}>
+                <Text style={{ color: "#2d3748", marginBottom: 8 }}>
+                  Chat deleted.
+                </Text>
+                <TouchableOpacity onPress={handleUndoDelete}>
+                  <Text style={{ color: "#3182ce", fontSize: 16 }}>Undo</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <CustomButton
+              onPress={() => {
+                setChatListModalVisible(false);
+                openMessageModal();
+              }}
+              title="Start New Chat"
+              backgroundColor="#3182ce"
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <TouchableOpacity
         style={styles.chatBubbleIcon}
-        onPress={toggleMessagesModal}
-        accessibilityLabel="Open messages"
+        onPress={async () => {
+          await fetchChatThreads();
+          setChatListModalVisible(true);
+        }}
+        accessibilityLabel="Open chat list"
         accessibilityRole="button"
       >
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />

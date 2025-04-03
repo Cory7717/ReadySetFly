@@ -125,7 +125,7 @@ const migrateAirplanesFields = async () => {
           if (!isNaN(parsedValue)) {
             updates[field] = parsedValue;
           } else {
-              console.warn(`⚠️ Invalid number format for field '${field}' in airplane ${docSnap.id}. Value: "${data[field]}". Skipping conversion.`);
+            console.warn(`⚠️ Invalid number format for field '${field}' in airplane ${docSnap.id}. Value: "${data[field]}". Skipping conversion.`);
           }
         }
       });
@@ -133,7 +133,6 @@ const migrateAirplanesFields = async () => {
       if (Object.keys(updates).length > 0) {
         batch.update(docSnap.ref, updates);
         updateCount += 1;
-        // console.log(`🛠️ Prepared number conversion for fields in airplane ID: ${docSnap.id}`); // Reduce log noise
       }
     }
 
@@ -181,14 +180,14 @@ const migrateRentalRequestIds = async () => {
         const rentalRequestId = data.rentalRequestId;
 
         if (!rentalRequestId || typeof rentalRequestId !== 'string' || rentalRequestId.trim() === '' || rentalRequestId !== documentId) {
-             if (!rentalRequestId || typeof rentalRequestId !== 'string' || rentalRequestId.trim() === '') {
-                 console.log(`📝 Setting missing/invalid rentalRequestId for document ID: ${documentId} under owner: ${ownerId}`);
-                 updateCount++;
-             } else { // rentalRequestId !== documentId
-                 console.log(`🔄 Fixing mismatched rentalRequestId for document ID: ${documentId} under owner: ${ownerId} (was: ${rentalRequestId})`);
-                 mismatchCount++;
-             }
-             batch.update(docSnap.ref, { rentalRequestId: documentId });
+          if (!rentalRequestId || typeof rentalRequestId !== 'string' || rentalRequestId.trim() === '') {
+            console.log(`📝 Setting missing/invalid rentalRequestId for document ID: ${documentId} under owner: ${ownerId}`);
+            updateCount++;
+          } else {
+            console.log(`🔄 Fixing mismatched rentalRequestId for document ID: ${documentId} under owner: ${ownerId} (was: ${rentalRequestId})`);
+            mismatchCount++;
+          }
+          batch.update(docSnap.ref, { rentalRequestId: documentId });
         }
       }
     }
@@ -207,7 +206,6 @@ const migrateRentalRequestIds = async () => {
     console.error('❌ Error migrating rentalRequestId fields in subcollections:', error);
   }
 };
-
 
 /**
  * Fix numeric fields (rentalHours, rentalCostPerHour) in 'rentalRequests' subcollections using collectionGroup.
@@ -233,31 +231,29 @@ const fixRentalHoursAndCostPerHour = async () => {
       let docNeedsUpdate = false;
 
       fieldsToFix.forEach(field => {
-          const currentValue = data[field];
-          let newValue = null;
+        const currentValue = data[field];
+        let newValue = null;
 
-          if (currentValue === undefined || currentValue === null) {
-              newValue = 0;
-              // console.log(`📝 Setting missing ${field} to 0 for Rental Request ${docSnap.ref.path}`); // Reduce noise
-          } else if (typeof currentValue === 'string') {
-              const parsedValue = parseFloat(currentValue);
-              if (!isNaN(parsedValue)) {
-                  newValue = parsedValue;
-                  // console.log(`🔄 Converted ${field} from string to number for Rental Request ${docSnap.ref.path}`); // Reduce noise
-              } else {
-                  newValue = 0;
-                  console.log(`⚠️ Invalid ${field} string format ("${currentValue}"). Setting to 0 for Rental Request ${docSnap.ref.path}`);
-              }
-          } else if (typeof currentValue !== 'number') {
-              newValue = 0;
-              console.log(`⚠️ Unexpected type (${typeof currentValue}) for ${field}. Setting to 0 for Rental Request ${docSnap.ref.path}`);
+        if (currentValue === undefined || currentValue === null) {
+          newValue = 0;
+        } else if (typeof currentValue === 'string') {
+          const parsedValue = parseFloat(currentValue);
+          if (!isNaN(parsedValue)) {
+            newValue = parsedValue;
+          } else {
+            newValue = 0;
+            console.log(`⚠️ Invalid ${field} string format ("${currentValue}"). Setting to 0 for Rental Request ${docSnap.ref.path}`);
           }
+        } else if (typeof currentValue !== 'number') {
+          newValue = 0;
+          console.log(`⚠️ Unexpected type (${typeof currentValue}) for ${field}. Setting to 0 for Rental Request ${docSnap.ref.path}`);
+        }
 
-          if (newValue !== null && newValue !== currentValue) {
-              updates[field] = newValue;
-              fieldsUpdatedCount++;
-              docNeedsUpdate = true;
-          }
+        if (newValue !== null && newValue !== currentValue) {
+          updates[field] = newValue;
+          fieldsUpdatedCount++;
+          docNeedsUpdate = true;
+        }
       });
 
       if (docNeedsUpdate) {
@@ -298,32 +294,30 @@ const fixRentalCostFields = async () => {
       const updates = {};
       let docNeedsUpdate = false;
 
-       fields.forEach((field) => {
-          const currentValue = data[field];
-          let newValue = null;
+      fields.forEach((field) => {
+        const currentValue = data[field];
+        let newValue = null;
 
-          if (currentValue === undefined || currentValue === null) {
-              newValue = 0;
-              // console.log(`📝 Setting missing ${field} to 0 for rentalRequest ${docSnap.id}`); // Reduce noise
-          } else if (typeof currentValue === 'string') {
-              const parsedValue = parseFloat(currentValue);
-              if (!isNaN(parsedValue)) {
-                  newValue = parsedValue;
-                  // console.log(`🔄 Converted ${field} from string to number for rentalRequest ${docSnap.id}`); // Reduce noise
-              } else {
-                  newValue = 0;
-                  console.log(`⚠️ Invalid ${field} string format ("${currentValue}"). Setting to 0 for rentalRequest ${docSnap.id}`);
-              }
-          } else if (typeof currentValue !== 'number') {
-              newValue = 0;
-              console.log(`⚠️ Unexpected type (${typeof currentValue}) for ${field}. Setting to 0 for rentalRequest ${docSnap.id}`);
+        if (currentValue === undefined || currentValue === null) {
+          newValue = 0;
+        } else if (typeof currentValue === 'string') {
+          const parsedValue = parseFloat(currentValue);
+          if (!isNaN(parsedValue)) {
+            newValue = parsedValue;
+          } else {
+            newValue = 0;
+            console.log(`⚠️ Invalid ${field} string format ("${currentValue}"). Setting to 0 for rentalRequest ${docSnap.id}`);
           }
+        } else if (typeof currentValue !== 'number') {
+          newValue = 0;
+          console.log(`⚠️ Unexpected type (${typeof currentValue}) for ${field}. Setting to 0 for rentalRequest ${docSnap.id}`);
+        }
 
-           if (newValue !== null && newValue !== currentValue) {
-              updates[field] = newValue;
-              fieldsUpdatedCount++;
-              docNeedsUpdate = true;
-          }
+        if (newValue !== null && newValue !== currentValue) {
+          updates[field] = newValue;
+          fieldsUpdatedCount++;
+          docNeedsUpdate = true;
+        }
       });
 
       if (docNeedsUpdate) {
@@ -342,18 +336,18 @@ const fixRentalCostFields = async () => {
 };
 
 /**
- * Update paymentStatus in top-level "rentalRequests" if rentalStatus is approved and paymentStatus needs update.
+ * Update paymentStatus in top-level "rentalRequests" if status is approved and paymentStatus needs update.
  */
 const updatePaymentStatusInRentalRequests = async () => {
   console.log('🔄 Starting migration to update paymentStatus in top-level rentalRequests...');
   try {
     const rentalRequestsRef = db.collection('rentalRequests');
     const snapshot = await rentalRequestsRef
-        .where('rentalStatus', '==', 'approved')
+        .where('status', '==', 'approved')
         .get();
 
     if (snapshot.empty) {
-      console.log('ℹ️ No rentalRequests found with rentalStatus="approved".');
+      console.log('ℹ️ No rentalRequests found with status="approved".');
       return;
     }
     const batch = db.batch();
@@ -394,7 +388,7 @@ const migrateNotificationsToActive = async () => {
     }
     let totalNotificationsProcessed = 0;
     let notificationsDeleted = 0;
-    let rentalStatusUpdatedCount = 0;
+    let statusUpdatedCount = 0;
 
     for (const renterDoc of rentersSnapshot.docs) {
       const renterId = renterDoc.id;
@@ -428,9 +422,9 @@ const migrateNotificationsToActive = async () => {
             const paymentCompleted = rentalData.paymentStatus === "succeeded" || rentalData.paymentStatus === "completed";
 
             if (paymentCompleted) {
-                if (rentalData.rentalStatus !== "active") {
-                    await rentalRequestRef.update({ rentalStatus: "active" });
-                    rentalStatusUpdatedCount++;
+                if (rentalData.status !== "active") {
+                    await rentalRequestRef.update({ status: "active" });
+                    statusUpdatedCount++;
                     console.log(`🛠️ Updated rental request ${rentalRequestId} status to 'active'.`);
                 }
                 await notifDoc.ref.delete();
@@ -441,18 +435,17 @@ const migrateNotificationsToActive = async () => {
         } catch (innerError) {
              console.error(`❌ Error processing notification ${notifDoc.ref.path} or rental request ${rentalRequestId}:`, innerError);
         }
-      } // end loop notifications
+      }
     } // end loop renters
 
     console.log('\n=== Notification Migration Summary ===');
     console.log(`Processed ${totalNotificationsProcessed} notifications.`);
-    console.log(`Updated ${rentalStatusUpdatedCount} rental requests to 'active'.`);
+    console.log(`Updated ${statusUpdatedCount} rental requests to 'active'.`);
     console.log(`Deleted ${notificationsDeleted} notifications.`);
   } catch (error) {
     console.error('❌ Error migrating notifications:', error);
   }
 };
-
 
 /**
  * Add a Stripe Express account ID to each owner in 'owners' collection if missing.
@@ -485,17 +478,17 @@ const addStripeAccountIdToOwners = async () => {
       try {
         console.log(`🛠️ ${logPrefix}: Creating Stripe Connected Account...`);
         const account = await stripe.accounts.create({
-          type: "express",
-          country: "US",
+          type: 'express',
+          country: 'US',
           email: ownerData.email.trim(),
           metadata: {
             ownerId: ownerId,
             firestoreDocPath: ownerDoc.ref.path,
             fullName: ownerData.fullName || '',
           },
-          capabilities: {
-                card_payments: {requested: true},
-                transfers: {requested: true},
+          capabilities: { 
+            transfers: { requested: true },
+            card_payments: { requested: true }
           },
         });
 
@@ -575,7 +568,6 @@ const syncStripeAccountIdFromOwnersToUsers = async () => {
           { merge: true }
         );
         updateCount++;
-        // console.log(`✅ Prepared sync for user ${userId} with stripeAccountId: ${ownerData.stripeAccountId}`); // Reduce noise
       }
     }
 
@@ -585,7 +577,6 @@ const syncStripeAccountIdFromOwnersToUsers = async () => {
     } else {
       console.log('✅ No owner documents required Stripe ID synchronization to users.');
     }
-    // Note: notFoundCount logic was commented out as set({merge:true}) handles creation.
   } catch (error) {
     console.error('❌ Error synchronizing stripeAccountId from owners to users:', error);
   }
@@ -665,7 +656,6 @@ const updateProfileTypeToBoth = async () => {
   }
 };
 
-
 /**
  * Migrate top-level "rentalRequests" fields needed by renter view, ensuring they are strings.
  */
@@ -683,8 +673,8 @@ const migrateRenterRentalRequestsFields = async () => {
     const fieldsToEnsureString = [
       'address', 'aircraftType', 'certifications', 'contact', 'currentLocation',
       'email', 'fcmToken', 'fullName', 'listingId', 'name',
-      'rentalPeriod', 'renterId', 'status', // 'totalCost' conversion depends on usage, keep as number?
-      'rentalDate', 'rentalStatus', 'ownerId'
+      'rentalPeriod', 'renterId', 'status', // using status instead of rentalStatus
+      'rentalDate', 'status', 'ownerId'
     ];
     const numericFields = ['totalCost']; // Fields that should likely remain numbers
 
@@ -699,10 +689,8 @@ const migrateRenterRentalRequestsFields = async () => {
 
         if (currentValue === undefined || currentValue === null) {
            newValue = "";
-           // console.log(`📝 Setting missing field '${field}' to "" in rentalRequest ${docSnap.id}.`); // Reduce noise
         } else if (typeof currentValue !== 'string') {
            newValue = String(currentValue);
-           // console.log(`🔄 Converted field '${field}' in rentalRequest ${docSnap.id} to string (was ${typeof currentValue}).`); // Reduce noise
         }
 
         if (newValue !== null) {
@@ -712,7 +700,6 @@ const migrateRenterRentalRequestsFields = async () => {
         }
       });
 
-       // Add check for numeric fields if needed (example: ensure totalCost is number)
        numericFields.forEach(field => {
            const currentValue = data[field];
            let newValue = null;
@@ -722,11 +709,11 @@ const migrateRenterRentalRequestsFields = async () => {
                     newValue = parsed;
                     console.log(`🔄 Converted field '${field}' in rentalRequest ${docSnap.id} back to number.`);
                 } else {
-                    newValue = 0; // Or handle error differently
+                    newValue = 0;
                     console.log(`⚠️ Could not convert field '${field}' to number in rentalRequest ${docSnap.id}. Setting to 0.`);
                 }
            } else if (currentValue === undefined) {
-               newValue = 0; // Default missing numeric fields to 0
+               newValue = 0;
            }
            if (newValue !== null && newValue !== currentValue) {
               updates[field] = newValue;
@@ -734,7 +721,6 @@ const migrateRenterRentalRequestsFields = async () => {
               docNeedsUpdate = true;
           }
        });
-
 
       if (docNeedsUpdate) {
         batch.update(docSnap.ref, updates);
@@ -751,7 +737,6 @@ const migrateRenterRentalRequestsFields = async () => {
     console.error('❌ Error migrating renter rentalRequests fields:', error);
   }
 };
-
 
 /**
  * Migrate 'listings' where category="Flight Schools": Move details into flightSchoolDetails object.
@@ -820,7 +805,6 @@ const migrateFlightSchoolFields = async () => {
   }
 };
 
-
 /**
  * Ensure 'listings' where category="Flight Instructors" have a 'profileImage' field (string).
  */
@@ -858,10 +842,116 @@ const migrateClassifiedsProfileImageField = async () => {
   }
 };
 
+/**
+ * Migrate top-level 'listings' for general field compliance (images, category, packageType, createdAt, publiclyViewable).
+ */
+const migrateClassifiedsListings = async () => {
+  console.log('🔄 Starting migration for general field compliance in "listings" collection...');
+  try {
+    const listingsRef = db.collection('listings');
+    const snapshot = await listingsRef.get();
+    if (snapshot.empty) {
+      console.log('ℹ️ No documents found in "listings" collection.');
+      return;
+    }
+
+    const batch = db.batch();
+    let updatedDocsCount = 0;
+    let fieldsFixedCount = 0;
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      const docRef = docSnap.ref;
+      const updates = {};
+      let needsUpdate = false;
+
+      // Ensure 'images' is an array
+      if (!Array.isArray(data.images)) {
+        updates.images = [];
+        needsUpdate = true;
+        fieldsFixedCount++;
+        console.log(`🛠️ Resetting 'images' to array for listing ${docRef.id}`);
+      }
+      // Ensure 'category' is a non-empty string
+      if (!data.category || typeof data.category !== 'string' || data.category.trim() === '') {
+        updates.category = 'Uncategorized';
+        needsUpdate = true;
+        fieldsFixedCount++;
+         console.log(`🛠️ Setting 'category' to 'Uncategorized' for listing ${docRef.id}`);
+      }
+      // Ensure 'packageType' is a non-empty string
+      if (!data.packageType || typeof data.packageType !== 'string' || data.packageType.trim() === '') {
+        updates.packageType = 'Basic';
+        needsUpdate = true;
+        fieldsFixedCount++;
+        console.log(`🛠️ Setting 'packageType' to 'Basic' for listing ${docRef.id}`);
+      }
+      // Ensure 'createdAt' is a Firestore Timestamp
+      if (!(data.createdAt instanceof admin.firestore.Timestamp)) {
+         console.warn(`⚠️ Listing ${docRef.id} has invalid 'createdAt'. Setting to server timestamp.`);
+         updates.createdAt = admin.firestore.FieldValue.serverTimestamp();
+         needsUpdate = true;
+         fieldsFixedCount++;
+      }
+      // Ensure 'publiclyViewable' is a boolean
+      if (typeof data.publiclyViewable !== 'boolean') {
+         updates.publiclyViewable = true; // Default to true
+         needsUpdate = true;
+         fieldsFixedCount++;
+          console.log(`🛠️ Setting 'publiclyViewable' to true for listing ${docRef.id}`);
+      }
+
+      if (needsUpdate) {
+        batch.update(docRef, updates);
+        updatedDocsCount++;
+      }
+    }
+
+    if (updatedDocsCount > 0) {
+      await batch.commit();
+      console.log(`🎉 Successfully updated ${updatedDocsCount} listing(s) fixing ${fieldsFixedCount} fields for general compliance.`);
+    } else {
+      console.log('✅ All listings already meet general field compliance checks.');
+    }
+  } catch (error) {
+    console.error('❌ Error migrating "listings" for general compliance:', error);
+  }
+};
 
 /**
- * Ensure 'messages' have a 'participants' array including owner & renter from the related rentalRequest.
+ * Migrate Charter Services Data from JSON file to 'charterServices' collection.
  */
+
+
+/**
+ * Migrate Charter Services fields within the 'listings' collection.
+ * For listings with category "Charter Services", move:
+ *   - charterServiceAreas
+ *   - charterServiceDescription
+ *   - charterServiceEmail
+ *   - charterServiceLocation
+ *   - charterServiceName
+ *   - charterServicePhone
+ * into a nested map called charterServiceDetails, and remove the top-level fields.
+ */
+
+/**
+ * Migrate messages to ensure 'participants' array includes owner and renter.
+ */
+
+/**
+ * Ensure each 'airplanes' document includes its own doc ID in the 'id' field.
+ */
+
+/**
+ * Migrate 'listings' collection for general field compliance (images, category, packageType, createdAt, publiclyViewable).
+ */
+
+/**
+ * Migrate Charter Services Data from JSON file to 'charterServices' collection.
+ */
+
+
 const migrateMessagesParticipants = async () => {
   console.log('🔄 Starting migration for messages participants...');
   try {
@@ -937,7 +1027,6 @@ const migrateMessagesParticipants = async () => {
   }
 };
 
-
 /**
  * Ensure each 'airplanes' document includes its own doc ID in the 'id' field.
  */
@@ -970,7 +1059,6 @@ const migrateAirplaneDocumentIds = async () => {
     console.error('❌ Error migrating airplane document IDs:', error);
   }
 };
-
 
 /**
  * Clean up orphaned listings in 'UserPost' collection and associated images in Storage.
@@ -1007,8 +1095,6 @@ const cleanupOrphanedListings = async () => {
             }
          } catch (ownerCheckError) {
               console.error(`❌ Error checking owner ${ownerId} for listing ${listingDoc.ref.path}:`, ownerCheckError);
-              // Consider skipping instead of assuming orphaned on error
-              // isOrphaned = true;
          }
       }
 
@@ -1074,206 +1160,14 @@ const cleanupOrphanedListings = async () => {
   }
 };
 
+/**
+ * Migrate 'listings' collection for general field compliance (images, category, packageType, createdAt, publiclyViewable).
+ */
+
 
 /**
- * Migrate the 'listings' collection for general field compliance (images, category, packageType, createdAt, publiclyViewable).
+ * Audit and Dynamic Schema Management Functions
  */
-const migrateClassifiedsListings = async () => {
-  console.log('🔄 Starting migration for general field compliance in "listings" collection...');
-  try {
-    const listingsRef = db.collection('listings');
-    const snapshot = await listingsRef.get();
-    if (snapshot.empty) {
-      console.log('ℹ️ No documents found in "listings" collection.');
-      return;
-    }
-
-    const batch = db.batch();
-    let updatedDocsCount = 0;
-    let fieldsFixedCount = 0;
-
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data();
-      const docRef = docSnap.ref;
-      const updates = {};
-      let needsUpdate = false;
-
-      // Ensure 'images' is an array
-      if (!Array.isArray(data.images)) {
-        updates.images = []; needsUpdate = true; fieldsFixedCount++;
-        console.log(`🛠️ Resetting 'images' to array for listing ${docRef.id}`);
-      }
-      // Ensure 'category' is a non-empty string
-      if (!data.category || typeof data.category !== 'string' || data.category.trim() === '') {
-        updates.category = 'Uncategorized'; needsUpdate = true; fieldsFixedCount++;
-         console.log(`🛠️ Setting 'category' to 'Uncategorized' for listing ${docRef.id}`);
-      }
-      // Ensure 'packageType' is a non-empty string
-      if (!data.packageType || typeof data.packageType !== 'string' || data.packageType.trim() === '') {
-        updates.packageType = 'Basic'; needsUpdate = true; fieldsFixedCount++;
-        console.log(`🛠️ Setting 'packageType' to 'Basic' for listing ${docRef.id}`);
-      }
-      // Ensure 'createdAt' is a Firestore Timestamp
-      if (!(data.createdAt instanceof admin.firestore.Timestamp)) {
-         console.warn(`⚠️ Listing ${docRef.id} has invalid 'createdAt'. Setting to server timestamp.`);
-         updates.createdAt = admin.firestore.FieldValue.serverTimestamp();
-         needsUpdate = true; fieldsFixedCount++;
-      }
-      // Ensure 'publiclyViewable' is a boolean
-      if (typeof data.publiclyViewable !== 'boolean') {
-         updates.publiclyViewable = true; // Default to true
-         needsUpdate = true; fieldsFixedCount++;
-          console.log(`🛠️ Setting 'publiclyViewable' to true for listing ${docRef.id}`);
-      }
-
-      if (needsUpdate) {
-        batch.update(docRef, updates);
-        updatedDocsCount++;
-      }
-    }
-
-    if (updatedDocsCount > 0) {
-      await batch.commit();
-      console.log(`🎉 Successfully updated ${updatedDocsCount} listing(s) fixing ${fieldsFixedCount} fields for general compliance.`);
-    } else {
-      console.log('✅ All listings already meet general field compliance checks.');
-    }
-  } catch (error) {
-    console.error('❌ Error migrating "listings" for general compliance:', error);
-  }
-};
-
-// This function is redundant if migrateClassifiedsListings ensures the publiclyViewable field.
-// Kept for reference but commented out from execution flow.
-/**
- * DEPRECATED by migrateClassifiedsListings: Ensure 'publiclyViewable' field exists and is boolean.
- */
-/*
-const addPubliclyViewableFieldToListings = async () => {
-  console.log('🔄 Starting migration to add "publiclyViewable: true" to "listings" collection...');
-  try {
-    const listingsRef = db.collection('listings');
-    const snapshot = await listingsRef.get();
-    if (snapshot.empty) {
-      console.log('ℹ️ No documents found in "listings" to update.');
-      return;
-    }
-    const batch = db.batch();
-    let updateCount = 0;
-    snapshot.docs.forEach((docSnap) => {
-      const data = docSnap.data();
-      if (typeof data.publiclyViewable !== 'boolean') {
-        batch.update(docSnap.ref, { publiclyViewable: true });
-        updateCount++;
-        console.log(`🛠️ Setting publiclyViewable: true for listing ${docSnap.id}`);
-      }
-    });
-    if (updateCount > 0) {
-      await batch.commit();
-      console.log(`🎉 Successfully updated ${updateCount} listings to have publiclyViewable: true`);
-    } else {
-      console.log('✅ All listings already have a publiclyViewable boolean field set.');
-    }
-  } catch (error) {
-    console.error('❌ Error adding publiclyViewable field to listings:', error);
-  }
-};
-*/
-
-/**
- * Migrate Charter Services Data from JSON file to 'charterServices' collection.
- */
-const migrateCharterServicesData = async () => {
-  console.log('🔄 Starting migration for Charter Services data...');
-  const charterServicesFilePath = path.join(__dirname, 'charterServicesData.json');
-
-  if (!fs.existsSync(charterServicesFilePath)) {
-    console.warn('⚠️ charterServicesData.json file not found. Skipping Charter Services data migration.');
-    return;
-  }
-
-  try {
-    const fileContent = fs.readFileSync(charterServicesFilePath, 'utf-8');
-    const charterServicesData = JSON.parse(fileContent);
-
-    if (!Array.isArray(charterServicesData)) {
-      console.error('❌ Invalid format: charterServicesData.json should contain an array of records.');
-      return;
-    }
-
-    const batch = db.batch();
-    const collectionRef = db.collection('charterServices');
-    let count = 0;
-
-    for (const record of charterServicesData) {
-      let docRef;
-      let docId;
-
-      if (record.id && typeof record.id === 'string' && record.id.trim() !== '') {
-        docId = record.id.trim();
-        docRef = collectionRef.doc(docId);
-      } else {
-        docRef = collectionRef.doc();
-        docId = docRef.id;
-        console.log(`ℹ️ Record missing valid 'id'. Generated new document ID: ${docId}`);
-      }
-
-      const firestoreData = {
-        id: docId,
-        companyName: typeof record.companyName === 'string' ? record.companyName.trim() : '',
-        servicesOffered: typeof record.servicesOffered === 'string' ? record.servicesOffered.trim() : '',
-        contactInfo: {
-          email: typeof record.contactInfo?.email === 'string' ? record.contactInfo.email.trim() : (typeof record.email === 'string' ? record.email.trim() : ''),
-          phone: typeof record.contactInfo?.phone === 'string' ? record.contactInfo.phone.trim() : (typeof record.phone === 'string' ? record.phone.trim() : ''),
-          website: typeof record.contactInfo?.website === 'string' ? record.contactInfo.website.trim() : (typeof record.website === 'string' ? record.website.trim() : ''),
-        },
-        location: {
-          address: typeof record.location?.address === 'string' ? record.location.address.trim() : (typeof record.address === 'string' ? record.address.trim() : ''),
-          city: typeof record.location?.city === 'string' ? record.location.city.trim() : '',
-          state: typeof record.location?.state === 'string' ? record.location.state.trim() : '',
-          zipCode: typeof record.location?.zipCode === 'string' ? record.location.zipCode.trim() : '',
-          country: typeof record.location?.country === 'string' ? record.location.country.trim() : 'US',
-        },
-        aircraftTypes: Array.isArray(record.aircraftTypes)
-          ? record.aircraftTypes
-              .map(item => typeof item === 'string' ? item.trim() : null)
-              .filter(item => item !== null && item !== '')
-          : [],
-        description: typeof record.description === 'string' ? record.description.trim() : '',
-        migratedAt: admin.firestore.FieldValue.serverTimestamp(),
-        // createdAt: admin.firestore.FieldValue.serverTimestamp(), // Uncomment if overwrite desired
-      };
-
-      // Optional: Remove empty nested objects
-      if (Object.values(firestoreData.contactInfo).every(val => val === '')) {
-          delete firestoreData.contactInfo;
-      }
-      if (Object.values(firestoreData.location).every(val => val === '' || val === 'US')) {
-          delete firestoreData.location;
-      }
-
-      batch.set(docRef, firestoreData, { merge: true });
-      count++;
-    }
-
-    if (count > 0) {
-      await batch.commit();
-      console.log(`🎉 Successfully migrated/updated ${count} Charter Services record(s) to Firestore.`);
-    } else {
-      console.log('✅ No Charter Services records found in the JSON file.');
-    }
-  } catch (error) {
-    console.error('❌ Error migrating Charter Services data:', error);
-     if (error instanceof SyntaxError) {
-       console.error('   -> Check charterServicesData.json for JSON syntax errors.');
-    }
-  }
-};
-
-
-// ====================
-// Audit and Dynamic Schema Management Functions (Corrected for SyntaxError)
-// ====================
 
 /**
  * Recursively traverse a collection and its subcollections for audit.
@@ -1284,7 +1178,6 @@ const traverseCollection = async (collectionRef, parentPath = '') => {
 
   for (const doc of snapshot.docs) {
     const docData = doc.data();
-    // Construct full path including collection name
     const docPath = parentPath ? `${parentPath}/${collectionRef.id}/${doc.id}` : `${collectionRef.id}/${doc.id}`;
     const docInfo = {
       id: doc.id,
@@ -1295,16 +1188,15 @@ const traverseCollection = async (collectionRef, parentPath = '') => {
     };
 
     try {
-        const subcollections = await doc.ref.listCollections();
-        if (subcollections.length > 0) {
-            docInfo.subcollectionsData = {};
-            for (const subcol of subcollections) {
-                // Pass the document path as the new parent path for the subcollection
-                docInfo.subcollectionsData[subcol.id] = await traverseCollection(subcol, docPath);
-            }
+      const subcollections = await doc.ref.listCollections();
+      if (subcollections.length > 0) {
+        docInfo.subcollectionsData = {};
+        for (const subcol of subcollections) {
+          docInfo.subcollectionsData[subcol.id] = await traverseCollection(subcol, docPath);
         }
+      }
     } catch (subError) {
-        console.error(`❌ Error listing/traversing subcollections for ${docPath}:`, subError);
+      console.error(`❌ Error listing/traversing subcollections for ${docPath}:`, subError);
     }
     data.push(docInfo);
   }
@@ -1312,68 +1204,61 @@ const traverseCollection = async (collectionRef, parentPath = '') => {
 };
 
 /**
- * Analyze a document against its expected schema (handles subcollection paths).
+ * Analyze a document against its expected schema.
  */
 const analyzeDocument = (collectionPath, docData, docPath) => {
-    // Derive schema name from the potentially nested collection path
-    // e.g., "owners/docId/rentalRequests" -> schema name "rentalRequests"
-    // e.g., "users" -> schema name "users"
-    const pathSegments = collectionPath.split('/');
-    const schemaName = pathSegments[pathSegments.length - 1]; // Use the last segment as schema key
-    const schema = expectedSchemas[schemaName];
-    const issues = [];
+  const pathSegments = collectionPath.split('/');
+  const schemaName = pathSegments[pathSegments.length - 1];
+  const schema = expectedSchemas[schemaName];
+  const issues = [];
 
-    if (!schema) {
-        console.log(`🔍 Schema not found for '${schemaName}' (derived from path ${collectionPath}). Add to schemas.json?`);
-        return [`⚠️ Schema definition missing for '${schemaName}'`];
-    }
+  if (!schema) {
+    console.log(`🔍 Schema not found for '${schemaName}' (derived from path ${collectionPath}). Add to schemas.json?`);
+    return [`⚠️ Schema definition missing for '${schemaName}'`];
+  }
 
-    const expectedFields = schema.fields || {};
+  const expectedFields = schema.fields || {};
 
-    // Check for missing fields
-    for (const field in expectedFields) {
-        if (!(field in docData)) {
-            issues.push(`❗ Missing field '${field}' (expected type: ${expectedFields[field]})`);
-        } else {
-            // Check type mismatches
-            const expectedType = expectedFields[field];
-            const actualType = inferDataType(docData[field]);
+  for (const field in expectedFields) {
+    if (!(field in docData)) {
+      issues.push(`❗ Missing field '${field}' (expected type: ${expectedFields[field]})`);
+    } else {
+      const expectedType = expectedFields[field];
+      const actualType = inferDataType(docData[field]);
 
-            if (expectedType === 'timestamp') {
-                if (!(docData[field] instanceof admin.firestore.Timestamp)) {
-                    issues.push(`❗ Type mismatch for '${field}': expected 'timestamp', got '${actualType}' in ${docPath}`);
-                }
-            } else if (expectedType === 'geopoint') {
-                if (!(docData[field] instanceof admin.firestore.GeoPoint)) {
-                    issues.push(`❗ Type mismatch for '${field}': expected 'geopoint', got '${actualType}' in ${docPath}`);
-                }
-            } else if (expectedType === 'array') {
-                if (!Array.isArray(docData[field])) {
-                    issues.push(`❗ Type mismatch for '${field}': expected 'array', got '${actualType}' in ${docPath}`);
-                }
-            } else if (actualType !== expectedType && expectedType !== 'any') {
-                 if ((expectedType === 'integer' && actualType === 'number' && !Number.isInteger(docData[field]))) {
-                     issues.push(`❗ Type mismatch for '${field}': expected 'integer', got 'number' (float) in ${docPath}`);
-                 } else if (!(expectedType === 'integer' && actualType === 'number')) {
-                    issues.push(`❗ Type mismatch for '${field}': expected '${expectedType}', got '${actualType}' in ${docPath}`);
-                 }
-            }
+      if (expectedType === 'timestamp') {
+        if (!(docData[field] instanceof admin.firestore.Timestamp)) {
+          issues.push(`❗ Type mismatch for '${field}': expected 'timestamp', got '${actualType}' in ${docPath}`);
         }
-    }
-
-    // Check for unexpected fields
-    for (const field in docData) {
-        if (!(field in expectedFields)) {
-            issues.push(`⚠️ Unexpected field '${field}' (type: ${inferDataType(docData[field])}) in ${docPath}`);
+      } else if (expectedType === 'geopoint') {
+        if (!(docData[field] instanceof admin.firestore.GeoPoint)) {
+          issues.push(`❗ Type mismatch for '${field}': expected 'geopoint', got '${actualType}' in ${docPath}`);
         }
+      } else if (expectedType === 'array') {
+        if (!Array.isArray(docData[field])) {
+          issues.push(`❗ Type mismatch for '${field}': expected 'array', got '${actualType}' in ${docPath}`);
+        }
+      } else if (actualType !== expectedType && expectedType !== 'any') {
+         if ((expectedType === 'integer' && actualType === 'number' && !Number.isInteger(docData[field]))) {
+             issues.push(`❗ Type mismatch for '${field}': expected 'integer', got 'number' (float) in ${docPath}`);
+         } else if (!(expectedType === 'integer' && actualType === 'number')) {
+            issues.push(`❗ Type mismatch for '${field}': expected '${expectedType}', got '${actualType}' in ${docPath}`);
+         }
+      }
     }
+  }
 
-    return issues;
+  for (const field in docData) {
+    if (!(field in expectedFields)) {
+      issues.push(`⚠️ Unexpected field '${field}' (type: ${inferDataType(docData[field])}) in ${docPath}`);
+    }
+  }
+
+  return issues;
 };
 
-
 /**
- * Infer data type for schema comparison/generation.
+ * Infer data type for schema comparison.
  */
 const inferDataType = (value) => {
   if (value === null) return 'null';
@@ -1424,7 +1309,7 @@ const fixMissingFields = async (collectionPath, docRef, field) => {
 };
 
 /**
- * Remove unexpected fields (Use with caution!).
+ * Remove unexpected fields.
  */
 const removeUnexpectedFields = async (collectionPath, docRef, field) => {
   if (!docRef || typeof docRef.update !== 'function') {
@@ -1457,7 +1342,7 @@ const addFieldToSchema = async (collectionPath, field, value) => {
       const inferredType = inferDataType(value);
       expectedSchemas[schemaName].fields[field] = inferredType;
       console.log(`🆕 Added new field '${field}' (type: '${inferredType}') to schema for '${schemaName}'.`);
-      saveSchemas(); // Save updated schema immediately
+      saveSchemas();
   }
 };
 
@@ -1486,7 +1371,6 @@ const generateAuditReportAndFix = async () => {
     const processedCollectionPaths = new Set();
 
     for (const collection of rootCollections) {
-        // Start recursive processing from root collections
         await processCollectionForAudit(collection, '', report, processedCollectionPaths, {
              FIX_MISSING, ADD_UNEXPECTED_TO_SCHEMA, REMOVE_UNEXPECTED
          });
@@ -1515,13 +1399,11 @@ const generateAuditReportAndFix = async () => {
   }
 };
 
-
 /**
  * Helper function to process a single collection (and its subcollections) for the audit.
  */
-async function processCollectionForAudit(collectionRef, parentDocPath, report, processedPaths, flags) {
-    // Construct the collection path: e.g., "owners" or "owners/docId/rentalRequests"
-    const collectionPath = parentDocPath ? `${parentDocPath}/${collectionRef.id}` : collectionRef.id;
+async function processCollectionForAudit(collectionRef, parentPath, report, processedPaths, flags) {
+    const collectionPath = parentPath ? `${parentPath}/${collectionRef.id}` : collectionRef.id;
 
     if (processedPaths.has(collectionPath)) return;
     processedPaths.add(collectionPath);
@@ -1536,11 +1418,9 @@ async function processCollectionForAudit(collectionRef, parentDocPath, report, p
     const snapshot = await collectionRef.get();
 
     for (const doc of snapshot.docs) {
-        // Full document path: e.g., "owners/docId" or "owners/docId/rentalRequests/reqId"
         const docPath = `${collectionPath}/${doc.id}`;
         report.summary.totalDocuments += 1;
         const docData = doc.data();
-        // Analyze using the collection path to find the correct schema
         const issues = analyzeDocument(collectionPath, docData, docPath);
 
         if (issues.length > 0) {
@@ -1551,7 +1431,6 @@ async function processCollectionForAudit(collectionRef, parentDocPath, report, p
             });
             report.summary.totalIssues += issues.length;
 
-            // Use for...of to handle awaits correctly during fixes
             for (const issue of issues) {
                 const issueType = issue.split(':')[0].trim();
                 report.summary.issuesByType[issueType] = (report.summary.issuesByType[issueType] || 0) + 1;
@@ -1561,25 +1440,23 @@ async function processCollectionForAudit(collectionRef, parentDocPath, report, p
 
                 if (field) {
                     if (issue.startsWith('❗ Missing field') && flags.FIX_MISSING) {
-                        await fixMissingFields(collectionPath, doc.ref, field); // Pass collectionPath
+                        await fixMissingFields(collectionPath, doc.ref, field);
                     } else if (issue.startsWith('⚠️ Unexpected field')) {
                         if (flags.ADD_UNEXPECTED_TO_SCHEMA) {
-                            await addFieldToSchema(collectionPath, field, docData[field]); // Pass collectionPath
+                            await addFieldToSchema(collectionPath, field, docData[field]);
                         }
                         if (flags.REMOVE_UNEXPECTED) {
                             console.warn(`🔥 Removing unexpected field '${field}' from ${docPath} based on REMOVE_UNEXPECTED flag.`);
-                            await removeUnexpectedFields(collectionPath, doc.ref, field); // Pass collectionPath
+                            await removeUnexpectedFields(collectionPath, doc.ref, field);
                         }
                     }
                 }
             }
         }
 
-        // Process Subcollections Recursively
         try {
             const subcollections = await doc.ref.listCollections();
             for (const subcol of subcollections) {
-                // The new parent path for the subcollection is the current document's path
                 await processCollectionForAudit(subcol, docPath, report, processedPaths, flags);
             }
         } catch (subError) {
@@ -1587,7 +1464,6 @@ async function processCollectionForAudit(collectionRef, parentDocPath, report, p
         }
     }
 }
-
 
 // ====================
 // Execution Flow
@@ -1608,20 +1484,18 @@ const runMigrationsAndAudit = async () => {
   await updateUserRoleToBoth();
   await updateProfileTypeToBoth();
   await migrateRenterRentalRequestsFields();
-  // Combined listing migrations
   await migrateFlightSchoolFields();
   await migrateClassifiedsProfileImageField();
-  await migrateClassifiedsListings(); // Includes publiclyViewable check
-  // await addPubliclyViewableFieldToListings(); // Commented out as redundant
-  // Other migrations
+  await migrateClassifiedsListings();
   await migrateMessagesParticipants();
   await migrateAirplaneDocumentIds();
   await cleanupOrphanedListings();
-  await migrateCharterServicesData();
+  // await migrateCharterServicesData();
+  // await migrateCharterServicesFields(); // New migration to consolidate Charter Services fields
 
   // --- Perform Audit and Dynamic Schema Management ---
-   console.log('\n--- Running Firestore Audit & Fixes ---');
-   await generateAuditReportAndFix();
+  console.log('\n--- Running Firestore Audit & Fixes ---');
+  await generateAuditReportAndFix();
 
   console.log('\n🏁 Migration and Audit script completed.');
   process.exit(0); // Success

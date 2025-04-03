@@ -365,7 +365,8 @@
       "createdAt": "object",
       "stripeAccountStatus": "string",
       "phoneNumber": "string",
-      "stripeDetailsSubmitted": "null"
+      "stripeDetailsSubmitted": "null",
+      "fullName": "string"
     }
   },
   "your-collection": {

@@ -79,7 +79,8 @@ const formatPhoneNumber = (phone) => {
 const getMaxImages = (selectedCategory, selectedPricing) => {
   if (selectedCategory === "Aviation Jobs") return 3;
   if (selectedCategory === "Flight Schools") return 5;
-  if (selectedCategory === "Aircraft for Sale") {
+  if (selectedCategory === "Aircraft for Sale");
+  {
     if (selectedPricing === "Basic") return 7;
     if (selectedPricing === "Featured") return 14;
     return 20;
@@ -92,11 +93,27 @@ const getMaxImages = (selectedCategory, selectedPricing) => {
 const renderListingDetails = (item) => {
   if (item.category === "Aviation Jobs") {
     return (
-      <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 20 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold", color: COLORS.black, marginBottom: 5 }}>
+      <View
+        style={{
+          padding: 10,
+          borderRadius: 10,
+          backgroundColor: COLORS.white,
+          marginBottom: 20,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: "bold",
+            color: COLORS.black,
+            marginBottom: 5,
+          }}
+        >
           {item.jobTitle || "No Job Title"}
         </Text>
-        <Text style={{ fontSize: 16, color: COLORS.secondary, marginBottom: 5 }}>
+        <Text
+          style={{ fontSize: 16, color: COLORS.secondary, marginBottom: 5 }}
+        >
           {item.companyName || "No Company Name"}
         </Text>
         <Text style={{ fontSize: 14, color: COLORS.gray }}>
@@ -107,7 +124,14 @@ const renderListingDetails = (item) => {
   } else if (item.category === "Flight Schools") {
     const details = item.flightSchoolDetails || {};
     return (
-      <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
+      <View
+        style={{
+          padding: 10,
+          borderRadius: 10,
+          backgroundColor: COLORS.white,
+          marginBottom: 10,
+        }}
+      >
         <Text style={{ fontSize: 18, fontWeight: "bold", color: COLORS.black }}>
           {details.flightSchoolName || "No Flight School Name"}
         </Text>
@@ -121,8 +145,22 @@ const renderListingDetails = (item) => {
     );
   } else if (item.category === "Flight Instructors") {
     return (
-      <View style={{ padding: 10, borderRadius: 10, backgroundColor: "transparent", marginBottom: 10 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold", color: COLORS.white, marginBottom: 5 }}>
+      <View
+        style={{
+          padding: 10,
+          borderRadius: 10,
+          backgroundColor: "transparent",
+          marginBottom: 10,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: "bold",
+            color: COLORS.white,
+            marginBottom: 5,
+          }}
+        >
           {item.firstName} {item.lastName}
         </Text>
         <Text style={{ fontSize: 16, color: COLORS.white, marginBottom: 5 }}>
@@ -163,7 +201,14 @@ const renderListingDetails = (item) => {
   } else if (item.category === "Charter Services") {
     const details = item.charterServiceDetails || {};
     return (
-      <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
+      <View
+        style={{
+          padding: 10,
+          borderRadius: 10,
+          backgroundColor: COLORS.white,
+          marginBottom: 10,
+        }}
+      >
         <Text style={{ fontSize: 18, fontWeight: "bold", color: COLORS.black }}>
           {details.charterServiceName || "No Charter Service Name"}
         </Text>
@@ -182,7 +227,14 @@ const renderListingDetails = (item) => {
     );
   } else {
     return (
-      <View style={{ padding: 10, borderRadius: 10, backgroundColor: COLORS.white, marginBottom: 10 }}>
+      <View
+        style={{
+          padding: 10,
+          borderRadius: 10,
+          backgroundColor: COLORS.white,
+          marginBottom: 10,
+        }}
+      >
         <Text style={{ fontSize: 16, color: COLORS.black, marginBottom: 5 }}>
           Airport Identifier: {item.airportIdentifier || "N/A"}
         </Text>
@@ -223,12 +275,20 @@ const FullScreenImageModal = ({ visible, onRequestClose, imageUri }) => {
   );
   const onPinchHandlerStateChange = (event) => {
     if (event.nativeEvent.state === State.END) {
-      Animated.spring(pinchScale, { toValue: 1, useNativeDriver: true }).start();
+      Animated.spring(pinchScale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
     }
   };
 
   return (
-    <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onRequestClose}>
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onRequestClose}
+    >
       <View style={styles.zoomModalContainer}>
         <TouchableOpacity
           onPress={onRequestClose}
@@ -238,10 +298,22 @@ const FullScreenImageModal = ({ visible, onRequestClose, imageUri }) => {
         >
           <Ionicons name="close" size={30} color={COLORS.white} />
         </TouchableOpacity>
-        <PinchGestureHandler onGestureEvent={onPinchGestureEvent} onHandlerStateChange={onPinchHandlerStateChange}>
-          <Animated.View style={[styles.zoomScrollView, { transform: [{ scale: pinchScale }] }]}>
+        <PinchGestureHandler
+          onGestureEvent={onPinchGestureEvent}
+          onHandlerStateChange={onPinchHandlerStateChange}
+        >
+          <Animated.View
+            style={[
+              styles.zoomScrollView,
+              { transform: [{ scale: pinchScale }] },
+            ]}
+          >
             {imageUri && (
-              <Image source={{ uri: imageUri }} style={styles.zoomImage} resizeMode="contain" />
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.zoomImage}
+                resizeMode="contain"
+              />
             )}
           </Animated.View>
         </PinchGestureHandler>
@@ -253,17 +325,30 @@ const FullScreenImageModal = ({ visible, onRequestClose, imageUri }) => {
 /**
  * renderListingImages: Renders listing images.
  */
-const renderListingImages = (item, isMainCard = false, imagePressHandler) => {
+const renderListingImages = (
+  item,
+  isMainCard = false,
+  imagePressHandler,
+  onScrollEnd
+) => {
   return (
     <View style={{ position: "relative" }}>
       <FlatList
         data={item.images || []}
         horizontal
+        pagingEnabled={true}
+        decelerationRate="fast"
+        snapToInterval={SCREEN_WIDTH - 32 + 10} // Adjust if your image width/margin changes
         showsHorizontalScrollIndicator={false}
         keyExtractor={(imageUri, index) => `${item.id}-${index}`}
         onMomentumScrollEnd={(event) => {
           const itemWidth = SCREEN_WIDTH - 32 + 10;
-          const index = Math.round(event.nativeEvent.contentOffset.x / itemWidth);
+          const index = Math.round(
+            event.nativeEvent.contentOffset.x / itemWidth
+          );
+          if (typeof onScrollEnd === "function") {
+            onScrollEnd(index);
+          }
         }}
         renderItem={({ item: imageUri }) =>
           isMainCard ? (
@@ -297,7 +382,9 @@ const renderListingImages = (item, isMainCard = false, imagePressHandler) => {
         <View style={styles.priceLocationOverlay}>
           <Text style={styles.priceText}>
             Price: $
-            {item.salePrice != null ? Number(item.salePrice).toLocaleString() : "N/A"}
+            {item.salePrice != null
+              ? Number(item.salePrice).toLocaleString()
+              : "N/A"}
           </Text>
           <View style={styles.locationContainer}>
             <Ionicons name="location-outline" size={20} color={COLORS.white} />
@@ -370,7 +457,8 @@ const Classifieds = () => {
   const [profileImage, setProfileImage] = useState("");
 
   // NEW: State for "View your listings" modal and user listings
-  const [viewListingsModalVisible, setViewListingsModalVisible] = useState(false);
+  const [viewListingsModalVisible, setViewListingsModalVisible] =
+    useState(false);
   const [userListings, setUserListings] = useState([]);
 
   // Helper function to close all modals
@@ -441,7 +529,10 @@ const Classifieds = () => {
           setLocation(currentLocation);
         } catch (error) {
           console.error("Error fetching location: ", error);
-          Alert.alert("Error fetching location", "Ensure location services are enabled.");
+          Alert.alert(
+            "Error fetching location",
+            "Ensure location services are enabled."
+          );
           setLocation(null);
         } finally {
           setLocationLoading(false);
@@ -563,9 +654,13 @@ const Classifieds = () => {
       Alert.alert(`You can only upload up to ${maxImages} images.`);
       return;
     }
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert("Permission Required", "Permission to access the camera roll is required!");
+      Alert.alert(
+        "Permission Required",
+        "Permission to access the camera roll is required!"
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -581,8 +676,13 @@ const Classifieds = () => {
         try {
           const response = await fetch(uri);
           const blob = await response.blob();
-          const imageName = `${new Date().getTime()}-${Math.floor(Math.random() * 1000)}.jpg`;
-          const storageReference = storageRef(storage, `listingImages/${imageName}`);
+          const imageName = `${new Date().getTime()}-${Math.floor(
+            Math.random() * 1000
+          )}.jpg`;
+          const storageReference = storageRef(
+            storage,
+            `listingImages/${imageName}`
+          );
           await uploadBytes(storageReference, blob);
           const downloadUrl = await getDownloadURL(storageReference);
           uploadedImageUrls.push(downloadUrl);
@@ -603,7 +703,8 @@ const Classifieds = () => {
         onPress={pickImage}
         disabled={images.length >= maxImages}
         style={{
-          backgroundColor: remainingUploads > 0 ? COLORS.primary : COLORS.lightGray,
+          backgroundColor:
+            remainingUploads > 0 ? COLORS.primary : COLORS.lightGray,
           paddingVertical: 10,
           paddingHorizontal: 16,
           borderRadius: 8,
@@ -626,9 +727,13 @@ const Classifieds = () => {
   // Profile Image Picker & Upload for Flight Instructors
   // -----------------------
   const pickProfileImage = async (setFieldValue) => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert("Permission Required", "Permission to access the camera roll is required!");
+      Alert.alert(
+        "Permission Required",
+        "Permission to access the camera roll is required!"
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -641,8 +746,13 @@ const Classifieds = () => {
       try {
         const response = await fetch(uri);
         const blob = await response.blob();
-        const imageName = `profile-${new Date().getTime()}-${Math.floor(Math.random() * 1000)}.jpg`;
-        const storageReference = storageRef(storage, `profileImages/${imageName}`);
+        const imageName = `profile-${new Date().getTime()}-${Math.floor(
+          Math.random() * 1000
+        )}.jpg`;
+        const storageReference = storageRef(
+          storage,
+          `profileImages/${imageName}`
+        );
         await uploadBytes(storageReference, blob);
         const downloadUrl = await getDownloadURL(storageReference);
         setProfileImage(downloadUrl);
@@ -661,7 +771,9 @@ const Classifieds = () => {
     const dLon = deg2rad(lng2 - lon1);
     const a =
       Math.sin(dLat / 2) ** 2 +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) ** 2;
+      Math.cos(deg2rad(lat1)) *
+        Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
@@ -675,7 +787,12 @@ const Classifieds = () => {
     const filtered = listings.filter((listing) => {
       if (listing.location && listing.location.lat && listing.location.lng) {
         const { lat, lng } = listing.location;
-        const distance = getDistanceFromLatLonInMiles(userLat, userLng, lat, lng);
+        const distance = getDistanceFromLatLonInMiles(
+          userLat,
+          userLng,
+          lat,
+          lng
+        );
         return distance <= radiusMiles;
       }
       return false;
@@ -726,7 +843,9 @@ const Classifieds = () => {
     }
     const contactEmail = selectedListing.email;
     if (contactEmail) {
-      const subject = encodeURIComponent(`Inquiry about ${selectedListing.title || "Your Listing"}`);
+      const subject = encodeURIComponent(
+        `Inquiry about ${selectedListing.title || "Your Listing"}`
+      );
       const mailUrl = `mailto:${contactEmail}?subject=${subject}`;
       Linking.openURL(mailUrl).catch((error) => {
         console.error("Error opening mail app:", error);
@@ -738,7 +857,6 @@ const Classifieds = () => {
   };
 
   // Updated: Removed the old handleContactUs – now the "Information about Broker Services" button will open the broker modal.
-
   const handleDeleteListing = (listingId) => {
     Alert.alert(
       "Confirm Deletion",
@@ -760,15 +878,27 @@ const Classifieds = () => {
               })
                 .then((response) => {
                   if (response.ok) {
-                    Alert.alert("Listing Deleted", "Your listing has been deleted successfully.");
+                    Alert.alert(
+                      "Listing Deleted",
+                      "Your listing has been deleted successfully."
+                    );
                   } else {
                     response.text().then((text) => {
                       try {
                         const data = JSON.parse(text);
-                        Alert.alert("Error", data.error || "Failed to delete listing.");
+                        Alert.alert(
+                          "Error",
+                          data.error || "Failed to delete listing."
+                        );
                       } catch (err) {
-                        console.error("Error parsing deleteListing error data:", err);
-                        Alert.alert("Error", "Failed to delete listing. " + text);
+                        console.error(
+                          "Error parsing deleteListing error data:",
+                          err
+                        );
+                        Alert.alert(
+                          "Error",
+                          "Failed to delete listing. " + text
+                        );
                       }
                     });
                   }
@@ -789,7 +919,11 @@ const Classifieds = () => {
     const listingDetails = {
       ...values,
       images,
-      location: location ? { lat: location.coords.latitude, lng: location.coords.longitude } : {},
+      location: location
+        ? { lat: location.coords.latitude, lng: location.coords.longitude }
+        : {},
+      city: values.city, // <-- Include city
+      state: values.state, // <-- Include state
     };
 
     listingDetails.selectedPricing = selectedPricing || "Basic";
@@ -800,7 +934,13 @@ const Classifieds = () => {
     }
 
     if (listingDetails.category === "Flight Schools") {
-      const { flightSchoolEmail, flightSchoolName, flightSchoolLocation, flightSchoolPhone, flightSchoolDescription } = listingDetails;
+      const {
+        flightSchoolEmail,
+        flightSchoolName,
+        flightSchoolLocation,
+        flightSchoolPhone,
+        flightSchoolDescription,
+      } = listingDetails;
       listingDetails.flightSchoolDetails = {
         flightSchoolEmail,
         ...(flightSchoolName ? { flightSchoolName } : {}),
@@ -817,7 +957,14 @@ const Classifieds = () => {
     }
 
     if (listingDetails.category === "Charter Services") {
-      const { charterServiceEmail, charterServiceName, charterServiceLocation, charterServicePhone, charterServiceDescription, charterServiceAreas } = listingDetails;
+      const {
+        charterServiceEmail,
+        charterServiceName,
+        charterServiceLocation,
+        charterServicePhone,
+        charterServiceDescription,
+        charterServiceAreas,
+      } = listingDetails;
       listingDetails.charterServiceDetails = {
         charterServiceEmail,
         charterServiceName,
@@ -835,8 +982,18 @@ const Classifieds = () => {
       delete listingDetails.salePrice;
     }
 
+    // NEW: Force free listing for Aviation Jobs
+    if (listingDetails.category === "Aviation Jobs") {
+      // Mark as free listing (for the first 7 days)
+      freeListing = true;
+      delete listingDetails.salePrice;
+    }
+
     if (editingListing) {
-      console.log("Updating listing with payload:", { listingId: editingListing.id, listingDetails });
+      console.log("Updating listing with payload:", {
+        listingId: editingListing.id,
+        listingDetails,
+      });
       getFirebaseIdToken().then((token) => {
         fetch(`${API_URL}/updateListing`, {
           method: "PUT",
@@ -844,11 +1001,17 @@ const Classifieds = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ listingId: editingListing.id, listingDetails }),
+          body: JSON.stringify({
+            listingId: editingListing.id,
+            listingDetails,
+          }),
         })
           .then((response) => {
             if (response.ok) {
-              Alert.alert("Listing Updated", "Your listing has been updated successfully.");
+              Alert.alert(
+                "Listing Updated",
+                "Your listing has been updated successfully."
+              );
               closeAllModals();
               setEditingListing(null);
               setImages([]);
@@ -856,7 +1019,10 @@ const Classifieds = () => {
               response.text().then((text) => {
                 try {
                   const data = JSON.parse(text);
-                  Alert.alert("Error", data.error || "Failed to update listing.");
+                  Alert.alert(
+                    "Error",
+                    data.error || "Failed to update listing."
+                  );
                 } catch (err) {
                   console.error("Error parsing updateListing error data:", err);
                   Alert.alert("Error", "Failed to update listing. " + text);
@@ -882,7 +1048,10 @@ const Classifieds = () => {
         })
           .then((response) => {
             if (response.ok) {
-              Alert.alert("Listing Created", "Your listing has been posted for free for 7 days!");
+              Alert.alert(
+                "Listing Created",
+                "Your listing has been posted for free for 7 days!"
+              );
               closeAllModals();
               setEditingListing(null);
               setImages([]);
@@ -890,7 +1059,10 @@ const Classifieds = () => {
               response.text().then((text) => {
                 try {
                   const data = JSON.parse(text);
-                  Alert.alert("Error", data.error || "Failed to create listing.");
+                  Alert.alert(
+                    "Error",
+                    data.error || "Failed to create listing."
+                  );
                 } catch (err) {
                   console.error("Error parsing createListing error data:", err);
                   Alert.alert("Error", "Failed to create listing. " + text);
@@ -904,8 +1076,16 @@ const Classifieds = () => {
           });
       });
     } else {
-      console.log("Navigating to classifiedsPaymentScreen with payload:", { listingDetails, selectedCategory, selectedPricing });
-      navigation.navigate("classifiedsPaymentScreen", { listingDetails, selectedCategory, selectedPricing });
+      console.log("Navigating to classifiedsPaymentScreen with payload:", {
+        listingDetails,
+        selectedCategory,
+        selectedPricing,
+      });
+      navigation.navigate("classifiedsPaymentScreen", {
+        listingDetails,
+        selectedCategory,
+        selectedPricing,
+      });
     }
   };
 
@@ -947,7 +1127,11 @@ const Classifieds = () => {
 
   useEffect(() => {
     if (modalVisible) {
-      Animated.spring(scaleValue, { toValue: 1, friction: 5, useNativeDriver: true }).start();
+      Animated.spring(scaleValue, {
+        toValue: 1,
+        friction: 5,
+        useNativeDriver: true,
+      }).start();
     } else {
       scaleValue.setValue(0);
     }
@@ -969,17 +1153,44 @@ const Classifieds = () => {
 
   if (loadingAuth || locationLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: COLORS.white }}>
-        <ActivityIndicator size="large" color={COLORS.primary} accessibilityLabel="Loading indicator" />
+      <SafeAreaView
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: COLORS.white,
+        }}
+      >
+        <ActivityIndicator
+          size="large"
+          color={COLORS.primary}
+          accessibilityLabel="Loading indicator"
+        />
         <Text style={{ marginTop: 10, color: COLORS.black }}>Loading...</Text>
       </SafeAreaView>
     );
   }
   if (!user) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: COLORS.white, padding: 16 }}>
-        <Text style={{ fontSize: 18, color: COLORS.black, marginBottom: 20, textAlign: "center" }}>
-          You need to be signed in to view classifieds. Please sign in or create an account.
+      <SafeAreaView
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: COLORS.white,
+          padding: 16,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            color: COLORS.black,
+            marginBottom: 20,
+            textAlign: "center",
+          }}
+        >
+          You need to be signed in to view classifieds. Please sign in or create
+          an account.
         </Text>
       </SafeAreaView>
     );
@@ -1034,9 +1245,12 @@ const Classifieds = () => {
         ref={scrollViewRef}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
         scrollEventThrottle={16}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: false,
-        })}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          {
+            useNativeDriver: false,
+          }
+        )}
       >
         <Animated.View
           style={{
@@ -1050,14 +1264,38 @@ const Classifieds = () => {
         >
           <ImageBackground
             source={wingtipClouds}
-            style={{ width: SCREEN_WIDTH, height: "100%", justifyContent: "flex-start" }}
+            style={{
+              width: SCREEN_WIDTH,
+              height: "100%",
+              justifyContent: "flex-start",
+            }}
             resizeMode="cover"
           >
-            <Animated.View style={{ paddingHorizontal: 16, paddingTop: headerPaddingTop, paddingBottom: 20 }}>
-              <Animated.Text style={{ color: COLORS.white, fontWeight: "bold", fontSize: headerFontSize }} accessibilityLabel="Greeting Text">
+            <Animated.View
+              style={{
+                paddingHorizontal: 16,
+                paddingTop: headerPaddingTop,
+                paddingBottom: 20,
+              }}
+            >
+              <Animated.Text
+                style={{
+                  color: COLORS.white,
+                  fontWeight: "bold",
+                  fontSize: headerFontSize,
+                }}
+                accessibilityLabel="Greeting Text"
+              >
                 Welcome
               </Animated.Text>
-              <Animated.Text style={{ color: COLORS.white, fontWeight: "bold", fontSize: headerFontSize }} accessibilityLabel="User Name">
+              <Animated.Text
+                style={{
+                  color: COLORS.white,
+                  fontWeight: "bold",
+                  fontSize: headerFontSize,
+                }}
+                accessibilityLabel="User Name"
+              >
                 {user.displayName}
               </Animated.Text>
             </Animated.View>
@@ -1065,35 +1303,72 @@ const Classifieds = () => {
         </Animated.View>
 
         {/* New "View your listings" button */}
-        <View style={{ flexDirection: "row", justifyContent: "center", marginBottom: 8 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            marginBottom: 8,
+          }}
+        >
           <TouchableOpacity
             onPress={() => setViewListingsModalVisible(true)}
             style={{ flexDirection: "row", alignItems: "center" }}
             accessibilityLabel="View your listings"
             accessibilityRole="button"
           >
-            <Ionicons name="list" size={24} color={COLORS.primary} style={{ marginRight: 8 }} />
-            <Text style={{ fontSize: 16, color: COLORS.primary, textDecorationLine: "underline" }}>
+            <Ionicons
+              name="list"
+              size={24}
+              color={COLORS.primary}
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              style={{
+                fontSize: 16,
+                color: COLORS.primary,
+                textDecorationLine: "underline",
+              }}
+            >
               View your listings
             </Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={{ fontSize: 28, fontWeight: "bold", marginBottom: 16, textAlign: "center", color: COLORS.black }}>
+        <Text
+          style={{
+            fontSize: 28,
+            fontWeight: "bold",
+            marginBottom: 16,
+            textAlign: "center",
+            color: COLORS.black,
+          }}
+        >
           Aviation Marketplace
         </Text>
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 16,
+          }}
+        >
           <Text style={{ fontSize: 18, color: COLORS.secondary }}>
             Filter by Location
-            {selectedCategory === "Aircraft for Sale" ? " or Aircraft Make" : ""}
+            {selectedCategory === "Aircraft for Sale"
+              ? " or Aircraft Make"
+              : ""}
           </Text>
           <TouchableOpacity
             onPress={() => {
               closeAllModals();
               setFilterModalVisible(true);
             }}
-            style={{ backgroundColor: COLORS.lightGray, padding: 8, borderRadius: 50 }}
+            style={{
+              backgroundColor: COLORS.lightGray,
+              padding: 8,
+              borderRadius: 50,
+            }}
             accessibilityLabel="Open Filter Modal"
             accessibilityRole="button"
           >
@@ -1108,7 +1383,7 @@ const Classifieds = () => {
             "Flight Schools",
             "Flight Instructors",
             "Aviation Mechanic",
-            "Charter Services"
+            "Charter Services",
           ]}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -1122,12 +1397,20 @@ const Classifieds = () => {
                 padding: 8,
                 borderRadius: 8,
                 marginRight: 8,
-                backgroundColor: selectedCategory === item ? COLORS.primary : COLORS.lightGray,
+                backgroundColor:
+                  selectedCategory === item ? COLORS.primary : COLORS.lightGray,
               }}
               accessibilityLabel={`Select category ${item}`}
               accessibilityRole="button"
             >
-              <Text style={{ fontSize: 14, fontWeight: "bold", color: selectedCategory === item ? COLORS.white : COLORS.black }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "bold",
+                  color:
+                    selectedCategory === item ? COLORS.white : COLORS.black,
+                }}
+              >
                 {item}
               </Text>
             </TouchableOpacity>
@@ -1146,23 +1429,47 @@ const Classifieds = () => {
             setImages([]);
             setProfileImage("");
           }}
-          style={{ backgroundColor: COLORS.primary, padding: 12, borderRadius: 8, marginBottom: 16, alignItems: "center" }}
+          style={{
+            backgroundColor: COLORS.primary,
+            padding: 12,
+            borderRadius: 8,
+            marginBottom: 16,
+            alignItems: "center",
+          }}
           accessibilityLabel="Add a Listing"
           accessibilityRole="button"
         >
-          <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: "bold" }}>
+          <Text
+            style={{ color: COLORS.white, fontSize: 16, fontWeight: "bold" }}
+          >
             Add a Listing
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => setBrokerModalVisible(true)}
-          style={{ marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
+          style={{
+            marginBottom: 16,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
           accessibilityLabel="Information about Broker Services"
           accessibilityRole="button"
         >
-          <Ionicons name="mail-outline" size={20} color={COLORS.primary} style={{ marginRight: 8 }} />
-          <Text style={{ color: COLORS.primary, textDecorationLine: "underline", fontSize: 16 }}>
+          <Ionicons
+            name="mail-outline"
+            size={20}
+            color={COLORS.primary}
+            style={{ marginRight: 8 }}
+          />
+          <Text
+            style={{
+              color: COLORS.primary,
+              textDecorationLine: "underline",
+              fontSize: 16,
+            }}
+          >
             Information about Broker Services
           </Text>
         </TouchableOpacity>
@@ -1183,7 +1490,8 @@ const Classifieds = () => {
                   elevation: 3,
                 }}
               >
-                {(item.packageType === "Featured" || item.packageType === "Enhanced") && (
+                {(item.packageType === "Featured" ||
+                  item.packageType === "Enhanced") && (
                   <View style={styles.featuredTag}>
                     <Text style={styles.featuredTagText}>
                       {item.packageType} Listing
@@ -1195,12 +1503,16 @@ const Classifieds = () => {
                   onPress={() => handleListingPress(item)}
                   style={{ flex: 1, padding: 10 }}
                   accessibilityLabel={`View details of listing ${
-                    item.category === "Flight Instructors" ? `${item.firstName} ${item.lastName}` : item.title || "Listing"
+                    item.category === "Flight Instructors"
+                      ? `${item.firstName} ${item.lastName}`
+                      : item.title || "Listing"
                   }`}
                   accessibilityRole="button"
                 >
                   {item.category === "Flight Instructors" ? (
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
                       {item.profileImage && (
                         <Image
                           source={{ uri: item.profileImage }}
@@ -1213,7 +1525,13 @@ const Classifieds = () => {
                         />
                       )}
                       <View>
-                        <Text style={{ fontSize: 18, fontWeight: "bold", color: COLORS.black }}>
+                        <Text
+                          style={{
+                            fontSize: 18,
+                            fontWeight: "bold",
+                            color: COLORS.black,
+                          }}
+                        >
                           {item.firstName} {item.lastName}
                         </Text>
                         <Text style={{ fontSize: 14, color: COLORS.gray }}>
@@ -1222,7 +1540,9 @@ const Classifieds = () => {
                         {item.serviceLocationsList &&
                           item.serviceLocationsList.length > 0 && (
                             <View style={{ marginTop: 5 }}>
-                              <Text style={{ fontSize: 14, color: COLORS.gray }}>
+                              <Text
+                                style={{ fontSize: 14, color: COLORS.gray }}
+                              >
                                 {item.serviceLocationsList.join(", ")}
                               </Text>
                             </View>
@@ -1234,12 +1554,26 @@ const Classifieds = () => {
                       {item.images && item.images.length > 0 ? (
                         renderListingImages(item, true, null)
                       ) : (
-                        <Text style={{ textAlign: "center", color: COLORS.gray, marginTop: 10, padding: 10 }}>
+                        <Text
+                          style={{
+                            textAlign: "center",
+                            color: COLORS.gray,
+                            marginTop: 10,
+                            padding: 10,
+                          }}
+                        >
                           No Images Available
                         </Text>
                       )}
                       {item.title ? (
-                        <Text style={{ fontSize: 18, fontWeight: "bold", color: COLORS.black, marginTop: 10 }}>
+                        <Text
+                          style={{
+                            fontSize: 18,
+                            fontWeight: "bold",
+                            color: COLORS.black,
+                            marginTop: 10,
+                          }}
+                        >
                           {item.title}
                         </Text>
                       ) : null}
@@ -1268,7 +1602,9 @@ const Classifieds = () => {
 
       {showUpButton && (
         <TouchableOpacity
-          onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
+          onPress={() =>
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true })
+          }
           style={styles.upButton}
           accessibilityLabel="Scroll to top"
           accessibilityRole="button"
@@ -1310,12 +1646,19 @@ const Classifieds = () => {
                 marginBottom: 30,
               }}
             >
-              Our Aircraft Broker Services connect buyers and sellers with trusted aviation professionals who specialize in aircraft acquisitions and sales. Whether you're looking to purchase, sell, or trade an aircraft, our experienced brokers provide personalized guidance, market analysis, and negotiation support to ensure a seamless and secure transaction from start to finish.
+              Our Aircraft Broker Services connect buyers and sellers with
+              trusted aviation professionals who specialize in aircraft
+              acquisitions and sales. Whether you're looking to purchase, sell,
+              or trade an aircraft, our experienced brokers provide personalized
+              guidance, market analysis, and negotiation support to ensure a
+              seamless and secure transaction from start to finish.
             </Text>
             <TouchableOpacity
               onPress={() => {
                 setBrokerModalVisible(false);
-                const subject = encodeURIComponent("Information About Broker Services");
+                const subject = encodeURIComponent(
+                  "Information About Broker Services"
+                );
                 const mailtoUrl = `mailto:coryarmer@gmail.com?subject=${subject}`;
                 Linking.openURL(mailtoUrl).catch((error) => {
                   console.error("Error opening mail app:", error);
@@ -1359,6 +1702,7 @@ const Classifieds = () => {
           </ScrollView>
         </View>
       </Modal>
+
       {/* Updated Aviation Jobs Modal */}
       <Modal
         visible={jobDetailsModalVisible}
@@ -1412,7 +1756,11 @@ const Classifieds = () => {
                 {selectedListing?.companyName || "No Company Name"}
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Ionicons name="location-outline" size={20} color={COLORS.white} />
+                <Ionicons
+                  name="location-outline"
+                  size={20}
+                  color={COLORS.white}
+                />
                 <Text
                   style={{
                     fontSize: 16,
@@ -1420,11 +1768,14 @@ const Classifieds = () => {
                     marginLeft: 5,
                   }}
                 >
-                  {selectedListing?.city || "No City"}, {selectedListing?.state || "No State"}
+                  {selectedListing?.city || "No City"},{" "}
+                  {selectedListing?.state || "No State"}
                 </Text>
               </View>
             </View>
-            <Text style={{ fontSize: 16, color: COLORS.white, marginBottom: 20 }}>
+            <Text
+              style={{ fontSize: 16, color: COLORS.white, marginBottom: 20 }}
+            >
               {selectedListing?.jobDescription || "No Description Provided"}
             </Text>
             <TouchableOpacity
@@ -1439,7 +1790,9 @@ const Classifieds = () => {
               accessibilityLabel="Apply for Job"
               accessibilityRole="button"
             >
-              <Text style={{ color: COLORS.white, fontSize: 16 }}>Apply Now</Text>
+              <Text style={{ color: COLORS.white, fontSize: 16 }}>
+                Apply Now
+              </Text>
             </TouchableOpacity>
             {renderEditAndDeleteButtons(selectedListing)}
           </SafeAreaView>
@@ -1477,14 +1830,23 @@ const Classifieds = () => {
                   />
                 )}
               {(selectedListing?.category === "Aircraft for Sale" ||
-                selectedListing?.category === "Charter Services") &&
+                selectedListing?.category === "Charter Services" ||
+                selectedListing?.category === "Flight Schools" ||
+                selectedListing?.category === "Aviation Jobs") &&
                 selectedListing?.images &&
                 selectedListing.images.length > 0 && (
                   <View style={{ marginBottom: 16 }}>
-                    {renderListingImages(selectedListing, false, handleImagePress)}
-                    {renderPaginationDots()}
+                    {renderListingImages(
+                      selectedListing,
+                      false,
+                      handleImagePress,
+                      setImageIndex
+                    )}
+                    {selectedListing.images.length > 1 &&
+                      renderPaginationDots()}
                   </View>
                 )}
+
               <Text
                 style={{
                   color: COLORS.white,
@@ -1495,19 +1857,27 @@ const Classifieds = () => {
                 }}
               >
                 {selectedListing?.category === "Flight Schools"
-                  ? selectedListing?.flightSchoolDetails?.flightSchoolName || "No Flight School Name"
+                  ? selectedListing?.flightSchoolDetails?.flightSchoolName ||
+                    "No Flight School Name"
                   : selectedListing?.category === "Flight Instructors"
                   ? `${selectedListing?.firstName} ${selectedListing?.lastName}`
                   : selectedListing?.category === "Charter Services"
-                  ? selectedListing?.charterServiceDetails?.charterServiceName || "No Charter Service Name"
-                  : selectedListing?.flightSchoolName || selectedListing?.title || "No Title"}
+                  ? selectedListing?.charterServiceDetails
+                      ?.charterServiceName || "No Charter Service Name"
+                  : selectedListing?.flightSchoolName ||
+                    selectedListing?.title ||
+                    "No Title"}
               </Text>
               {selectedListing?.category === "Flight Instructors" ? (
                 renderListingDetails(selectedListing)
               ) : selectedListing?.category === "Flight Schools" ? (
                 <>
                   <View style={styles.centeredRow}>
-                    <Ionicons name="location-outline" size={20} color={COLORS.white} />
+                    <Ionicons
+                      name="location-outline"
+                      size={20}
+                      color={COLORS.white}
+                    />
                     <Text
                       style={{
                         fontSize: 16,
@@ -1515,20 +1885,34 @@ const Classifieds = () => {
                         marginLeft: 5,
                       }}
                     >
-                      {selectedListing?.flightSchoolDetails?.flightSchoolLocation || "No Location Provided"}
+                      {selectedListing?.flightSchoolDetails
+                        ?.flightSchoolLocation || "No Location Provided"}
                     </Text>
                   </View>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
-                    Email: {selectedListing?.flightSchoolDetails?.flightSchoolEmail || "N/A"}
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}
+                  >
+                    Email:{" "}
+                    {selectedListing?.flightSchoolDetails?.flightSchoolEmail ||
+                      "N/A"}
                   </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    Phone: {formatPhoneNumber(selectedListing?.flightSchoolDetails?.flightSchoolPhone)}
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}
+                  >
+                    Phone:{" "}
+                    {formatPhoneNumber(
+                      selectedListing?.flightSchoolDetails?.flightSchoolPhone
+                    )}
                   </Text>
                 </>
               ) : selectedListing?.category === "Charter Services" ? (
                 <>
                   <View style={styles.centeredRow}>
-                    <Ionicons name="location-outline" size={20} color={COLORS.white} />
+                    <Ionicons
+                      name="location-outline"
+                      size={20}
+                      color={COLORS.white}
+                    />
                     <Text
                       style={{
                         fontSize: 16,
@@ -1536,43 +1920,90 @@ const Classifieds = () => {
                         marginLeft: 5,
                       }}
                     >
-                      {selectedListing?.charterServiceDetails?.charterServiceLocation || "No Location Provided"}
+                      {selectedListing?.charterServiceDetails
+                        ?.charterServiceLocation || "No Location Provided"}
                     </Text>
                   </View>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
-                    Email: {selectedListing?.charterServiceDetails?.charterServiceEmail || "N/A"}
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}
+                  >
+                    Email:{" "}
+                    {selectedListing?.charterServiceDetails
+                      ?.charterServiceEmail || "N/A"}
                   </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    Phone: {formatPhoneNumber(selectedListing?.charterServiceDetails?.charterServicePhone)}
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}
+                  >
+                    Phone:{" "}
+                    {formatPhoneNumber(
+                      selectedListing?.charterServiceDetails
+                        ?.charterServicePhone
+                    )}
                   </Text>
-                  {selectedListing?.charterServiceDetails?.charterServiceAreas && (
-                    <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                      Service Areas: {selectedListing?.charterServiceDetails?.charterServiceAreas}
+                  {selectedListing?.charterServiceDetails
+                    ?.charterServiceAreas && (
+                    <Text
+                      style={{
+                        color: COLORS.white,
+                        fontSize: 16,
+                        marginTop: 5,
+                      }}
+                    >
+                      Service Areas:{" "}
+                      {
+                        selectedListing?.charterServiceDetails
+                          ?.charterServiceAreas
+                      }
                     </Text>
                   )}
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    {selectedListing?.charterServiceDetails?.charterServiceDescription || "No Description Provided"}
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}
+                  >
+                    {selectedListing?.charterServiceDetails
+                      ?.charterServiceDescription || "No Description Provided"}
                   </Text>
                 </>
               ) : (
                 <>
                   <View style={styles.centeredRow}>
-                    <Ionicons name="location-outline" size={20} color={COLORS.white} />
-                    <Text style={{ fontSize: 16, color: COLORS.white, marginLeft: 5 }}>
-                      {selectedListing?.city || "No City"}, {selectedListing?.state || "No State"}
+                    <Ionicons
+                      name="location-outline"
+                      size={20}
+                      color={COLORS.white}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        color: COLORS.white,
+                        marginLeft: 5,
+                      }}
+                    >
+                      {selectedListing?.city || "No City"},{" "}
+                      {selectedListing?.state || "No State"}
                     </Text>
                   </View>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}>
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 10 }}
+                  >
                     Email: {selectedListing?.email || "N/A"}
                   </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}
+                  >
                     Phone: {formatPhoneNumber(selectedListing?.phone)}
                   </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}
+                  >
                     Tail Number: {selectedListing?.tailNumber || "N/A"}
                   </Text>
-                  <Text style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}>
-                    Price: ${selectedListing?.salePrice != null ? Number(selectedListing.salePrice).toLocaleString() : "N/A"}
+                  <Text
+                    style={{ color: COLORS.white, fontSize: 16, marginTop: 5 }}
+                  >
+                    Price: $
+                    {selectedListing?.salePrice != null
+                      ? Number(selectedListing.salePrice).toLocaleString()
+                      : "N/A"}
                   </Text>
                 </>
               )}
@@ -1588,8 +2019,11 @@ const Classifieds = () => {
                     }}
                   >
                     {selectedListing?.category === "Flight Schools"
-                      ? selectedListing?.flightSchoolDetails?.flightSchoolDescription || "No Description Provided"
-                      : selectedListing?.flightSchoolDescription || selectedListing?.description || "No Description"}
+                      ? selectedListing?.flightSchoolDetails
+                          ?.flightSchoolDescription || "No Description Provided"
+                      : selectedListing?.flightSchoolDescription ||
+                        selectedListing?.description ||
+                        "No Description"}
                   </Text>
                 )}
               <TouchableOpacity
@@ -1613,8 +2047,7 @@ const Classifieds = () => {
           </SafeAreaView>
         </View>
       </Modal>
-
-      {/* Submit Your Listing Modal */}
+      {/* Submit Your Listing Modal (continued) */}
       <Modal
         animationType="none"
         transparent={true}
@@ -1670,15 +2103,18 @@ const Classifieds = () => {
                   initialValues={{
                     // Flight Instructors
                     firstName:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.firstName || ""
                         : "",
                     lastName:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.lastName || ""
                         : "",
                     certifications:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.certifications || ""
                         : "",
                     flightHours:
@@ -1687,19 +2123,23 @@ const Classifieds = () => {
                         ? String(editingListing?.flightHours)
                         : "",
                     fiEmail:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.email || ""
                         : "",
                     fiPhone:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.phone || ""
                         : "",
                     fiDescription:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.description || ""
                         : "",
                     serviceLocationsList:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.serviceLocationsList || []
                         : [],
                     newServiceLocation: "",
@@ -1709,95 +2149,133 @@ const Classifieds = () => {
                         ? String(editingListing?.hourlyRate)
                         : "",
                     aircraftProvided:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.aircraftProvided || false
                         : false,
                     profileImage:
-                      editingListing && editingListing.category === "Flight Instructors"
+                      editingListing &&
+                      editingListing.category === "Flight Instructors"
                         ? editingListing.profileImage || ""
                         : "",
                     // Aviation Mechanic
                     amFirstName:
-                      editingListing && editingListing.category === "Aviation Mechanic"
+                      editingListing &&
+                      editingListing.category === "Aviation Mechanic"
                         ? editingListing.firstName || ""
                         : "",
                     amLastName:
-                      editingListing && editingListing.category === "Aviation Mechanic"
+                      editingListing &&
+                      editingListing.category === "Aviation Mechanic"
                         ? editingListing.lastName || ""
                         : "",
                     amCertifications:
-                      editingListing && editingListing.category === "Aviation Mechanic"
+                      editingListing &&
+                      editingListing.category === "Aviation Mechanic"
                         ? editingListing.certifications || ""
                         : "",
                     amEmail:
-                      editingListing && editingListing.category === "Aviation Mechanic"
+                      editingListing &&
+                      editingListing.category === "Aviation Mechanic"
                         ? editingListing.email || ""
                         : "",
                     amPhone:
-                      editingListing && editingListing.category === "Aviation Mechanic"
+                      editingListing &&
+                      editingListing.category === "Aviation Mechanic"
                         ? editingListing.phone || ""
                         : "",
                     amDescription:
-                      editingListing && editingListing.category === "Aviation Mechanic"
+                      editingListing &&
+                      editingListing.category === "Aviation Mechanic"
                         ? editingListing.description || ""
                         : "",
                     amServiceLocations:
-                      editingListing && editingListing.category === "Aviation Mechanic"
+                      editingListing &&
+                      editingListing.category === "Aviation Mechanic"
                         ? editingListing.serviceLocations || ""
                         : "",
                     // Flight Schools
                     flightSchoolName:
-                      editingListing && editingListing.category === "Flight Schools"
-                        ? editingListing.flightSchoolDetails?.flightSchoolName || ""
+                      editingListing &&
+                      editingListing.category === "Flight Schools"
+                        ? editingListing.flightSchoolDetails
+                            ?.flightSchoolName || ""
                         : "",
                     flightSchoolLocation:
-                      editingListing && editingListing.category === "Flight Schools"
-                        ? editingListing.flightSchoolDetails?.flightSchoolLocation || ""
+                      editingListing &&
+                      editingListing.category === "Flight Schools"
+                        ? editingListing.flightSchoolDetails
+                            ?.flightSchoolLocation || ""
                         : "",
                     flightSchoolEmail:
-                      editingListing && editingListing.category === "Flight Schools"
-                        ? editingListing.flightSchoolDetails?.flightSchoolEmail || ""
+                      editingListing &&
+                      editingListing.category === "Flight Schools"
+                        ? editingListing.flightSchoolDetails
+                            ?.flightSchoolEmail || ""
                         : "",
                     flightSchoolPhone:
-                      editingListing && editingListing.category === "Flight Schools"
-                        ? editingListing.flightSchoolDetails?.flightSchoolPhone || ""
+                      editingListing &&
+                      editingListing.category === "Flight Schools"
+                        ? editingListing.flightSchoolDetails
+                            ?.flightSchoolPhone || ""
                         : "",
                     flightSchoolDescription:
-                      editingListing && editingListing.category === "Flight Schools"
-                        ? editingListing.flightSchoolDetails?.flightSchoolDescription || ""
+                      editingListing &&
+                      editingListing.category === "Flight Schools"
+                        ? editingListing.flightSchoolDetails
+                            ?.flightSchoolDescription || ""
                         : "",
                     // Aviation Jobs
                     companyName:
-                      editingListing && editingListing.category === "Aviation Jobs"
+                      editingListing &&
+                      editingListing.category === "Aviation Jobs"
                         ? editingListing.companyName || ""
                         : "",
                     jobTitle:
-                      editingListing && editingListing.category === "Aviation Jobs"
+                      editingListing &&
+                      editingListing.category === "Aviation Jobs"
                         ? editingListing.jobTitle || ""
                         : "",
+                    city:
+                      editingListing &&
+                      editingListing.category === "Aviation Jobs"
+                        ? editingListing.city || ""
+                        : "",
+                    state:
+                      editingListing &&
+                      editingListing.category === "Aviation Jobs"
+                        ? editingListing.state || ""
+                        : "",
+
                     salary:
-                      editingListing && editingListing.category === "Aviation Jobs"
+                      editingListing &&
+                      editingListing.category === "Aviation Jobs"
                         ? editingListing.salary || ""
                         : "",
                     jobDescription:
-                      editingListing && editingListing.category === "Aviation Jobs"
+                      editingListing &&
+                      editingListing.category === "Aviation Jobs"
                         ? editingListing.jobDescription || ""
                         : "",
                     email:
-                      editingListing && editingListing.category === "Aviation Jobs"
+                      editingListing &&
+                      editingListing.category === "Aviation Jobs"
                         ? editingListing.email || ""
                         : "",
                     phone:
-                      editingListing && editingListing.category === "Aviation Jobs"
+                      editingListing &&
+                      editingListing.category === "Aviation Jobs"
                         ? editingListing.phone || ""
                         : "",
                     // Aircraft for Sale
                     title:
-                      editingListing && editingListing.category === "Aircraft for Sale"
+                      editingListing &&
+                      editingListing.category === "Aircraft for Sale"
                         ? editingListing.title || ""
                         : "",
                     tailNumber:
-                      editingListing && editingListing.category === "Aircraft for Sale"
+                      editingListing &&
+                      editingListing.category === "Aircraft for Sale"
                         ? editingListing.tailNumber || ""
                         : "",
                     salePrice:
@@ -1806,53 +2284,74 @@ const Classifieds = () => {
                         ? String(editingListing?.salePrice)
                         : "",
                     description:
-                      editingListing && editingListing.category === "Aircraft for Sale"
+                      editingListing &&
+                      editingListing.category === "Aircraft for Sale"
                         ? editingListing.description || ""
                         : "",
                     city:
-                      editingListing && editingListing.category === "Aircraft for Sale"
+                      editingListing &&
+                      editingListing.category === "Aircraft for Sale"
                         ? editingListing.city || ""
                         : "",
                     state:
-                      editingListing && editingListing.category === "Aircraft for Sale"
+                      editingListing &&
+                      editingListing.category === "Aircraft for Sale"
                         ? editingListing.state || ""
                         : "",
                     email:
-                      editingListing && editingListing.category === "Aircraft for Sale"
+                      editingListing &&
+                      editingListing.category === "Aircraft for Sale"
                         ? editingListing.email || ""
                         : "",
                     phone:
-                      editingListing && editingListing.category === "Aircraft for Sale"
+                      editingListing &&
+                      editingListing.category === "Aircraft for Sale"
                         ? editingListing.phone || ""
                         : "",
                     // Charter Services fields
                     charterServiceName:
-                      editingListing && editingListing.category === "Charter Services"
-                        ? editingListing.charterServiceDetails?.charterServiceName || ""
+                      editingListing &&
+                      editingListing.category === "Charter Services"
+                        ? editingListing.charterServiceDetails
+                            ?.charterServiceName || ""
                         : "",
                     charterServiceLocation:
-                      editingListing && editingListing.category === "Charter Services"
-                        ? editingListing.charterServiceDetails?.charterServiceLocation || ""
+                      editingListing &&
+                      editingListing.category === "Charter Services"
+                        ? editingListing.charterServiceDetails
+                            ?.charterServiceLocation || ""
                         : "",
                     charterServiceEmail:
-                      editingListing && editingListing.category === "Charter Services"
-                        ? editingListing.charterServiceDetails?.charterServiceEmail || ""
+                      editingListing &&
+                      editingListing.category === "Charter Services"
+                        ? editingListing.charterServiceDetails
+                            ?.charterServiceEmail || ""
                         : "",
                     charterServicePhone:
-                      editingListing && editingListing.category === "Charter Services"
-                        ? editingListing.charterServiceDetails?.charterServicePhone || ""
+                      editingListing &&
+                      editingListing.category === "Charter Services"
+                        ? editingListing.charterServiceDetails
+                            ?.charterServicePhone || ""
                         : "",
                     charterServiceDescription:
-                      editingListing && editingListing.category === "Charter Services"
-                        ? editingListing.charterServiceDetails?.charterServiceDescription || ""
+                      editingListing &&
+                      editingListing.category === "Charter Services"
+                        ? editingListing.charterServiceDetails
+                            ?.charterServiceDescription || ""
                         : "",
                     charterServiceAreas:
-                      editingListing && editingListing.category === "Charter Services"
-                        ? editingListing.charterServiceDetails?.charterServiceAreas || ""
+                      editingListing &&
+                      editingListing.category === "Charter Services"
+                        ? editingListing.charterServiceDetails
+                            ?.charterServiceAreas || ""
                         : "",
                     selectedPricing: selectedPricing || "Basic",
-                    packageCost: selectedPricing ? pricingPackages[selectedPricing] || 0 : 0,
-                    category: editingListing ? editingListing.category || selectedCategory : selectedCategory,
+                    packageCost: selectedPricing
+                      ? pricingPackages[selectedPricing] || 0
+                      : 0,
+                    category: editingListing
+                      ? editingListing.category || selectedCategory
+                      : selectedCategory,
                   }}
                   enableReinitialize={true}
                   validate={(values) => {
@@ -1864,7 +2363,8 @@ const Classifieds = () => {
                       if (!values.lastName)
                         errors.lastName = "Last name is required.";
                       if (!values.certifications)
-                        errors.certifications = "CFI Certification Number is required.";
+                        errors.certifications =
+                          "CFI Certification Number is required.";
                       if (!values.fiEmail) {
                         errors.fiEmail = "Contact email is required.";
                       } else if (!/\S+@\S+\.\S+/.test(values.fiEmail)) {
@@ -1872,13 +2372,18 @@ const Classifieds = () => {
                       }
                       if (!values.fiDescription)
                         errors.fiDescription = "Description is required.";
-                      if (!values.serviceLocationsList || values.serviceLocationsList.length === 0) {
-                        errors.serviceLocationsList = "At least one service location is required.";
+                      if (
+                        !values.serviceLocationsList ||
+                        values.serviceLocationsList.length === 0
+                      ) {
+                        errors.serviceLocationsList =
+                          "At least one service location is required.";
                       }
                       if (!values.hourlyRate)
                         errors.hourlyRate = "Hourly rate is required.";
                       else if (isNaN(Number(values.hourlyRate))) {
-                        errors.hourlyRate = "Hourly rate must be a valid number.";
+                        errors.hourlyRate =
+                          "Hourly rate must be a valid number.";
                       }
                     } else if (category === "Aviation Mechanic") {
                       if (!values.amFirstName)
@@ -1886,7 +2391,8 @@ const Classifieds = () => {
                       if (!values.amLastName)
                         errors.amLastName = "Last name is required.";
                       if (!values.amCertifications)
-                        errors.amCertifications = "Certifications are required.";
+                        errors.amCertifications =
+                          "Certifications are required.";
                       if (!values.amEmail) {
                         errors.amEmail = "Contact email is required.";
                       } else if (!/\S+@\S+\.\S+/.test(values.amEmail)) {
@@ -1895,7 +2401,8 @@ const Classifieds = () => {
                       if (!values.amDescription)
                         errors.amDescription = "Description is required.";
                       if (!values.amServiceLocations)
-                        errors.amServiceLocations = "Service locations are required.";
+                        errors.amServiceLocations =
+                          "Service locations are required.";
                     } else if (category === "Aviation Jobs") {
                       if (!values.companyName)
                         errors.companyName = "Company Name is required.";
@@ -1910,30 +2417,42 @@ const Classifieds = () => {
                       }
                     } else if (category === "Flight Schools") {
                       if (!values.flightSchoolName)
-                        errors.flightSchoolName = "Flight School Name is required.";
+                        errors.flightSchoolName =
+                          "Flight School Name is required.";
                       if (!values.flightSchoolLocation)
-                        errors.flightSchoolLocation = "Flight School Location is required.";
+                        errors.flightSchoolLocation =
+                          "Flight School Location is required.";
                       if (!values.flightSchoolEmail) {
                         errors.flightSchoolEmail = "Contact email is required.";
-                      } else if (!/\S+@\S+\.\S+/.test(values.flightSchoolEmail)) {
+                      } else if (
+                        !/\S+@\S+\.\S+/.test(values.flightSchoolEmail)
+                      ) {
                         errors.flightSchoolEmail = "Invalid email address.";
                       }
                       if (!values.flightSchoolDescription)
-                        errors.flightSchoolDescription = "Description is required.";
+                        errors.flightSchoolDescription =
+                          "Description is required.";
                     } else if (category === "Charter Services") {
                       if (!values.charterServiceName)
-                        errors.charterServiceName = "Charter Service Name is required.";
+                        errors.charterServiceName =
+                          "Charter Service Name is required.";
                       if (!values.charterServiceLocation)
-                        errors.charterServiceLocation = "Charter Service Location is required.";
+                        errors.charterServiceLocation =
+                          "Charter Service Location is required.";
                       if (!values.charterServiceEmail) {
-                        errors.charterServiceEmail = "Contact email is required.";
-                      } else if (!/\S+@\S+\.\S+/.test(values.charterServiceEmail)) {
+                        errors.charterServiceEmail =
+                          "Contact email is required.";
+                      } else if (
+                        !/\S+@\S+\.\S+/.test(values.charterServiceEmail)
+                      ) {
                         errors.charterServiceEmail = "Invalid email address.";
                       }
                     } else {
                       if (!values.title) errors.title = "Title is required.";
-                      if (!values.description) errors.description = "Description is required.";
-                      if (!values.salePrice) errors.salePrice = "Sale Price is required.";
+                      if (!values.description)
+                        errors.description = "Description is required.";
+                      if (!values.salePrice)
+                        errors.salePrice = "Sale Price is required.";
                       if (!values.email) {
                         errors.email = "Contact email is required.";
                       } else if (!/\S+@\S+\.\S+/.test(values.email)) {
@@ -1944,7 +2463,15 @@ const Classifieds = () => {
                   }}
                   onSubmit={onSubmitMethod}
                 >
-                  {({ handleChange, handleBlur, handleSubmit, values, errors, touched, setFieldValue }) => (
+                  {({
+                    handleChange,
+                    handleBlur,
+                    handleSubmit,
+                    values,
+                    errors,
+                    touched,
+                    setFieldValue,
+                  }) => (
                     <>
                       {values.category === "Flight Instructors" ? (
                         <>
@@ -2090,34 +2617,58 @@ const Classifieds = () => {
                             name="serviceLocationsList"
                             render={(arrayHelpers) => (
                               <View style={{ marginBottom: 16 }}>
-                                {values.serviceLocationsList && values.serviceLocationsList.length > 0 ? (
-                                  values.serviceLocationsList.map((loc, index) => (
-                                    <View
-                                      key={index}
-                                      style={{
-                                        flexDirection: "row",
-                                        alignItems: "center",
-                                        marginBottom: 8,
-                                      }}
-                                    >
-                                      <Text style={{ flex: 1, color: COLORS.black }}>
-                                        {loc}
-                                      </Text>
-                                      <TouchableOpacity
-                                        onPress={() => arrayHelpers.remove(index)}
-                                        accessibilityLabel={`Remove service location ${loc}`}
-                                        accessibilityRole="button"
+                                {values.serviceLocationsList &&
+                                values.serviceLocationsList.length > 0 ? (
+                                  values.serviceLocationsList.map(
+                                    (loc, index) => (
+                                      <View
+                                        key={index}
+                                        style={{
+                                          flexDirection: "row",
+                                          alignItems: "center",
+                                          marginBottom: 8,
+                                        }}
                                       >
-                                        <Ionicons name="close-circle" size={24} color={COLORS.red} />
-                                      </TouchableOpacity>
-                                    </View>
-                                  ))
+                                        <Text
+                                          style={{
+                                            flex: 1,
+                                            color: COLORS.black,
+                                          }}
+                                        >
+                                          {loc}
+                                        </Text>
+                                        <TouchableOpacity
+                                          onPress={() =>
+                                            arrayHelpers.remove(index)
+                                          }
+                                          accessibilityLabel={`Remove service location ${loc}`}
+                                          accessibilityRole="button"
+                                        >
+                                          <Ionicons
+                                            name="close-circle"
+                                            size={24}
+                                            color={COLORS.red}
+                                          />
+                                        </TouchableOpacity>
+                                      </View>
+                                    )
+                                  )
                                 ) : (
-                                  <Text style={{ color: COLORS.gray, marginBottom: 8 }}>
+                                  <Text
+                                    style={{
+                                      color: COLORS.gray,
+                                      marginBottom: 8,
+                                    }}
+                                  >
                                     No service locations added.
                                   </Text>
                                 )}
-                                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                <View
+                                  style={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                  }}
+                                >
                                   <TextInput
                                     placeholder="Add service location (City, State)"
                                     placeholderTextColor={COLORS.gray}
@@ -2128,7 +2679,9 @@ const Classifieds = () => {
                                       padding: 8,
                                       color: COLORS.black,
                                     }}
-                                    onChangeText={handleChange("newServiceLocation")}
+                                    onChangeText={handleChange(
+                                      "newServiceLocation"
+                                    )}
                                     onBlur={handleBlur("newServiceLocation")}
                                     value={values.newServiceLocation}
                                     accessibilityLabel="New Service Location Input"
@@ -2139,7 +2692,9 @@ const Classifieds = () => {
                                         values.newServiceLocation &&
                                         values.newServiceLocation.trim() !== ""
                                       ) {
-                                        arrayHelpers.push(values.newServiceLocation.trim());
+                                        arrayHelpers.push(
+                                          values.newServiceLocation.trim()
+                                        );
                                         setFieldValue("newServiceLocation", "");
                                       }
                                     }}
@@ -2147,14 +2702,21 @@ const Classifieds = () => {
                                     accessibilityLabel="Add Service Location"
                                     accessibilityRole="button"
                                   >
-                                    <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
+                                    <Ionicons
+                                      name="add-circle-outline"
+                                      size={24}
+                                      color={COLORS.primary}
+                                    />
                                   </TouchableOpacity>
                                 </View>
-                                {touched.serviceLocationsList && errors.serviceLocationsList && (
-                                  <Text style={{ color: "red", marginBottom: 8 }}>
-                                    {errors.serviceLocationsList}
-                                  </Text>
-                                )}
+                                {touched.serviceLocationsList &&
+                                  errors.serviceLocationsList && (
+                                    <Text
+                                      style={{ color: "red", marginBottom: 8 }}
+                                    >
+                                      {errors.serviceLocationsList}
+                                    </Text>
+                                  )}
                               </View>
                             )}
                           />
@@ -2186,14 +2748,25 @@ const Classifieds = () => {
                               marginBottom: 16,
                             }}
                           >
-                            <Text style={{ flex: 1, color: COLORS.black, fontSize: 16 }}>
+                            <Text
+                              style={{
+                                flex: 1,
+                                color: COLORS.black,
+                                fontSize: 16,
+                              }}
+                            >
                               Aircraft provided by CFI
                             </Text>
                             <Switch
                               value={values.aircraftProvided}
-                              onValueChange={(value) => setFieldValue("aircraftProvided", value)}
+                              onValueChange={(value) =>
+                                setFieldValue("aircraftProvided", value)
+                              }
                               thumbColor={COLORS.primary}
-                              trackColor={{ false: COLORS.lightGray, true: COLORS.primary }}
+                              trackColor={{
+                                false: COLORS.lightGray,
+                                true: COLORS.primary,
+                              }}
                             />
                           </View>
                           <Text
@@ -2234,14 +2807,20 @@ const Classifieds = () => {
                                 accessibilityLabel="Remove Profile Image"
                                 accessibilityRole="button"
                               >
-                                <Ionicons name="close-circle" size={24} color={COLORS.red} />
+                                <Ionicons
+                                  name="close-circle"
+                                  size={24}
+                                  color={COLORS.red}
+                                />
                               </TouchableOpacity>
                             </View>
                           ) : null}
                           <TouchableOpacity
                             onPress={() => pickProfileImage(setFieldValue)}
                             style={{
-                              backgroundColor: values.profileImage ? COLORS.lightGray : COLORS.primary,
+                              backgroundColor: values.profileImage
+                                ? COLORS.lightGray
+                                : COLORS.primary,
                               paddingVertical: 10,
                               paddingHorizontal: 16,
                               borderRadius: 8,
@@ -2253,10 +2832,14 @@ const Classifieds = () => {
                             <Text
                               style={{
                                 textAlign: "center",
-                                color: values.profileImage ? COLORS.black : COLORS.white,
+                                color: values.profileImage
+                                  ? COLORS.black
+                                  : COLORS.white,
                               }}
                             >
-                              {values.profileImage ? "Profile Image Uploaded" : "Add Profile Image"}
+                              {values.profileImage
+                                ? "Profile Image Uploaded"
+                                : "Add Profile Image"}
                             </Text>
                           </TouchableOpacity>
                         </>
@@ -2318,11 +2901,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Certifications Input"
                           />
-                          {touched.amCertifications && errors.amCertifications && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.amCertifications}
-                            </Text>
-                          )}
+                          {touched.amCertifications &&
+                            errors.amCertifications && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.amCertifications}
+                              </Text>
+                            )}
                           <TextInput
                             placeholder="Contact Email"
                             placeholderTextColor={COLORS.gray}
@@ -2399,11 +2983,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Service Locations Input"
                           />
-                          {touched.amServiceLocations && errors.amServiceLocations && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.amServiceLocations}
-                            </Text>
-                          )}
+                          {touched.amServiceLocations &&
+                            errors.amServiceLocations && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.amServiceLocations}
+                              </Text>
+                            )}
                         </>
                       ) : values.category === "Aviation Jobs" ? (
                         <>
@@ -2428,6 +3013,36 @@ const Classifieds = () => {
                               {errors.companyName}
                             </Text>
                           )}
+                          <TextInput
+                            placeholder="City"
+                            placeholderTextColor={COLORS.gray}
+                            onChangeText={handleChange("city")}
+                            onBlur={handleBlur("city")}
+                            value={values.city}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
+                            accessibilityLabel="City Input"
+                          />
+                          <TextInput
+                            placeholder="State"
+                            placeholderTextColor={COLORS.gray}
+                            onChangeText={handleChange("state")}
+                            onBlur={handleBlur("state")}
+                            value={values.state}
+                            style={{
+                              borderBottomWidth: 1,
+                              borderBottomColor: COLORS.lightGray,
+                              marginBottom: 16,
+                              padding: 8,
+                              color: COLORS.black,
+                            }}
+                            accessibilityLabel="State Input"
+                          />
                           <TextInput
                             placeholder="Job Title"
                             placeholderTextColor={COLORS.gray}
@@ -2568,11 +3183,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Flight School Name Input"
                           />
-                          {touched.flightSchoolName && errors.flightSchoolName && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.flightSchoolName}
-                            </Text>
-                          )}
+                          {touched.flightSchoolName &&
+                            errors.flightSchoolName && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.flightSchoolName}
+                              </Text>
+                            )}
                           <TextInput
                             placeholder="Flight School Location"
                             placeholderTextColor={COLORS.gray}
@@ -2588,11 +3204,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Flight School Location Input"
                           />
-                          {touched.flightSchoolLocation && errors.flightSchoolLocation && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.flightSchoolLocation}
-                            </Text>
-                          )}
+                          {touched.flightSchoolLocation &&
+                            errors.flightSchoolLocation && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.flightSchoolLocation}
+                              </Text>
+                            )}
                           <TextInput
                             placeholder="Contact Email"
                             placeholderTextColor={COLORS.gray}
@@ -2609,11 +3226,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Flight School Contact Email Input"
                           />
-                          {touched.flightSchoolEmail && errors.flightSchoolEmail && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.flightSchoolEmail}
-                            </Text>
-                          )}
+                          {touched.flightSchoolEmail &&
+                            errors.flightSchoolEmail && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.flightSchoolEmail}
+                              </Text>
+                            )}
                           <TextInput
                             placeholder="Phone Number (Optional)"
                             placeholderTextColor={COLORS.gray}
@@ -2633,7 +3251,9 @@ const Classifieds = () => {
                           <TextInput
                             placeholder="Flight School Description"
                             placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange("flightSchoolDescription")}
+                            onChangeText={handleChange(
+                              "flightSchoolDescription"
+                            )}
                             onBlur={handleBlur("flightSchoolDescription")}
                             value={values.flightSchoolDescription}
                             multiline
@@ -2649,11 +3269,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Flight School Description Input"
                           />
-                          {touched.flightSchoolDescription && errors.flightSchoolDescription && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.flightSchoolDescription}
-                            </Text>
-                          )}
+                          {touched.flightSchoolDescription &&
+                            errors.flightSchoolDescription && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.flightSchoolDescription}
+                              </Text>
+                            )}
                           {/* NEW: Image Upload for Flight Schools */}
                           <View style={{ marginBottom: 16 }}>
                             {images.length > 0 && (
@@ -2697,15 +3318,18 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Charter Service Name Input"
                           />
-                          {touched.charterServiceName && errors.charterServiceName && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.charterServiceName}
-                            </Text>
-                          )}
+                          {touched.charterServiceName &&
+                            errors.charterServiceName && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.charterServiceName}
+                              </Text>
+                            )}
                           <TextInput
                             placeholder="Charter Service Location"
                             placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange("charterServiceLocation")}
+                            onChangeText={handleChange(
+                              "charterServiceLocation"
+                            )}
                             onBlur={handleBlur("charterServiceLocation")}
                             value={values.charterServiceLocation}
                             style={{
@@ -2717,11 +3341,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Charter Service Location Input"
                           />
-                          {touched.charterServiceLocation && errors.charterServiceLocation && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.charterServiceLocation}
-                            </Text>
-                          )}
+                          {touched.charterServiceLocation &&
+                            errors.charterServiceLocation && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.charterServiceLocation}
+                              </Text>
+                            )}
                           <TextInput
                             placeholder="Charter Service Email"
                             placeholderTextColor={COLORS.gray}
@@ -2738,11 +3363,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Charter Service Email Input"
                           />
-                          {touched.charterServiceEmail && errors.charterServiceEmail && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.charterServiceEmail}
-                            </Text>
-                          )}
+                          {touched.charterServiceEmail &&
+                            errors.charterServiceEmail && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.charterServiceEmail}
+                              </Text>
+                            )}
                           <TextInput
                             placeholder="Charter Service Phone (Optional)"
                             placeholderTextColor={COLORS.gray}
@@ -2762,7 +3388,9 @@ const Classifieds = () => {
                           <TextInput
                             placeholder="Charter Service Description"
                             placeholderTextColor={COLORS.gray}
-                            onChangeText={handleChange("charterServiceDescription")}
+                            onChangeText={handleChange(
+                              "charterServiceDescription"
+                            )}
                             onBlur={handleBlur("charterServiceDescription")}
                             value={values.charterServiceDescription}
                             multiline
@@ -2778,11 +3406,12 @@ const Classifieds = () => {
                             }}
                             accessibilityLabel="Charter Service Description Input"
                           />
-                          {touched.charterServiceDescription && errors.charterServiceDescription && (
-                            <Text style={{ color: "red", marginBottom: 8 }}>
-                              {errors.charterServiceDescription}
-                            </Text>
-                          )}
+                          {touched.charterServiceDescription &&
+                            errors.charterServiceDescription && (
+                              <Text style={{ color: "red", marginBottom: 8 }}>
+                                {errors.charterServiceDescription}
+                              </Text>
+                            )}
                           <TextInput
                             placeholder="Charter Service Areas (e.g. Regions or States)"
                             placeholderTextColor={COLORS.gray}
@@ -3033,12 +3662,23 @@ const Classifieds = () => {
                         >
                           Select Pricing Package
                         </Text>
-                        <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-around",
+                          }}
+                        >
                           {Object.keys(pricingPackages).map((packageType) => (
-                            <View key={packageType} style={{ alignItems: "center", width: "30%" }}>
+                            <View
+                              key={packageType}
+                              style={{ alignItems: "center", width: "30%" }}
+                            >
                               <TouchableOpacity
                                 onPress={() =>
-                                  setPricingModalVisible((prev) => ({ ...prev, [packageType]: true }))
+                                  setPricingModalVisible((prev) => ({
+                                    ...prev,
+                                    [packageType]: true,
+                                  }))
                                 }
                                 style={{ marginBottom: 4 }}
                                 accessibilityLabel={`View details for ${packageType} package`}
@@ -3047,19 +3687,29 @@ const Classifieds = () => {
                                 <Ionicons
                                   name="information-circle-outline"
                                   size={24}
-                                  color={selectedPricing === packageType ? COLORS.primary : COLORS.black}
+                                  color={
+                                    selectedPricing === packageType
+                                      ? COLORS.primary
+                                      : COLORS.black
+                                  }
                                 />
                               </TouchableOpacity>
                               <TouchableOpacity
                                 onPress={() => {
                                   setSelectedPricing(packageType);
                                   setFieldValue("selectedPricing", packageType);
-                                  setFieldValue("packageCost", pricingPackages[packageType]);
+                                  setFieldValue(
+                                    "packageCost",
+                                    pricingPackages[packageType]
+                                  );
                                 }}
                                 style={{
                                   padding: 10,
                                   borderRadius: 8,
-                                  backgroundColor: selectedPricing === packageType ? COLORS.primary : COLORS.lightGray,
+                                  backgroundColor:
+                                    selectedPricing === packageType
+                                      ? COLORS.primary
+                                      : COLORS.lightGray,
                                   alignItems: "center",
                                 }}
                                 accessibilityLabel={`Select ${packageType} package`}
@@ -3067,27 +3717,49 @@ const Classifieds = () => {
                               >
                                 <Text
                                   style={{
-                                    color: selectedPricing === packageType ? COLORS.white : COLORS.black,
+                                    color:
+                                      selectedPricing === packageType
+                                        ? COLORS.white
+                                        : COLORS.black,
                                     fontWeight: "bold",
                                   }}
                                 >
                                   {packageType}
                                 </Text>
-                                {((packageType === "Basic" && (values.category === "Aircraft for Sale" || values.category === "Flight Schools")) ||
-                                  (packageType === "Flight Instructors" && values.category === "Flight Instructors") ||
-                                  (packageType === "Aviation Mechanic" && values.category === "Aviation Mechanic") ||
-                                  (packageType === "Charter Services" && values.category === "Charter Services")) ? (
+                                {(packageType === "Basic" &&
+                                  (values.category === "Aircraft for Sale" ||
+                                    values.category === "Flight Schools")) ||
+                                (packageType === "Flight Instructors" &&
+                                  values.category === "Flight Instructors") ||
+                                (packageType === "Aviation Mechanic" &&
+                                  values.category === "Aviation Mechanic") ||
+                                (packageType === "Charter Services" &&
+                                  values.category === "Charter Services") ? (
                                   <Text
-                                    style={{ color: selectedPricing === packageType ? COLORS.white : COLORS.black }}
+                                    style={{
+                                      color:
+                                        selectedPricing === packageType
+                                          ? COLORS.white
+                                          : COLORS.black,
+                                    }}
                                   >
-                                    <Text style={{ textDecorationLine: "line-through" }}>
+                                    <Text
+                                      style={{
+                                        textDecorationLine: "line-through",
+                                      }}
+                                    >
                                       ${pricingPackages[packageType]}
                                     </Text>{" "}
                                     Free for 7 days
                                   </Text>
                                 ) : (
                                   <Text
-                                    style={{ color: selectedPricing === packageType ? COLORS.white : COLORS.black }}
+                                    style={{
+                                      color:
+                                        selectedPricing === packageType
+                                          ? COLORS.white
+                                          : COLORS.black,
+                                    }}
                                   >
                                     ${pricingPackages[packageType]}
                                   </Text>
@@ -3137,7 +3809,9 @@ const Classifieds = () => {
                             paddingVertical: 12,
                             borderRadius: 50,
                           }}
-                          accessibilityLabel={editingListing ? "Save" : "Proceed to pay"}
+                          accessibilityLabel={
+                            editingListing ? "Save" : "Proceed to pay"
+                          }
                           accessibilityRole="button"
                         >
                           <Text
@@ -3167,7 +3841,9 @@ const Classifieds = () => {
                         accessibilityLabel="Cancel Submit Listing Modal"
                         accessibilityRole="button"
                       >
-                        <Text style={{ textAlign: "center", color: COLORS.black }}>
+                        <Text
+                          style={{ textAlign: "center", color: COLORS.black }}
+                        >
                           Cancel
                         </Text>
                       </TouchableOpacity>
@@ -3211,7 +3887,9 @@ const Classifieds = () => {
                 {renderListingDetails(previewData)}
               </>
             ) : (
-              <Text style={{ textAlign: "center" }}>No preview data available.</Text>
+              <Text style={{ textAlign: "center" }}>
+                No preview data available.
+              </Text>
             )}
           </ScrollView>
         </SafeAreaView>
@@ -3223,44 +3901,74 @@ const Classifieds = () => {
         imageUri={zoomImageUri}
       />
 
-      {/* Filter Modal: Added back to allow filtering by location or aircraft make/type */}
+      {/* Filter Modal: replaced to match home.js exactly */}
       <Modal
-        visible={filterModalVisible}
-        transparent={true}
         animationType="slide"
+        transparent={true}
+        visible={filterModalVisible}
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <View style={{ width: "80%", backgroundColor: COLORS.white, borderRadius: 10, padding: 20 }}>
-            <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 10 }}>Filter Listings</Text>
-            <TextInput
-              placeholder="Enter City or State"
-              placeholderTextColor={COLORS.gray}
-              value={cityState}
-              onChangeText={setCityState}
-              style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 20, padding: 8, color: COLORS.black }}
-              accessibilityLabel="City or State Filter Input"
-            />
-            {selectedCategory === "Aircraft for Sale" && (
+        <TouchableOpacity
+          style={styles.filterModalOverlay}
+          activeOpacity={1}
+          onPressOut={() => setFilterModalVisible(false)}
+          accessibilityLabel="Close filter modal"
+          accessibilityRole="button"
+        >
+          <View style={styles.filterModalContent}>
+            <View style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Filter Listings</Text>
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                <Ionicons name="close" size={24} color="black" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.filterLabel}>Location</Text>
+            <View style={styles.inputGroup}>
               <TextInput
-                placeholder="Enter Aircraft Make/Model"
-                placeholderTextColor={COLORS.gray}
+                value={cityState}
+                onChangeText={setCityState}
+                placeholder="Enter city, state e.g., Austin, TX"
+                placeholderTextColor="#718096"
+                style={styles.textInput}
+                accessibilityLabel="Enter location"
+              />
+            </View>
+            <View style={styles.orSeparator}>
+              <View style={styles.line} />
+              <Text style={styles.orText}>OR</Text>
+              <View style={styles.line} />
+            </View>
+            <Text style={styles.filterLabel}>Aircraft Make & Model</Text>
+            <View style={styles.inputGroup}>
+              <TextInput
                 value={makeModel}
                 onChangeText={setMakeModel}
-                style={{ borderBottomWidth: 1, borderBottomColor: COLORS.lightGray, marginBottom: 20, padding: 8, color: COLORS.black }}
-                accessibilityLabel="Aircraft Make/Model Filter Input"
+                placeholder="Enter aircraft make/model"
+                placeholderTextColor="#718096"
+                style={styles.textInput}
+                accessibilityLabel="Enter aircraft make and model"
               />
-            )}
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <TouchableOpacity onPress={clearFilter} style={{ padding: 10, backgroundColor: COLORS.red, borderRadius: 8 }}>
-                <Text style={{ color: COLORS.white }}>Clear</Text>
+            </View>
+            <View style={styles.filterActions}>
+              <TouchableOpacity
+                onPress={clearFilter}
+                style={styles.clearFilterButton}
+                accessibilityLabel="Clear filters"
+                accessibilityRole="button"
+              >
+                <Text style={styles.filterActionText}>Clear</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={applyFilter} style={{ padding: 10, backgroundColor: COLORS.primary, borderRadius: 8 }}>
-                <Text style={{ color: COLORS.white }}>Apply Filter</Text>
+              <TouchableOpacity
+                onPress={applyFilter}
+                style={styles.applyFilterButton}
+                accessibilityLabel="Apply filters"
+                accessibilityRole="button"
+              >
+                <Text style={styles.filterActionText}>Apply</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* New Modal: "View your listings" */}
@@ -3390,7 +4098,10 @@ const Classifieds = () => {
             key={packageType}
             visible={isVisible}
             onRequestClose={() =>
-              setPricingModalVisible((prev) => ({ ...prev, [packageType]: false }))
+              setPricingModalVisible((prev) => ({
+                ...prev,
+                [packageType]: false,
+              }))
             }
             transparent={true}
             animationType="slide"
@@ -3403,10 +4114,20 @@ const Classifieds = () => {
                 backgroundColor: "rgba(0,0,0,0.5)",
               }}
             >
-              <View style={{ width: "80%", backgroundColor: "#fff", borderRadius: 10, padding: 20 }}>
+              <View
+                style={{
+                  width: "80%",
+                  backgroundColor: "#fff",
+                  borderRadius: 10,
+                  padding: 20,
+                }}
+              >
                 <TouchableOpacity
                   onPress={() =>
-                    setPricingModalVisible((prev) => ({ ...prev, [packageType]: false }))
+                    setPricingModalVisible((prev) => ({
+                      ...prev,
+                      [packageType]: false,
+                    }))
                   }
                   style={{ position: "absolute", top: 10, right: 10 }}
                   accessibilityLabel={`Close ${packageType} info modal`}
@@ -3414,37 +4135,51 @@ const Classifieds = () => {
                 >
                   <Ionicons name="close" size={24} color="#000" />
                 </TouchableOpacity>
-                <Text style={{ fontWeight: "bold", fontSize: 18, marginBottom: 10 }}>
+                <Text
+                  style={{ fontWeight: "bold", fontSize: 18, marginBottom: 10 }}
+                >
                   {packageType} Package Details
                 </Text>
                 {packageType === "Basic" && (
                   <Text style={{ marginBottom: 10 }}>
-                    The Basic package includes a standard listing with a set number of images. Great option for those wanting an affordable way to reach buyers.
+                    The Basic package includes a standard listing with a set
+                    number of images. Great option for those wanting an
+                    affordable way to reach buyers.
                   </Text>
                 )}
                 {packageType === "Featured" && (
                   <Text style={{ marginBottom: 10 }}>
-                    The Featured package provides increased visibility, highlighting your listing among others and allowing for more images.
+                    The Featured package provides increased visibility,
+                    highlighting your listing among others and allowing for more
+                    images.
                   </Text>
                 )}
                 {packageType === "Enhanced" && (
                   <Text style={{ marginBottom: 10 }}>
-                    The Enhanced package grants maximum exposure on the marketplace and includes the highest image limit and premier placement.
+                    The Enhanced package grants maximum exposure on the
+                    marketplace and includes the highest image limit and premier
+                    placement.
                   </Text>
                 )}
                 {packageType === "Flight Instructors" && (
                   <Text style={{ marginBottom: 10 }}>
-                    A specialized listing package tailored for Flight Instructors to showcase ratings, experience, and service locations.
+                    A specialized listing package tailored for Flight
+                    Instructors to showcase ratings, experience, and service
+                    locations.
                   </Text>
                 )}
                 {packageType === "Aviation Mechanic" && (
                   <Text style={{ marginBottom: 10 }}>
-                    A specialized listing package for Aviation Mechanics to advertise certifications, locations, and specialized services.
+                    A specialized listing package for Aviation Mechanics to
+                    advertise certifications, locations, and specialized
+                    services.
                   </Text>
                 )}
                 {packageType === "Charter Services" && (
                   <Text style={{ marginBottom: 10 }}>
-                    A premier listing option specifically designed for Charter Services to highlight unique routes, services, and fleet capabilities.
+                    A premier listing option specifically designed for Charter
+                    Services to highlight unique routes, services, and fleet
+                    capabilities.
                   </Text>
                 )}
               </View>
@@ -3459,14 +4194,23 @@ const Classifieds = () => {
 const AppNavigator = () => (
   <NavigationContainer independent={true}>
     <Stack.Navigator initialRouteName="Classifieds">
-      <Stack.Screen name="Classifieds" component={Classifieds} options={{ headerShown: false }} />
-      <Stack.Screen name="classifiedsPaymentScreen" component={classifiedsPaymentScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="Classifieds"
+        component={Classifieds}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="classifiedsPaymentScreen"
+        component={classifiedsPaymentScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   </NavigationContainer>
 );
 
 export default AppNavigator;
 
+/** Final styles, including those for the updated Filter Modal **/
 const styles = StyleSheet.create({
   paginationDotsContainer: {
     flexDirection: "row",
@@ -3600,5 +4344,88 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "bold",
+  },
+
+  /* Filter Modal styles matching home.js */
+  filterModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  filterModalContent: {
+    backgroundColor: "#FFFFFF",
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: SCREEN_HEIGHT * 0.6,
+  },
+  filterModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  filterModalTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#2D3748",
+  },
+  filterLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2D3748",
+    marginBottom: 8,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: "#A0AEC0",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: "#000",
+  },
+  orSeparator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#CBD5E0",
+  },
+  orText: {
+    marginHorizontal: 10,
+    fontSize: 16,
+    color: "#718096",
+  },
+  filterActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  clearFilterButton: {
+    backgroundColor: "#E53E3E",
+    padding: 14,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 10,
+    alignItems: "center",
+  },
+  applyFilterButton: {
+    backgroundColor: "#1E90FF",
+    padding: 14,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 10,
+    alignItems: "center",
+  },
+  filterActionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
