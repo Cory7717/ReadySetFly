@@ -252,6 +252,35 @@ const renderListingDetails = (item) => {
   }
 };
 
+// New helper for Aviation Jobs images – modeled after the Aircraft for Sale version:
+const renderJobListingImages = (item, imagePressHandler) => {
+  const imageHeight = 180; // Specific height for Aviation Jobs images
+  return (
+    <FlatList
+      data={item.images || []}
+      horizontal
+      pagingEnabled // Enables full-page swipes
+      bounces={false} // Disable overscroll bounce
+      showsHorizontalScrollIndicator={false}
+      keyExtractor={(uri, index) => `${item.id}-${index}`}
+      renderItem={({ item: uri }) => (
+        <TouchableOpacity onPress={() => imagePressHandler(uri)}>
+          <Image
+            source={{ uri }}
+            style={{
+              width: SCREEN_WIDTH - 32,
+              height: imageHeight,
+              borderRadius: 10,
+              marginRight: 10,
+            }}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+      )}
+    />
+  );
+};
+
 /** New helper: Renders an abbreviated version for Flight Instructors on the main card */
 const renderListingDetailsAbbreviated = (item) => {
   if (item.category === "Flight Instructors") {
@@ -331,18 +360,24 @@ const renderListingImages = (
   imagePressHandler,
   onScrollEnd
 ) => {
+  // Adjust height: reduce for Aviation Jobs
+  const imageHeight = item.category === "Aviation Jobs" ? 180 : 200;
+  // Calculate full item width including marginRight (10)
+  const itemWidth = SCREEN_WIDTH - 32 + 10;
   return (
     <View style={{ position: "relative" }}>
       <FlatList
         data={item.images || []}
         horizontal
-        pagingEnabled={true}
+        // Remove pagingEnabled
         decelerationRate="fast"
-        snapToInterval={SCREEN_WIDTH - 32 + 10} // Adjust if your image width/margin changes
+        snapToInterval={itemWidth} // Ensure each snap matches the image item width
+        snapToAlignment="start"
+        disableIntervalMomentum={true}
+        bounces={false} // Disable bounce to prevent slight extra scrolling
         showsHorizontalScrollIndicator={false}
         keyExtractor={(imageUri, index) => `${item.id}-${index}`}
         onMomentumScrollEnd={(event) => {
-          const itemWidth = SCREEN_WIDTH - 32 + 10;
           const index = Math.round(
             event.nativeEvent.contentOffset.x / itemWidth
           );
@@ -356,7 +391,7 @@ const renderListingImages = (
               source={{ uri: imageUri }}
               style={{
                 width: SCREEN_WIDTH - 32,
-                height: 200,
+                height: imageHeight,
                 borderRadius: 10,
                 marginBottom: 10,
                 marginRight: 10,
@@ -368,7 +403,7 @@ const renderListingImages = (
                 source={{ uri: imageUri }}
                 style={{
                   width: SCREEN_WIDTH - 32,
-                  height: 200,
+                  height: imageHeight,
                   borderRadius: 10,
                   marginBottom: 10,
                   marginRight: 10,
@@ -1727,13 +1762,26 @@ const Classifieds = () => {
             }}
           >
             <TouchableOpacity
-              style={{ position: "absolute", top: 10, right: 10 }}
+              style={{
+                position: "absolute",
+                top: 10,
+                right: 10,
+                zIndex: 999, // Ensure the close button stays on top
+              }}
               onPress={() => setJobDetailsModalVisible(false)}
               accessibilityLabel="Close Job Details Modal"
               accessibilityRole="button"
             >
               <Ionicons name="close" size={30} color={COLORS.white} />
             </TouchableOpacity>
+
+            {selectedListing?.images && selectedListing.images.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                {renderJobListingImages(selectedListing, handleImagePress)}
+                {selectedListing.images.length > 1 && renderPaginationDots()}
+              </View>
+            )}
+
             <Text
               style={{
                 fontSize: 24,
@@ -1774,7 +1822,11 @@ const Classifieds = () => {
               </View>
             </View>
             <Text
-              style={{ fontSize: 16, color: COLORS.white, marginBottom: 20 }}
+              style={{
+                fontSize: 16,
+                color: COLORS.white,
+                marginBottom: 20,
+              }}
             >
               {selectedListing?.jobDescription || "No Description Provided"}
             </Text>
@@ -4016,11 +4068,21 @@ const Classifieds = () => {
             </Text>
             {userListings.length > 0 ? (
               <FlatList
-                data={userListings}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
+              data={userListings}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => {
+                // For flight instructors, use profileImage; otherwise, use first image in images array
+                const mainImage =
+                  item.category === "Flight Instructors"
+                    ? item.profileImage
+                    : item.images && item.images.length > 0
+                    ? item.images[0]
+                    : null;
+                return (
                   <View
                     style={{
+                      flexDirection: "row",
+                      alignItems: "center",
                       borderWidth: 1,
                       borderColor: COLORS.lightGray,
                       borderRadius: 8,
@@ -4028,59 +4090,71 @@ const Classifieds = () => {
                       marginBottom: 8,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: "bold",
-                        color: COLORS.black,
+                    {/* Wrap image and text in a touchable so tapping opens the listing */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        handleListingPress(item);
+                        setViewListingsModalVisible(false);
                       }}
+                      style={{ flexDirection: "row", flex: 1, alignItems: "center" }}
                     >
-                      {item.title || item.jobTitle || "Listing"}
-                    </Text>
-                    <Text style={{ fontSize: 14, color: COLORS.gray }}>
-                      {item.category}
-                    </Text>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-around",
-                        marginTop: 8,
-                      }}
-                    >
+                      {mainImage ? (
+                        <Image
+                          source={{ uri: mainImage }}
+                          style={{ width: 80, height: 80, borderRadius: 8 }}
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 80,
+                            height: 80,
+                            backgroundColor: COLORS.lightGray,
+                            borderRadius: 8,
+                            justifyContent: "center",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Text style={{ color: COLORS.gray, fontSize: 12 }}>No Image</Text>
+                        </View>
+                      )}
+            
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={{ fontSize: 16, fontWeight: "bold", color: COLORS.black }}>
+                          {item.title || item.jobTitle || "Listing"}
+                        </Text>
+                        <Text style={{ fontSize: 14, color: COLORS.gray }}>{item.category}</Text>
+                      </View>
+                    </TouchableOpacity>
+            
+                    {/* Edit and Delete Icon buttons */}
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
                       <TouchableOpacity
                         onPress={() => {
                           handleEditListing(item);
                           setViewListingsModalVisible(false);
                         }}
-                        style={{
-                          backgroundColor: COLORS.primary,
-                          padding: 8,
-                          borderRadius: 8,
-                        }}
+                        style={{ marginRight: 8 }}
                         accessibilityLabel="Edit Listing"
                         accessibilityRole="button"
                       >
-                        <Text style={{ color: COLORS.white }}>Edit</Text>
+                        <Ionicons name="create-outline" size={24} color={COLORS.primary} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => {
                           handleDeleteListing(item.id);
                           setViewListingsModalVisible(false);
                         }}
-                        style={{
-                          backgroundColor: COLORS.red,
-                          padding: 8,
-                          borderRadius: 8,
-                        }}
                         accessibilityLabel="Delete Listing"
                         accessibilityRole="button"
                       >
-                        <Text style={{ color: COLORS.white }}>Delete</Text>
+                        <Ionicons name="trash-outline" size={24} color={COLORS.red} />
                       </TouchableOpacity>
                     </View>
                   </View>
-                )}
-              />
+                );
+              }}
+            />
+                    
             ) : (
               <Text style={{ textAlign: "center", color: COLORS.gray }}>
                 You haven't posted any listings yet.

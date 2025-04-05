@@ -887,14 +887,49 @@ const OwnerProfile = ({ ownerId }) => {
             })
           );
 
-          const pendingRequests = requestsWithDetails.filter(
+          let pendingRequests = requestsWithDetails.filter(
             (req) => req.status === "pending"
           );
           const activeRentals = requestsWithDetails.filter(
             (req) => req.status === "active"
           );
 
-          setRentalRequests(pendingRequests);
+          // Clean up stale pending requests (those with a rentalDate in the past)
+          const now = new Date();
+          for (const req of pendingRequests) {
+            if (req.rentalDate) {
+              let rentalDateObj = req.rentalDate;
+              if (rentalDateObj.toDate) {
+                rentalDateObj = rentalDateObj.toDate();
+              } else {
+                rentalDateObj = new Date(rentalDateObj);
+              }
+              if (now > rentalDateObj) {
+                try {
+                  await deleteDoc(doc(db, "rentalRequests", req.id));
+                  console.log(`Deleted stale request ${req.id}`);
+                } catch (error) {
+                  console.error("Error deleting stale request:", error);
+                }
+              }
+            }
+          }
+
+          // Filter pending requests again to only include those that are still valid
+          const validPendingRequests = pendingRequests.filter((req) => {
+            if (req.rentalDate) {
+              let rentalDateObj = req.rentalDate;
+              if (rentalDateObj.toDate) {
+                rentalDateObj = rentalDateObj.toDate();
+              } else {
+                rentalDateObj = new Date(rentalDateObj);
+              }
+              return now <= rentalDateObj;
+            }
+            return true;
+          });
+
+          setRentalRequests(validPendingRequests);
           setActiveRentals(activeRentals);
         },
         (error) => {
@@ -993,7 +1028,7 @@ const OwnerProfile = ({ ownerId }) => {
           setSelectedChatThreadId(threadId);
         }
       }
-
+  
       // Now, fetch the chat thread data
       const chatDocRef = doc(db, "messages", threadId);
       const chatDoc = await getDoc(chatDocRef);
@@ -1008,9 +1043,10 @@ const OwnerProfile = ({ ownerId }) => {
     } catch (error) {
       console.error("Error opening message modal:", error);
       Alert.alert("Error", "Failed to open messages.");
+      setChatFailed(true); // Flag to trigger fail-safe modal if payment is complete
     }
   };
-
+  
   // Function to handle deletion with an undo option
   const handleDeleteChatThread = (thread) => {
     // Clear any existing timer if needed
@@ -1197,7 +1233,7 @@ const OwnerProfile = ({ ownerId }) => {
   const fetchListingDetails = async (listingId) => {
     try {
       if (!listingId) {
-        console.warn(`Rental Request is missing listingId.`);
+        // console.warn(`Rental Request is missing listingId.`);
         return null;
       }
 
@@ -1206,15 +1242,15 @@ const OwnerProfile = ({ ownerId }) => {
       if (listingDoc.exists()) {
         const listingData = listingDoc.data();
         if (!listingData.ownerId) {
-          console.warn(
-            `Listing ID: ${listingId} is missing 'ownerId'. This listing will be excluded.`
-          );
+          // console.warn(
+          //   `Listing ID: ${listingId} is missing 'ownerId'. This listing will be excluded.`
+          // );
           return null;
         }
         return listingData;
       } else {
-        console.warn(`No listing found for listingId: ${listingId}`);
-        return null;
+        // console.warn(`No listing found for listingId: ${listingId}`);
+        // return null;
       }
     } catch (error) {
       console.error("Error fetching listing details:", error);
@@ -1685,6 +1721,7 @@ const OwnerProfile = ({ ownerId }) => {
           ...updatedAircraftDetails,
           ownerId: resolvedOwnerId,
           createdAt: serverTimestamp(),
+          isListed: true,
         };
         const docRef = await addDoc(airplanesRef, newAircraft);
         newAircraft.id = docRef.id;
@@ -1844,6 +1881,68 @@ const OwnerProfile = ({ ownerId }) => {
     } catch (error) {
       console.error("Error uploading images:", error);
       throw error;
+    }
+  };
+
+  const performCleanup = async () => {
+    setCleanupLoading(true);
+    try {
+      // Cleanup orphaned rental requests.
+      // These are requests with either no listingId or with a listingId that doesn't exist in "airplanes".
+      const rentalRequestsRef = collection(db, "rentalRequests");
+      const rentalSnapshot = await getDocs(rentalRequestsRef);
+      const batch = writeBatch(db);
+      let orphanRequestsCount = 0;
+
+      for (const rentalDoc of rentalSnapshot.docs) {
+        const requestData = rentalDoc.data();
+        // If no listingId is present, consider it orphaned.
+        if (!requestData.listingId) {
+          batch.delete(rentalDoc.ref);
+          orphanRequestsCount++;
+        } else {
+          // Check if the corresponding airplane listing exists.
+          const listingDocRef = doc(db, "airplanes", requestData.listingId);
+          const listingDoc = await getDoc(listingDocRef);
+          if (!listingDoc.exists()) {
+            batch.delete(rentalDoc.ref);
+            orphanRequestsCount++;
+          }
+        }
+      }
+
+      if (orphanRequestsCount > 0) {
+        await batch.commit();
+      }
+
+      // Cleanup orphaned airplane listings.
+      // For example, if a listing is missing an ownerId, consider it orphaned.
+      const airplanesRef = collection(db, "airplanes");
+      const airplanesSnapshot = await getDocs(airplanesRef);
+      const batch2 = writeBatch(db);
+      let orphanListingsCount = 0;
+
+      for (const airplaneDoc of airplanesSnapshot.docs) {
+        const airplaneData = airplaneDoc.data();
+        if (!airplaneData.ownerId) {
+          batch2.delete(airplaneDoc.ref);
+          orphanListingsCount++;
+        }
+      }
+
+      if (orphanListingsCount > 0) {
+        await batch2.commit();
+      }
+
+      Alert.alert(
+        "Cleanup Complete",
+        `Deleted ${orphanRequestsCount} orphan rental request(s) and ${orphanListingsCount} orphan listing(s).`
+      );
+    } catch (error) {
+      console.error("Error during cleanup:", error);
+      Alert.alert("Cleanup Error", "An error occurred during cleanup.");
+    } finally {
+      setCleanupLoading(false);
     }
   };
 
@@ -2415,51 +2514,134 @@ const OwnerProfile = ({ ownerId }) => {
 
                   <TouchableOpacity
                     onPress={() => {
-                      Alert.alert(
-                        "Remove Listing",
-                        "Are you sure you want to remove this listing?",
-                        [
-                          { text: "Cancel", style: "cancel" },
-                          {
-                            text: "Remove",
-                            style: "destructive",
-                            onPress: async () => {
-                              try {
-                                await deleteDoc(doc(db, "airplanes", item.id));
-
-                                setUserListings(
-                                  userListings.filter((a) => a.id !== item.id)
-                                );
-                                setAllAircrafts(
-                                  allAircrafts.filter((a) => a.id !== item.id)
-                                );
-                                setSelectedAircraftIds(
-                                  selectedAircraftIds.filter(
-                                    (id) => id !== item.id
-                                  )
-                                );
-
-                                Alert.alert(
-                                  "Removed",
-                                  "The listing has been removed."
-                                );
-                              } catch (error) {
-                                console.error("Error removing listing:", error);
-                                Alert.alert(
-                                  "Error",
-                                  "Failed to remove the listing."
-                                );
-                              }
+                      if (item.isListed) {
+                        // When currently listed, prompt to remove the listing.
+                        Alert.alert(
+                          "Remove Listing",
+                          "Are you sure you want to remove this listing?",
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                              text: "Remove",
+                              style: "destructive",
+                              onPress: async () => {
+                                try {
+                                  // Instead of deleting, update the aircraft document.
+                                  await updateDoc(
+                                    doc(db, "airplanes", item.id),
+                                    {
+                                      isListed: false,
+                                    }
+                                  );
+                                  // Update local state to reflect the change.
+                                  setUserListings((prev) =>
+                                    prev.map((ac) =>
+                                      ac.id === item.id
+                                        ? { ...ac, isListed: false }
+                                        : ac
+                                    )
+                                  );
+                                  setAllAircrafts((prev) =>
+                                    prev.map((ac) =>
+                                      ac.id === item.id
+                                        ? { ...ac, isListed: false }
+                                        : ac
+                                    )
+                                  );
+                                  Alert.alert(
+                                    "Removed",
+                                    "The listing has been removed."
+                                  );
+                                } catch (error) {
+                                  console.error(
+                                    "Error removing listing:",
+                                    error
+                                  );
+                                  Alert.alert(
+                                    "Error",
+                                    "Failed to remove the listing."
+                                  );
+                                }
+                              },
                             },
-                          },
-                        ]
-                      );
+                          ]
+                        );
+                      } else {
+                        // When not listed, allow the user to add the listing.
+                        Alert.alert(
+                          "Add Listing",
+                          "Do you want to add this listing back?",
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                              text: "Add",
+                              onPress: async () => {
+                                try {
+                                  await updateDoc(
+                                    doc(db, "airplanes", item.id),
+                                    {
+                                      isListed: true,
+                                    }
+                                  );
+                                  setUserListings((prev) =>
+                                    prev.map((ac) =>
+                                      ac.id === item.id
+                                        ? { ...ac, isListed: true }
+                                        : ac
+                                    )
+                                  );
+                                  setAllAircrafts((prev) =>
+                                    prev.map((ac) =>
+                                      ac.id === item.id
+                                        ? { ...ac, isListed: true }
+                                        : ac
+                                    )
+                                  );
+                                  Alert.alert(
+                                    "Added",
+                                    "The listing has been added."
+                                  );
+                                } catch (error) {
+                                  console.error("Error adding listing:", error);
+                                  Alert.alert(
+                                    "Error",
+                                    "Failed to add the listing."
+                                  );
+                                }
+                              },
+                            },
+                          ]
+                        );
+                      }
                     }}
                     style={{ marginLeft: 16 }}
-                    accessibilityLabel={`Remove listing for aircraft ${item.aircraftModel}`}
+                    accessibilityLabel={
+                      item.isListed
+                        ? `Remove listing for aircraft ${item.aircraftModel}`
+                        : `Add listing for aircraft ${item.aircraftModel}`
+                    }
                     accessibilityRole="button"
                   >
-                    <Ionicons name="close-circle" size={24} color="red" />
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <Ionicons
+                        name={
+                          item.isListed ? "close-circle" : "checkmark-circle"
+                        }
+                        size={24}
+                        color={item.isListed ? "red" : "green"}
+                      />
+                      <Text
+                        style={{
+                          marginLeft: 4,
+                          fontSize: 14,
+                          color: item.isListed ? "red" : "green",
+                        }}
+                      >
+                        {item.isListed ? "Hide Listing" : "Show Listing"}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 </TouchableOpacity>
               )}
@@ -2467,46 +2649,9 @@ const OwnerProfile = ({ ownerId }) => {
           ) : (
             <Text style={{ color: "#a0aec0" }}>No current listings.</Text>
           )}
-
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedAircraft(null);
-              setIsEditing(true);
-              setAircraftDetails({
-                aircraftModel: "",
-                tailNumber: "",
-                engineType: "",
-                totalTimeOnFrame: "",
-                location: "",
-                airportIdentifier: "",
-                costPerHour: "",
-                description: "",
-                images: [],
-                mainImage: "",
-              });
-              setImages([]);
-              setAircraftModalVisible(true);
-            }}
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              marginTop: 16,
-            }}
-            accessibilityLabel="Add new aircraft"
-            accessibilityRole="button"
-          >
-            <Ionicons name="add-circle" size={60} color="#3182ce" />
-          </TouchableOpacity>
-          <CustomButton
-            onPress={handleListForRentToggle}
-            title="List Selected Aircraft"
-            backgroundColor="#38a169"
-            style={{ marginTop: 16, marginBottom: 16 }}
-            accessibilityLabel="List selected aircraft for rent"
-          />
         </View>
 
-        {user?.email === "admin@example.com" && (
+        {user?.email === "coryarmer@gmail.com" && (
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
             <Text
               style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}

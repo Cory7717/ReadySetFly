@@ -339,7 +339,7 @@ const Home = ({ route, navigation }) => {
   // Subscribe to Firestore listings and then filter client-side based on location and make/model
   const subscribeToListings = () => {
     const listingsRef = collection(db, "airplanes");
-    const q = query(listingsRef, orderBy("createdAt", "desc"));
+    const q = query(listingsRef, where("isListed", "==", true), orderBy("createdAt", "desc"));
     return onSnapshot(
       q,
       (snapshot) => {
@@ -362,7 +362,7 @@ const Home = ({ route, navigation }) => {
             };
           })
           .filter((listing) => listing.ownerId);
-
+  
         if (filter.location) {
           listingsData = listingsData.filter((listing) =>
             listing.location.toLowerCase().includes(filter.location)
@@ -375,7 +375,7 @@ const Home = ({ route, navigation }) => {
               listing.airplaneModel.toLowerCase().includes(filter.make)
           );
         }
-
+  
         listingsData.forEach((listing) => {
           console.log(
             `Listing ID: ${listing.id}, Year: ${listing.year}, Make: ${listing.make}, Model: ${listing.airplaneModel}, Owner ID: ${listing.ownerId}`
@@ -399,6 +399,7 @@ const Home = ({ route, navigation }) => {
       }
     );
   };
+  
 
   // Calculate the total cost based on rental hours
   const calculateTotalCost = (hours) => {
@@ -787,8 +788,7 @@ const Home = ({ route, navigation }) => {
           ref={scrollViewRef}
         />
       </View>
-
-      {showScrollToTop && (
+        {showScrollToTop && (
         <TouchableOpacity
           style={[styles.scrollToTopButton, { width: 48, height: 48, borderRadius: 24 }]}
           onPress={handleScrollToTop}
@@ -801,191 +801,179 @@ const Home = ({ route, navigation }) => {
 
       {/* Full Screen Listing Modal */}
       <Modal
-        animationType="slide"
-        transparent={true}
-        visible={fullScreenModalVisible}
-        onRequestClose={() => setFullScreenModalVisible(false)}
-      >
-        <SafeAreaView style={styles.modalSafeArea}>
-          {selectedListing && selectedListing.images && (
-            <View style={styles.modalContainer}>
-              <TouchableOpacity
-                onPress={() => setFullScreenModalVisible(false)}
-                style={styles.modalCloseButton}
-                accessibilityLabel="Close modal"
-                accessibilityRole="button"
-              >
-                <Ionicons name="close" size={30} color="#FFFFFF" />
-              </TouchableOpacity>
-              <Animated.ScrollView
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onScroll={Animated.event(
-                  [{ nativeEvent: { contentOffset: { x: modalScrollX } } }],
-                  {
-                    useNativeDriver: false,
-                    listener: (event) => {
-                      const offsetX = event.nativeEvent.contentOffset.x;
-                      const index = Math.round(offsetX / SCREEN_WIDTH);
-                      setImageIndex(index);
-                    },
-                  }
-                )}
-                scrollEventThrottle={16}
-                style={styles.carouselScrollView}
-              >
-                {selectedListing.images.map((image, index) => (
-                  <TouchableOpacity key={index} activeOpacity={0.9} onPress={() => handleImagePress(image)}>
-                    <View style={styles.carouselImageContainer}>
-                      <Image source={{ uri: image }} style={styles.modalImage} resizeMode="cover" />
-                      <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={styles.gradientOverlay} />
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </Animated.ScrollView>
-              {renderPaginationDots()}
-              <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-                <Text style={styles.modalTitle}>
-                  {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
-                </Text>
-                <Text style={styles.modalRate}>
-                  ${parseFloat(selectedListing.costPerHour).toFixed(2)} per hour
-                </Text>
-                <Text style={styles.modalLocation}>Location: {selectedListing.location}</Text>
-                <Text style={styles.modalDescription}>{selectedListing.description}</Text>
-                {selectedListing.ownerId === user.uid && (userRole === "Owner" || userRole === "Both") && (
-                  <View style={styles.modalOwnerActions}>
-                    <TouchableOpacity
-                      onPress={() => handleEditListing(selectedListing.id)}
-                      style={styles.modalEditButton}
-                      accessibilityLabel="Edit listing"
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.buttonText}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteListing(selectedListing.id)}
-                      style={styles.modalDeleteButton}
-                      accessibilityLabel="Delete listing"
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.buttonText}>Delete</Text>
-                    </TouchableOpacity>
+  animationType="slide"
+  transparent={true}
+  visible={fullScreenModalVisible}
+  onRequestClose={() => setFullScreenModalVisible(false)}
+>
+  <SafeAreaView style={styles.modalSafeArea}>
+    {selectedListing && selectedListing.images && (
+      <ScrollView contentContainerStyle={styles.modalContentContainer} showsVerticalScrollIndicator={false}>
+        <TouchableOpacity
+          onPress={() => setFullScreenModalVisible(false)}
+          style={styles.modalCloseButton}
+          accessibilityLabel="Close modal"
+          accessibilityRole="button"
+        >
+          <Ionicons name="close" size={30} color="#FFFFFF" />
+        </TouchableOpacity>
+        
+        {/* Carousel Section */}
+        <View style={styles.carouselWrapper}>
+          <Animated.ScrollView
+            horizontal
+            pagingEnabled
+            snapToInterval={SCREEN_WIDTH}
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: modalScrollX } } }],
+              {
+                useNativeDriver: false,
+                listener: (event) => {
+                  const offsetX = event.nativeEvent.contentOffset.x;
+                  const index = Math.round(offsetX / SCREEN_WIDTH);
+                  setImageIndex(index);
+                },
+              }
+            )}
+            scrollEventThrottle={16}
+            style={styles.carouselScrollView}
+          >
+            {selectedListing.images.map((image, index) => (
+              <View key={index} style={{ width: SCREEN_WIDTH, justifyContent: "center", alignItems: "center" }}>
+                <TouchableOpacity activeOpacity={0.9} onPress={() => handleImagePress(image)}>
+                  <View style={styles.carouselImageContainer}>
+                    <Image source={{ uri: image }} style={styles.modalImage} resizeMode="cover" />
+                    <LinearGradient colors={["transparent", "rgba(0,0,0,0.7)"]} style={styles.gradientOverlay} />
                   </View>
-                )}
-                <TouchableOpacity
-                  onPress={() => handleDeleteListing(selectedListing.id)}
-                  style={styles.modalDeleteButton}
-                  accessibilityLabel="Developer delete listing"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.buttonText}>Developer Delete</Text>
                 </TouchableOpacity>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Full Name</Text>
-                  <TextInput
-                    value={fullName}
-                    onChangeText={setFullName}
-                    placeholder="Enter your full name"
-                    placeholderTextColor="#FFFFFF"
-                    style={[styles.textInput, { color: "#FFFFFF" }]}
-                    accessibilityLabel="Full name input"
-                  />
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Current City & State</Text>
-                  <TextInput
-                    value={cityStateCombined}
-                    onChangeText={setCityStateCombined}
-                    placeholder="e.g., New York, NY"
-                    placeholderTextColor="#FFFFFF"
-                    style={[styles.textInput, { color: "#FFFFFF" }]}
-                    accessibilityLabel="Current city and state input"
-                  />
-                </View>
-                <View style={styles.toggleGroup}>
-                  <Text style={styles.inputLabel}>
-                    Do you have a current medical certificate?
-                  </Text>
-                  <Switch
-                    value={hasMedicalCertificate}
-                    onValueChange={setHasMedicalCertificate}
-                    accessibilityLabel="Medical certificate toggle"
-                  />
-                </View>
-                <View style={styles.toggleGroup}>
-                  <Text style={styles.inputLabel}>
-                    Do you have current renter's insurance?
-                  </Text>
-                  <Switch
-                    value={hasRentersInsurance}
-                    onValueChange={setHasRentersInsurance}
-                    accessibilityLabel="Renters insurance toggle"
-                  />
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Flight Hours</Text>
-                  <TextInput
-                    value={flightHours}
-                    onChangeText={setFlightHours}
-                    placeholder="Enter hours"
-                    placeholderTextColor="#FFFFFF"
-                    keyboardType="numeric"
-                    style={[styles.textInputSmall, { color: "#FFFFFF" }]}
-                    accessibilityLabel="Flight hours input"
-                  />
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Rental Hours</Text>
-                  <TextInput
-                    value={String(rentalHours)}
-                    placeholderTextColor="#FFFFFF"
-                    onChangeText={(text) => {
-                      const num = Number(text);
-                      if (!isNaN(num) && num >= 0) {
-                        setRentalHours(num);
-                      } else {
-                        Alert.alert("Invalid Input", "Please enter a valid number of rental hours.");
-                      }
-                    }}
-                    keyboardType="numeric"
-                    style={[styles.textInputSmall, { color: "#FFFFFF" }]}
-                    accessibilityLabel="Rental hours input"
-                  />
-                </View>
-                <TouchableOpacity
-                  onPress={() => setCalendarModalVisible(true)}
-                  style={styles.calendarButton}
-                  accessibilityLabel="Select rental date"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.calendarButtonText}>Select Rental Date</Text>
-                </TouchableOpacity>
-                {rentalDate && (
-                  <Text style={styles.selectedDateText}>Selected Rental Date: {rentalDate}</Text>
-                )}
-                <View style={styles.totalCostContainer}>
-                  <Text style={styles.totalCostTitle}>Total Cost</Text>
-                  <Text>Rental Cost: ${totalCost.rentalCost}</Text>
-                  <Text>Booking Fee: ${totalCost.bookingFee}</Text>
-                  <Text>Transaction Fee: ${totalCost.transactionFee}</Text>
-                  <Text>Sales Tax: ${totalCost.salesTax}</Text>
-                  <Text style={styles.totalCostValue}>Total: ${totalCost.total}</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={handleSendRentalRequest}
-                  style={styles.sendRequestButton}
-                  accessibilityLabel="Send rental request"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.sendRequestButtonText}>Send Rental Request</Text>
-                </TouchableOpacity>
-              </ScrollView>
+              </View>
+            ))}
+          </Animated.ScrollView>
+          {renderPaginationDots()}
+        </View>
+        
+        {/* Text Content Section */}
+        <View style={styles.modalTextContent}>
+          <Text style={styles.modalTitle}>
+            {`${selectedListing.year} ${selectedListing.make} ${selectedListing.airplaneModel}`}
+          </Text>
+          <Text style={styles.modalRate}>
+            ${parseFloat(selectedListing.costPerHour).toFixed(2)} per hour
+          </Text>
+          <Text style={styles.modalLocation}>Location: {selectedListing.location}</Text>
+          <Text style={styles.modalDescription}>{selectedListing.description}</Text>
+          {selectedListing.ownerId === user.uid && (userRole === "Owner" || userRole === "Both") && (
+            <View style={styles.modalOwnerActions}>
+              {/* Owner actions can remain here */}
             </View>
           )}
-        </SafeAreaView>
-      </Modal>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Full Name</Text>
+            <TextInput
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Enter your full name"
+              placeholderTextColor="#FFFFFF"
+              style={[styles.textInput, { color: "#FFFFFF" }]}
+              accessibilityLabel="Full name input"
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Current City & State</Text>
+            <TextInput
+              value={cityStateCombined}
+              onChangeText={setCityStateCombined}
+              placeholder="e.g., New York, NY"
+              placeholderTextColor="#FFFFFF"
+              style={[styles.textInput, { color: "#FFFFFF" }]}
+              accessibilityLabel="Current city and state input"
+            />
+          </View>
+          <View style={styles.toggleGroup}>
+            <Text style={styles.inputLabel}>
+              Do you have a current medical certificate?
+            </Text>
+            <Switch
+              value={hasMedicalCertificate}
+              onValueChange={setHasMedicalCertificate}
+              accessibilityLabel="Medical certificate toggle"
+            />
+          </View>
+          <View style={styles.toggleGroup}>
+            <Text style={styles.inputLabel}>
+              Do you have current renter's insurance?
+            </Text>
+            <Switch
+              value={hasRentersInsurance}
+              onValueChange={setHasRentersInsurance}
+              accessibilityLabel="Renters insurance toggle"
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Flight Hours</Text>
+            <TextInput
+              value={flightHours}
+              onChangeText={setFlightHours}
+              placeholder="Enter hours"
+              placeholderTextColor="#FFFFFF"
+              keyboardType="numeric"
+              style={[styles.textInputSmall, { color: "#FFFFFF" }]}
+              accessibilityLabel="Flight hours input"
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Rental Hours</Text>
+            <TextInput
+              value={String(rentalHours)}
+              placeholderTextColor="#FFFFFF"
+              onChangeText={(text) => {
+                const num = Number(text);
+                if (!isNaN(num) && num >= 0) {
+                  setRentalHours(num);
+                } else {
+                  Alert.alert("Invalid Input", "Please enter a valid number of rental hours.");
+                }
+              }}
+              keyboardType="numeric"
+              style={[styles.textInputSmall, { color: "#FFFFFF" }]}
+              accessibilityLabel="Rental hours input"
+            />
+          </View>
+          <TouchableOpacity
+            onPress={() => setCalendarModalVisible(true)}
+            style={styles.calendarButton}
+            accessibilityLabel="Select rental date"
+            accessibilityRole="button"
+          >
+            <Text style={styles.calendarButtonText}>Select Rental Date</Text>
+          </TouchableOpacity>
+          {rentalDate && (
+            <Text style={styles.selectedDateText}>Selected Rental Date: {rentalDate}</Text>
+          )}
+          <View style={styles.totalCostContainer}>
+            <Text style={styles.totalCostTitle}>Total Cost</Text>
+            <Text>Rental Cost: ${totalCost.rentalCost}</Text>
+            <Text>Booking Fee: ${totalCost.bookingFee}</Text>
+            <Text>Transaction Fee: ${totalCost.transactionFee}</Text>
+            <Text>Sales Tax: ${totalCost.salesTax}</Text>
+            <Text style={styles.totalCostValue}>Total: ${totalCost.total}</Text>
+          </View>
+          <TouchableOpacity
+            onPress={handleSendRentalRequest}
+            style={styles.sendRequestButton}
+            accessibilityLabel="Send rental request"
+            accessibilityRole="button"
+          >
+            <Text style={styles.sendRequestButtonText}>Send Rental Request</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    )}
+  </SafeAreaView>
+</Modal>
+
 
       {/* Zoom Image Modal */}
       <Modal
@@ -1294,27 +1282,36 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.9)",
   },
+  // New vertical container wrapping modal content (carousel + text)
+  modalContentContainer: {
+    padding: 16,
+  },
   modalContainer: {
     flex: 1,
-    padding: 16,
     position: "relative",
   },
   modalCloseButton: {
     alignSelf: "flex-end",
     marginBottom: 10,
   },
+  // Carousel wrapper for spacing below the carousel
+  carouselWrapper: {
+    marginBottom: 16,
+  },
+  // Updated carousel scroll view now spans the full screen width and increased height
   carouselScrollView: {
-    height: SCREEN_HEIGHT * 0.7,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.25,  // Increased height to cover more of the modal
     borderRadius: 12,
-    overflow: "visible",
+    overflow: "hidden",
     marginBottom: 8,
   },
+  // Updated carousel image container to use the full width
   carouselImageContainer: {
-    width: SCREEN_WIDTH - 32,
-    height: SCREEN_HEIGHT * 0.4,
-    marginRight: 16,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.25,
     borderRadius: 12,
-    overflow: "visible",
+    overflow: "hidden",
   },
   modalImage: {
     width: "100%",
@@ -1328,8 +1325,9 @@ const styles = StyleSheet.create({
     right: 0,
     height: "40%",
   },
-  modalContent: {
-    padding: 16,
+  // Container for text content below the carousel
+  modalTextContent: {
+    paddingVertical: 16,
   },
   modalTitle: {
     fontSize: 22,
@@ -1593,6 +1591,25 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
   },
+  // New styles for pagination dots
+  paginationDotsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: "#FFFFFF",
+  },
+  inactiveDot: {
+    backgroundColor: "#888",
+  },
 });
-
 export default Home;
+

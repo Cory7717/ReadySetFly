@@ -37,6 +37,7 @@ import {
   startAfter,
   setDoc,
   deleteDoc,
+  arrayUnion,
 } from "firebase/firestore";
 
 import * as ImagePicker from "expo-image-picker";
@@ -194,6 +195,18 @@ const renter = () => {
   const params = useLocalSearchParams(); // Access search params (e.g., autoOpenChat)
   const navigation = useNavigation(); // Get navigation object
 
+  // At the top of your renter component, add:
+  const [chatFailed, setChatFailed] = useState(false);
+  const [chatFailSafeModalVisible, setChatFailSafeModalVisible] =
+    useState(false);
+  const [ownerEmail, setOwnerEmail] = useState(null);
+
+  useEffect(() => {
+    if (chatFailed && paymentComplete) {
+      setChatFailSafeModalVisible(true);
+    }
+  }, [chatFailed, paymentComplete]);
+
   // New state to track if the payment flow has already been handled (Original)
   const [paymentHandled, setPaymentHandled] = useState(false);
 
@@ -232,8 +245,7 @@ const renter = () => {
   const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] =
     useState(false);
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
-  const [notificationModalVisible, setNotificationModalVisible] =
-    useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [allNotificationsModalVisible, setAllNotificationsModalVisible] =
     useState(false);
   const [faqModalVisible, setFaqModalVisible] = useState(false);
@@ -374,6 +386,47 @@ const renter = () => {
     } catch (error) {
       console.error("Error opening message modal:", error);
       Alert.alert("Error", "Failed to open messages.");
+    }
+  };
+
+  const sendPaymentNotificationToOwner = async (rentalRequestId, ownerId) => {
+    try {
+      // First, get or create a chat thread between the renter and the owner.
+      let chatThreadId = selectedChatThreadId;
+      if (!chatThreadId) {
+        const newChatThread = {
+          participants: [renterId, ownerId],
+          messages: [],
+          rentalRequestId: rentalRequestId,
+          createdAt: serverTimestamp(),
+        };
+        const chatDocRef = await addDoc(
+          collection(db, "messages"),
+          newChatThread
+        );
+        chatThreadId = chatDocRef.id;
+        setSelectedChatThreadId(chatThreadId);
+      }
+      // Construct a system message that notifies the owner of payment completion.
+      const paymentMessage = {
+        senderId: renterId,
+        senderName: renter.displayName || "Renter",
+        text: "Payment completed for rental. Let’s chat!",
+        timestamp: serverTimestamp(),
+        // Include recipients so the server function sends push notifications.
+        recipients: [ownerId],
+      };
+      // Append the message to the chat thread.
+      const chatDocRef = doc(db, "messages", chatThreadId);
+      await updateDoc(chatDocRef, {
+        messages: arrayUnion(paymentMessage),
+      });
+      console.log(
+        "Payment notification sent to owner in chat thread:",
+        chatThreadId
+      );
+    } catch (error) {
+      console.error("Error sending payment notification message:", error);
     }
   };
 
@@ -527,10 +580,10 @@ const renter = () => {
     ) {
       const rentalId = params.paymentSuccessFor;
       const ownerIdForChat = params.ownerId;
-  
+
       console.log(`Handling payment success for rental: ${rentalId}`);
       setProcessingPaymentSuccess(rentalId);
-  
+
       // Update rental request status to "active"
       (async () => {
         try {
@@ -541,15 +594,20 @@ const renter = () => {
           console.error("Error updating rental status:", error);
         }
       })();
-  
+
       Alert.alert("Payment Successful!", "Your rental is now active.", [
-        { text: "OK", onPress: () => closeAllOpenModals() },
+        {
+          text: "OK",
+          onPress: async () => {
+            await sendPaymentNotificationToOwner(rentalId, ownerIdForChat);
+            closeAllOpenModals();
+          },
+        },
       ]);
-  
       // Clear parameters to avoid re-triggering the effect
       navigation.setParams({ paymentSuccessFor: null, ownerId: null });
     }
-  
+
     return () => {
       if (
         navigation.isFocused() &&
@@ -559,7 +617,6 @@ const renter = () => {
       }
     };
   }, [params, navigation, processingPaymentSuccess]);
-  
 
   // -------------------------
   // Fetch Profile on Mount (Original - unchanged, reads from 'users')
@@ -1076,9 +1133,10 @@ const renter = () => {
             const ownerDoc = await getDoc(ownerDocRef);
             if (ownerDoc.exists()) {
               ownerName = ownerDoc.data().fullName || "N/A";
+              setOwnerEmail(ownerDoc.data().email || null); // Set owner email if available
             }
           } catch (e) {
-            console.error("Error fetching owner name", e);
+            console.error("Error fetching owner details:", e);
           }
         }
 
@@ -1410,6 +1468,20 @@ const renter = () => {
       rentalRequestListenerRef.current = null;
     }
   }, [selectedNotification, selectedRentalRequest]);
+
+  const handleDeniedNotificationClose = async () => {
+    if (!selectedNotification || !renterId) return;
+    try {
+      // Delete the denied notification from the renter's notifications collection
+      await deleteDoc(
+        doc(db, "renters", renterId, "notifications", selectedNotification.id)
+      );
+      // Optionally update your local state here if needed.
+    } catch (error) {
+      console.error("Error deleting denied notification:", error);
+    }
+    closeModal();
+  };
 
   // -------------------------
   // Remove All Notifications (Original - unchanged)
@@ -1854,6 +1926,27 @@ const renter = () => {
                   renderItem={renderRentalItem}
                   scrollEnabled={false}
                 />
+                {paymentComplete &&
+                  rentals.some((r) => {
+                    if (r.rentalDate) {
+                      let rentalDateObj;
+                      if (typeof r.rentalDate === "string") {
+                        rentalDateObj = new Date(r.rentalDate);
+                      } else if (r.rentalDate.toDate) {
+                        rentalDateObj = r.rentalDate.toDate();
+                      } else {
+                        rentalDateObj = new Date(r.rentalDate);
+                      }
+                      return rentalDateObj >= new Date();
+                    }
+                    return false;
+                  }) && (
+                    <CustomButton
+                      onPress={() => setChatFailSafeModalVisible(true)}
+                      title="Email Owner"
+                      backgroundColor="#3182ce"
+                    />
+                  )}
               </>
             ) : (
               <Text style={styles.noActiveRentalsText}>
@@ -2257,8 +2350,7 @@ const renter = () => {
                           Booking Fee (6%): ${safeToFixed(totalCost.bookingFee)}
                         </Text>
                         <Text style={styles.detailValue}>
-                          Transaction Fee (3%): $
-                          {safeToFixed(totalCost.transactionFee)}
+                          Transaction Fee (3%): ${safeToFixed(totalCost.transactionFee)}
                         </Text>
                         <Text style={styles.detailValue}>
                           Sales Tax (8.25%): ${safeToFixed(totalCost.salesTax)}
@@ -2273,7 +2365,22 @@ const renter = () => {
                   </View>
                 )}
 
-                {!paymentComplete ? (
+                {selectedRentalRequest &&
+                selectedRentalRequest.rentalStatus === "denied" ? (
+                  <TouchableOpacity
+                    onPress={handleDeniedNotificationClose}
+                    style={[
+                      styles.closeNotificationModalButton,
+                      { marginTop: 20 },
+                    ]}
+                    accessibilityLabel="Close"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.closeNotificationModalButtonText}>
+                      Close
+                    </Text>
+                  </TouchableOpacity>
+                ) : !paymentComplete ? (
                   <TouchableOpacity
                     onPress={() => {
                       const ownerIdForCheckout = selectedRentalRequest?.ownerId;
@@ -2309,6 +2416,7 @@ const renter = () => {
                     )}
                   </TouchableOpacity>
                 ) : (
+                  // Existing branch for when payment is complete...
                   <View style={{ alignItems: "center", marginVertical: 16 }}>
                     <Text
                       style={{
@@ -2539,7 +2647,7 @@ const renter = () => {
                       styles.proceedToPayButton,
                       { marginTop: 20, backgroundColor: "#38a169" },
                     ]}
-                    accessibilityLabel="Proceed to Pay"
+                    accessibilityLabel="Proceed to payment"
                     accessibilityRole="button"
                     disabled={isProcessingPayment}
                   >
@@ -2677,8 +2785,7 @@ const renter = () => {
                         Booking Fee (6%): ${safeToFixed(pastCost.bookingFee)}
                       </Text>
                       <Text style={styles.detailValue}>
-                        Transaction Fee (3%): $
-                        {safeToFixed(pastCost.transactionFee)}
+                        Transaction Fee (3%): ${safeToFixed(pastCost.transactionFee)}
                       </Text>
                       <Text style={styles.detailValue}>
                         Sales Tax (8.25%): ${safeToFixed(pastCost.salesTax)}
@@ -2854,6 +2961,50 @@ const renter = () => {
           </View>
         </View>
       </Modal>
+      {/* Chat Fail-Safe Modal */}
+      <Modal
+        visible={chatFailSafeModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setChatFailSafeModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
+        >
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "#fff",
+              padding: 20,
+              borderRadius: 10,
+            }}
+          >
+            <ModalHeader
+              title="Contact Owner"
+              onClose={() => setChatFailSafeModalVisible(false)}
+            />
+            <Text style={{ fontSize: 16, marginBottom: 16 }}>
+              It looks like the chat isn’t working. Please contact the owner
+              directly at:
+            </Text>
+            <Text style={styles.ownerEmailText}>
+              {ownerEmail || "Email not available"}
+            </Text>
+            <CustomButton
+              onPress={() => {
+                if (ownerEmail) {
+                  Linking.openURL(
+                    `mailto:${ownerEmail}?subject=Rental Inquiry`
+                  );
+                }
+              }}
+              title="Send Email"
+              backgroundColor="#3182ce"
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <Modal
         visible={chatListModalVisible}
@@ -2949,7 +3100,7 @@ const renter = () => {
             <CustomButton
               onPress={() => {
                 setChatListModalVisible(false);
-                openMessageModal();
+                openMessageModal(); // Auto-create a new chat thread if none selected.
               }}
               title="Start New Chat"
               backgroundColor="#3182ce"
@@ -3455,6 +3606,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
+  },
+  ownerEmailText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#3182ce",
+    textAlign: "center",
+    marginBottom: 16,
   },
   profileImageUpload: {
     alignItems: "center",
