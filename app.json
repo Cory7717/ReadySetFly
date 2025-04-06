@@ -7,6 +7,10 @@
     "orientation": "portrait",
     "icon": "./Assets/images/RSFOpaqueLogo.png",
     "userInterfaceStyle": "automatic",
+
+    // ✅ new‑arch flag lives right here
+    "newArchEnabled": false,
+
     "splash": {
       "image": "./Assets/images/RSFOpaqueLogo.png",
       "resizeMode": "contain",

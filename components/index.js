@@ -10,7 +10,7 @@ import SingleEnginePiston from "./SingleEnginePiston";
 import TwinEnginePiston from "./TwinEnginePiston";
 import PistonHelicopter from "./PistonHelicopter";
 import Header from "./Header";
-import CFIScreen from "./CFIScreen";
+// import CFIScreen from "./CFIScreen";
 import Categories from "./Categories";
 import HeaderCFI from "./HeaderCFI";
 
@@ -29,7 +29,7 @@ export {
   TwinEnginePiston,
   PistonHelicopter,
   Header,
-  CFIScreen,
+  // CFIScreen,
   Categories, 
   HeaderCFI
 };

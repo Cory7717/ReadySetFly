@@ -4266,7 +4266,7 @@ const Classifieds = () => {
 };
 
 const AppNavigator = () => (
-  <NavigationContainer independent={true}>
+  
     <Stack.Navigator initialRouteName="Classifieds">
       <Stack.Screen
         name="Classifieds"
@@ -4279,7 +4279,7 @@ const AppNavigator = () => (
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
-  </NavigationContainer>
+
 );
 
 export default AppNavigator;
