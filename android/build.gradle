@@ -1,18 +1,12 @@
-/*
-  For Gradle, add the following dependency to your build.gradle and replace with
-  the version number you want to use from:
-  - https://mvnrepository.com/artifact/com.stripe/stripe-java or
-  - https://github.com/stripe/stripe-java/releases/latest
-*/
-// implementation "com.stripe:stripe-java:26.0.0"
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
     ext {
-        buildToolsVersion = findProperty('android.buildToolsVersion') ?: '34.0.0'
-        minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '23')
-        compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '34')
+        buildToolsVersion = findProperty('android.buildToolsVersion') ?: '35.0.0'
+        minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '24')
+        compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '35')
         targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '34')
-        kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.23'
+        kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.25'
 
         ndkVersion = "26.1.10909125"
     }
@@ -24,12 +18,10 @@ buildscript {
         classpath('com.android.tools.build:gradle')
         classpath('com.facebook.react:react-native-gradle-plugin')
         classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
-        classpath 'com.google.gms:google-services:4.3.3' // <-- This is correct here.
     }
 }
 
-apply plugin: 
-"com.facebook.react.rootproject"
+apply plugin: "com.facebook.react.rootproject"
 
 allprojects {
     repositories {
