@@ -1010,39 +1010,40 @@ const Classifieds = () => {
   };
 
   // ───────────────────────────────────────────────────────────
-// NEW: Flag / Report a listing
-// ───────────────────────────────────────────────────────────
-const handleReportListing = (listing) => {
-  Alert.alert(
-    "Report listing",
-    "Flag this listing as spam or fraudulent? A moderator will be notified.",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Report",
-        style: "destructive",
-        onPress: () => {
-          getFirebaseIdToken().then((token) => {
-            fetch(`${API_URL}/reportListing`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ listingId: listing.id }),
-            })
-              .then(() => Alert.alert("Thank you", "The listing was reported."))
-              .catch((err) => {
-                console.error(err);
-                Alert.alert("Error", "Could not send report.");
-              });
-          });
+  // NEW: Flag / Report a listing
+  // ───────────────────────────────────────────────────────────
+  const handleReportListing = (listing) => {
+    Alert.alert(
+      "Report listing",
+      "Flag this listing as spam or fraudulent? A moderator will be notified.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Report",
+          style: "destructive",
+          onPress: () => {
+            getFirebaseIdToken().then((token) => {
+              fetch(`${API_URL}/reportListing`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ listingId: listing.id }),
+              })
+                .then(() =>
+                  Alert.alert("Thank you", "The listing was reported.")
+                )
+                .catch((err) => {
+                  console.error(err);
+                  Alert.alert("Error", "Could not send report.");
+                });
+            });
+          },
         },
-      },
-    ]
-  );
-};
-
+      ]
+    );
+  };
 
   // Updated: Removed the old handleContactUs – now the "Information about Broker Services" button will open the broker modal.
   const handleDeleteListing = (listingId) => {
@@ -1769,29 +1770,38 @@ const handleReportListing = (listing) => {
                 </TouchableOpacity>
 
                 <View style={styles.editDeleteContainer}>
-  {/* NEW: show “Report Post” label + flag if viewer is NOT the owner */}
-  {user && item.ownerId !== user.uid && (
-    <TouchableOpacity
-      onPress={() => handleReportListing(item)}
-      style={{
-        alignSelf: "flex-end",
-        marginTop: 1,
-        flexDirection: "row",
-        alignItems: "center",
-      }}
-      accessibilityLabel="Report listing"
-      accessibilityRole="button"
-    >
-      <Text style={{ color: COLORS.red, fontSize: 14, marginRight: 6 }}>
-        Report Post
-      </Text>
-      <Ionicons name="flag-outline" size={20} color={COLORS.red} />
-    </TouchableOpacity>
-  )}
-  {/* existing owner‑only Edit / Delete buttons */}
-  {renderEditAndDeleteButtons(item)}
-</View>
-
+                  {/* NEW: show “Report Post” label + flag if viewer is NOT the owner */}
+                  {user && item.ownerId !== user.uid && (
+                    <TouchableOpacity
+                      onPress={() => handleReportListing(item)}
+                      style={{
+                        alignSelf: "flex-end",
+                        marginTop: 1,
+                        flexDirection: "row",
+                        alignItems: "center",
+                      }}
+                      accessibilityLabel="Report listing"
+                      accessibilityRole="button"
+                    >
+                      <Text
+                        style={{
+                          color: COLORS.red,
+                          fontSize: 14,
+                          marginRight: 6,
+                        }}
+                      >
+                        Report Post
+                      </Text>
+                      <Ionicons
+                        name="flag-outline"
+                        size={20}
+                        color={COLORS.red}
+                      />
+                    </TouchableOpacity>
+                  )}
+                  {/* existing owner‑only Edit / Delete buttons */}
+                  {renderEditAndDeleteButtons(item)}
+                </View>
               </View>
               {(index + 1) % 17 === 0 && (
                 <View>
@@ -4729,5 +4739,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: 4,
   },
-  
 });
