@@ -13,6 +13,8 @@ const bodyParser = require('body-parser');
 const { onRequest } = require('firebase-functions/v2/https');
 const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const nodemailer = require('nodemailer');   // <-- NEW
+
 
 // =====================
 // Initialize Firebase Admin SDK
@@ -36,6 +38,23 @@ const ALLOWED_PACKAGES = ['Basic', 'Featured', 'Enhanced', 'Charter Services']; 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = Stripe(stripeSecretKey);
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const MODERATOR_EMAIL = process.env.MODERATOR_EMAIL;
+
+// =====================
+// Email (Nodemailer) setup            // <-- NEW block
+// =====================
+
+console.log('SMTP vars:', process.env.SMTP_HOST, process.env.SMTP_PORT, process.env.SMTP_USER);
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,          // e.g. "smtp.gmail.com"
+  port: Number(process.env.SMTP_PORT),  // e.g. 465
+  secure: true,                         // true for 465, false otherwise
+  auth: {
+    user: process.env.SMTP_USER,        // full email address
+    pass: process.env.SMTP_PASS
+  }
+});
 
 // =====================
 // Initialize Express App
@@ -236,6 +255,29 @@ const sendNotification = async (tokens, title, body, data = {}) => {
     admin.logger.info('Notifications sent successfully:', response);
   } catch (error) {
     admin.logger.error('Error sending notifications:', error);
+  }
+};
+
+/**
+ * Send an email to the moderators when a listing is reported      // <-- NEW helper
+ */
+const sendReportEmail = async ({ listingId, reporterId, reason, comments }) => {
+  try {
+    await transporter.sendMail({
+      from: `"RSF Alert" <${process.env.SMTP_USER}>`,
+      to: MODERATOR_EMAIL,                             // comma‑separated for multiple mods
+      subject: `⚑ Listing ${listingId} reported`,
+      html: `
+        <h2>Listing report received</h2>
+        <p><strong>Listing ID:</strong> ${listingId}</p>
+        <p><strong>Reporter UID:</strong> ${reporterId}</p>
+        <p><strong>Reason:</strong> ${reason}</p>
+        <p><strong>Comments:</strong> ${comments || '(none)'}</p>
+      `
+    });
+    admin.logger.info(`Report email for ${listingId} sent.`);
+  } catch (err) {
+    admin.logger.error('sendReportEmail error:', err);
   }
 };
 
@@ -682,6 +724,46 @@ app.delete('/deleteListing', authenticate, async (req, res) => {
   }
 });
 
+// -------------------------------------------------------------------
+// POST /reportListing   ⟶  saves a report + emails the moderators
+// -------------------------------------------------------------------
+app.post('/reportListing', authenticate, async (req, res) => {
+  try {
+    const { listingId, reason, comments = '' } = req.body;
+
+    // ─── basic validation ──────────────────────────────────────────
+    if (!listingId || !reason) {
+      return res.status(400).json({ error: 'listingId and reason are required' });
+    }
+
+    // make sure the listing still exists (optional but nice)
+    const listingSnap = await db.collection('listings').doc(listingId).get();
+    if (!listingSnap.exists) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+
+    // ─── build and save the report doc ─────────────────────────────
+    const report = {
+      listingId,
+      reporterId: req.user.uid,
+      reason,                   // e.g. "Spam" | "Offensive content" | …
+      comments,                 // free‑form text from the user
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    await db.collection('listingReports').add(report);   // <-- THIS is the write you asked about
+
+    // ─── ping the mods by email (helper added earlier) ─────────────
+    sendReportEmail(report);
+
+    return res.status(201).json({ success: true });
+  } catch (err) {
+    admin.logger.error('Error in /reportListing:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 // ===================================================================
 // Payment Endpoints
 // ===================================================================
@@ -952,10 +1034,12 @@ app.post('/retrieve-connected-account', authenticate, async (req, res) => {
   }
 });
 
-// NEW: Get Stripe Balance Endpoint (Updated to return pending deposit amount)
+// ===================================================================
+// Get Stripe Balance Endpoint (now returns pendingAmount AND ytdAmount)
+// ===================================================================
 app.get('/get-stripe-balance', authenticate, async (req, res) => {
   try {
-    // Retrieve the owner's document using the UID from the decoded token
+    // 1) Load the owner’s Firestore record
     const ownerDoc = await db.collection('users').doc(req.user.uid).get();
     if (!ownerDoc.exists) {
       return res.status(404).json({ error: 'Owner not found' });
@@ -964,16 +1048,42 @@ app.get('/get-stripe-balance', authenticate, async (req, res) => {
     if (!ownerData.stripeAccountId) {
       return res.status(400).json({ error: 'Stripe account not connected' });
     }
-    // Retrieve the connected account’s balance with correct parameters
-    const balance = await stripe.balance.retrieve({}, { stripeAccount: ownerData.stripeAccountId });
-    // Sum up the amounts in the pending array (in cents)
+    const accountId = ownerData.stripeAccountId;
+
+    // 2) Retrieve the connected account’s current balance
+    const balance = await stripe.balance.retrieve(
+      {},
+      { stripeAccount: accountId }
+    );
+    // Sum up pending
     let pendingAmount = 0;
-    if (balance.pending && Array.isArray(balance.pending)) {
-      for (const pending of balance.pending) {
-        pendingAmount += pending.amount;
+    if (Array.isArray(balance.pending)) {
+      for (const p of balance.pending) {
+        pendingAmount += p.amount;
       }
     }
-    return res.status(200).json({ pendingAmount });
+
+    // 3) Calculate Year‑to‑Date earnings by listing all balance transactions since Jan 1
+    const startOfYear = Math.floor(
+      new Date(new Date().getFullYear(), 0, 1).getTime() / 1000
+    );
+    const transactions = await stripe.balanceTransactions
+      .list(
+        { limit: 100, created: { gte: startOfYear } },
+        { stripeAccount: accountId }
+      )
+      .autoPagingToArray({ limit: 1000 });
+
+    let ytdAmount = 0;
+    for (const tx of transactions) {
+      // Only count positive amounts (i.e. incoming payments)
+      if (tx.amount > 0) {
+        ytdAmount += tx.amount;
+      }
+    }
+
+    // 4) Return both values (in cents)
+    return res.status(200).json({ pendingAmount, ytdAmount });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -982,6 +1092,16 @@ app.get('/get-stripe-balance', authenticate, async (req, res) => {
 // ===================================================================
 // Firestore-Triggered Functions
 // ===================================================================
+
+
+exports.emailOnListingReported = onDocumentCreated(
+  'listingReports/{reportId}',
+  async (snap, ctx) => {
+    const data = snap.data();
+    await sendReportEmail(data);       // reuse the same helper
+    return null;
+  }
+);
 
 exports.onMessageSent = onDocumentCreated('messages/{messageId}', async (snapshot, context) => {
   const { messageId } = context.params;

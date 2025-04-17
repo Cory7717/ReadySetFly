@@ -43,6 +43,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import * as Location from "expo-location";
+import { useFocusEffect } from '@react-navigation/native';
 
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -194,6 +195,7 @@ const renter = () => {
   const router = useRouter();
   const params = useLocalSearchParams(); // Access search params (e.g., autoOpenChat)
   const navigation = useNavigation(); // Get navigation object
+  const flatListRef = useRef(null);
 
   // At the top of your renter component, add:
   const [chatFailed, setChatFailed] = useState(false);
@@ -391,36 +393,58 @@ const renter = () => {
 
   const sendPaymentNotificationToOwner = async (rentalRequestId, ownerId) => {
     try {
-      // First, get or create a chat thread between the renter and the owner.
+      // 1) Find or create the shared chat thread
       let chatThreadId = selectedChatThreadId;
+  
       if (!chatThreadId) {
-        const newChatThread = {
-          participants: [renterId, ownerId],
-          messages: [],
-          rentalRequestId: rentalRequestId,
-          createdAt: serverTimestamp(),
-        };
-        const chatDocRef = await addDoc(
-          collection(db, "messages"),
-          newChatThread
+        const threadsRef = collection(db, "messages");
+        // look for any thread where this renter is a participant
+        const q = query(
+          threadsRef,
+          where("participants", "array-contains", renterId)
         );
-        chatThreadId = chatDocRef.id;
+        const snap = await getDocs(q);
+  
+        // try to find one that also contains the owner and matches the rentalRequestId
+        const existing = snap.docs.find(docSnap => {
+          const data = docSnap.data();
+          return data.participants.includes(renterId)
+              && data.participants.includes(ownerId)
+              && data.rentalRequestId === rentalRequestId;
+        });
+  
+        if (existing) {
+          chatThreadId = existing.id;
+        } else {
+          // no existing thread — create a new one
+          const newThread = {
+            participants: [renterId, ownerId],
+            rentalRequestId,
+            messages: [],
+            createdAt: serverTimestamp(),
+          };
+          const docRef = await addDoc(threadsRef, newThread);
+          chatThreadId = docRef.id;
+        }
+  
+        // keep it in state for future calls
         setSelectedChatThreadId(chatThreadId);
       }
-      // Construct a system message that notifies the owner of payment completion.
+  
+      // 2) Send the “payment completed” system message
       const paymentMessage = {
         senderId: renterId,
-        senderName: renter.displayName || "Renter",
+        senderName: renter?.displayName || "Renter",
         text: "Payment completed for rental. Let’s chat!",
         timestamp: serverTimestamp(),
-        // Include recipients so the server function sends push notifications.
         recipients: [ownerId],
       };
-      // Append the message to the chat thread.
-      const chatDocRef = doc(db, "messages", chatThreadId);
-      await updateDoc(chatDocRef, {
+  
+      const threadDocRef = doc(db, "messages", chatThreadId);
+      await updateDoc(threadDocRef, {
         messages: arrayUnion(paymentMessage),
       });
+  
       console.log(
         "Payment notification sent to owner in chat thread:",
         chatThreadId
@@ -429,7 +453,6 @@ const renter = () => {
       console.error("Error sending payment notification message:", error);
     }
   };
-
   // Function to handle deletion with an undo option
   const handleDeleteChatThread = (thread) => {
     if (deleteTimer) {
@@ -573,50 +596,56 @@ const renter = () => {
   // -------------------------
   // *** MODIFIED: useEffect to Handle Post-Payment Navigation ***
   // -------------------------
-  useEffect(() => {
-    if (
-      params?.paymentSuccessFor &&
-      params.paymentSuccessFor !== processingPaymentSuccess
-    ) {
-      const rentalId = params.paymentSuccessFor;
-      const ownerIdForChat = params.ownerId;
+  // *** NEW: useEffect to Handle Post-Payment Navigation & Auto‑Open Chat ***
+useEffect(() => {
+  if (
+    params?.paymentSuccessFor &&
+    params.paymentSuccessFor !== processingPaymentSuccess
+  ) {
+    const rentalId = params.paymentSuccessFor;
+    const ownerIdForChat = params.ownerId;
 
-      console.log(`Handling payment success for rental: ${rentalId}`);
-      setProcessingPaymentSuccess(rentalId);
+    console.log(`Handling payment success for rental: ${rentalId}`);
+    setProcessingPaymentSuccess(rentalId);
 
-      // Update rental request status to "active"
-      (async () => {
-        try {
-          const rentalRequestRef = doc(db, "rentalRequests", rentalId);
-          await updateDoc(rentalRequestRef, { rentalStatus: "active" });
-          console.log("Rental status updated to active");
-        } catch (error) {
-          console.error("Error updating rental status:", error);
-        }
-      })();
-
-      Alert.alert("Payment Successful!", "Your rental is now active.", [
-        {
-          text: "OK",
-          onPress: async () => {
-            await sendPaymentNotificationToOwner(rentalId, ownerIdForChat);
-            closeAllOpenModals();
-          },
-        },
-      ]);
-      // Clear parameters to avoid re-triggering the effect
-      navigation.setParams({ paymentSuccessFor: null, ownerId: null });
-    }
-
-    return () => {
-      if (
-        navigation.isFocused() &&
-        params?.paymentSuccessFor !== processingPaymentSuccess
-      ) {
-        setProcessingPaymentSuccess(null);
+    // 1) Mark the rentalRequest “active” in Firestore
+    (async () => {
+      try {
+        const rentalRef = doc(db, "rentalRequests", rentalId);
+        await updateDoc(rentalRef, { rentalStatus: "active" });
+        console.log("Rental status updated to active");
+      } catch (err) {
+        console.error("Error updating rental status:", err);
       }
-    };
-  }, [params, navigation, processingPaymentSuccess]);
+    })();
+
+    // 2) Notify renter, then open chat once they tap “OK”
+    Alert.alert("Payment Successful!", "Your rental is now active.", [
+      {
+        text: "OK",
+        onPress: async () => {
+          // a) send the “payment completed” system message into the chat thread
+          await sendPaymentNotificationToOwner(rentalId, ownerIdForChat);
+          // b) close any open modals
+          closeAllOpenModals();
+          // c) set the current owner so chat knows where to point
+          setCurrentChatOwnerId(ownerIdForChat);
+          // d) actually open the in‑app chat modal (will create/reuse the thread)
+          openMessageModal();
+          // e) clear URL params so this effect won’t re‑fire
+          router.replace({ pathname: "/renter" });
+        },
+      },
+    ]);
+  }
+
+  // cleanup: reset our local “handled” flag if params change
+  return () => {
+    if (params?.paymentSuccessFor !== processingPaymentSuccess) {
+      setProcessingPaymentSuccess(null);
+    }
+  };
+}, [params, processingPaymentSuccess]);
 
   // -------------------------
   // Fetch Profile on Mount (Original - unchanged, reads from 'users')
@@ -2211,43 +2240,42 @@ const renter = () => {
           </View>
 
           <FlatList
-            data={messages}
-            keyExtractor={(item, index) =>
-              `${item.senderId}_${item.timestamp?.seconds}_${item.timestamp?.nanoseconds}_${index}`
-            }
-            renderItem={({ item }) => (
-              <View
-                style={[
-                  styles.chatBubble,
-                  item.senderId === renterId
-                    ? styles.chatBubbleRight
-                    : styles.chatBubbleLeft,
-                ]}
-              >
-                <Text style={styles.chatSenderName}>{item.senderName}:</Text>
-                <Text style={styles.chatMessageText}>
-                  {typeof item.text === "string"
-                    ? item.text
-                    : JSON.stringify(item.text)}
-                </Text>
-                <Text style={styles.chatTimestamp}>
-                  {item.timestamp?.toDate
-                    ? item.timestamp.toDate().toLocaleString()
-                    : "Sending..."}
-                </Text>
-              </View>
-            )}
-            contentContainerStyle={styles.messagesList}
-            style={{ flex: 1, width: "100%" }}
-            inverted
-            ref={(ref) => (this.flatList = ref)}
-            onContentSizeChange={() =>
-              this.flatList.scrollToOffset({ animated: false, offset: 0 })
-            }
-            onLayout={() =>
-              this.flatList.scrollToOffset({ animated: false, offset: 0 })
-            }
-          />
+  data={messages}
+  keyExtractor={(item, index) =>
+    `${item.senderId}_${item.timestamp?.seconds}_${item.timestamp?.nanoseconds}_${index}`
+  }
+  renderItem={({ item }) => (
+    <View
+      style={[
+        styles.chatBubble,
+        item.senderId === renterId
+          ? styles.chatBubbleRight
+          : styles.chatBubbleLeft,
+      ]}
+    >
+      <Text style={styles.chatSenderName}>{item.senderName}:</Text>
+      <Text style={styles.chatMessageText}>
+        {typeof item.text === "string" ? item.text : JSON.stringify(item.text)}
+      </Text>
+      <Text style={styles.chatTimestamp}>
+        {item.timestamp?.toDate
+          ? item.timestamp.toDate().toLocaleString()
+          : "Sending..."}
+      </Text>
+    </View>
+  )}
+  contentContainerStyle={styles.messagesList}
+  style={{ flex: 1, width: "100%" }}
+  inverted
+  ref={flatListRef}
+  onContentSizeChange={() =>
+    flatListRef.current?.scrollToOffset({ animated: false, offset: 0 })
+  }
+  onLayout={() =>
+    flatListRef.current?.scrollToOffset({ animated: false, offset: 0 })
+  }
+/>
+
 
           <View style={styles.messageInputContainer}>
             <TextInput
@@ -2683,128 +2711,148 @@ const renter = () => {
         </KeyboardAvoidingView>
       </Modal>
       {/* Past Rental Details Modal */}
-      <Modal
-        visible={pastRentalModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closePastRentalModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(0,0,0,0.5)",
-          }}
-        >
-          <View
-            style={{
-              width: "90%",
-              backgroundColor: "#fff",
-              padding: 20,
-              borderRadius: 10,
-              maxHeight: "85%",
+      {/* Past Rental Details Modal */}
+<Modal
+  visible={pastRentalModalVisible}
+  animationType="slide"
+  transparent={true}
+  onRequestClose={closePastRentalModal}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    style={{
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgba(0,0,0,0.5)",
+    }}
+  >
+    <View
+      style={{
+        width: "90%",
+        backgroundColor: "#fff",
+        padding: 20,
+        borderRadius: 10,
+        maxHeight: "85%",
+      }}
+    >
+      <ModalHeader
+        title="Past Rental Details"
+        onClose={closePastRentalModal}
+      />
+      <ScrollView>
+        {/* Listing Preview Card */}
+        {selectedPastRental && selectedPastRental.listing && (
+          <TouchableOpacity
+            style={styles.listingCard}
+            onPress={() => {
+              const listingId =
+                selectedPastRental.listingId ||
+                selectedPastRental.listing.id;
+              if (listingId) {
+                router.push({
+                  pathname: "/home",
+                  params: { listingId },
+                });
+              } else {
+                Alert.alert("Error", "Listing not available.");
+              }
             }}
           >
-            <ModalHeader
-              title="Past Rental Details"
-              onClose={closePastRentalModal}
+            <Image
+              source={{
+                uri:
+                  selectedPastRental.listing.images &&
+                  selectedPastRental.listing.images[0]
+                    ? selectedPastRental.listing.images[0]
+                    : "https://via.placeholder.com/150",
+              }}
+              style={styles.listingImage}
             />
-            <ScrollView>
-              {/* Listing Preview Card */}
-              {selectedPastRental && selectedPastRental.listing && (
-                <TouchableOpacity
-                  style={styles.listingCard}
-                  onPress={() => {
-                    const listingId =
-                      selectedPastRental.listingId ||
-                      selectedPastRental.listing.id;
-                    if (listingId) {
-                      router.push({
-                        pathname: "/home",
-                        params: { listingId },
-                      });
-                    } else {
-                      Alert.alert("Error", "Listing not available.");
-                    }
-                  }}
-                >
-                  <Image
-                    source={{
-                      uri:
-                        selectedPastRental.listing.images &&
-                        selectedPastRental.listing.images[0]
-                          ? selectedPastRental.listing.images[0]
-                          : "https://via.placeholder.com/150",
-                    }}
-                    style={styles.listingImage}
-                  />
-                  <Text style={styles.listingTitle}>
-                    {selectedPastRental.listing.aircraftModel || "View Listing"}
-                  </Text>
-                </TouchableOpacity>
-              )}
+            <Text style={styles.listingTitle}>
+              {selectedPastRental.listing.aircraftModel || "View Listing"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
-              {/* Rental & Payment Details */}
-              <Text style={styles.detailLabel}>Aircraft Model:</Text>
-              <Text style={styles.detailValue}>
-                {selectedPastRental?.listing?.aircraftModel || "N/A"}
-              </Text>
-              <Text style={styles.detailLabel}>Tail Number:</Text>
-              <Text style={styles.detailValue}>
-                {selectedPastRental?.listing?.tailNumber || "N/A"}
-              </Text>
-              <Text style={styles.detailLabel}>Rental Hours:</Text>
-              <Text style={styles.detailValue}>
-                {selectedPastRental?.rentalHours || "N/A"}
-              </Text>
-              <Text style={styles.detailLabel}>Rental Date:</Text>
-              <Text style={styles.detailValue}>
-                {selectedPastRental?.rentalDate || "N/A"}
-              </Text>
-              <Text style={[styles.detailLabel, { marginTop: 15 }]}>
-                Payment Details:
-              </Text>
-              {selectedPastRental?.listing &&
-              selectedPastRental?.rentalHours &&
-              !isNaN(parseFloat(selectedPastRental.listing.costPerHour)) ? (
-                (() => {
-                  const costPerHour =
-                    parseFloat(selectedPastRental.listing.costPerHour) || 0;
-                  const hours = parseFloat(selectedPastRental.rentalHours) || 0;
-                  const pastCost = calculateTotalCost(costPerHour, hours);
-                  return (
-                    <View style={{ marginTop: 8 }}>
-                      <Text style={styles.detailValue}>
-                        Rental Cost (${costPerHour}/hr *{" "}
-                        {selectedPastRental.rentalHours} hours): $
-                        {safeToFixed(pastCost.rentalCost)}
-                      </Text>
-                      <Text style={styles.detailValue}>
-                        Booking Fee (6%): ${safeToFixed(pastCost.bookingFee)}
-                      </Text>
-                      <Text style={styles.detailValue}>
-                        Transaction Fee (3%): ${safeToFixed(pastCost.transactionFee)}
-                      </Text>
-                      <Text style={styles.detailValue}>
-                        Sales Tax (8.25%): ${safeToFixed(pastCost.salesTax)}
-                      </Text>
-                      <Text style={styles.detailTotalCostText}>
-                        Total Paid: ${safeToFixed(pastCost.total)}
-                      </Text>
-                    </View>
-                  );
-                })()
-              ) : (
+        {/* Rental & Payment Details */}
+        <Text style={styles.detailLabel}>Aircraft Model:</Text>
+        <Text style={styles.detailValue}>
+          {selectedPastRental?.listing?.aircraftModel || "N/A"}
+        </Text>
+        <Text style={styles.detailLabel}>Tail Number:</Text>
+        <Text style={styles.detailValue}>
+          {selectedPastRental?.listing?.tailNumber || "N/A"}
+        </Text>
+        <Text style={styles.detailLabel}>Rental Hours:</Text>
+        <Text style={styles.detailValue}>
+          {selectedPastRental?.rentalHours || "N/A"}
+        </Text>
+        <Text style={styles.detailLabel}>Rental Date:</Text>
+        <Text style={styles.detailValue}>
+          {selectedPastRental?.rentalDate || "N/A"}
+        </Text>
+        <Text style={[styles.detailLabel, { marginTop: 15 }]}>
+          Payment Details:
+        </Text>
+        {selectedPastRental?.listing &&
+        selectedPastRental?.rentalHours &&
+        !isNaN(parseFloat(selectedPastRental.listing.costPerHour)) ? (
+          (() => {
+            const costPerHour =
+              parseFloat(selectedPastRental.listing.costPerHour) || 0;
+            const hours = parseFloat(selectedPastRental.rentalHours) || 0;
+            const pastCost = calculateTotalCost(costPerHour, hours);
+            return (
+              <View style={{ marginTop: 8 }}>
                 <Text style={styles.detailValue}>
-                  Payment details not available.
+                  Rental Cost (${costPerHour}/hr *{" "}
+                  {selectedPastRental.rentalHours} hours): $
+                  {safeToFixed(pastCost.rentalCost)}
                 </Text>
-              )}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+                <Text style={styles.detailValue}>
+                  Booking Fee (6%): ${safeToFixed(pastCost.bookingFee)}
+                </Text>
+                <Text style={styles.detailValue}>
+                  Transaction Fee (3%): ${safeToFixed(pastCost.transactionFee)}
+                </Text>
+                <Text style={styles.detailValue}>
+                  Sales Tax (8.25%): ${safeToFixed(pastCost.salesTax)}
+                </Text>
+                <Text style={styles.detailTotalCostText}>
+                  Total Paid: ${safeToFixed(pastCost.total)}
+                </Text>
+              </View>
+            );
+          })()
+        ) : (
+          <Text style={styles.detailValue}>
+            Payment details not available.
+          </Text>
+        )}
+
+        {/* ----------------------------------------- */}
+        {/* *** ADDED: “Open Chat” Button for Past Rental *** */}
+        {/* ----------------------------------------- */}
+        {selectedPastRental && selectedPastRental.listing?.ownerId && (
+          <CustomButton
+            onPress={async () => {
+              // set the owner for the chat context
+              setCurrentChatOwnerId(selectedPastRental.listing.ownerId);
+              // open (or create) the chat thread for this rental
+              await openMessageModal();
+              // close the Past‑Rental modal so you can see the chat
+              closePastRentalModal();
+            }}
+            title="Open Chat"
+            backgroundColor="#3182ce"
+          />
+        )}
+      </ScrollView>
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
+
 
       {/* FAQ Modal */}
       <Modal

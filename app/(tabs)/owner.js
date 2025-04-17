@@ -182,6 +182,7 @@ const OwnerProfile = ({ ownerId }) => {
   const resolvedOwnerId = ownerId || user?.uid; // Resolve ownerId or default to Firebase user ID
   const [pendingDeletion, setPendingDeletion] = useState(null);
   const [deleteTimer, setDeleteTimer] = useState(null);
+  const [ytdBalance, setYtdBalance] = useState(null);
 
   // Add this helper component (you can place it near the top of OwnerProfile)
   const ParticipantName = ({ participantId }) => {
@@ -460,6 +461,8 @@ const OwnerProfile = ({ ownerId }) => {
     return sanitizedData;
   };
 
+  // … all your other hooks and state up above …
+
   const fetchOwnerData = useCallback(async () => {
     if (!resolvedOwnerId) {
       console.error("No owner ID or user ID available.");
@@ -468,23 +471,24 @@ const OwnerProfile = ({ ownerId }) => {
     }
 
     try {
-      // Read from the root user document now
+      // 1) Read the user's root document
       const profileDocRef = doc(db, "users", resolvedOwnerId);
       const profileDocSnap = await getDoc(profileDocRef);
 
       if (profileDocSnap.exists()) {
         const profile = profileDocSnap.data();
-        setProfileData({
-          fullName: profile.fullName || "",
-          contact: profile.contact || "",
-          address: profile.address || "",
-          email: profile.email || user.email || "",
-        });
-        setStripeAccountId(profile.stripeAccountId || null);
-        setIsStripeConnected(!!profile.stripeAccountId);
-        setAvailableBalance(profile.availableBalance || 0);
-        setTotalWithdrawn(profile.totalWithdrawn || 0);
-        // Retrieve saved costData from Firestore (or use default values)
+
+        // Hydrate profileData
+        setProfileData(
+          profile.profileData || {
+            fullName: user?.displayName || "",
+            contact: "",
+            address: "",
+            email: user?.email || "",
+          }
+        );
+
+        // Hydrate costData and flags
         setCostData(
           profile.costData || {
             loanAmount: "",
@@ -501,21 +505,34 @@ const OwnerProfile = ({ ownerId }) => {
             financingExpense: "",
           }
         );
+        setCostSaved(!!profile.costData);
+        setShowCalculator(!!profile.costData);
+
+        // Hydrate aircraftDetails
+        setAircraftDetails(
+          profile.aircraftDetails || {
+            aircraftModel: "",
+            tailNumber: "",
+            engineType: "",
+            totalTimeOnFrame: "",
+            location: "",
+            airportIdentifier: "",
+            costPerHour: "",
+            description: "",
+            images: [],
+            mainImage: "",
+          }
+        );
+
+        // ─── NEW: Hydrate Stripe info ───
+        setStripeAccountId(profile.stripeAccountId || null);
+        setIsStripeConnected(!!profile.stripeAccountId);
+        // ─────────────────────────────────
       } else {
         console.log("No owner profile data found.");
-        setIsStripeConnected(false);
-        setProfileData((prev) => ({
-          ...prev,
-          email: user.email || "",
-          fullName:
-            user?.displayName ||
-            (user?.providerData && user.providerData[0]?.displayName) ||
-            "",
-        }));
-        setAvailableBalance(0);
-        setTotalWithdrawn(0);
       }
 
+      // 2) Load this owner's aircraft listings
       const airplanesRef = collection(db, "airplanes");
       const q = query(
         airplanesRef,
@@ -523,10 +540,11 @@ const OwnerProfile = ({ ownerId }) => {
         orderBy("createdAt", "desc")
       );
       const snapshot = await getDocs(q);
-      const aircrafts = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const aircrafts = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
       }));
+
       setUserListings(aircrafts);
       setAllAircrafts(aircrafts);
     } catch (error) {
@@ -535,12 +553,18 @@ const OwnerProfile = ({ ownerId }) => {
     }
   }, [resolvedOwnerId, user]);
 
+  // ─── ensure this sits immediately after fetchOwnerData ───
+  useEffect(() => {
+    fetchOwnerData();
+  }, [fetchOwnerData]);
+  // ─────────────────────────────────────────────────────────
+
   useFocusEffect(
     useCallback(() => {
       fetchOwnerData();
 
       if (resolvedOwnerId) {
-        // Listen to changes on the root user document now
+        // Listen to balance updates
         const profileDocRef = doc(db, "users", resolvedOwnerId);
         const unsubscribeBalance = onSnapshot(
           profileDocRef,
@@ -552,20 +576,16 @@ const OwnerProfile = ({ ownerId }) => {
             }
           },
           (error) => {
-            console.error(
-              "Error listening to availableBalance updates:",
-              error
-            );
+            console.error("Error listening to balance updates:", error);
           }
         );
 
-        return () => {
-          unsubscribeBalance();
-        };
+        return () => unsubscribeBalance();
       }
     }, [fetchOwnerData, resolvedOwnerId])
   );
 
+  // … the rest of your component …
   useEffect(() => {
     if (resolvedOwnerId) {
       autoSaveDataToFirestore("profileData", profileData);
@@ -578,11 +598,11 @@ const OwnerProfile = ({ ownerId }) => {
     }
   }, [aircraftDetails, resolvedOwnerId]);
 
-  useEffect(() => {
-    if (resolvedOwnerId) {
-      autoSaveDataToFirestore("costData", costData);
-    }
-  }, [costData, resolvedOwnerId]);
+  // useEffect(() => {
+  //   if (resolvedOwnerId) {
+  //     autoSaveDataToFirestore("costData", costData);
+  //   }
+  // }, [costData, resolvedOwnerId]);
 
   // NEW: Fetch live Stripe balance when Payment Information modal opens.
   // Instead of expecting a "latestPayment" field, we now get the pending deposit amount.
@@ -591,24 +611,24 @@ const OwnerProfile = ({ ownerId }) => {
       try {
         const token = await user.getIdToken();
         const response = await fetch(`${API_URL}/get-stripe-balance`, {
-          method: "GET",
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
         });
         const data = await response.json();
         if (response.ok) {
-          // We now expect data.pendingAmount from the server (in cents)
           setLiveBalance(data.pendingAmount);
+          setYtdBalance(data.ytdAmount);
         } else {
-          console.error("Error fetching live balance:", data.error);
+          console.error('Error fetching live balance:', data.error);
         }
       } catch (e) {
-        console.error("Error fetching live balance:", e);
+        console.error('Error fetching live balance:', e);
       }
     };
-
+  
     if (withdrawModalVisible) {
       fetchStripeBalance();
     }
@@ -690,6 +710,7 @@ const OwnerProfile = ({ ownerId }) => {
    * OR to supply their full name and email address.
    */
   const handleRetrieveExistingStripeAccount = async () => {
+    // 1️⃣ If the user manually entered an acct_… ID:
     if (existingStripeAccountId.trim() !== "") {
       const stripeAccountIdRegex = /^acct_[a-zA-Z0-9]+$/;
       if (!stripeAccountIdRegex.test(existingStripeAccountId.trim())) {
@@ -699,12 +720,22 @@ const OwnerProfile = ({ ownerId }) => {
         );
         return;
       }
-      setStripeAccountId(existingStripeAccountId.trim());
+      const acctId = existingStripeAccountId.trim();
+
+      // update React state
+      setStripeAccountId(acctId);
       setIsStripeConnected(true);
+
+      // 🔥 persist to Firestore
+      const profileRef = doc(db, "users", resolvedOwnerId);
+      await updateDoc(profileRef, { stripeAccountId: acctId });
+
       Alert.alert("Success", "Stripe account ID saved successfully.");
       setExistingStripeModalVisible(false);
       return;
     }
+
+    // 2️⃣ Otherwise, fetch it from your Cloud Function
     if (!profileData.email || !profileData.fullName) {
       Alert.alert(
         "Incomplete Information",
@@ -712,6 +743,7 @@ const OwnerProfile = ({ ownerId }) => {
       );
       return;
     }
+
     try {
       const token = await user.getIdToken();
       const response = await fetch(`${API_URL}/retrieve-connected-account`, {
@@ -726,25 +758,24 @@ const OwnerProfile = ({ ownerId }) => {
           fullName: profileData.fullName,
         }),
       });
-
       const data = await response.json();
 
       if (response.ok) {
-        // Assume that the response returns stripeAccountId
-        setStripeAccountId(data.stripeAccountId);
+        const acctId = data.stripeAccountId;
+
+        // update React state
+        setStripeAccountId(acctId);
         setIsStripeConnected(true);
+
+        // 🔥 and here too: persist to Firestore
+        const profileRef = doc(db, "users", resolvedOwnerId);
+        await updateDoc(profileRef, { stripeAccountId: acctId });
+
         Alert.alert("Success", "Stripe account data retrieved and saved.");
         setExistingStripeModalVisible(false);
       } else {
         let errMsg = data.error || "Failed to retrieve Stripe account data.";
-        if (
-          errMsg.includes(
-            "destination account needs to have at least one of the following capabilities enabled"
-          )
-        ) {
-          errMsg =
-            "Your connected Stripe account is missing required capabilities (e.g. transfers). Please contact support for assistance.";
-        }
+        // … your existing error‑message tweaks …
         Alert.alert("Error", errMsg);
       }
     } catch (error) {
@@ -757,13 +788,37 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   /**
-   * Function to handle withdrawal.
-   *
-   * Note: availableBalance and totalWithdrawn are stored in cents.
-   * When displaying, we convert them to dollars.
+   * Fetches the Stripe support phone number for the connected account
+   * and prompts the user to call.
    */
-  const handleWithdraw = async () => {
-    // This function is no longer used since withdrawal is now informational only.
+  const handleGetStripeSupportPhone = async () => {
+    if (!stripeAccountId) {
+      Alert.alert("No Account ID", "Please connect your Stripe account first.");
+      return;
+    }
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`${API_URL}/get-stripe-account-support`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ accountId: stripeAccountId }),
+      });
+      const { phone, error } = await response.json();
+      if (response.ok && phone) {
+        Alert.alert("Stripe Support", phone, [
+          { text: "Call Now", onPress: () => Linking.openURL(`tel:${phone}`) },
+          { text: "OK", style: "cancel" },
+        ]);
+      } else {
+        throw new Error(error || "Could not fetch support number.");
+      }
+    } catch (e) {
+      console.error("Error fetching support phone:", e);
+      Alert.alert("Error", e.message || "Unable to get support number.");
+    }
   };
 
   /**
@@ -1028,7 +1083,7 @@ const OwnerProfile = ({ ownerId }) => {
           setSelectedChatThreadId(threadId);
         }
       }
-  
+
       // Now, fetch the chat thread data
       const chatDocRef = doc(db, "messages", threadId);
       const chatDoc = await getDoc(chatDocRef);
@@ -1046,7 +1101,7 @@ const OwnerProfile = ({ ownerId }) => {
       setChatFailed(true); // Flag to trigger fail-safe modal if payment is complete
     }
   };
-  
+
   // Function to handle deletion with an undo option
   const handleDeleteChatThread = (thread) => {
     // Clear any existing timer if needed
@@ -1484,6 +1539,8 @@ const OwnerProfile = ({ ownerId }) => {
    * Utility Functions
    */
 
+  // Inside your OwnerProfile component, locate the saveCostData function and replace it with the following:
+
   const saveCostData = async () => {
     setLoading(true);
     try {
@@ -1565,11 +1622,9 @@ const OwnerProfile = ({ ownerId }) => {
         costPerHour,
         financingExpense,
       }));
-      setCostSaved(true);
-      setLoading(false);
 
+      // Persist to Firestore
       await setDoc(
-        // Save costData to the root user document
         doc(db, "users", resolvedOwnerId),
         {
           costData: sanitizeData({
@@ -1580,6 +1635,11 @@ const OwnerProfile = ({ ownerId }) => {
         },
         { merge: true }
       );
+
+      // ────────── ADD THESE TWO LINES HERE ──────────
+      setCostSaved(true); // <-- mark cost data as saved so the mini‑view shows
+      setShowCalculator(true); // <-- optionally collapse inputs to the summary
+      // ─────────────────────────────────────────────
 
       Alert.alert("Success", `Estimated cost per hour: $${costPerHour}`);
     } catch (error) {
@@ -3566,69 +3626,80 @@ const OwnerProfile = ({ ownerId }) => {
 
       {/* Updated Withdraw Funds Modal */}
       <Modal
-        visible={withdrawModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setWithdrawModalVisible(false)}
+  visible={withdrawModalVisible}
+  animationType="slide"
+  transparent={true}
+  onRequestClose={() => setWithdrawModalVisible(false)}
+>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    style={{ flex: 1 }}
+    keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+  >
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <View
+        style={{
+          width: "88%",
+          maxHeight: "90%",
+          backgroundColor: "#fff",
+          borderRadius: 8,
+          padding: 24,
+        }}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+        <ModalHeader
+          title="Payment Information"
+          onClose={() => setWithdrawModalVisible(false)}
+        />
+
+        {/* Live balance (pending deposits) */}
+        <Text style={{ fontSize: 16, marginBottom: 16 }}>
+          Live Balance: $
+          {liveBalance != null
+            ? (liveBalance / 100).toFixed(2)
+            : (availableBalance / 100).toFixed(2)}
+        </Text>
+
+        {/* NEW: Year‑to‑Date balance pulled live from Stripe */}
+        <Text style={{ fontSize: 16, marginBottom: 16, fontWeight: "bold" }}>
+          Year‑to‑Date Balance: $
+          {ytdBalance != null
+            ? (ytdBalance / 100).toFixed(2)
+            : "Loading..."}
+        </Text>
+
+        {/* Total withdrawn (historical) */}
+        <Text
+          style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}
         >
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "rgba(0,0,0,0.5)",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                width: "88%",
-                maxHeight: "90%",
-                backgroundColor: "#fff",
-                borderRadius: 8,
-                padding: 24,
-              }}
-            >
-              <ModalHeader
-                title="Payment Information"
-                onClose={() => setWithdrawModalVisible(false)}
-              />
+          Total Withdrawn: ${(totalWithdrawn / 100).toFixed(2)}
+        </Text>
 
-              <Text style={{ fontSize: 16, marginBottom: 16 }}>
-                Live Balance: $
-                {liveBalance
-                  ? (liveBalance / 100).toFixed(2)
-                  : (availableBalance / 100).toFixed(2)}
-              </Text>
+        <CustomButton
+          onPress={() => setWithdrawModalVisible(false)}
+          title="Close"
+          backgroundColor="#f56565"
+          accessibilityLabel="Close payment information"
+        />
 
-              <Text
-                style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}
-              >
-                Total Earned YTD: ${(totalWithdrawn / 100).toFixed(2)}
-              </Text>
+        {loading && (
+          <ActivityIndicator
+            size="large"
+            color="#3182ce"
+            style={{ marginTop: 16 }}
+          />
+        )}
+      </View>
+    </View>
+  </KeyboardAvoidingView>
+</Modal>
 
-              <CustomButton
-                onPress={() => setWithdrawModalVisible(false)}
-                title="Close"
-                backgroundColor="#f56565"
-                accessibilityLabel="Close payment information"
-              />
-
-              {loading && (
-                <ActivityIndicator
-                  size="large"
-                  color="#3182ce"
-                  style={{ marginTop: 16 }}
-                />
-              )}
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* Stripe Info Modal */}
       <Modal
@@ -3701,15 +3772,48 @@ const OwnerProfile = ({ ownerId }) => {
               title="Connected Stripe Account"
               onClose={() => setConnectedAccountModalVisible(false)}
             />
+
             {stripeAccountId ? (
-              <Text style={{ fontSize: 16, marginBottom: 16 }}>
-                Your connected Stripe account ID is: {stripeAccountId}
-              </Text>
+              <>
+                <Text style={{ fontSize: 16, marginBottom: 12 }}>
+                  Your Stripe Account ID:
+                  {"\n"}
+                  <Text style={{ fontWeight: "bold" }}>{stripeAccountId}</Text>
+                </Text>
+
+                {/* YTD balance */}
+                <Text style={{ fontSize: 16, marginBottom: 24 }}>
+                  Year‑to‑Date Balance:{" "}
+                  <Text style={{ fontWeight: "bold" }}>
+                    ${(totalWithdrawn / 100).toFixed(2)}
+                  </Text>
+                </Text>
+
+                {/* Updated Contact Support link */}
+                <TouchableOpacity
+                  onPress={() =>
+                    Linking.openURL("https://support.stripe.com/contact/login")
+                  }
+                  accessibilityRole="button"
+                  style={{ marginBottom: 24 }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: "#3182ce",
+                      textDecorationLine: "underline",
+                    }}
+                  >
+                    Contact Support
+                  </Text>
+                </TouchableOpacity>
+              </>
             ) : (
-              <Text style={{ fontSize: 16, marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, marginBottom: 24 }}>
                 No connected account information available.
               </Text>
             )}
+
             <CustomButton
               onPress={() => setConnectedAccountModalVisible(false)}
               title="Close"

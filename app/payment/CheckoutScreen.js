@@ -18,7 +18,7 @@ import { CardField, useConfirmPayment } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp,query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebaseConfig'; 
 import { Formik } from 'formik';
 import * as Yup from 'yup';
@@ -343,7 +343,7 @@ export default function CheckoutScreen() {
       if (error) {
         Alert.alert('Payment failed', error.message);
         setLoading(false);
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      } else if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
         console.log("Payment Succeeded on CheckoutScreen for rental:", currentRentalRequestId);
         setLoading(false);
         router.replace({
@@ -351,9 +351,10 @@ export default function CheckoutScreen() {
           params: { paymentSuccessFor: currentRentalRequestId, ownerId: ownerId },
         });
       } else {
-         Alert.alert('Payment Status Unknown', 'Payment status could not be confirmed.');
-         setLoading(false);
+        Alert.alert('Payment Status Unknown', 'Payment status could not be confirmed.');
+        setLoading(false);
       }
+      
     } catch (error) {
       console.error('Rental payment error:', error);
       Alert.alert('Error', 'Payment processing failed for your rental.');

@@ -30,6 +30,9 @@ import {
   orderBy,
   query,
   where,
+  limit,
+  startAfter,
+  getDocs,
 } from "firebase/firestore";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
@@ -43,6 +46,9 @@ import {
 } from "firebase/storage";
 import classifiedsPaymentScreen from "../payment/classifiedsPaymentScreen";
 import { PinchGestureHandler, State } from "react-native-gesture-handler";
+
+// make FlatList animatable
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -79,8 +85,7 @@ const formatPhoneNumber = (phone) => {
 const getMaxImages = (selectedCategory, selectedPricing) => {
   if (selectedCategory === "Aviation Jobs") return 3;
   if (selectedCategory === "Flight Schools") return 5;
-  if (selectedCategory === "Aircraft for Sale");
-  {
+  if (selectedCategory === "Aircraft for Sale") {
     if (selectedPricing === "Basic") return 7;
     if (selectedPricing === "Featured") return 14;
     return 20;
@@ -89,6 +94,7 @@ const getMaxImages = (selectedCategory, selectedPricing) => {
   return 1;
 };
 
+/** Helper function: Renders full listing details UI based on category */
 /** Helper function: Renders full listing details UI based on category */
 const renderListingDetails = (item) => {
   if (item.category === "Aviation Jobs") {
@@ -196,6 +202,36 @@ const renderListingDetails = (item) => {
             ))}
           </View>
         )}
+      </View>
+    );
+  } else if (item.category === "Aviation Mechanic") {
+    return (
+      <View
+        style={{
+          padding: 10,
+          borderRadius: 10,
+          backgroundColor: COLORS.white,
+          marginBottom: 10,
+        }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: "bold", color: COLORS.black }}>
+          {item.amFirstName} {item.amLastName}
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.gray, marginVertical: 5 }}>
+          Certifications: {item.amCertifications || "N/A"}
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.gray, marginVertical: 5 }}>
+          Email: {item.amEmail || "N/A"}
+        </Text>
+        <Text style={{ fontSize: 16, color: COLORS.gray, marginVertical: 5 }}>
+          Phone: {item.amPhone ? formatPhoneNumber(item.amPhone) : "N/A"}
+        </Text>
+        <Text style={{ fontSize: 14, color: COLORS.gray, marginBottom: 5 }}>
+          {item.amDescription || "No description provided."}
+        </Text>
+        <Text style={{ fontSize: 14, color: COLORS.gray }}>
+          Service Locations: {item.amServiceLocations || "N/A"}
+        </Text>
       </View>
     );
   } else if (item.category === "Charter Services") {
@@ -461,6 +497,12 @@ const Classifieds = () => {
   const scrollViewRef = useRef(null);
   const [showUpButton, setShowUpButton] = useState(false);
 
+  // Pagination & refresh
+  const [pageSize] = useState(20);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   // New state for preview listing modal
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [previewData, setPreviewData] = useState(null);
@@ -583,36 +625,81 @@ const Classifieds = () => {
   // -----------------------
   // Firestore Listings Subscription (for main feed)
   // -----------------------
+  // useEffect(() => {
+  //   if (user) {
+  //     const collectionName = "listings";
+  //     const q = selectedCategory
+  //       ? query(
+  //           collection(db, collectionName),
+  //           where("category", "==", selectedCategory),
+  //           orderBy("createdAt", "desc")
+  //         )
+  //       : query(collection(db, collectionName), orderBy("createdAt", "desc"));
+  //     const unsubscribe = onSnapshot(
+  //       q,
+  //       (querySnapshot) => {
+  //         const listingsData = [];
+  //         querySnapshot.forEach((doc) => {
+  //           listingsData.push({ id: doc.id, ...doc.data() });
+  //         });
+  //         setListings(listingsData);
+  //       },
+  //       (error) => {
+  //         console.error("Error fetching listings:", error);
+  //         Alert.alert("Error", "Failed to fetch listings.");
+  //       }
+  //     );
+  //     return () => unsubscribe();
+  //   } else {
+  //     setListings([]);
+  //     setFilteredListings([]);
+  //   }
+  // }, [selectedCategory, user]);
+
   useEffect(() => {
     if (user) {
-      const collectionName = "listings";
-      const q = selectedCategory
-        ? query(
-            collection(db, collectionName),
-            where("category", "==", selectedCategory),
-            orderBy("createdAt", "desc")
-          )
-        : query(collection(db, collectionName), orderBy("createdAt", "desc"));
-      const unsubscribe = onSnapshot(
-        q,
-        (querySnapshot) => {
-          const listingsData = [];
-          querySnapshot.forEach((doc) => {
-            listingsData.push({ id: doc.id, ...doc.data() });
-          });
-          setListings(listingsData);
-        },
-        (error) => {
-          console.error("Error fetching listings:", error);
-          Alert.alert("Error", "Failed to fetch listings.");
-        }
-      );
-      return () => unsubscribe();
+      fetchPage(true); // initial load or category change
     } else {
       setListings([]);
       setFilteredListings([]);
     }
   }, [selectedCategory, user]);
+
+  const fetchPage = async (refresh = false) => {
+    if (refresh) {
+      setIsRefreshing(true);
+      setLastVisible(null);
+    } else {
+      setIsLoadingMore(true);
+    }
+
+    // build base query
+    let q = query(
+      collection(db, "listings"),
+      where("category", "==", selectedCategory),
+      orderBy("createdAt", "desc"),
+      limit(pageSize)
+    );
+
+    if (!refresh && lastVisible) {
+      q = query(q, startAfter(lastVisible));
+    }
+
+    try {
+      const snap = await getDocs(q);
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setLastVisible(snap.docs[snap.docs.length - 1] || null);
+
+      if (refresh) setListings(docs);
+      else setListings((prev) => [...prev, ...docs]);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error fetching listings");
+    } finally {
+      setIsRefreshing(false);
+      setIsLoadingMore(false);
+    }
+  };
 
   // -----------------------
   // Subscribe to Current User's Listings (for "View your listings" modal)
@@ -644,29 +731,60 @@ const Classifieds = () => {
   // -----------------------
   // Client-side Filtering
   // -----------------------
+  // -----------------------
+  // Client‑side Filtering
+  // -----------------------
   useEffect(() => {
     let updated = [...listings];
+
+    // always filter by location if provided
     if (filter.location) {
-      updated = updated.filter((listing) => {
-        let locField = "";
-        switch (selectedCategory) {
-          case "Aircraft for Sale":
-          case "Aviation Jobs":
-          case "Flight Schools":
-            locField = listing.city || "";
-            break;
-          default:
-            locField = listing.city || "";
-        }
-        return locField.toLowerCase().includes(filter.location);
-      });
+      updated = updated.filter((listing) =>
+        (listing.city || "").toLowerCase().includes(filter.location)
+      );
     }
+
+    // Aircraft for Sale: filter by title
     if (selectedCategory === "Aircraft for Sale" && filter.make) {
+      updated = updated.filter((listing) =>
+        (listing.title || "").toLowerCase().includes(filter.make)
+      );
+    }
+
+    // Aviation Jobs: filter by jobTitle OR companyName
+    if (selectedCategory === "Aviation Jobs" && filter.make) {
       updated = updated.filter((listing) => {
-        let makeField = listing.title || "";
-        return makeField.toLowerCase().includes(filter.make);
+        const term = filter.make;
+        return (
+          (listing.jobTitle || "").toLowerCase().includes(term) ||
+          (listing.companyName || "").toLowerCase().includes(term)
+        );
       });
     }
+    if (selectedCategory === "Aviation Mechanic" && filter.make) {
+      updated = updated.filter((listing) => {
+        const term = filter.make;
+        return (
+          (listing.amDescription || "").toLowerCase().includes(term) ||
+          (listing.amCertifications || "").toLowerCase().includes(term) ||
+          (listing.amServiceLocations || "").toLowerCase().includes(term)
+        );
+      });
+    }
+    if (selectedCategory === "Charter Services" && filter.make) {
+      const term = filter.make;
+      updated = updated.filter((listing) => {
+        const details = listing.charterServiceDetails || {};
+        return (
+          (details.charterServiceName || "").toLowerCase().includes(term) ||
+          (details.charterServiceDescription || "")
+            .toLowerCase()
+            .includes(term) ||
+          (details.charterServiceAreas || "").toLowerCase().includes(term)
+        );
+      });
+    }
+
     setFilteredListings(updated);
   }, [filter, listings, selectedCategory]);
 
@@ -891,6 +1009,41 @@ const Classifieds = () => {
     }
   };
 
+  // ───────────────────────────────────────────────────────────
+// NEW: Flag / Report a listing
+// ───────────────────────────────────────────────────────────
+const handleReportListing = (listing) => {
+  Alert.alert(
+    "Report listing",
+    "Flag this listing as spam or fraudulent? A moderator will be notified.",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Report",
+        style: "destructive",
+        onPress: () => {
+          getFirebaseIdToken().then((token) => {
+            fetch(`${API_URL}/reportListing`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ listingId: listing.id }),
+            })
+              .then(() => Alert.alert("Thank you", "The listing was reported."))
+              .catch((err) => {
+                console.error(err);
+                Alert.alert("Error", "Could not send report.");
+              });
+          });
+        },
+      },
+    ]
+  );
+};
+
+
   // Updated: Removed the old handleContactUs – now the "Information about Broker Services" button will open the broker modal.
   const handleDeleteListing = (listingId) => {
     Alert.alert(
@@ -1020,7 +1173,8 @@ const Classifieds = () => {
     // NEW: Force free listing for Aviation Jobs
     if (listingDetails.category === "Aviation Jobs") {
       // Mark as free listing (for the first 7 days)
-      freeListing = true;
+      // RIGHT: explicitly tag this listing as free
+      listingDetails.freeListing = true;
       delete listingDetails.salePrice;
     }
 
@@ -1389,10 +1543,7 @@ const Classifieds = () => {
           }}
         >
           <Text style={{ fontSize: 18, color: COLORS.secondary }}>
-            Filter by Location
-            {selectedCategory === "Aircraft for Sale"
-              ? " or Aircraft Make"
-              : ""}
+            Select category to filter listings
           </Text>
           <TouchableOpacity
             onPress={() => {
@@ -1617,7 +1768,30 @@ const Classifieds = () => {
                   )}
                 </TouchableOpacity>
 
-                {renderEditAndDeleteButtons(item)}
+                <View style={styles.editDeleteContainer}>
+  {/* NEW: show “Report Post” label + flag if viewer is NOT the owner */}
+  {user && item.ownerId !== user.uid && (
+    <TouchableOpacity
+      onPress={() => handleReportListing(item)}
+      style={{
+        alignSelf: "flex-end",
+        marginTop: 1,
+        flexDirection: "row",
+        alignItems: "center",
+      }}
+      accessibilityLabel="Report listing"
+      accessibilityRole="button"
+    >
+      <Text style={{ color: COLORS.red, fontSize: 14, marginRight: 6 }}>
+        Report Post
+      </Text>
+      <Ionicons name="flag-outline" size={20} color={COLORS.red} />
+    </TouchableOpacity>
+  )}
+  {/* existing owner‑only Edit / Delete buttons */}
+  {renderEditAndDeleteButtons(item)}
+</View>
+
               </View>
               {(index + 1) % 17 === 0 && (
                 <View>
@@ -3985,22 +4159,46 @@ const Classifieds = () => {
                 accessibilityLabel="Enter location"
               />
             </View>
-            <View style={styles.orSeparator}>
-              <View style={styles.line} />
-              <Text style={styles.orText}>OR</Text>
-              <View style={styles.line} />
-            </View>
-            <Text style={styles.filterLabel}>Aircraft Make & Model</Text>
-            <View style={styles.inputGroup}>
-              <TextInput
-                value={makeModel}
-                onChangeText={setMakeModel}
-                placeholder="Enter aircraft make/model"
-                placeholderTextColor="#718096"
-                style={styles.textInput}
-                accessibilityLabel="Enter aircraft make and model"
-              />
-            </View>
+
+            {selectedCategory !== "Flight Schools" &&
+              selectedCategory !== "Flight Instructors" && (
+                <>
+                  <View style={styles.orSeparator}>
+                    <View style={styles.line} />
+                    <Text style={styles.orText}>OR</Text>
+                    <View style={styles.line} />
+                  </View>
+
+                  <Text style={styles.filterLabel}>
+                    {selectedCategory === "Aircraft for Sale"
+                      ? "Aircraft Make & Model"
+                      : selectedCategory === "Aviation Jobs"
+                      ? "Job Title or Company"
+                      : "Keyword"}
+                  </Text>
+                  <View style={styles.inputGroup}>
+                    <TextInput
+                      value={makeModel}
+                      onChangeText={setMakeModel}
+                      placeholder={
+                        selectedCategory === "Aircraft for Sale"
+                          ? "Enter aircraft make/model"
+                          : selectedCategory === "Aviation Jobs"
+                          ? "Enter job title or company"
+                          : "Enter keyword"
+                      }
+                      placeholderTextColor="#718096"
+                      style={styles.textInput}
+                      accessibilityLabel={
+                        selectedCategory === "Aviation Jobs"
+                          ? "Enter job title or company"
+                          : "Enter keyword"
+                      }
+                    />
+                  </View>
+                </>
+              )}
+
             <View style={styles.filterActions}>
               <TouchableOpacity
                 onPress={clearFilter}
@@ -4068,93 +4266,116 @@ const Classifieds = () => {
             </Text>
             {userListings.length > 0 ? (
               <FlatList
-              data={userListings}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
-                // For flight instructors, use profileImage; otherwise, use first image in images array
-                const mainImage =
-                  item.category === "Flight Instructors"
-                    ? item.profileImage
-                    : item.images && item.images.length > 0
-                    ? item.images[0]
-                    : null;
-                return (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      borderWidth: 1,
-                      borderColor: COLORS.lightGray,
-                      borderRadius: 8,
-                      padding: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {/* Wrap image and text in a touchable so tapping opens the listing */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        handleListingPress(item);
-                        setViewListingsModalVisible(false);
+                data={userListings}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => {
+                  // For flight instructors, use profileImage; otherwise, use first image in images array
+                  const mainImage =
+                    item.category === "Flight Instructors"
+                      ? item.profileImage
+                      : item.images && item.images.length > 0
+                      ? item.images[0]
+                      : null;
+                  return (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        borderWidth: 1,
+                        borderColor: COLORS.lightGray,
+                        borderRadius: 8,
+                        padding: 8,
+                        marginBottom: 8,
                       }}
-                      style={{ flexDirection: "row", flex: 1, alignItems: "center" }}
                     >
-                      {mainImage ? (
-                        <Image
-                          source={{ uri: mainImage }}
-                          style={{ width: 80, height: 80, borderRadius: 8 }}
-                        />
-                      ) : (
-                        <View
-                          style={{
-                            width: 80,
-                            height: 80,
-                            backgroundColor: COLORS.lightGray,
-                            borderRadius: 8,
-                            justifyContent: "center",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Text style={{ color: COLORS.gray, fontSize: 12 }}>No Image</Text>
+                      {/* Wrap image and text in a touchable so tapping opens the listing */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          handleListingPress(item);
+                          setViewListingsModalVisible(false);
+                        }}
+                        style={{
+                          flexDirection: "row",
+                          flex: 1,
+                          alignItems: "center",
+                        }}
+                      >
+                        {mainImage ? (
+                          <Image
+                            source={{ uri: mainImage }}
+                            style={{ width: 80, height: 80, borderRadius: 8 }}
+                          />
+                        ) : (
+                          <View
+                            style={{
+                              width: 80,
+                              height: 80,
+                              backgroundColor: COLORS.lightGray,
+                              borderRadius: 8,
+                              justifyContent: "center",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Text style={{ color: COLORS.gray, fontSize: 12 }}>
+                              No Image
+                            </Text>
+                          </View>
+                        )}
+
+                        <View style={{ flex: 1, marginLeft: 8 }}>
+                          <Text
+                            style={{
+                              fontSize: 16,
+                              fontWeight: "bold",
+                              color: COLORS.black,
+                            }}
+                          >
+                            {item.title || item.jobTitle || "Listing"}
+                          </Text>
+                          <Text style={{ fontSize: 14, color: COLORS.gray }}>
+                            {item.category}
+                          </Text>
                         </View>
-                      )}
-            
-                      <View style={{ flex: 1, marginLeft: 8 }}>
-                        <Text style={{ fontSize: 16, fontWeight: "bold", color: COLORS.black }}>
-                          {item.title || item.jobTitle || "Listing"}
-                        </Text>
-                        <Text style={{ fontSize: 14, color: COLORS.gray }}>{item.category}</Text>
+                      </TouchableOpacity>
+
+                      {/* Edit and Delete Icon buttons */}
+                      <View
+                        style={{ flexDirection: "row", alignItems: "center" }}
+                      >
+                        <TouchableOpacity
+                          onPress={() => {
+                            handleEditListing(item);
+                            setViewListingsModalVisible(false);
+                          }}
+                          style={{ marginRight: 8 }}
+                          accessibilityLabel="Edit Listing"
+                          accessibilityRole="button"
+                        >
+                          <Ionicons
+                            name="create-outline"
+                            size={24}
+                            color={COLORS.primary}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            handleDeleteListing(item.id);
+                            setViewListingsModalVisible(false);
+                          }}
+                          accessibilityLabel="Delete Listing"
+                          accessibilityRole="button"
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={24}
+                            color={COLORS.red}
+                          />
+                        </TouchableOpacity>
                       </View>
-                    </TouchableOpacity>
-            
-                    {/* Edit and Delete Icon buttons */}
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          handleEditListing(item);
-                          setViewListingsModalVisible(false);
-                        }}
-                        style={{ marginRight: 8 }}
-                        accessibilityLabel="Edit Listing"
-                        accessibilityRole="button"
-                      >
-                        <Ionicons name="create-outline" size={24} color={COLORS.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => {
-                          handleDeleteListing(item.id);
-                          setViewListingsModalVisible(false);
-                        }}
-                        accessibilityLabel="Delete Listing"
-                        accessibilityRole="button"
-                      >
-                        <Ionicons name="trash-outline" size={24} color={COLORS.red} />
-                      </TouchableOpacity>
                     </View>
-                  </View>
-                );
-              }}
-            />
-                    
+                  );
+                }}
+              />
             ) : (
               <Text style={{ textAlign: "center", color: COLORS.gray }}>
                 You haven't posted any listings yet.
@@ -4266,20 +4487,18 @@ const Classifieds = () => {
 };
 
 const AppNavigator = () => (
-  
-    <Stack.Navigator initialRouteName="Classifieds">
-      <Stack.Screen
-        name="Classifieds"
-        component={Classifieds}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="classifiedsPaymentScreen"
-        component={classifiedsPaymentScreen}
-        options={{ headerShown: false }}
-      />
-    </Stack.Navigator>
-
+  <Stack.Navigator initialRouteName="Classifieds">
+    <Stack.Screen
+      name="Classifieds"
+      component={Classifieds}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="classifiedsPaymentScreen"
+      component={classifiedsPaymentScreen}
+      options={{ headerShown: false }}
+    />
+  </Stack.Navigator>
 );
 
 export default AppNavigator;
@@ -4502,4 +4721,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+  reportButton: {
+    backgroundColor: COLORS.lightGray,
+    padding: 8,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
+  },
+  
 });
