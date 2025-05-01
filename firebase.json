@@ -3,6 +3,12 @@
     {
       "source": "backend",
       "codebase": "default",
+      "env": {
+        "SMTP_HOST": "smtp.gmail.com",
+        "SMTP_PORT": "465",
+        "SMTP_USER": "coryarmer@gmail.com",
+        "SMTP_PASS": "mpwibhvjliumpdnr"
+      },
       "ignore": [
         "node_modules",
         ".git",
@@ -46,11 +52,7 @@
   },
   "hosting": {
     "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
   },
   "storage": {
     "rules": "storage.rules"

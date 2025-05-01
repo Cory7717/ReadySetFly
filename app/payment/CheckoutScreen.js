@@ -18,7 +18,7 @@ import { CardField, useConfirmPayment } from '@stripe/stripe-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp,query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp,query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig'; 
 import { Formik } from 'formik';
 import * as Yup from 'yup';
@@ -234,134 +234,127 @@ export default function CheckoutScreen() {
   };
 
   // Original createRentalRequest (if needed)
-  const createRentalRequest = async () => {
-    try {
-      const actualListingId = listingDetails.id; 
-      if (!actualListingId) {
-        Alert.alert('Error', 'Listing information is missing.');
-        return null;
-      }
-      const rentalRequestData = {
-        renterId: user.uid,
-        listingId: actualListingId,
-        rentalStatus: 'pending',
-        costPerHour: parseFloat(costPerHour),
-        rentalHours: parseFloat(rentalHours),
-        createdAt: serverTimestamp(),
-        ownerId: ownerId, 
-      };
-      const rentalRequestRef = await addDoc(collection(db, 'rentalRequests'), rentalRequestData);
-      const newRentalRequestId = rentalRequestRef.id;
-      setRentalRequestId(newRentalRequestId);
-      console.log(`Rental Request Created with ID: ${newRentalRequestId}`);
-      return newRentalRequestId;
-    } catch (error) {
-      console.error('Error creating rental request:', error);
-      Alert.alert('Error', 'Failed to create rental request.');
-      return null;
-    }
-  };
+  // const createRentalRequest = async () => {
+  //   try {
+  //     const actualListingId = listingDetails.id; 
+  //     if (!actualListingId) {
+  //       Alert.alert('Error', 'Listing information is missing.');
+  //       return null;
+  //     }
+  //     const rentalRequestData = {
+  //       renterId: user.uid,
+  //       listingId: actualListingId,
+  //       rentalStatus: 'pending',
+  //       costPerHour: parseFloat(costPerHour),
+  //       rentalHours: parseFloat(rentalHours),
+  //       createdAt: serverTimestamp(),
+  //       ownerId: ownerId, 
+  //     };
+  //     const rentalRequestRef = await addDoc(collection(db, 'rentalRequests'), rentalRequestData);
+  //     const newRentalRequestId = rentalRequestRef.id;
+  //     setRentalRequestId(newRentalRequestId);
+  //     console.log(`Rental Request Created with ID: ${newRentalRequestId}`);
+  //     return newRentalRequestId;
+  //   } catch (error) {
+  //     console.error('Error creating rental request:', error);
+  //     Alert.alert('Error', 'Failed to create rental request.');
+  //     return null;
+  //   }
+  // };
 
-  // *** MODIFIED: handleRentalPayment function ***
-  const handleRentalPayment = async (values) => {
-    if (values.cardholderName.trim() === '') {
-      Alert.alert('Validation Error', 'Please enter the name on the credit card.');
+ // *** MODIFIED: handleRentalPayment function ***
+const handleRentalPayment = async (values) => {
+  // 1) Validate inputs
+  if (values.cardholderName.trim() === '') {
+    Alert.alert('Validation Error', 'Please enter the name on the credit card.');
+    return;
+  }
+  if (!ownerId) {
+    Alert.alert('Error', 'Cannot process payment: Owner information missing.');
+    console.error('ownerId is missing in handleRentalPayment');
+    return;
+  }
+  if (!rentalRequestId) {
+    Alert.alert('Error', 'Rental request ID is missing. Please go back and try again.');
+    console.error('rentalRequestId is missing in handleRentalPayment');
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    // 2) Create PaymentIntent on your backend
+    const endpoint = '/create-rental-payment-intent';
+    const body = {
+      rentalRequestId,
+      ownerId,
+      amount: totalAmount,
+      renterId: user.uid,
+    };
+    const token = await getFirebaseIdToken();
+    const resp = await fetch(`${API_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.clientSecret) {
+      throw new Error(data.error || 'Failed to create payment intent.');
+    }
+    const clientSecret = data.clientSecret;
+
+    // 3) Confirm the payment on-device
+    const { error, paymentIntent } = await confirmPayment(clientSecret, {
+      paymentMethodType: 'Card',
+      billingDetails: { name: values.cardholderName.trim() },
+    });
+    if (error) {
+      Alert.alert('Payment failed', error.message);
+      setLoading(false);
       return;
     }
-    if (!ownerId) {
-      Alert.alert('Error', 'Cannot process payment: Owner information missing.');
-      console.error("ownerId is missing in handleRentalPayment");
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      let currentRentalRequestId = rentalRequestId; 
-      
-      if (!currentRentalRequestId) {
-        console.warn("rentalRequestId not found in params, attempting to create...");
-        currentRentalRequestId = await createRentalRequest(); 
-        if (!currentRentalRequestId) {
-          setLoading(false);
-          return;
-        }
-      }
 
-      const endpoint = '/create-rental-payment-intent';
-      const body = {
-        rentalRequestId: currentRentalRequestId,
-        ownerId: ownerId,
-        amount: totalAmount,
-        renterId: user.uid,
-      };
-
-      const token = await getFirebaseIdToken();
-      if (!token) {
-        setLoading(false);
-        return; 
-      }
-
-      const response = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
+    // 4) Handle statuses
+    const status = paymentIntent?.status;
+    if (['succeeded', 'processing', 'requires_capture'].includes(status)) {
+      // ** NEW: mark the rentalRequest in Firestore **
+      const rentalRef = doc(db, 'rentalRequests', rentalRequestId);
+      await updateDoc(rentalRef, {
+        paymentStatus: 'succeeded',
+        rentalStatus: 'active',
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        const text = await response.clone().text();
-        console.error('Response is not JSON:', text);
-        Alert.alert('Error', 'Failed to create payment intent.');
-        setLoading(false);
-        return;
-      }
+      console.log(`Payment succeeded for rental: ${rentalRequestId}`);
+      setLoading(false);
 
-      if (!response.ok) {
-        Alert.alert('Error', data.error || 'Failed to create payment intent.');
-        setLoading(false);
-        return;
-      }
-
-      const clientSecret = data.clientSecret;
-      if (!clientSecret) {
-        console.error("Error: Client secret is missing for rental payment.");
-        Alert.alert('Error', 'Payment details are missing.');
-        setLoading(false);
-        return;
-      }
-
-      const { error, paymentIntent } = await confirmPayment(clientSecret, {
-        paymentMethodType: 'Card',
-        billingDetails: { name: values.cardholderName.trim() },
+      // 5) Redirect back into the renter flow (opens chat on success)
+      router.replace({
+        pathname: '/renter',
+        params: { paymentSuccessFor: rentalRequestId, ownerId },
       });
 
-      if (error) {
-        Alert.alert('Payment failed', error.message);
-        setLoading(false);
-      } else if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
-        console.log("Payment Succeeded on CheckoutScreen for rental:", currentRentalRequestId);
-        setLoading(false);
-        router.replace({
-          pathname: '/renter',
-          params: { paymentSuccessFor: currentRentalRequestId, ownerId: ownerId },
-        });
-      } else {
-        Alert.alert('Payment Status Unknown', 'Payment status could not be confirmed.');
-        setLoading(false);
-      }
-      
-    } catch (error) {
-      console.error('Rental payment error:', error);
-      Alert.alert('Error', 'Payment processing failed for your rental.');
+    } else if (status === 'requires_action') {
+      Alert.alert(
+        'Additional Authentication Required',
+        'Please complete the authentication steps on your card.'
+      );
+      setLoading(false);
+
+    } else {
+      Alert.alert('Payment Status', `Your payment is in “${status}” state.`);
       setLoading(false);
     }
-  };
 
+  } catch (err) {
+    console.error('Rental payment error:', err);
+    Alert.alert('Error', 'Payment processing failed for your rental.');
+    setLoading(false);
+  }
+};
+  
   // Original handleFormSubmit
   const handleFormSubmit = (values) => {
     if (loading) {

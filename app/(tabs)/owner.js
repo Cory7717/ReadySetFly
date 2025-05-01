@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   TextInput,
@@ -16,6 +16,8 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Linking,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { db, storage, auth } from "../../firebaseConfig";
@@ -46,6 +48,7 @@ import { useStripe } from "@stripe/stripe-react-native";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Picker } from "@react-native-picker/picker";
 import BankDetailsForm from "../payment/BankDetailsForm";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Define the API URL constant
 const API_URL =
@@ -183,6 +186,81 @@ const OwnerProfile = ({ ownerId }) => {
   const [pendingDeletion, setPendingDeletion] = useState(null);
   const [deleteTimer, setDeleteTimer] = useState(null);
   const [ytdBalance, setYtdBalance] = useState(null);
+  const pulse = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef();
+  const prevMessagesCount = useRef(0);
+  // Add this:
+  const flatListRef = useRef(null);
+  const [ownerTermsAgreed, setOwnerTermsAgreed] = useState(false);
+  // on mount, check whether the owner has already agreed
+  useEffect(() => {
+    (async () => {
+      try {
+        const val = await AsyncStorage.getItem("ownerTermsAgreed");
+        if (val === "true") {
+          setOwnerTermsAgreed(true);
+        } else {
+          // if not yet agreed, show the Important modal
+          setFaqModalVisible(true);
+        }
+      } catch (e) {
+        console.warn("Failed to load owner agreement flag", e);
+      }
+    })();
+  }, []);
+
+  // Request permission as soon as this screen mounts
+  useEffect(() => {
+    (async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Enable Notifications",
+          "To receive new‑rental and message alerts, please enable notifications in your device settings."
+        );
+      }
+    })();
+  }, []);
+
+  // add near the top of OwnerProfile, alongside your other handlers:
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to delete your account? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // call your cloud‐function to delete user data
+              const token = await user.getIdToken();
+              await fetch(`${API_URL}/deleteAccount`, {
+                method: "DELETE",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+              // then sign out locally
+              await auth.signOut();
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Welcome" }],
+              });
+            } catch (err) {
+              console.error("Delete account failed:", err);
+              Alert.alert(
+                "Error",
+                "Unable to delete account. Please try again."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Add this helper component (you can place it near the top of OwnerProfile)
   const ParticipantName = ({ participantId }) => {
@@ -221,6 +299,34 @@ const OwnerProfile = ({ ownerId }) => {
     return <Text>{name}</Text>;
   };
 
+  /**
+   * Helper component to fetch & display the rental date for a thread
+   */
+  const RentalDate = ({ rentalRequestId }) => {
+    const [date, setDate] = useState(null);
+
+    useEffect(() => {
+      if (!rentalRequestId) return;
+      const fetchRentalDate = async () => {
+        try {
+          const reqRef = doc(db, "rentalRequests", rentalRequestId);
+          const reqSnap = await getDoc(reqRef);
+          if (reqSnap.exists() && reqSnap.data().rentalDate) {
+            const rd = reqSnap.data().rentalDate;
+            setDate(rd.toDate ? rd.toDate() : new Date(rd));
+          }
+        } catch (error) {
+          console.error("Error fetching rental date:", error);
+        }
+      };
+      fetchRentalDate();
+    }, [rentalRequestId]);
+
+    return date ? (
+      <Text style={{ fontSize: 12, color: "#718096" }}>{formatDate(date)}</Text>
+    ) : null;
+  };
+
   const ParticipantDate = ({ participantId }) => {
     const [date, setDate] = useState(null);
 
@@ -252,22 +358,24 @@ const OwnerProfile = ({ ownerId }) => {
   };
 
   const fetchChatThreads = async () => {
-    try {
-      const messagesRef = collection(db, "messages");
-      const q = query(
-        messagesRef,
-        where("participants", "array-contains", resolvedOwnerId)
-      );
-      const snapshot = await getDocs(q);
-      const threads = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
-      setChatThreads(threads);
-    } catch (error) {
-      console.error("Error fetching chat threads:", error);
-      Alert.alert("Error", "Failed to load chat threads.");
-    }
+    const messagesRef = collection(db, "messages");
+    const q = query(
+      messagesRef,
+      where("participants", "array-contains", resolvedOwnerId)
+    );
+    const snapshot = await getDocs(q);
+    const threads = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+    // reduce to one thread per rentalRequestId
+    const unique = Object.values(
+      threads.reduce((acc, t) => {
+        if (!acc[t.rentalRequestId]) acc[t.rentalRequestId] = t;
+        return acc;
+      }, {})
+    );
+    setChatThreads(unique);
   };
 
   // NEW: New state for FAQ and Invest modals
@@ -279,44 +387,41 @@ const OwnerProfile = ({ ownerId }) => {
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
 
   // NEW: New state for account type ("Owner", "Renter", or "Both")
-  const [userRole, setUserRole] = useState("");
+ // ─── User Role ─────────────────────────────────────────────────────────────
+const [userRole, setUserRole] = useState("");
 
-  // NEW: Fetch user role from Firestore
-  useEffect(() => {
-    if (user) {
-      const userDocRef = doc(db, "users", user.uid);
-      getDoc(userDocRef)
-        .then((docSnapshot) => {
-          if (docSnapshot.exists()) {
-            setUserRole(docSnapshot.data().accountType);
-          }
-        })
-        .catch((error) => {
-          console.error("Error fetching user role in owner.js:", error);
-        });
-    }
-  }, [user]);
+// fetch once, defaulting to empty string if accountType is undefined
+useEffect(() => {
+  if (!user) return;
 
-  // NEW: Prevent access to this screen if the user is solely a "Renter"
-  // This updated check now allows users with account type "Both" to access the owner screen.
-  useEffect(() => {
-    if (userRole && userRole === "Renter") {
-      Alert.alert(
-        "Access Denied",
-        "This section is for aircraft owners. Please use the renter section."
-      );
-      navigation.goBack();
-    }
-  }, [userRole]);
+  const userDocRef = doc(db, "users", user.uid);
+  getDoc(userDocRef)
+    .then(docSnap => {
+      const role = docSnap.exists()
+        ? (docSnap.data().accountType ?? "")
+        : "";
+      setUserRole(role);
+    })
+    .catch(error => {
+      console.error("Error fetching user role:", error);
+    });
+}, [user]);
 
-  // New state for Manage Rental Modal
-  const [manageRentalModalVisible, setManageRentalModalVisible] =
-    useState(false);
-  // NEW: State for Connected Account Modal (to be opened when "View Connected Account" is pressed)
-  const [connectedAccountModalVisible, setConnectedAccountModalVisible] =
-    useState(false);
-  // NEW: State for live balance retrieved from Stripe – now we expect pending deposit amount
-  const [liveBalance, setLiveBalance] = useState(null);
+// block pure renters (but allow "Both")
+useEffect(() => {
+  if (userRole.toLowerCase() === "renter") {
+    Alert.alert(
+      "Access Denied",
+      "This section is for aircraft owners. Please use the renter section."
+    );
+    navigation.goBack();
+  }
+}, [userRole]);
+
+// ─── Other OwnerProfile State ─────────────────────────────────────────────
+const [manageRentalModalVisible, setManageRentalModalVisible] = useState(false);
+const [connectedAccountModalVisible, setConnectedAccountModalVisible] = useState(false);
+const [liveBalance, setLiveBalance] = useState(null);
 
   // NEW: State for Update Profile Modal (newly added)
   const [updateProfileModalVisible, setUpdateProfileModalVisible] =
@@ -324,10 +429,9 @@ const OwnerProfile = ({ ownerId }) => {
 
   // Update initial profileData to check providerData if displayName isn’t directly set.
   const [profileData, setProfileData] = useState({
-    fullName:
-      user?.displayName ||
-      (user?.providerData && user.providerData[0]?.displayName) ||
-      "",
+    firstName: "",
+    lastName: "",
+    fullName: user?.displayName || "",
     contact: "",
     address: "",
     email: user?.email || "",
@@ -394,7 +498,105 @@ const OwnerProfile = ({ ownerId }) => {
   const [selectedAircraft, setSelectedAircraft] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedAircraftIds, setSelectedAircraftIds] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
+  // 1) Add this **above** your existing single‐thread useEffect
+  // 1) Up near your other callbacks/hooks:
+  const closeMessageModal = useCallback(() => {
+    setMessageModalVisible(false);
+    setSelectedChatThreadId(null);
+    setMessages([]);
+  }, []);
+
+  // 2) Single‐thread listener:
+  // Single‐thread listener + local notification for new messages
+  useEffect(() => {
+    if (!selectedChatThreadId) return;
+
+    const threadRef = doc(db, "messages", selectedChatThreadId);
+    const unsubscribe = onSnapshot(
+      threadRef,
+      (docSnap) => {
+        const msgs = docSnap.exists() ? docSnap.data().messages || [] : [];
+
+        // If we already had messages, and one more arrived, fire notification
+        if (
+          prevMessagesCount.current > 0 &&
+          msgs.length > prevMessagesCount.current
+        ) {
+          const last = msgs[msgs.length - 1];
+          if (last.senderId !== resolvedOwnerId) {
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: `New message from ${last.senderName}`,
+                body: last.text,
+                data: { chatThreadId: selectedChatThreadId },
+              },
+              trigger: null,
+            });
+          }
+        }
+
+        // update the ref and state
+        prevMessagesCount.current = msgs.length;
+        setMessages(msgs);
+      },
+      (err) => console.error("Chat subscription error:", err)
+    );
+
+    return () => unsubscribe();
+  }, [selectedChatThreadId, resolvedOwnerId]);
+
+  // 3) Unread‐count listener:
+  useEffect(() => {
+    if (!resolvedOwnerId) return;
+    const messagesRef = collection(db, "messages");
+    const q = query(
+      messagesRef,
+      where("participants", "array-contains", resolvedOwnerId)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.docs.forEach((docSnap) => {
+        const msgs = docSnap.data().messages || [];
+        if (msgs.length && msgs[msgs.length - 1].senderId !== resolvedOwnerId) {
+          count++;
+        }
+      });
+      setUnreadCount(count);
+    });
+    return () => unsubscribe();
+  }, [resolvedOwnerId]);
+
+  useEffect(() => {
+    if (unreadCount > 0) {
+      // build & store the animation
+      pulseAnim.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse, {
+            toValue: 1.2,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulse, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      pulseAnim.current.start();
+    } else {
+      // no unread: reset scale and stop any running loop
+      pulseAnim.current?.stop();
+      pulse.setValue(1);
+    }
+
+    return () => {
+      pulseAnim.current?.stop();
+    };
+  }, [unreadCount, pulse]);
   const [rentalRequestModalVisible, setRentalRequestModalVisible] =
     useState(false);
 
@@ -469,25 +671,29 @@ const OwnerProfile = ({ ownerId }) => {
       Alert.alert("Error", "User is not authenticated. Please log in.");
       return;
     }
-
+  
     try {
       // 1) Read the user's root document
-      const profileDocRef = doc(db, "users", resolvedOwnerId);
+      const profileDocRef  = doc(db, "users", resolvedOwnerId);
       const profileDocSnap = await getDoc(profileDocRef);
-
+  
       if (profileDocSnap.exists()) {
         const profile = profileDocSnap.data();
-
-        // Hydrate profileData
-        setProfileData(
-          profile.profileData || {
-            fullName: user?.displayName || "",
-            contact: "",
-            address: "",
-            email: user?.email || "",
-          }
-        );
-
+  
+        // Hydrate profileData WITH firstName, lastName, fullName
+        setProfileData({
+          firstName: profile.firstName || "",
+          lastName:  profile.lastName  || "",
+          fullName:
+            profile.fullName ||
+            `${profile.firstName || ""} ${profile.lastName || ""}`.trim() ||
+            user?.displayName ||
+            "",
+          contact: profile.profileData?.contact || "",
+          address: profile.profileData?.address || "",
+          email: profile.profileData?.email   || user?.email   || "",
+        });
+  
         // Hydrate costData and flags
         setCostData(
           profile.costData || {
@@ -507,7 +713,7 @@ const OwnerProfile = ({ ownerId }) => {
         );
         setCostSaved(!!profile.costData);
         setShowCalculator(!!profile.costData);
-
+  
         // Hydrate aircraftDetails
         setAircraftDetails(
           profile.aircraftDetails || {
@@ -523,7 +729,7 @@ const OwnerProfile = ({ ownerId }) => {
             mainImage: "",
           }
         );
-
+  
         // ─── NEW: Hydrate Stripe info ───
         setStripeAccountId(profile.stripeAccountId || null);
         setIsStripeConnected(!!profile.stripeAccountId);
@@ -531,7 +737,7 @@ const OwnerProfile = ({ ownerId }) => {
       } else {
         console.log("No owner profile data found.");
       }
-
+  
       // 2) Load this owner's aircraft listings
       const airplanesRef = collection(db, "airplanes");
       const q = query(
@@ -544,14 +750,14 @@ const OwnerProfile = ({ ownerId }) => {
         id: docSnap.id,
         ...docSnap.data(),
       }));
-
+  
       setUserListings(aircrafts);
       setAllAircrafts(aircrafts);
     } catch (error) {
       console.error("Error fetching owner data:", error);
       Alert.alert("Error", "Failed to fetch saved data.");
     }
-  }, [resolvedOwnerId, user]);
+  }, [resolvedOwnerId, user]);  
 
   // ─── ensure this sits immediately after fetchOwnerData ───
   useEffect(() => {
@@ -611,9 +817,9 @@ const OwnerProfile = ({ ownerId }) => {
       try {
         const token = await user.getIdToken();
         const response = await fetch(`${API_URL}/get-stripe-balance`, {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
         });
@@ -622,13 +828,13 @@ const OwnerProfile = ({ ownerId }) => {
           setLiveBalance(data.pendingAmount);
           setYtdBalance(data.ytdAmount);
         } else {
-          console.error('Error fetching live balance:', data.error);
+          console.error("Error fetching live balance:", data.error);
         }
       } catch (e) {
-        console.error('Error fetching live balance:', e);
+        console.error("Error fetching live balance:", e);
       }
     };
-  
+
     if (withdrawModalVisible) {
       fetchStripeBalance();
     }
@@ -881,10 +1087,11 @@ const OwnerProfile = ({ ownerId }) => {
       const unsubscribeRentalRequests = onSnapshot(
         q,
         async (snapshot) => {
+          // Notify on new pending requests
           snapshot.docChanges().forEach((change) => {
             if (change.type === "added") {
               const newRequest = change.doc.data();
-              if (newRequest.status === "pending") {
+              if (newRequest.rentalStatus === "pending") {
                 Notifications.scheduleNotificationAsync({
                   content: {
                     title: "New Rental Request",
@@ -897,6 +1104,7 @@ const OwnerProfile = ({ ownerId }) => {
             }
           });
 
+          // Enrich each request with listing details and cost calculations
           const requestsWithDetails = await Promise.all(
             snapshot.docs.map(async (docSnap) => {
               const requestData = docSnap.data();
@@ -942,11 +1150,13 @@ const OwnerProfile = ({ ownerId }) => {
             })
           );
 
+          // Split into pending and active (including paid) lists
           let pendingRequests = requestsWithDetails.filter(
-            (req) => req.status === "pending"
+            (req) => req.rentalStatus === "pending"
           );
           const activeRentals = requestsWithDetails.filter(
-            (req) => req.status === "active"
+            (req) =>
+              req.rentalStatus === "active" || req.rentalStatus === "paid"
           );
 
           // Clean up stale pending requests (those with a rentalDate in the past)
@@ -970,7 +1180,7 @@ const OwnerProfile = ({ ownerId }) => {
             }
           }
 
-          // Filter pending requests again to only include those that are still valid
+          // Filter pending requests again to only include those still valid
           const validPendingRequests = pendingRequests.filter((req) => {
             if (req.rentalDate) {
               let rentalDateObj = req.rentalDate;
@@ -998,7 +1208,6 @@ const OwnerProfile = ({ ownerId }) => {
       };
     }
   }, [resolvedOwnerId]);
-
   /**
    * Function to calculate the actual revenue based on rental history.
    */
@@ -1042,63 +1251,145 @@ const OwnerProfile = ({ ownerId }) => {
           messages: [...(chatData.messages || []), messageData],
         });
       }
+
       setMessageInput("");
-      setMessages((prevMessages) => [...prevMessages, messageData]);
+      setMessages((prev) => [...prev, messageData]);
+      // scroll to the new message
+      flatListRef.current?.scrollToEnd({ animated: true });
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message.");
     }
   };
 
+  const reportMessage = async (reason, comments = "") => {
+    if (!selectedChatThreadId) {
+      return Alert.alert(
+        "No Conversation",
+        "You need to have a chat open in order to report it."
+      );
+    }
+
+    // lookup the thread document so we can extract the renter’s info
+    const chatDoc = await getDoc(doc(db, "messages", selectedChatThreadId));
+    if (!chatDoc.exists()) {
+      return Alert.alert("Error", "Could not find this chat thread.");
+    }
+    const data = chatDoc.data();
+    // participants array contains both owner and renter
+    const renterId = data.participants.find((id) => id !== user.uid);
+    const renterName =
+      data.messages?.[0]?.senderName === user.displayName
+        ? data.messages[data.messages.length - 1]?.senderName
+        : data.messages?.[0]?.senderName || "Unknown";
+
+    try {
+      const token = await user.getIdToken();
+      const payload = {
+        listingId: selectedRequest?.listingId || null,
+        chatThreadId: selectedChatThreadId,
+        ownerId: user.uid,
+        renterId,
+        renterName,
+        reason,
+        comments,
+      };
+
+      await fetch(`${API_URL}/reportListing`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      Alert.alert(
+        "Reported",
+        "Thank you—we’ve notified the moderators with all relevant details."
+      );
+    } catch (err) {
+      console.error("Report failed", err);
+      Alert.alert("Error", "Unable to send report. Please try again later.");
+    }
+  };
+
   /**
    * Function to open the message modal for a specific chat thread.
+   */
+  /**
+   * Function to open the message modal for a specific chat thread.
+   * Now also sets selectedChatThreadId so we can stream updates.
    */
   const openMessageModal = async (chatThreadId = null) => {
     try {
       let threadId = chatThreadId;
-      // If no thread ID is provided, try using the one stored in state
+
+      // If caller passed in an ID, use it…
       if (!threadId) {
+        // Or reuse the selected one if we’ve already opened it this session
         if (selectedChatThreadId) {
           threadId = selectedChatThreadId;
         } else {
-          // Auto-create a chat thread if there's an active rental request
-          if (!selectedRequest || !selectedRequest.renterId) {
+          // No thread yet—try to find one by rentalRequestId
+          if (!selectedRequest?.id || !selectedRequest?.renterId) {
             Alert.alert("Error", "No active rental selected to start a chat.");
             return;
           }
+          const rentalId = selectedRequest.id;
           const renterId = selectedRequest.renterId;
-          const newChatThread = {
-            participants: [resolvedOwnerId, renterId],
-            ownerId: resolvedOwnerId,
-            renterId: renterId,
-            rentalRequestId: selectedRequest.id,
-            messages: [],
-            createdAt: serverTimestamp(),
-          };
-          const chatDocRef = await addDoc(
+
+          // Query for an existing thread on this rental
+          const existingQuery = query(
             collection(db, "messages"),
-            newChatThread
+            where("rentalRequestId", "==", rentalId),
+            where("participants", "array-contains", resolvedOwnerId),
+            limit(1)
           );
-          threadId = chatDocRef.id;
-          setSelectedChatThreadId(threadId);
+          const existingSnap = await getDocs(existingQuery);
+
+          if (!existingSnap.empty) {
+            // Reuse the first thread we find
+            threadId = existingSnap.docs[0].id;
+          } else {
+            // No existing thread → create a new one
+            const newThread = {
+              participants: [resolvedOwnerId, renterId],
+              ownerId: resolvedOwnerId,
+              renterId,
+              rentalRequestId: rentalId,
+              messages: [],
+              createdAt: serverTimestamp(),
+            };
+            const chatDocRef = await addDoc(
+              collection(db, "messages"),
+              newThread
+            );
+            threadId = chatDocRef.id;
+          }
         }
       }
 
-      // Now, fetch the chat thread data
+      // Store and load
+      setSelectedChatThreadId(threadId);
       const chatDocRef = doc(db, "messages", threadId);
       const chatDoc = await getDoc(chatDocRef);
       if (chatDoc.exists()) {
-        const chatData = chatDoc.data();
-        setMessages(chatData.messages || []);
+        // grab the existing messages…
+        const initial = chatDoc.data().messages || [];
+        setMessages(initial);
+        // …and prime our ref so we don’t fire on old messages
+        prevMessagesCount.current = initial.length;
       } else {
         Alert.alert("Error", "Chat thread not found.");
         return;
       }
+
       setMessageModalVisible(true);
     } catch (error) {
       console.error("Error opening message modal:", error);
       Alert.alert("Error", "Failed to open messages.");
-      setChatFailed(true); // Flag to trigger fail-safe modal if payment is complete
+      setChatFailed(true);
     }
   };
 
@@ -1110,7 +1401,7 @@ const OwnerProfile = ({ ownerId }) => {
     }
     // Mark this thread as pending deletion so it is temporarily removed from the list
     setPendingDeletion(thread);
-    // Start a 10-second timer to permanently delete the thread
+    // Start a 3-second timer to permanently delete the thread
     const timer = setTimeout(async () => {
       try {
         await deleteDoc(doc(db, "messages", thread.id));
@@ -1121,7 +1412,7 @@ const OwnerProfile = ({ ownerId }) => {
       }
       setPendingDeletion(null);
       setDeleteTimer(null);
-    }, 10000);
+    }, 3000);
     setDeleteTimer(timer);
   };
 
@@ -1402,6 +1693,9 @@ const OwnerProfile = ({ ownerId }) => {
   /**
    * Function to handle opening chat for an active rental.
    */
+  /**
+   * Function to handle opening chat for an active rental.
+   */
   const handleOpenChatForRental = async () => {
     try {
       const renterId = selectedRequest?.renterId;
@@ -1409,22 +1703,26 @@ const OwnerProfile = ({ ownerId }) => {
         Alert.alert("Error", "No renter ID available.");
         return;
       }
+
+      // Look for an existing thread between owner and this renter
       const chatThreadsQuery = query(
         collection(db, "messages"),
         where("participants", "array-contains", resolvedOwnerId)
       );
       const chatSnapshot = await getDocs(chatThreadsQuery);
-      let existingChatThread = null;
+
+      let chatThreadId = null;
       chatSnapshot.forEach((docSnap) => {
         const chatData = docSnap.data();
         if (
           chatData.participants.includes(resolvedOwnerId) &&
           chatData.participants.includes(renterId)
         ) {
-          existingChatThread = { id: docSnap.id, ...chatData };
+          chatThreadId = docSnap.id;
         }
       });
-      let chatThreadId = existingChatThread ? existingChatThread.id : null;
+
+      // If none exists, create a fresh thread
       if (!chatThreadId) {
         const chatThread = {
           participants: [resolvedOwnerId, renterId],
@@ -1437,6 +1735,11 @@ const OwnerProfile = ({ ownerId }) => {
         const chatDocRef = await addDoc(collection(db, "messages"), chatThread);
         chatThreadId = chatDocRef.id;
       }
+
+      // **NEW**: Make sure state knows which thread we're in
+      setSelectedChatThreadId(chatThreadId);
+
+      // Close the rental‑modals and hand off to openMessageModal
       setManageRentalModalVisible(false);
       setRentalRequestModalVisible(false);
       openMessageModal(chatThreadId);
@@ -2006,6 +2309,17 @@ const OwnerProfile = ({ ownerId }) => {
     }
   };
 
+  // ––– Define displayName for the header –––
+ const displayName = (
+   <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>
+     {profileData.fullName ||
+      user?.displayName ||
+      user?.providerData?.[0]?.displayName ||
+      "User"}
+   </Text>
+ );
+ // –––––––––––––––––––––––––––––––––––––––––
+
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <StatusBar
@@ -2021,34 +2335,29 @@ const OwnerProfile = ({ ownerId }) => {
         contentContainerStyle={{ paddingBottom: 16 }}
       >
         {/* Header Section */}
-        <ImageBackground
-          source={wingtipClouds}
-          style={{ height: 224 }}
-          resizeMode="cover"
-        >
-          <TouchableOpacity onPress={() => setUpdateProfileModalVisible(true)}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                paddingHorizontal: 16,
-                paddingTop: 24,
-              }}
-            >
-              <View>
-                <Text style={{ fontSize: 14, color: "#fff" }}>Welcome</Text>
-                <Text
-                  style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}
-                >
-                  {profileData.fullName ||
-                    (user?.providerData && user.providerData[0]?.displayName) ||
-                    "User"}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </ImageBackground>
+{/* Header Section */}
+<ImageBackground
+  source={wingtipClouds}
+  style={{ height: 224 }}
+  resizeMode="cover"
+>
+  <TouchableOpacity onPress={() => setUpdateProfileModalVisible(true)}>
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingTop: 24,
+      }}
+    >
+      <View>
+        <Text style={{ fontSize: 14, color: "#fff" }}>Welcome</Text>
+        {displayName}
+      </View>
+    </View>
+  </TouchableOpacity>
+</ImageBackground>
 
         <View
           style={{
@@ -2095,11 +2404,20 @@ const OwnerProfile = ({ ownerId }) => {
           <TouchableOpacity
             onPress={() => setFaqModalVisible(true)}
             style={{ alignItems: "center" }}
-            accessibilityLabel="FAQ"
+            accessibilityLabel="Important"
           >
-            <Ionicons name="help-circle-outline" size={36} color="#3182ce" />
-            <Text style={{ marginTop: 4 }}>FAQ</Text>
+            <Ionicons
+              name={
+                ownerTermsAgreed ? "checkmark-circle" : "alert-circle-outline"
+              }
+              size={36}
+              color={ownerTermsAgreed ? "green" : "#3182ce"}
+            />
+            <Text style={{ marginTop: 4 }}>
+              {ownerTermsAgreed ? "Agreed" : "Important"}
+            </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => setUpdateProfileModalVisible(true)}
             style={{ alignItems: "center" }}
@@ -3128,37 +3446,155 @@ const OwnerProfile = ({ ownerId }) => {
             >
               <Ionicons name="arrow-back" size={24} color="#2d3748" />
             </TouchableOpacity>
+
             <Text style={styles.messagesTitle}>Messages</Text>
+
+            {/* just a spacer */}
             <View style={{ width: 24 }} />
+
+            {/* DROP-IN: Report button */}
+            <TouchableOpacity
+              onPress={() => reportMessage("spam/scam")}
+              style={styles.reportButton}
+              accessibilityRole="button"
+              accessibilityLabel="Report conversation as spam or scam"
+            >
+              <Text style={styles.reportText}>🚩 Report as spam/scam</Text>
+            </TouchableOpacity>
           </View>
 
           <FlatList
+            ref={flatListRef}
             data={messages}
             keyExtractor={(item, index) =>
               `${item.senderId}_${item.createdAt?.seconds}_${item.createdAt?.nanoseconds}_${index}`
             }
-            renderItem={({ item }) => (
-              <View
-                style={[
-                  styles.chatBubble,
-                  item.senderId === user.uid
-                    ? styles.chatBubbleRight
-                    : styles.chatBubbleLeft,
-                ]}
-              >
-                <Text style={styles.chatSenderName}>{item.senderName}:</Text>
-                <Text style={styles.chatMessageText}>{item.text}</Text>
-                <Text style={styles.chatTimestamp}>
-                  {item.createdAt
-                    ? item.createdAt.toDate
-                      ? item.createdAt.toDate().toLocaleString()
-                      : new Date(item.createdAt).toLocaleString()
-                    : "N/A"}
-                </Text>
-              </View>
-            )}
-            contentContainerStyle={styles.messagesList}
-            style={{ flex: 1, width: "100%" }}
+            renderItem={({ item, index }) => {
+              const isSender = item.senderId === user.uid;
+
+              // Get this message’s date string
+              const dateObj = item.createdAt
+                ? item.createdAt.toDate
+                  ? item.createdAt.toDate()
+                  : new Date(item.createdAt)
+                : new Date();
+              const thisDay = dateObj.toDateString();
+
+              // Peek at the previous message’s date (if any)
+              const prev = messages[index - 1];
+              const prevDay =
+                prev && prev.createdAt
+                  ? (prev.createdAt.toDate
+                      ? prev.createdAt.toDate()
+                      : new Date(prev.createdAt)
+                    ).toDateString()
+                  : null;
+
+              // Should we show the date separator?
+              const showSeparator = prevDay !== thisDay;
+
+              return (
+                <View
+                  style={{
+                    width: "100%",
+                    paddingHorizontal: 16, // inset from screen edges
+                    alignItems: isSender ? "flex-end" : "flex-start",
+                  }}
+                >
+                  {/* Date Separator */}
+                  {showSeparator && (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        marginVertical: 8,
+                        width: "100%",
+                      }}
+                    >
+                      <View
+                        style={{ flex: 1, height: 1, backgroundColor: "#ccc" }}
+                      />
+                      <Text
+                        style={{
+                          marginHorizontal: 8,
+                          color: "#666",
+                          fontSize: 12,
+                        }}
+                      >
+                        {dateObj.toLocaleDateString()}
+                      </Text>
+                      <View
+                        style={{ flex: 1, height: 1, backgroundColor: "#ccc" }}
+                      />
+                    </View>
+                  )}
+
+                  {/* Message + Header */}
+                  <View
+                    style={{
+                      marginBottom: 4,
+                      alignSelf: isSender ? "flex-end" : "flex-start",
+                      maxWidth: "80%",
+                    }}
+                  >
+                    {/* Header: name + time */}
+                    <View
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        backgroundColor: "#fff",
+                        borderTopLeftRadius: 8,
+                        borderTopRightRadius: 8,
+                        borderBottomWidth: 1,
+                        borderColor: "#ccc",
+                        alignItems: "flex-end",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontWeight: "bold",
+                          fontSize: 14,
+                          color: "#000",
+                        }}
+                      >
+                        {item.senderName}
+                      </Text>
+                      <Text
+                        style={{
+                          fontWeight: "bold",
+                          fontSize: 10,
+                          color: "#000",
+                          marginTop: 2,
+                        }}
+                      >
+                        {dateObj.toLocaleTimeString()}
+                      </Text>
+                    </View>
+
+                    {/* Bubble: auto-sized */}
+                    <View
+                      style={{
+                        padding: 12,
+                        borderBottomLeftRadius: 8,
+                        borderBottomRightRadius: 8,
+                        backgroundColor: isSender ? "#333" : "#e2e8f0",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: isSender ? "#fff" : "#000",
+                          lineHeight: 20,
+                        }}
+                      >
+                        {item.text}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            }}
+            contentContainerStyle={{ paddingBottom: 16 }}
+            keyboardShouldPersistTaps="handled"
           />
 
           <View style={styles.messageInputContainer}>
@@ -3626,80 +4062,81 @@ const OwnerProfile = ({ ownerId }) => {
 
       {/* Updated Withdraw Funds Modal */}
       <Modal
-  visible={withdrawModalVisible}
-  animationType="slide"
-  transparent={true}
-  onRequestClose={() => setWithdrawModalVisible(false)}
->
-  <KeyboardAvoidingView
-    behavior={Platform.OS === "ios" ? "padding" : "height"}
-    style={{ flex: 1 }}
-    keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
-  >
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <View
-        style={{
-          width: "88%",
-          maxHeight: "90%",
-          backgroundColor: "#fff",
-          borderRadius: 8,
-          padding: 24,
-        }}
+        visible={withdrawModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setWithdrawModalVisible(false)}
       >
-        <ModalHeader
-          title="Payment Information"
-          onClose={() => setWithdrawModalVisible(false)}
-        />
-
-        {/* Live balance (pending deposits) */}
-        <Text style={{ fontSize: 16, marginBottom: 16 }}>
-          Live Balance: $
-          {liveBalance != null
-            ? (liveBalance / 100).toFixed(2)
-            : (availableBalance / 100).toFixed(2)}
-        </Text>
-
-        {/* NEW: Year‑to‑Date balance pulled live from Stripe */}
-        <Text style={{ fontSize: 16, marginBottom: 16, fontWeight: "bold" }}>
-          Year‑to‑Date Balance: $
-          {ytdBalance != null
-            ? (ytdBalance / 100).toFixed(2)
-            : "Loading..."}
-        </Text>
-
-        {/* Total withdrawn (historical) */}
-        <Text
-          style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
         >
-          Total Withdrawn: ${(totalWithdrawn / 100).toFixed(2)}
-        </Text>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                width: "88%",
+                maxHeight: "90%",
+                backgroundColor: "#fff",
+                borderRadius: 8,
+                padding: 24,
+              }}
+            >
+              <ModalHeader
+                title="Payment Information"
+                onClose={() => setWithdrawModalVisible(false)}
+              />
 
-        <CustomButton
-          onPress={() => setWithdrawModalVisible(false)}
-          title="Close"
-          backgroundColor="#f56565"
-          accessibilityLabel="Close payment information"
-        />
+              {/* Live balance (pending deposits) */}
+              <Text style={{ fontSize: 16, marginBottom: 16 }}>
+                Live Balance: $
+                {liveBalance != null
+                  ? (liveBalance / 100).toFixed(2)
+                  : (availableBalance / 100).toFixed(2)}
+              </Text>
 
-        {loading && (
-          <ActivityIndicator
-            size="large"
-            color="#3182ce"
-            style={{ marginTop: 16 }}
-          />
-        )}
-      </View>
-    </View>
-  </KeyboardAvoidingView>
-</Modal>
+              {/* NEW: Year‑to‑Date balance pulled live from Stripe */}
+              <Text
+                style={{ fontSize: 16, marginBottom: 16, fontWeight: "bold" }}
+              >
+                Year‑to‑Date Balance: $
+                {ytdBalance != null
+                  ? (ytdBalance / 100).toFixed(2)
+                  : "Loading..."}
+              </Text>
 
+              {/* Total withdrawn (historical) */}
+              <Text
+                style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}
+              >
+                Total Withdrawn: ${(totalWithdrawn / 100).toFixed(2)}
+              </Text>
+
+              <CustomButton
+                onPress={() => setWithdrawModalVisible(false)}
+                title="Close"
+                backgroundColor="#f56565"
+                accessibilityLabel="Close payment information"
+              />
+
+              {loading && (
+                <ActivityIndicator
+                  size="large"
+                  color="#3182ce"
+                  style={{ marginTop: 16 }}
+                />
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Stripe Info Modal */}
       <Modal
@@ -3881,10 +4318,20 @@ const OwnerProfile = ({ ownerId }) => {
               backgroundColor="#3182ce"
               accessibilityLabel="Save profile changes"
             />
+            <View style={{ alignItems: "center", marginTop: 12 }}>
+              <TouchableOpacity onPress={handleDeleteAccount}>
+                <Text
+                  style={{ color: "#e53e3e", textDecorationLine: "underline" }}
+                >
+                  Delete Account
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
-      {/* FAQ Modal */}
+
+      {/* Important Modal */}
       <Modal
         visible={faqModalVisible}
         animationType="slide"
@@ -3908,94 +4355,69 @@ const OwnerProfile = ({ ownerId }) => {
             }}
           >
             <ModalHeader
-              title="FAQ"
+              title="Important"
               onClose={() => setFaqModalVisible(false)}
             />
-            <ScrollView style={{ maxHeight: 400 }}>
+
+            {/* New agreement intro */}
+            <Text style={{ marginBottom: 16, fontSize: 14, lineHeight: 20 }}>
+              You must agree to the following before you can list your aircraft
+              for rent in the Rental Marketplace.
+            </Text>
+
+            <ScrollView
+              style={{ maxHeight: 400 }}
+              showsHorizontalScrollIndicator={false}
+            >
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
-                1. Will my insurance company allow this, and will my costs
-                increase?
-              </Text>
-              <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>Insurance Approval:</Text>{" "}
-                Yes. Most insurance carriers allow owners to rent their
-                planes—similar to a flight school lease-back or flying club
-                arrangement.
-                {"\n"}
-                <Text style={{ fontWeight: "bold" }}>Cost Impact:</Text> Your
-                costs may rise, but not dramatically.
-                {"\n"}
-                <Text style={{ fontWeight: "bold" }}>Next Steps:</Text> Contact
-                your insurance company for a quote. Look for links to approved
-                providers in the app and on our website.
+                1. You will ensure your aircraft is current on its annual.
               </Text>
 
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
-                2. Does the FAA allow this?
+                2. You agree to carry proper insurance.
               </Text>
-              <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>FAA Guidelines:</Text> Yes.
-                The FAA permits private owners to lease their planes to licensed
-                pilots.
-                {"\n"}
-                <Text style={{ fontWeight: "bold" }}>Important Note:</Text> Do
-                not charge for flights beyond the lease transaction; doing so
-                could trigger FAA regulations.
+              <Text style={{ marginBottom: 8, fontSize: 14 }}>
+                (We recommend getting in touch with your insurance agent.)
               </Text>
 
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
-                3. What if a renter damages or makes my aircraft less clean?
-              </Text>
-              <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>Preventive Measures:</Text>{" "}
-                The app includes an “Owner’s Portal” with pre- and post-rental
-                walk-around checklists and photo uploads. A $500 credit card
-                hold is added on top of the rental fare. Owners can claim this
-                if any issues arise.
-                {"\n"}
-                <Text style={{ fontWeight: "bold" }}>Community Trust:</Text> We
-                believe in the aviation community’s commitment to safety and
-                proper care.
+                3. You may be required to show proof to the renter that your
+                insurance is up to date.
               </Text>
 
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
-                4. Why should I trust a stranger with my plane?
+                4. The renter will be required to show you proof of the
+                following:
               </Text>
-              <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>Renter Verification:</Text>{" "}
-                Renters must upload their current log book, medical certificate,
-                certifications, and non-owner insurance policy.
-                {"\n"}
-                <Text style={{ fontWeight: "bold" }}>Owner Options:</Text> You
-                can upload your aircraft’s maintenance records, insurance
-                details, and avionics package. Set a minimum flight hour
-                requirement (e.g., 150 hours) to filter renters automatically.
-                Optionally, require a CFI checkout (renter’s expense) without
-                mandating a specific instructor.
-                {"\n"}
-                <Text style={{ fontWeight: "bold" }}>
-                  Reputation System:
-                </Text>{" "}
-                Our “Star Rating” system lets both parties rate each other,
-                helping you decide if a renter meets your trust criteria.
+              <Text style={{ marginLeft: 16, fontSize: 14, marginBottom: 8 }}>
+                a. A current copy of the renter’s insurance policy.{"\n"}
+                b. Their pilot’s license.{"\n"}
+                c. A copy of the most recent entries in their logbook.{"\n"}
+                d. Proof of current medical.
               </Text>
 
               <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
-                5. Do I need to perform a 100-hour inspection if I lease my
-                aircraft?
+                5. It is also recommended that you conduct a full safety
+                walk-around and a pre-flight with any potential renters prior to
+                leasing your aircraft.
               </Text>
-              <Text style={{ marginBottom: 8 }}>
-                <Text style={{ fontWeight: "bold" }}>
-                  No, You’re Not Required:
-                </Text>{" "}
-                A 100-hour inspection is not necessary unless you mandate a CFI
-                checkout and specify the CFI. If the renter chooses their own
-                CFI, the inspection requirement does not apply.
+
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                6. You agree to keep all transactions within the app.
               </Text>
             </ScrollView>
+
             <CustomButton
-              onPress={() => setFaqModalVisible(false)}
-              title="Close"
+              onPress={async () => {
+                try {
+                  await AsyncStorage.setItem("ownerTermsAgreed", "true");
+                } catch (e) {
+                  console.warn("Failed to save agreement", e);
+                }
+                setOwnerTermsAgreed(true);
+                setFaqModalVisible(false);
+              }}
+              title="Agree & Proceed to List Your Aircraft"
               backgroundColor="#3182ce"
             />
           </View>
@@ -4030,19 +4452,25 @@ const OwnerProfile = ({ ownerId }) => {
               onClose={() => setInvestModalVisible(false)}
             />
             <Text style={{ marginBottom: 16 }}>
-              Interested in investing in Ready Set Fly? Contact us at{" "}
+              Ready Set Fly is revolutionizing aviation with a modern,
+              all-in-one marketplace that seamlessly blends hourly rentals and
+              traditional listings in a single platform. Join us on this
+              exciting journey to transform how pilots, aircraft owners, and
+              aviation enthusiasts connect. For investment opportunities and
+              more details, email us at{" "}
               <Text
                 style={{ color: "#3182ce", textDecorationLine: "underline" }}
                 onPress={() =>
                   Linking.openURL(
-                    "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready,%20Set,%20Fly!"
+                    "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready%2C%20Set%2C%20Fly!"
                   )
                 }
               >
                 coryarmer@gmail.com
-              </Text>{" "}
-              for more details.
+              </Text>
+              .
             </Text>
+
             <CustomButton
               onPress={() => setInvestModalVisible(false)}
               title="Close"
@@ -4188,13 +4616,19 @@ const OwnerProfile = ({ ownerId }) => {
                     >
                       <Text style={{ fontSize: 16, fontWeight: "bold" }}>
                         Chat with{" "}
-                        <ParticipantName
+                        {/* <ParticipantName
                           participantId={otherParticipantId || "Unknown"}
-                        />
+                        /> */}
                       </Text>
                       <ParticipantDate
                         participantId={otherParticipantId || "Unknown"}
                       />
+                      <Text style={{ fontSize: 16, fontWeight: "bold" }}>
+                        <ParticipantName
+                          participantId={otherParticipantId || "Unknown"}
+                        />
+                      </Text>
+                      <RentalDate rentalRequestId={item.rentalRequestId} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -4245,6 +4679,13 @@ const OwnerProfile = ({ ownerId }) => {
         accessibilityLabel="Open chat list"
         accessibilityRole="button"
       >
+        {unreadCount > 0 && (
+          <Animated.View
+            style={[styles.badge, { transform: [{ scale: pulse }] }]}
+          >
+            <Text style={styles.badgeText}>{unreadCount}</Text>
+          </Animated.View>
+        )}
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />
       </TouchableOpacity>
 
@@ -4287,11 +4728,11 @@ const styles = {
     maxWidth: "80%",
   },
   chatBubbleLeft: {
-    backgroundColor: "#edf2f7",
+    backgroundColor: "#e2e8f0",
     alignSelf: "flex-start",
   },
   chatBubbleRight: {
-    backgroundColor: "#3182ce",
+    backgroundColor: "#000000",
     alignSelf: "flex-end",
   },
   chatSenderName: {
@@ -4300,7 +4741,7 @@ const styles = {
     marginBottom: 4,
   },
   chatMessageText: {
-    color: "#2d3748",
+    color: "#ffffff",
   },
   chatTimestamp: {
     fontSize: 10,
@@ -4347,5 +4788,21 @@ const styles = {
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
+  },
+  badge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "red",
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    minWidth: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 };

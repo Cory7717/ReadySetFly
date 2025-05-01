@@ -1,10 +1,19 @@
 import React, { useEffect, useState } from "react";
+import * as Notifications from "expo-notifications";
 import { SplashScreen, Stack } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { initializeApp, getApps, getApp } from "firebase/app";
 import Constants from "expo-constants";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 // Firebase configuration
 const firebaseConfig = {

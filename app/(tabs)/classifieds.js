@@ -33,6 +33,9 @@ import {
   limit,
   startAfter,
   getDocs,
+  doc,
+  updateDoc,
+  increment,
 } from "firebase/firestore";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
@@ -537,6 +540,26 @@ const Classifieds = () => {
   const [viewListingsModalVisible, setViewListingsModalVisible] =
     useState(false);
   const [userListings, setUserListings] = useState([]);
+  // const isBlocked = item.expired || item.status === "trial_expired";
+
+  const extendListing = async (listingId, paymentMethodId) => {
+    const token = await getFirebaseIdToken();
+    try {
+      const res = await fetch(`${API_URL}/continueListing`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        // replace `/* your PM */` with the variable that actually holds your Stripe PM ID:
+        body: JSON.stringify({ listingId, paymentMethodId }),
+      });
+      if (!res.ok) throw new Error("Payment failed");
+      Alert.alert("Success", "Your listing has been extended 30 days.");
+    } catch (err) {
+      Alert.alert("Error", err.message);
+    }
+  };
 
   // Helper function to close all modals
   const closeAllModals = () => {
@@ -680,6 +703,16 @@ const Classifieds = () => {
       orderBy("createdAt", "desc"),
       limit(pageSize)
     );
+
+    //The code below will replace the q = query line above once I get everything working.
+
+    // let q = query(
+    //   collection(db, "listings"),
+    //   where("category", "==", selectedCategory),
+    //   where("status", "in", ["active","trial"]),      // ← new
+    //   orderBy("createdAt", "desc"),
+    //   limit(pageSize)
+    // );
 
     if (!refresh && lastVisible) {
       q = query(q, startAfter(lastVisible));
@@ -953,11 +986,29 @@ const Classifieds = () => {
     setFilteredListings(filtered);
   };
 
-  const handleListingPress = (listing) => {
+  const handleListingPress = async (listing) => {
     closeAllModals();
-    setSelectedListing(listing);
-    if (listing.category === "Aviation Jobs") setJobDetailsModalVisible(true);
-    else setDetailsModalVisible(true);
+
+    // 1) increment Firestore
+    try {
+      const listingRef = doc(db, "listings", listing.id);
+      await updateDoc(listingRef, { views: increment(1) });
+    } catch (error) {
+      console.error("Error incrementing view count:", error);
+    }
+
+    // 2) bump local so UI updates immediately
+    setSelectedListing({
+      ...listing,
+      views: (listing.views || 0) + 1,
+    });
+
+    // 3) open the right modal
+    if (listing.category === "Aviation Jobs") {
+      setJobDetailsModalVisible(true);
+    } else {
+      setDetailsModalVisible(true);
+    }
   };
 
   const handleEditListing = (listing) => {
@@ -1116,6 +1167,11 @@ const Classifieds = () => {
     };
 
     listingDetails.selectedPricing = selectedPricing || "Basic";
+
+    // ...after you build `listingDetails` but before fetch:
+    if (!editingListing) {
+      listingDetails.views = 0;
+    }
 
     if (listingDetails.category === "Flight Instructors") {
       listingDetails.profileImage = profileImage;
@@ -1662,70 +1718,76 @@ const Classifieds = () => {
         </TouchableOpacity>
 
         {filteredListings.length > 0 ? (
-          filteredListings.map((item, index) => (
-            <React.Fragment key={item.id}>
-              <View
-                style={{
-                  borderRadius: 10,
-                  overflow: "hidden",
-                  backgroundColor: COLORS.white,
-                  marginBottom: 20,
-                  shadowColor: COLORS.black,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 2,
-                  elevation: 3,
-                }}
-              >
-                {(item.packageType === "Featured" ||
-                  item.packageType === "Enhanced") && (
-                  <View style={styles.featuredTag}>
-                    <Text style={styles.featuredTagText}>
-                      {item.packageType} Listing
-                    </Text>
-                  </View>
-                )}
+          filteredListings.map((item, index) => {
+            const isBlocked = item.expired || item.status === "trial_expired";
 
-                <TouchableOpacity
-                  onPress={() => handleListingPress(item)}
-                  style={{ flex: 1, padding: 10 }}
-                  accessibilityLabel={`View details of listing ${
-                    item.category === "Flight Instructors"
-                      ? `${item.firstName} ${item.lastName}`
-                      : item.title || "Listing"
-                  }`}
-                  accessibilityRole="button"
+            return (
+              <React.Fragment key={item.id}>
+                <View
+                  style={{
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    backgroundColor: COLORS.white,
+                    marginBottom: 20,
+                    shadowColor: COLORS.black,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 2,
+                    elevation: 3,
+                    opacity: isBlocked ? 0.5 : 1, // half-fade if blocked
+                  }}
                 >
-                  {item.category === "Flight Instructors" ? (
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      {item.profileImage && (
-                        <Image
-                          source={{ uri: item.profileImage }}
-                          style={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 25,
-                            marginRight: 10,
-                          }}
-                        />
-                      )}
-                      <View>
-                        <Text
-                          style={{
-                            fontSize: 18,
-                            fontWeight: "bold",
-                            color: COLORS.black,
-                          }}
-                        >
-                          {item.firstName} {item.lastName}
-                        </Text>
-                        <Text style={{ fontSize: 14, color: COLORS.gray }}>
-                          CFI #{item.certifications || "N/A"}
-                        </Text>
-                        {item.serviceLocationsList &&
-                          item.serviceLocationsList.length > 0 && (
+                  {(item.packageType === "Featured" ||
+                    item.packageType === "Enhanced") && (
+                    <View style={styles.featuredTag}>
+                      <Text style={styles.featuredTagText}>
+                        {item.packageType} Listing
+                      </Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      isBlocked ? null : handleListingPress(item)
+                    }
+                    disabled={isBlocked}
+                    style={{ flex: 1, padding: 10 }}
+                    accessibilityLabel={`View details of listing ${
+                      item.category === "Flight Instructors"
+                        ? `${item.firstName} ${item.lastName}`
+                        : item.title || "Listing"
+                    }`}
+                    accessibilityRole="button"
+                  >
+                    {item.category === "Flight Instructors" ? (
+                      <View
+                        style={{ flexDirection: "row", alignItems: "center" }}
+                      >
+                        {item.profileImage && (
+                          <Image
+                            source={{ uri: item.profileImage }}
+                            style={{
+                              width: 50,
+                              height: 50,
+                              borderRadius: 25,
+                              marginRight: 10,
+                            }}
+                          />
+                        )}
+                        <View>
+                          <Text
+                            style={{
+                              fontSize: 18,
+                              fontWeight: "bold",
+                              color: COLORS.black,
+                            }}
+                          >
+                            {item.firstName} {item.lastName}
+                          </Text>
+                          <Text style={{ fontSize: 14, color: COLORS.gray }}>
+                            CFI #{item.certifications || "N/A"}
+                          </Text>
+                          {item.serviceLocationsList?.length > 0 && (
                             <View style={{ marginTop: 5 }}>
                               <Text
                                 style={{ fontSize: 14, color: COLORS.gray }}
@@ -1734,84 +1796,106 @@ const Classifieds = () => {
                               </Text>
                             </View>
                           )}
+                          {/* NEW: show views */}
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: COLORS.gray,
+                              marginTop: 4,
+                            }}
+                          >
+                            Views: {item.views || 0}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  ) : (
-                    <>
-                      {item.images && item.images.length > 0 ? (
-                        renderListingImages(item, true, null)
-                      ) : (
-                        <Text
-                          style={{
-                            textAlign: "center",
-                            color: COLORS.gray,
-                            marginTop: 10,
-                            padding: 10,
-                          }}
-                        >
-                          No Images Available
-                        </Text>
-                      )}
-                      {item.title ? (
-                        <Text
-                          style={{
-                            fontSize: 18,
-                            fontWeight: "bold",
-                            color: COLORS.black,
-                            marginTop: 10,
-                          }}
-                        >
-                          {item.title}
-                        </Text>
-                      ) : null}
-                      {renderListingDetails(item)}
-                    </>
-                  )}
-                </TouchableOpacity>
+                    ) : (
+                      <>
+                        {item.images?.length > 0 ? (
+                          renderListingImages(item, true, null)
+                        ) : (
+                          <Text
+                            style={{
+                              textAlign: "center",
+                              color: COLORS.gray,
+                              marginTop: 10,
+                              padding: 10,
+                            }}
+                          >
+                            No Images Available
+                          </Text>
+                        )}
+                        {item.title && (
+                          <>
+                            <Text
+                              style={{
+                                fontSize: 18,
+                                fontWeight: "bold",
+                                color: COLORS.black,
+                                marginTop: 10,
+                              }}
+                            >
+                              {item.title}
+                            </Text>
+                            {/* NEW: show views */}
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color: COLORS.gray,
+                                marginTop: 4,
+                              }}
+                            >
+                              Views: {item.views || 0}
+                            </Text>
+                          </>
+                        )}
+                        {renderListingDetails(item)}
+                      </>
+                    )}
+                  </TouchableOpacity>
 
-                <View style={styles.editDeleteContainer}>
-                  {/* NEW: show “Report Post” label + flag if viewer is NOT the owner */}
-                  {user && item.ownerId !== user.uid && (
-                    <TouchableOpacity
-                      onPress={() => handleReportListing(item)}
-                      style={{
-                        alignSelf: "flex-end",
-                        marginTop: 1,
-                        flexDirection: "row",
-                        alignItems: "center",
-                      }}
-                      accessibilityLabel="Report listing"
-                      accessibilityRole="button"
-                    >
-                      <Text
+                  <View style={styles.editDeleteContainer}>
+                    {user && item.ownerId !== user.uid && (
+                      <TouchableOpacity
+                        onPress={() => handleReportListing(item)}
                         style={{
-                          color: COLORS.red,
-                          fontSize: 14,
-                          marginRight: 6,
+                          alignSelf: "flex-end",
+                          marginTop: 1,
+                          flexDirection: "row",
+                          alignItems: "center",
                         }}
+                        accessibilityLabel="Report listing"
+                        accessibilityRole="button"
                       >
-                        Report Post
-                      </Text>
-                      <Ionicons
-                        name="flag-outline"
-                        size={20}
-                        color={COLORS.red}
-                      />
-                    </TouchableOpacity>
-                  )}
-                  {/* existing owner‑only Edit / Delete buttons */}
-                  {renderEditAndDeleteButtons(item)}
+                        <Text
+                          style={{
+                            color: COLORS.red,
+                            fontSize: 14,
+                            marginRight: 6,
+                          }}
+                        >
+                          Report Post
+                        </Text>
+                        <Ionicons
+                          name="flag-outline"
+                          size={20}
+                          color={COLORS.red}
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {renderEditAndDeleteButtons(item)}
+                  </View>
                 </View>
-              </View>
-              {(index + 1) % 17 === 0 && (
-                <View>
-                  <Text style={{ textAlign: "center", color: COLORS.gray }}>
-                    Google Ad Placeholder
-                  </Text>
-                </View>
-              )}
-            </React.Fragment>
-          ))
+
+                {(index + 1) % 17 === 0 && (
+                  <View>
+                    <Text style={{ textAlign: "center", color: COLORS.gray }}>
+                      Google Ad Placeholder
+                    </Text>
+                  </View>
+                )}
+              </React.Fragment>
+            );
+          })
         ) : (
           <Text style={{ textAlign: "center", color: COLORS.gray }}>
             No listings available

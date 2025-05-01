@@ -7,7 +7,11 @@
     "orientation": "portrait",
     "icon": "./Assets/images/RSFOpaqueLogo.png",
     "userInterfaceStyle": "automatic",
-
+    "notification": {
+      "iosDisplayInForeground": true,
+      "icon": "./Assets/images/notification-icon.png",
+      "color": "#ffffff"
+    },
     // ✅ new‑arch flag lives right here
     "newArchEnabled": false,
 
@@ -23,6 +27,7 @@
       "expo-router",
       "expo-font",
       "expo-document-picker",
+      "expo-notifications",
       [
         "expo-image-picker",
         {

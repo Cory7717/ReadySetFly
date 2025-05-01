@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react"; // Added useCallback
+
 import {
   TextInput,
   Image,
@@ -18,6 +19,7 @@ import {
   FlatList,
   StyleSheet,
   Linking,
+  SectionList,
 } from "react-native";
 
 import {
@@ -40,12 +42,21 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+
+import { onAuthStateChanged, signOut } from "firebase/auth"; // ← added signOut
+
+import axios from "axios"; // ← added axios
+
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import * as Location from "expo-location";
-import { useFocusEffect } from '@react-navigation/native';
-
-import { onAuthStateChanged } from "firebase/auth";
+import { useFocusEffect } from "@react-navigation/native";
 
 import {
   Ionicons,
@@ -53,6 +64,7 @@ import {
   MaterialCommunityIcons,
   Fontisto,
 } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 
 import { useRouter, useLocalSearchParams, useNavigation } from "expo-router"; // Added useNavigation
 
@@ -60,11 +72,25 @@ import ConfirmationScreen from "../payment/ConfirmationScreen";
 import MessagesScreen from "../screens/MessagesScreen";
 
 import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_URL =
   "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
 
 import { db, auth } from "../../firebaseConfig";
+
+const storage = getStorage();
+// helper to upload a local file URI → Storage → getDownloadURL
+async function uploadFileAsync(uri, path) {
+  // download file as blob
+  const resp = await fetch(uri);
+  const blob = await resp.blob();
+  // upload to storage
+  const ref = storageRef(storage, path);
+  await uploadBytes(ref, blob);
+  // get a public URL
+  return getDownloadURL(ref);
+}
 
 const ParticipantName = ({ participantId }) => {
   const [name, setName] = useState("");
@@ -99,6 +125,23 @@ const ParticipantName = ({ participantId }) => {
 
   return <Text>{name}</Text>;
 };
+
+/**
+ * Safely format a Firestore timestamp or JS Date
+ */
+function renterTimeStamp(ts) {
+  if (!ts) return "--";
+  // Firestore Timestamp
+  if (typeof ts.toDate === "function") {
+    return ts.toDate().toLocaleString();
+  }
+  // plain JS Date
+  if (ts instanceof Date) {
+    return ts.toLocaleString();
+  }
+  // anything else
+  return new Date(ts).toLocaleString();
+}
 
 const ParticipantDate = ({ participantId }) => {
   const [date, setDate] = useState(null);
@@ -151,26 +194,26 @@ function safeToFixed(value, decimals = 2) {
 }
 
 // --- ModalHeader Component (identical to owner.js) ---
-const ModalHeader = ({ title, onClose }) => (
-  <View
-    style={{
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 16,
-    }}
-  >
-    <Text style={{ fontSize: 20, fontWeight: "bold" }}>{title}</Text>
-    <TouchableOpacity
-      onPress={onClose}
-      style={{ padding: 8 }}
-      accessibilityLabel="Close modal"
-      accessibilityRole="button"
-    >
-      <Ionicons name="close" size={24} color="#2d3748" />
-    </TouchableOpacity>
-  </View>
-);
+// const ModalHeader = ({ title, onClose }) => (
+//   <View
+//     style={{
+//       flexDirection: "row",
+//       justifyContent: "space-between",
+//       alignItems: "center",
+//       marginBottom: 16,
+//     }}
+//   >
+//     <Text style={{ fontSize: 20, fontWeight: "bold" }}>{title}</Text>
+//     <TouchableOpacity
+//       onPress={onClose}
+//       style={{ padding: 8 }}
+//       accessibilityLabel="Close modal"
+//       accessibilityRole="button"
+//     >
+//       <Ionicons name="close" size={24} color="#2d3748" />
+//     </TouchableOpacity>
+//   </View>
+// );
 
 // --- CustomButton Component ---
 const CustomButton = ({ onPress, title, backgroundColor }) => (
@@ -190,6 +233,34 @@ const CustomButton = ({ onPress, title, backgroundColor }) => (
   </TouchableOpacity>
 );
 
+// Replace your existing ModalHeader with this drop-in version:
+const ModalHeader = ({ title, onClose, children }) => (
+  <View style={styles.modalHeader}>
+    <Text style={styles.modalHeaderTitle}>{title}</Text>
+    <View style={{ flexDirection: "row", alignItems: "center" }}>
+      {children}
+      <TouchableOpacity onPress={onClose} style={styles.modalHeaderClose}>
+        <Ionicons name="close" size={24} color="#2d3748" />
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+const ChatMessage = ({ message, isOwn }) => (
+  <View
+    style={[
+      styles.chatBubble,
+      isOwn ? styles.chatBubbleRight : styles.chatBubbleLeft,
+    ]}
+  >
+    <Text style={styles.chatSenderName}>{message.senderName}</Text>
+    <Text style={styles.chatMessageText}>{message.text}</Text>
+    <Text style={styles.chatTimestamp}>
+      {renterTimeStamp(message.timestamp ?? message.createdAt)}
+    </Text>
+  </View>
+);
+
 // ---- START OF RENTER COMPONENT ----
 const renter = () => {
   const router = useRouter();
@@ -202,12 +273,28 @@ const renter = () => {
   const [chatFailSafeModalVisible, setChatFailSafeModalVisible] =
     useState(false);
   const [ownerEmail, setOwnerEmail] = useState(null);
+  // after all your other useState calls
+  const [termsAgreed, setTermsAgreed] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem("termsAgreed");
+        if (saved === "true") {
+          setTermsAgreed(true);
+        }
+      } catch (e) {
+        console.warn("↪️ failed to load termsAgreed", e);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (chatFailed && paymentComplete) {
       setChatFailSafeModalVisible(true);
     }
   }, [chatFailed, paymentComplete]);
+  
 
   // New state to track if the payment flow has already been handled (Original)
   const [paymentHandled, setPaymentHandled] = useState(false);
@@ -247,7 +334,8 @@ const renter = () => {
   const [rentalCostEstimatorModalVisible, setRentalCostEstimatorModalVisible] =
     useState(false);
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
-  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] =
+    useState(false);
   const [allNotificationsModalVisible, setAllNotificationsModalVisible] =
     useState(false);
   const [faqModalVisible, setFaqModalVisible] = useState(false);
@@ -296,6 +384,81 @@ const renter = () => {
   });
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
+
+  // Utility to format just the date part
+  // Utility to format just the date part
+  const formatDate = (ts) => {
+    let d;
+    if (!ts) return "";
+    // Firestore Timestamp with toDate()
+    if (typeof ts.toDate === "function") {
+      d = ts.toDate();
+    }
+    // plain JS Date
+    else if (ts instanceof Date) {
+      d = ts;
+    }
+    // Firestore-like object { seconds, nanoseconds }
+    else if (ts.seconds != null) {
+      d = new Date(ts.seconds * 1000 + Math.floor(ts.nanoseconds / 1e6));
+    }
+    // fallback
+    else {
+      d = new Date(ts);
+    }
+    return d.toLocaleDateString();
+  };
+
+  const buildDisplayMessages = (msgs) => {
+    const out = [];
+    let lastDay = null;
+
+    msgs.forEach((m) => {
+      // pick whichever exists
+      const rawTs = m.timestamp ?? m.createdAt;
+
+      // convert to JS Date
+      let dateObj;
+      if (rawTs) {
+        if (typeof rawTs.toDate === "function") {
+          dateObj = rawTs.toDate();
+        } else if (rawTs instanceof Date) {
+          dateObj = rawTs;
+        } else if (rawTs.seconds != null) {
+          dateObj = new Date(
+            rawTs.seconds * 1000 + (rawTs.nanoseconds || 0) / 1e6
+          );
+        } else {
+          dateObj = new Date(rawTs);
+        }
+      } else {
+        console.warn("Message missing raw timestamp:", m);
+        dateObj = new Date();
+      }
+
+      // date separator (owner.js uses toLocaleDateString)
+      const dayString = dateObj.toDateString();
+      if (dayString !== lastDay) {
+        out.push({
+          type: "separator",
+          date: dateObj.toLocaleDateString(),
+        });
+        lastDay = dayString;
+      }
+
+      // attach a normalized 'timestamp' field so ChatMessage can use it
+      out.push({
+        type: "message",
+        ...m,
+        timestamp: rawTs,
+      });
+    });
+
+    return out;
+  };
+
+  const displayMessages = buildDisplayMessages(messages);
+
   const [rentalsLastDoc, setRentalsLastDoc] = useState(null);
   const [hasMoreRentals, setHasMoreRentals] = useState(true);
   const RENTALS_PAGE_SIZE = 20;
@@ -318,6 +481,9 @@ const renter = () => {
   const [favoritesListings, setFavoritesListings] = useState([]);
   const [chatListModalVisible, setChatListModalVisible] = useState(false);
   const [chatThreads, setChatThreads] = useState([]);
+  // ─── New: track number of threads with unread messages ───
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const [pendingDeletion, setPendingDeletion] = useState(null);
   const [deleteTimer, setDeleteTimer] = useState(null);
 
@@ -330,64 +496,94 @@ const renter = () => {
         where("participants", "array-contains", renterId)
       );
       const snapshot = await getDocs(q);
-      const threads = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
-      setChatThreads(threads);
+
+      // Build a map so we only keep one doc per rentalRequestId
+      const threadsByRental = {};
+      snapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        const rentalId = data.rentalRequestId || "__no_rental__";
+        // only keep the first thread we encounter for each rental
+        if (!threadsByRental[rentalId]) {
+          threadsByRental[rentalId] = { id: docSnap.id, ...data };
+        }
+      });
+
+      setChatThreads(Object.values(threadsByRental));
     } catch (error) {
       console.error("Error fetching chat threads:", error);
       Alert.alert("Error", "Failed to load chat threads.");
     }
   };
 
+  /**
+   * Function to open the message modal for a specific chat thread.
+   * Now also sets selectedChatThreadId and currentChatOwnerId.
+   */
+  /**
+   * Opens (or creates) a single chat thread per rental.
+   */
   const openMessageModal = async (chatThreadId = null) => {
     try {
       let threadId = chatThreadId;
-      // If no thread ID is provided, use one stored in state if available.
+
+      // 1) If you were passed an explicit threadId, keep it.
       if (!threadId) {
+        // 2) Otherwise, reuse any thread we’ve already opened in this session…
         if (selectedChatThreadId) {
           threadId = selectedChatThreadId;
         } else {
-          // Ensure owner info is available before creating a new thread.
-          if (!currentChatOwnerId) {
+          // 3) No open thread yet → try to find one by rentalRequestId
+          const rentalId = selectedRentalRequest?.id;
+          if (!rentalId || !currentChatOwnerId) {
             Alert.alert(
               "Error",
-              "Owner information is missing. Cannot open chat."
+              "Cannot open chat: missing rental or owner information."
             );
             return;
           }
-          // Use the current rental request's ID (if available) for context.
-          const rentalRequestId = selectedRentalRequest?.id || null;
-          const newChatThread = {
-            participants: [renterId, currentChatOwnerId],
-            rentalRequestId, // Associate with a rental request if available.
-            messages: [],
-            createdAt: serverTimestamp(),
-          };
-          const chatDocRef = await addDoc(
+
+          // Query for an existing thread for this rental
+          const existingQuery = query(
             collection(db, "messages"),
-            newChatThread
+            where("rentalRequestId", "==", rentalId),
+            where("participants", "array-contains", renterId),
+            limit(1)
           );
-          threadId = chatDocRef.id;
-          setSelectedChatThreadId(threadId);
+          const existingSnap = await getDocs(existingQuery);
+
+          if (!existingSnap.empty) {
+            // Reuse the first matching thread
+            threadId = existingSnap.docs[0].id;
+          } else {
+            // No thread exists yet → create a new one
+            const newThread = {
+              participants: [renterId, currentChatOwnerId],
+              rentalRequestId: rentalId,
+              messages: [],
+              createdAt: serverTimestamp(),
+            };
+            const chatDocRef = await addDoc(
+              collection(db, "messages"),
+              newThread
+            );
+            threadId = chatDocRef.id;
+          }
         }
       }
-      // Fetch the latest chat messages.
+
+      // 4) Save and load
+      setSelectedChatThreadId(threadId);
       const chatDocRef = doc(db, "messages", threadId);
-      const chatDocSnap = await getDoc(chatDocRef);
-      if (chatDocSnap.exists()) {
-        const chatData = chatDocSnap.data();
-        setMessages(chatData.messages || []);
-      } else {
+      const chatDoc = await getDoc(chatDocRef);
+      if (!chatDoc.exists()) {
         Alert.alert("Error", "Chat thread not found.");
         return;
       }
-      // Open the messaging modal.
+      setMessages(chatDoc.data().messages || []);
       setMessagesModalVisible(true);
-    } catch (error) {
-      console.error("Error opening message modal:", error);
-      Alert.alert("Error", "Failed to open messages.");
+    } catch (err) {
+      console.error("Error opening message modal:", err);
+      Alert.alert("Error", "Failed to open chat.");
     }
   };
 
@@ -395,7 +591,7 @@ const renter = () => {
     try {
       // 1) Find or create the shared chat thread
       let chatThreadId = selectedChatThreadId;
-  
+
       if (!chatThreadId) {
         const threadsRef = collection(db, "messages");
         // look for any thread where this renter is a participant
@@ -404,15 +600,17 @@ const renter = () => {
           where("participants", "array-contains", renterId)
         );
         const snap = await getDocs(q);
-  
+
         // try to find one that also contains the owner and matches the rentalRequestId
-        const existing = snap.docs.find(docSnap => {
+        const existing = snap.docs.find((docSnap) => {
           const data = docSnap.data();
-          return data.participants.includes(renterId)
-              && data.participants.includes(ownerId)
-              && data.rentalRequestId === rentalRequestId;
+          return (
+            data.participants.includes(renterId) &&
+            data.participants.includes(ownerId) &&
+            data.rentalRequestId === rentalRequestId
+          );
         });
-  
+
         if (existing) {
           chatThreadId = existing.id;
         } else {
@@ -426,11 +624,11 @@ const renter = () => {
           const docRef = await addDoc(threadsRef, newThread);
           chatThreadId = docRef.id;
         }
-  
+
         // keep it in state for future calls
         setSelectedChatThreadId(chatThreadId);
       }
-  
+
       // 2) Send the “payment completed” system message
       const paymentMessage = {
         senderId: renterId,
@@ -439,12 +637,12 @@ const renter = () => {
         timestamp: serverTimestamp(),
         recipients: [ownerId],
       };
-  
+
       const threadDocRef = doc(db, "messages", chatThreadId);
       await updateDoc(threadDocRef, {
         messages: arrayUnion(paymentMessage),
       });
-  
+
       console.log(
         "Payment notification sent to owner in chat thread:",
         chatThreadId
@@ -597,55 +795,56 @@ const renter = () => {
   // *** MODIFIED: useEffect to Handle Post-Payment Navigation ***
   // -------------------------
   // *** NEW: useEffect to Handle Post-Payment Navigation & Auto‑Open Chat ***
-useEffect(() => {
-  if (
-    params?.paymentSuccessFor &&
-    params.paymentSuccessFor !== processingPaymentSuccess
-  ) {
-    const rentalId = params.paymentSuccessFor;
-    const ownerIdForChat = params.ownerId;
+  useEffect(() => {
+    if (
+      params?.paymentSuccessFor &&
+      params.paymentSuccessFor !== processingPaymentSuccess
+    ) {
+      const rentalId = params.paymentSuccessFor;
+      const ownerIdForChat = params.ownerId;
 
-    console.log(`Handling payment success for rental: ${rentalId}`);
-    setProcessingPaymentSuccess(rentalId);
+      console.log(`Handling payment success for rental: ${rentalId}`);
+      setProcessingPaymentSuccess(rentalId);
 
-    // 1) Mark the rentalRequest “active” in Firestore
-    (async () => {
-      try {
-        const rentalRef = doc(db, "rentalRequests", rentalId);
-        await updateDoc(rentalRef, { rentalStatus: "active" });
-        console.log("Rental status updated to active");
-      } catch (err) {
-        console.error("Error updating rental status:", err);
-      }
-    })();
+      // 1) Mark the rentalRequest “active” in Firestore
+      (async () => {
+        try {
+          const rentalRef = doc(db, "rentalRequests", rentalId);
+          await updateDoc(rentalRef, { rentalStatus: "active" });
+          console.log("Rental status updated to active");
+        } catch (err) {
+          console.error("Error updating rental status:", err);
+        }
+      })();
 
-    // 2) Notify renter, then open chat once they tap “OK”
-    Alert.alert("Payment Successful!", "Your rental is now active.", [
-      {
-        text: "OK",
-        onPress: async () => {
-          // a) send the “payment completed” system message into the chat thread
-          await sendPaymentNotificationToOwner(rentalId, ownerIdForChat);
-          // b) close any open modals
-          closeAllOpenModals();
-          // c) set the current owner so chat knows where to point
-          setCurrentChatOwnerId(ownerIdForChat);
-          // d) actually open the in‑app chat modal (will create/reuse the thread)
-          openMessageModal();
-          // e) clear URL params so this effect won’t re‑fire
-          router.replace({ pathname: "/renter" });
+      // 2) Notify renter, then open chat once they tap “OK”
+      Alert.alert("Payment Successful!", "Your rental is now active.", [
+        {
+          text: "OK",
+          onPress: async () => {
+            setIsProcessingPayment(false);
+            // a) send the “payment completed” system message into the chat thread
+            await sendPaymentNotificationToOwner(rentalId, ownerIdForChat);
+            // b) close any open modals
+            closeAllOpenModals();
+            // c) set the current owner so chat knows where to point
+            setCurrentChatOwnerId(ownerIdForChat);
+            // d) actually open the in‑app chat modal (will create/reuse the thread)
+            openMessageModal();
+            // e) clear URL params so this effect won’t re‑fire
+            router.replace({ pathname: "/renter" });
+          },
         },
-      },
-    ]);
-  }
-
-  // cleanup: reset our local “handled” flag if params change
-  return () => {
-    if (params?.paymentSuccessFor !== processingPaymentSuccess) {
-      setProcessingPaymentSuccess(null);
+      ]);
     }
-  };
-}, [params, processingPaymentSuccess]);
+
+    // cleanup: reset our local “handled” flag if params change
+    return () => {
+      if (params?.paymentSuccessFor !== processingPaymentSuccess) {
+        setProcessingPaymentSuccess(null);
+      }
+    };
+  }, [params, processingPaymentSuccess]);
 
   // -------------------------
   // Fetch Profile on Mount (Original - unchanged, reads from 'users')
@@ -750,11 +949,56 @@ useEffect(() => {
     }
   }, [isAuthChecked, renterId]);
 
+  useEffect(() => {
+    if (!renterId) return;
+
+    (async () => {
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      let finalStatus = existing;
+      if (existing !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== "granted") {
+        Alert.alert(
+          "Permission required",
+          "Push notifications won’t work without permission."
+        );
+        return;
+      }
+
+      const { data: token } = await Notifications.getExpoPushTokenAsync();
+      // Merge it into your user record
+      await setDoc(
+        doc(db, "users", renterId),
+        { expoPushToken: token },
+        { merge: true }
+      );
+    })();
+  }, [renterId]);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const { rentalRequestId } =
+          response.notification.request.content.data || {};
+        if (rentalRequestId) {
+          router.push({
+            pathname: "/payment/CheckoutScreen",
+            params: { rentalRequestId },
+          });
+        }
+      }
+    );
+    return () => sub.remove();
+  }, []);
+
   // -------------------------
   // Listen for Rental Request Status Changes for Notifications (Original - unchanged)
   // -------------------------
   useEffect(() => {
     if (!renterId) return;
+
     const rentalRequestsRef = collection(db, "rentalRequests");
     const statusQuery = query(
       rentalRequestsRef,
@@ -772,14 +1016,19 @@ useEffect(() => {
               data.rentalStatus === "approved"
                 ? "Rental Approved"
                 : "Rental Denied";
+
             const body =
               data.rentalStatus === "approved"
-                ? "Your rental request has been approved."
+                ? "Your rental request has been approved. Tap to pay now."
                 : "Your rental request has been denied.";
 
             try {
               await Notifications.scheduleNotificationAsync({
-                content: { title, body },
+                content: {
+                  title,
+                  body,
+                  data: { rentalRequestId: docSnap.id },
+                },
                 trigger: null,
               });
 
@@ -1623,7 +1872,6 @@ useEffect(() => {
       return;
     }
 
-    // Reverted: Check rentalStatus (not status)
     if (
       selectedRentalRequest &&
       selectedRentalRequest.rentalStatus === "completed"
@@ -1635,31 +1883,140 @@ useEffect(() => {
       return;
     }
 
-    if (!currentChatOwnerId) {
-      Alert.alert("Error", "Cannot send message: Owner information missing.");
+    if (!selectedChatThreadId || !currentChatOwnerId) {
+      Alert.alert("Error", "Cannot send message: missing chat context.");
       return;
     }
 
     try {
-      const rentalRequestIdForMsg =
-        selectedRentalRequest?.id ||
-        selectedNotification?.rentalRequestId ||
-        null;
-
-      await addDoc(collection(db, "messages"), {
+      const threadRef = doc(db, "messages", selectedChatThreadId);
+      const newMsg = {
         senderId: renterId,
         senderName: renter.displayName || "User",
         text: messageText.trim(),
-        timestamp: serverTimestamp(),
-        participants: [renterId, currentChatOwnerId],
-        rentalRequestId: rentalRequestIdForMsg,
+        timestamp: new Date(),
+      };
+
+      await updateDoc(threadRef, {
+        messages: arrayUnion(newMsg),
       });
+
       setMessageText("");
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message.");
     }
   };
+
+  /**
+   * Exact same logic as owner.js → report this chat thread to moderators
+   */
+  const reportSpamMessage = async (reason, comments = "") => {
+    if (!selectedChatThreadId) {
+      return Alert.alert(
+        "No Conversation",
+        "You need to have a chat open in order to report it."
+      );
+    }
+
+    // 1) Fetch the thread so we can find the other participant (owner)
+    let chatDoc;
+    try {
+      chatDoc = await getDoc(doc(db, "messages", selectedChatThreadId));
+    } catch (err) {
+      console.error(err);
+      return Alert.alert("Error", "Could not access this chat thread.");
+    }
+    if (!chatDoc.exists()) {
+      return Alert.alert("Error", "Could not find this chat thread.");
+    }
+    const data = chatDoc.data();
+
+    // 2) Identify the owner (the one that isn’t the renter)
+    const ownerId = data.participants.find((id) => id !== renterId);
+    // 3) Pick a “name” for the owner (first or last sender in the thread)
+    const ownerName =
+      data.messages?.[0]?.senderName === renter?.displayName
+        ? data.messages[data.messages.length - 1]?.senderName
+        : data.messages?.[0]?.senderName || "Unknown";
+
+    // 4) Call your Cloud Function
+    try {
+      const token = await renter.getIdToken();
+      const payload = {
+        listingId: selectedRentalRequest?.listingId || null,
+        chatThreadId: selectedChatThreadId,
+        renterId, // this user
+        ownerId, // the other party
+        ownerName,
+        reason,
+        comments,
+      };
+
+      await fetch(`${API_URL}/reportListing`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      Alert.alert(
+        "Reported",
+        "Thank you—we’ve notified the moderators with all relevant details."
+      );
+      setMessagesModalVisible(false);
+    } catch (err) {
+      console.error("Report failed", err);
+      Alert.alert("Error", "Unable to send report. Please try again later.");
+    }
+  };
+
+  // ─── Listen to the single thread’s messages ───
+  useEffect(() => {
+    if (!selectedChatThreadId) {
+      setMessages([]);
+      return;
+    }
+
+    const threadRef = doc(db, "messages", selectedChatThreadId);
+    const unsubscribe = onSnapshot(
+      threadRef,
+      (snap) => {
+        setMessages(snap.exists() ? snap.data().messages || [] : []);
+      },
+      (err) => {
+        console.error("Error listening to chat thread:", err);
+        Alert.alert("Error", "Lost connection to chat.");
+      }
+    );
+
+    return () => unsubscribe();
+  }, [selectedChatThreadId]);
+
+  // ─── New: subscribe to all chat threads to compute unread count ───
+  useEffect(() => {
+    if (!renterId) return;
+    const messagesRef = collection(db, "messages");
+    const q = query(
+      messagesRef,
+      where("participants", "array-contains", renterId)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        const msgs = data.messages || [];
+        if (msgs.length) {
+          const lastMsg = msgs[msgs.length - 1];
+          if (lastMsg.senderId !== renterId) count += 1;
+        }
+      });
+      setUnreadCount(count);
+    });
+    return () => unsubscribe();
+  }, [renterId]);
 
   const toggleMessagesModal = () => {
     closeAllOpenModals();
@@ -1682,15 +2039,40 @@ useEffect(() => {
     }
   };
 
-  const pickDocument = async (field) => {
-    let result = await DocumentPicker.getDocumentAsync({
-      type: ["application/pdf", "image/*"],
-    });
+  const handleDocument = async (field) => {
+    try {
+      const existingUri = profileData[field];
 
-    if (result.assets && result.assets.length > 0) {
-      setProfileData({ ...profileData, [field]: result.assets[0].uri });
-    } else if (!result.canceled && result.uri) {
-      setProfileData({ ...profileData, [field]: result.uri });
+      if (existingUri) {
+        // —— OPEN existing document ——
+        // works for both http(s) URLs or local file:// URIs
+        await Linking.openURL(existingUri);
+        return;
+      }
+
+      // —— PICK new document ——
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/*"],
+      });
+
+      if (result.type === "success") {
+        // uploadFileAsync is your Firebase-storage helper from earlier
+        const localUri = result.uri;
+        const fileName = localUri.split("/").pop();
+        const storagePath = `users/${renterId}/${field}/${fileName}`;
+        const downloadUrl = await uploadFileAsync(localUri, storagePath);
+
+        setProfileData((prev) => ({
+          ...prev,
+          [field]: downloadUrl,
+        }));
+      }
+    } catch (err) {
+      console.error("Doc pick/open error", err);
+      Alert.alert(
+        "Oops",
+        "We couldn’t open or upload that file. Please try again."
+      );
     }
   };
 
@@ -1734,10 +2116,60 @@ useEffect(() => {
   // -------------------------
   // Profile Submit (Original - unchanged)
   // -------------------------
-  const handleProfileSubmit = (values) => {
-    setProfileData(values);
-    setProfileSaved(true);
-    setProfileModalVisible(false);
+  const handleProfileSubmit = async (values) => {
+    try {
+      // write only the changed profile fields back to Firestore
+      const userRef = doc(db, "users", renterId);
+      await updateDoc(userRef, {
+        firstName: values.firstName,
+        lastName: values.lastName,
+        image: values.image,
+        insurance: values.insurance,
+        pilotLicense: values.pilotLicense,
+        medical: values.medical,
+        aircraftType: values.aircraftType,
+        certifications: values.certifications,
+      });
+
+      // update local state and close modal
+      setProfileData(values);
+      setProfileModalVisible(false);
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      Alert.alert("Error", "Couldn’t save your profile—please try again.");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      // 1) Get fresh ID token
+      const user = auth.currentUser;
+      if (!user) throw new Error("No authenticated user");
+
+      const idToken = await user.getIdToken();
+
+      // 2) Call your backend to delete both Firestore user doc and Auth account
+      await axios.delete(`${API_URL}/deleteAccount`, {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      // 3) Actually sign out locally
+      await signOut(auth);
+
+      // 4) Navigate back to your sign-in or onboarding flow
+      // (useRouter hook from expo-router)
+      router.replace("/sign-in");
+    } catch (error) {
+      console.error("Delete account failed:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.error ||
+          error.message ||
+          "Could not delete account. Please try again."
+      );
+    }
   };
 
   // -------------------------
@@ -1779,42 +2211,42 @@ useEffect(() => {
   // -------------------------
   // Listen for Messages (Original - unchanged)
   // -------------------------
-  useEffect(() => {
-    if (currentChatOwnerId && renterId) {
-      const messagesRef = collection(db, "messages");
-      const messagesQueryInstance = query(
-        messagesRef,
-        where("participants", "array-contains", renterId),
-        orderBy("timestamp", "asc")
-      );
+  // useEffect(() => {
+  //   if (currentChatOwnerId && renterId) {
+  //     const messagesRef = collection(db, "messages");
+  //     const messagesQueryInstance = query(
+  //       messagesRef,
+  //       where("participants", "array-contains", renterId),
+  //       orderBy("timestamp", "asc")
+  //     );
 
-      const unsubscribe = onSnapshot(
-        messagesQueryInstance,
-        (snapshot) => {
-          const fetchedMessages = [];
-          snapshot.docs.forEach((docSnap) => {
-            const messageData = docSnap.data();
-            if (
-              messageData.participants &&
-              messageData.participants.includes(renterId) &&
-              messageData.participants.includes(currentChatOwnerId)
-            ) {
-              fetchedMessages.push({ id: docSnap.id, ...messageData });
-            }
-          });
-          setMessages(fetchedMessages);
-        },
-        (error) => {
-          console.error("Error fetching messages:", error);
-          Alert.alert("Error", "Failed to fetch messages.");
-        }
-      );
+  //     const unsubscribe = onSnapshot(
+  //       messagesQueryInstance,
+  //       (snapshot) => {
+  //         const fetchedMessages = [];
+  //         snapshot.docs.forEach((docSnap) => {
+  //           const messageData = docSnap.data();
+  //           if (
+  //             messageData.participants &&
+  //             messageData.participants.includes(renterId) &&
+  //             messageData.participants.includes(currentChatOwnerId)
+  //           ) {
+  //             fetchedMessages.push({ id: docSnap.id, ...messageData });
+  //           }
+  //         });
+  //         setMessages(fetchedMessages);
+  //       },
+  //       (error) => {
+  //         console.error("Error fetching messages:", error);
+  //         Alert.alert("Error", "Failed to fetch messages.");
+  //       }
+  //     );
 
-      return () => unsubscribe();
-    } else {
-      setMessages([]);
-    }
-  }, [currentChatOwnerId, renterId]);
+  //     return () => unsubscribe();
+  //   } else {
+  //     setMessages([]);
+  //   }
+  // }, [currentChatOwnerId, renterId]);
 
   // --- JSX Return ---
   return (
@@ -1851,7 +2283,14 @@ useEffect(() => {
                   >
                     <Text style={styles.welcomeText}>Welcome,</Text>
                     <Text style={styles.userNameText}>
-                      {profileData.firstName
+                      {/*
+    Show the auth‐user’s displayName first when they chose “Both”,
+    otherwise fall back to their first/last name from profileData,
+    then finally to displayName or "User" if nothing else exists.
+  */}
+                      {profileData.profileType === "both"
+                        ? renter?.displayName || "User"
+                        : profileData.firstName
                         ? `${profileData.firstName} ${profileData.lastName}`
                         : renter?.displayName || "User"}
                     </Text>
@@ -1871,12 +2310,21 @@ useEffect(() => {
             <TouchableOpacity
               style={styles.navigationButton}
               onPress={() => setFaqModalVisible(true)}
-              accessibilityLabel="Frequently Asked Questions"
+              accessibilityLabel={
+                termsAgreed ? "Agreed" : "Important Information"
+              }
               accessibilityRole="button"
             >
-              <Ionicons name="help-circle-outline" size={32} color="#3182ce" />
-              <Text>FAQ</Text>
+              <Ionicons
+                name={termsAgreed ? "checkmark-circle" : "alert-circle-outline"}
+                size={32}
+                color={termsAgreed ? "#38A169" : "#e53e3e"}
+              />
+              <Text style={{ color: termsAgreed ? "#38A169" : "#000" }}>
+                {termsAgreed ? "Agreed" : "Important"}
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.navigationButton}
               onPress={fetchUserProfile}
@@ -2081,7 +2529,7 @@ useEffect(() => {
       )}
 
       {/* Original Profile Saved View */}
-      {profileSaved && renterId && (
+      {/* {profileSaved && renterId && (
         <View style={styles.profileContainer}>
           <Text style={styles.profileTitle}>Profile Information</Text>
           <View style={styles.profileRow}>
@@ -2097,7 +2545,7 @@ useEffect(() => {
             />
           )}
         </View>
-      )}
+      )} */}
 
       {/* --- Modals --- */}
 
@@ -2112,105 +2560,146 @@ useEffect(() => {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.modalContainer}
         >
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
-            <TouchableOpacity
-              onPress={pickImage}
-              style={styles.profileImageUpload}
-              accessibilityLabel="Upload profile image"
-              accessibilityRole="button"
+          <View style={styles.profileModalWrapper}>
+            <ScrollView
+              style={styles.profileModalScroll}
+              contentContainerStyle={styles.profileModalContent}
             >
-              {profileData.image ? (
-                <Image
-                  source={{ uri: profileData.image }}
-                  style={styles.profileImagePreview}
-                />
-              ) : (
-                <Ionicons
-                  name="person-circle-outline"
-                  size={100}
-                  color="#ccc"
-                />
-              )}
-              <Text style={styles.uploadText}>Upload Profile Image</Text>
-            </TouchableOpacity>
-            <TextInput
-              placeholder="First Name"
-              value={profileData.firstName}
-              onChangeText={(text) =>
-                setProfileData({ ...profileData, firstName: text })
-              }
-              style={styles.modalInput}
-            />
-            <TextInput
-              placeholder="Last Name"
-              value={profileData.lastName}
-              onChangeText={(text) =>
-                setProfileData({ ...profileData, lastName: text })
-              }
-              style={styles.modalInput}
-            />
-            <TouchableOpacity
-              onPress={() => pickDocument("insurance")}
-              style={styles.uploadButton}
-              accessibilityLabel="Upload renters insurance"
-              accessibilityRole="button"
-            >
-              <Text style={styles.uploadButtonText}>
-                {profileData.insurance
-                  ? "Renters Insurance Uploaded"
-                  : "Upload Renters Insurance"}
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+
+              <TouchableOpacity
+                onPress={pickImage}
+                style={styles.profileImageUpload}
+                accessibilityLabel="Upload profile image"
+                accessibilityRole="button"
+              >
+                {profileData.image ? (
+                  <Image
+                    source={{ uri: profileData.image }}
+                    style={styles.profileImagePreview}
+                  />
+                ) : (
+                  <Ionicons
+                    name="person-circle-outline"
+                    size={100}
+                    color="#ccc"
+                  />
+                )}
+                <Text style={styles.uploadText}>Upload Profile Image</Text>
+              </TouchableOpacity>
+
+              <TextInput
+                placeholder="First Name"
+                value={profileData.firstName}
+                onChangeText={(text) =>
+                  setProfileData({ ...profileData, firstName: text })
+                }
+                style={styles.modalInput}
+              />
+
+              <TextInput
+                placeholder="Last Name"
+                value={profileData.lastName}
+                onChangeText={(text) =>
+                  setProfileData({ ...profileData, lastName: text })
+                }
+                style={styles.modalInput}
+              />
+
+              {[
+                { key: "insurance", label: "Renters Insurance" },
+                { key: "pilotLicense", label: "Pilot’s License" },
+                { key: "medical", label: "Medical Document" },
+              ].map(({ key, label }) => (
+                <View key={key} style={{ marginBottom: 16 }}>
+                  <TouchableOpacity
+                    onPress={() => handleDocument(key)}
+                    style={styles.uploadButton}
+                    activeOpacity={0.7}
+                    accessibilityLabel={`${
+                      profileData[key] ? "View" : "Upload"
+                    } ${label}`}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.uploadButtonText}>
+                      {profileData[key] ? `View ${label}` : `Upload ${label}`}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {profileData[key] && (
+                    <TouchableOpacity
+                      style={styles.documentRow}
+                      onPress={() => handleDocument(key)}
+                    >
+                      <MaterialCommunityIcons
+                        name="file-document-outline"
+                        size={18}
+                        color="#2c5282"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={styles.documentText}>
+                        {profileData[key].split("/").pop()}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+
+              <TextInput
+                placeholder="Type of aircraft certified in"
+                value={profileData.aircraftType}
+                onChangeText={(text) =>
+                  setProfileData({ ...profileData, aircraftType: text })
+                }
+                style={styles.modalInput}
+              />
+
+              <TextInput
+                placeholder="Certifications (e.g., IFR)"
+                value={profileData.certifications}
+                onChangeText={(text) =>
+                  setProfileData({ ...profileData, certifications: text })
+                }
+                style={styles.modalInput}
+              />
+
+              <TouchableOpacity
+                onPress={() => handleProfileSubmit(profileData)}
+                style={styles.saveButton}
+                accessibilityLabel="Save profile"
+                accessibilityRole="button"
+              >
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+
+              {/* NEW: Delete Account */}
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert(
+                    "Delete Account",
+                    "Are you sure you want to delete your account? This action cannot be undone.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: () => handleDeleteAccount(),
+                      },
+                    ],
+                    { cancelable: true }
+                  )
+                }
+                style={styles.deleteAccountButton}
+                accessibilityLabel="Delete account"
+                accessibilityRole="button"
+              >
+                <Text style={styles.deleteAccountText}>Delete Account</Text>
+              </TouchableOpacity>
+              <Text style={styles.deleteWarningText}>
+                This cannot be undone!
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => pickDocument("pilotLicense")}
-              style={styles.uploadButton}
-              accessibilityLabel="Upload pilots license"
-              accessibilityRole="button"
-            >
-              <Text style={styles.uploadButtonText}>
-                {profileData.pilotLicense
-                  ? "Pilots License Uploaded"
-                  : "Upload Pilots License"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => pickDocument("medical")}
-              style={styles.uploadButton}
-              accessibilityLabel="Upload current medical"
-              accessibilityRole="button"
-            >
-              <Text style={styles.uploadButtonText}>
-                {profileData.medical
-                  ? "Medical Document Uploaded"
-                  : "Upload Current Medical"}
-              </Text>
-            </TouchableOpacity>
-            <TextInput
-              placeholder="Type of aircraft certified in"
-              value={profileData.aircraftType}
-              onChangeText={(text) =>
-                setProfileData({ ...profileData, aircraftType: text })
-              }
-              style={styles.modalInput}
-            />
-            <TextInput
-              placeholder="Certifications (e.g., IFR)"
-              value={profileData.certifications}
-              onChangeText={(text) =>
-                setProfileData({ ...profileData, certifications: text })
-              }
-              style={styles.modalInput}
-            />
-            <TouchableOpacity
-              onPress={() => handleProfileSubmit(profileData)}
-              style={styles.saveButton}
-              accessibilityLabel="Save profile"
-              accessibilityRole="button"
-            >
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -2223,80 +2712,130 @@ useEffect(() => {
         onRequestClose={() => setMessagesModalVisible(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.messageModalContainer}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
         >
-          <View style={styles.messagesHeader}>
-            <TouchableOpacity
-              onPress={() => setMessagesModalVisible(false)}
-              style={styles.closeModalButton}
-              accessibilityLabel="Close messages"
-              accessibilityRole="button"
+          <SafeAreaView style={{ flex: 1, backgroundColor: "#f7fafc" }}>
+            <ModalHeader
+              title="Messages"
+              onClose={() => setMessagesModalVisible(false)}
             >
-              <Ionicons name="arrow-back" size={24} color="#2d3748" />
-            </TouchableOpacity>
-            <Text style={styles.messagesTitle}>Messages</Text>
-            <View style={{ width: 24 }} />
-          </View>
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert(
+                    "Report Spam or Scam?",
+                    "Select a reason:",
+                    [
+                      {
+                        text: "Spam",
+                        onPress: () => reportSpamMessage("Spam"),
+                      },
+                      {
+                        text: "Scam",
+                        onPress: () => reportSpamMessage("Scam"),
+                      },
+                      {
+                        text: "Other",
+                        onPress: () =>
+                          Alert.prompt(
+                            "Other Reason",
+                            "Please describe:",
+                            (comments) => reportSpamMessage("Other", comments),
+                            "plain-text"
+                          ),
+                      },
+                      { text: "Cancel", style: "cancel" },
+                    ],
+                    { cancelable: true }
+                  )
+                }
+                style={styles.modalHeaderReport}
+                accessibilityLabel="Report this chat"
+                accessibilityRole="button"
+              >
+                <MaterialIcons name="report" size={24} color="#e53e3e" />
+              </TouchableOpacity>
+            </ModalHeader>
 
-          <FlatList
-  data={messages}
-  keyExtractor={(item, index) =>
-    `${item.senderId}_${item.timestamp?.seconds}_${item.timestamp?.nanoseconds}_${index}`
-  }
-  renderItem={({ item }) => (
-    <View
-      style={[
-        styles.chatBubble,
-        item.senderId === renterId
-          ? styles.chatBubbleRight
-          : styles.chatBubbleLeft,
-      ]}
-    >
-      <Text style={styles.chatSenderName}>{item.senderName}:</Text>
-      <Text style={styles.chatMessageText}>
-        {typeof item.text === "string" ? item.text : JSON.stringify(item.text)}
-      </Text>
-      <Text style={styles.chatTimestamp}>
-        {item.timestamp?.toDate
-          ? item.timestamp.toDate().toLocaleString()
-          : "Sending..."}
-      </Text>
-    </View>
-  )}
-  contentContainerStyle={styles.messagesList}
-  style={{ flex: 1, width: "100%" }}
-  inverted
-  ref={flatListRef}
-  onContentSizeChange={() =>
-    flatListRef.current?.scrollToOffset({ animated: false, offset: 0 })
-  }
-  onLayout={() =>
-    flatListRef.current?.scrollToOffset({ animated: false, offset: 0 })
-  }
-/>
-
-
-          <View style={styles.messageInputContainer}>
-            <TextInput
-              placeholder="Type your message..."
-              value={messageText}
-              onChangeText={(text) => setMessageText(text)}
-              style={styles.messageTextInput}
-              keyboardType="default"
-              autoCapitalize="sentences"
-              accessibilityLabel="Type a message"
-              multiline
+            <FlatList
+              data={displayMessages}
+              keyExtractor={(item, index) =>
+                item.type === "separator"
+                  ? `sep-${item.date}-${index}`
+                  : `${item.senderId}-${
+                      item.timestamp?.seconds ?? item.createdAt?.seconds
+                    }-${
+                      item.timestamp?.nanoseconds ?? item.createdAt?.nanoseconds
+                    }-${index}`
+              }
+              renderItem={({ item }) => {
+                if (item.type === "separator") {
+                  return (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        marginVertical: 8,
+                        width: "100%",
+                      }}
+                    >
+                      <View
+                        style={{ flex: 1, height: 1, backgroundColor: "#ccc" }}
+                      />
+                      <Text
+                        style={{
+                          marginHorizontal: 8,
+                          color: "#666",
+                          fontSize: 12,
+                        }}
+                      >
+                        {item.date}
+                      </Text>
+                      <View
+                        style={{ flex: 1, height: 1, backgroundColor: "#ccc" }}
+                      />
+                    </View>
+                  );
+                }
+                return (
+                  <ChatMessage
+                    message={item}
+                    isOwn={item.senderId === renterId}
+                  />
+                );
+              }}
+              contentContainerStyle={styles.messagesList}
+              ref={flatListRef}
+              onContentSizeChange={() =>
+                flatListRef.current?.scrollToEnd({ animated: false })
+              }
+              onLayout={() =>
+                flatListRef.current?.scrollToEnd({ animated: false })
+              }
+              style={{ flex: 1 }}
             />
-            <TouchableOpacity
-              onPress={sendMessage}
-              style={styles.sendButton}
-              accessibilityLabel="Send message"
-              accessibilityRole="button"
-            >
-              <Ionicons name="send" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
+
+            <View style={styles.messageInputContainer}>
+              <TextInput
+                placeholder="Type your message..."
+                value={messageText}
+                onChangeText={setMessageText}
+                style={styles.messageTextInput}
+                keyboardType="default"
+                autoCapitalize="sentences"
+                accessibilityLabel="Type a message"
+                multiline
+              />
+              <TouchableOpacity
+                onPress={sendMessage}
+                style={styles.sendButton}
+                accessibilityLabel="Send message"
+                accessibilityRole="button"
+              >
+                <Ionicons name="send" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -2378,7 +2917,8 @@ useEffect(() => {
                           Booking Fee (6%): ${safeToFixed(totalCost.bookingFee)}
                         </Text>
                         <Text style={styles.detailValue}>
-                          Transaction Fee (3%): ${safeToFixed(totalCost.transactionFee)}
+                          Transaction Fee (3%): $
+                          {safeToFixed(totalCost.transactionFee)}
                         </Text>
                         <Text style={styles.detailValue}>
                           Sales Tax (8.25%): ${safeToFixed(totalCost.salesTax)}
@@ -2712,153 +3252,153 @@ useEffect(() => {
       </Modal>
       {/* Past Rental Details Modal */}
       {/* Past Rental Details Modal */}
-<Modal
-  visible={pastRentalModalVisible}
-  animationType="slide"
-  transparent={true}
-  onRequestClose={closePastRentalModal}
->
-  <KeyboardAvoidingView
-    behavior={Platform.OS === "ios" ? "padding" : "height"}
-    style={{
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      backgroundColor: "rgba(0,0,0,0.5)",
-    }}
-  >
-    <View
-      style={{
-        width: "90%",
-        backgroundColor: "#fff",
-        padding: 20,
-        borderRadius: 10,
-        maxHeight: "85%",
-      }}
-    >
-      <ModalHeader
-        title="Past Rental Details"
-        onClose={closePastRentalModal}
-      />
-      <ScrollView>
-        {/* Listing Preview Card */}
-        {selectedPastRental && selectedPastRental.listing && (
-          <TouchableOpacity
-            style={styles.listingCard}
-            onPress={() => {
-              const listingId =
-                selectedPastRental.listingId ||
-                selectedPastRental.listing.id;
-              if (listingId) {
-                router.push({
-                  pathname: "/home",
-                  params: { listingId },
-                });
-              } else {
-                Alert.alert("Error", "Listing not available.");
-              }
+      <Modal
+        visible={pastRentalModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closePastRentalModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "#fff",
+              padding: 20,
+              borderRadius: 10,
+              maxHeight: "85%",
             }}
           >
-            <Image
-              source={{
-                uri:
-                  selectedPastRental.listing.images &&
-                  selectedPastRental.listing.images[0]
-                    ? selectedPastRental.listing.images[0]
-                    : "https://via.placeholder.com/150",
-              }}
-              style={styles.listingImage}
+            <ModalHeader
+              title="Past Rental Details"
+              onClose={closePastRentalModal}
             />
-            <Text style={styles.listingTitle}>
-              {selectedPastRental.listing.aircraftModel || "View Listing"}
-            </Text>
-          </TouchableOpacity>
-        )}
+            <ScrollView>
+              {/* Listing Preview Card */}
+              {selectedPastRental && selectedPastRental.listing && (
+                <TouchableOpacity
+                  style={styles.listingCard}
+                  onPress={() => {
+                    const listingId =
+                      selectedPastRental.listingId ||
+                      selectedPastRental.listing.id;
+                    if (listingId) {
+                      router.push({
+                        pathname: "/home",
+                        params: { listingId },
+                      });
+                    } else {
+                      Alert.alert("Error", "Listing not available.");
+                    }
+                  }}
+                >
+                  <Image
+                    source={{
+                      uri:
+                        selectedPastRental.listing.images &&
+                        selectedPastRental.listing.images[0]
+                          ? selectedPastRental.listing.images[0]
+                          : "https://via.placeholder.com/150",
+                    }}
+                    style={styles.listingImage}
+                  />
+                  <Text style={styles.listingTitle}>
+                    {selectedPastRental.listing.aircraftModel || "View Listing"}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
-        {/* Rental & Payment Details */}
-        <Text style={styles.detailLabel}>Aircraft Model:</Text>
-        <Text style={styles.detailValue}>
-          {selectedPastRental?.listing?.aircraftModel || "N/A"}
-        </Text>
-        <Text style={styles.detailLabel}>Tail Number:</Text>
-        <Text style={styles.detailValue}>
-          {selectedPastRental?.listing?.tailNumber || "N/A"}
-        </Text>
-        <Text style={styles.detailLabel}>Rental Hours:</Text>
-        <Text style={styles.detailValue}>
-          {selectedPastRental?.rentalHours || "N/A"}
-        </Text>
-        <Text style={styles.detailLabel}>Rental Date:</Text>
-        <Text style={styles.detailValue}>
-          {selectedPastRental?.rentalDate || "N/A"}
-        </Text>
-        <Text style={[styles.detailLabel, { marginTop: 15 }]}>
-          Payment Details:
-        </Text>
-        {selectedPastRental?.listing &&
-        selectedPastRental?.rentalHours &&
-        !isNaN(parseFloat(selectedPastRental.listing.costPerHour)) ? (
-          (() => {
-            const costPerHour =
-              parseFloat(selectedPastRental.listing.costPerHour) || 0;
-            const hours = parseFloat(selectedPastRental.rentalHours) || 0;
-            const pastCost = calculateTotalCost(costPerHour, hours);
-            return (
-              <View style={{ marginTop: 8 }}>
+              {/* Rental & Payment Details */}
+              <Text style={styles.detailLabel}>Aircraft Model:</Text>
+              <Text style={styles.detailValue}>
+                {selectedPastRental?.listing?.aircraftModel || "N/A"}
+              </Text>
+              <Text style={styles.detailLabel}>Tail Number:</Text>
+              <Text style={styles.detailValue}>
+                {selectedPastRental?.listing?.tailNumber || "N/A"}
+              </Text>
+              <Text style={styles.detailLabel}>Rental Hours:</Text>
+              <Text style={styles.detailValue}>
+                {selectedPastRental?.rentalHours || "N/A"}
+              </Text>
+              <Text style={styles.detailLabel}>Rental Date:</Text>
+              <Text style={styles.detailValue}>
+                {selectedPastRental?.rentalDate || "N/A"}
+              </Text>
+              <Text style={[styles.detailLabel, { marginTop: 15 }]}>
+                Payment Details:
+              </Text>
+              {selectedPastRental?.listing &&
+              selectedPastRental?.rentalHours &&
+              !isNaN(parseFloat(selectedPastRental.listing.costPerHour)) ? (
+                (() => {
+                  const costPerHour =
+                    parseFloat(selectedPastRental.listing.costPerHour) || 0;
+                  const hours = parseFloat(selectedPastRental.rentalHours) || 0;
+                  const pastCost = calculateTotalCost(costPerHour, hours);
+                  return (
+                    <View style={{ marginTop: 8 }}>
+                      <Text style={styles.detailValue}>
+                        Rental Cost (${costPerHour}/hr *{" "}
+                        {selectedPastRental.rentalHours} hours): $
+                        {safeToFixed(pastCost.rentalCost)}
+                      </Text>
+                      <Text style={styles.detailValue}>
+                        Booking Fee (6%): ${safeToFixed(pastCost.bookingFee)}
+                      </Text>
+                      <Text style={styles.detailValue}>
+                        Transaction Fee (3%): $
+                        {safeToFixed(pastCost.transactionFee)}
+                      </Text>
+                      <Text style={styles.detailValue}>
+                        Sales Tax (8.25%): ${safeToFixed(pastCost.salesTax)}
+                      </Text>
+                      <Text style={styles.detailTotalCostText}>
+                        Total Paid: ${safeToFixed(pastCost.total)}
+                      </Text>
+                    </View>
+                  );
+                })()
+              ) : (
                 <Text style={styles.detailValue}>
-                  Rental Cost (${costPerHour}/hr *{" "}
-                  {selectedPastRental.rentalHours} hours): $
-                  {safeToFixed(pastCost.rentalCost)}
+                  Payment details not available.
                 </Text>
-                <Text style={styles.detailValue}>
-                  Booking Fee (6%): ${safeToFixed(pastCost.bookingFee)}
-                </Text>
-                <Text style={styles.detailValue}>
-                  Transaction Fee (3%): ${safeToFixed(pastCost.transactionFee)}
-                </Text>
-                <Text style={styles.detailValue}>
-                  Sales Tax (8.25%): ${safeToFixed(pastCost.salesTax)}
-                </Text>
-                <Text style={styles.detailTotalCostText}>
-                  Total Paid: ${safeToFixed(pastCost.total)}
-                </Text>
-              </View>
-            );
-          })()
-        ) : (
-          <Text style={styles.detailValue}>
-            Payment details not available.
-          </Text>
-        )}
+              )}
 
-        {/* ----------------------------------------- */}
-        {/* *** ADDED: “Open Chat” Button for Past Rental *** */}
-        {/* ----------------------------------------- */}
-        {selectedPastRental && selectedPastRental.listing?.ownerId && (
-          <CustomButton
-            onPress={async () => {
-              // set the owner for the chat context
-              setCurrentChatOwnerId(selectedPastRental.listing.ownerId);
-              // open (or create) the chat thread for this rental
-              await openMessageModal();
-              // close the Past‑Rental modal so you can see the chat
-              closePastRentalModal();
-            }}
-            title="Open Chat"
-            backgroundColor="#3182ce"
-          />
-        )}
-      </ScrollView>
-    </View>
-  </KeyboardAvoidingView>
-</Modal>
+              {/* ----------------------------------------- */}
+              {/* *** ADDED: “Open Chat” Button for Past Rental *** */}
+              {/* ----------------------------------------- */}
+              {selectedPastRental && selectedPastRental.listing?.ownerId && (
+                <CustomButton
+                  onPress={async () => {
+                    // set the owner for the chat context
+                    setCurrentChatOwnerId(selectedPastRental.listing.ownerId);
+                    // open (or create) the chat thread for this rental
+                    await openMessageModal();
+                    // close the Past‑Rental modal so you can see the chat
+                    closePastRentalModal();
+                  }}
+                  title="Open Chat"
+                  backgroundColor="#3182ce"
+                />
+              )}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
-
-      {/* FAQ Modal */}
+      {/* Important Modal (FAQ for renters) */}
       <Modal
         visible={faqModalVisible}
         animationType="slide"
-        transparent={true}
+        transparent
         onRequestClose={() => setFaqModalVisible(false)}
       >
         <KeyboardAvoidingView
@@ -2867,15 +3407,64 @@ useEffect(() => {
         >
           <View style={styles.modalContent}>
             <ModalHeader
-              title="FAQ"
+              title="Important"
               onClose={() => setFaqModalVisible(false)}
             />
-            <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-              <Text>FAQ content goes here.</Text>
+
+            {/* Intro text */}
+            <Text style={{ marginBottom: 16, fontSize: 14, lineHeight: 20 }}>
+              You must agree to the following before you can rent an aircraft
+              through our platform.
+            </Text>
+
+            <ScrollView
+              style={{ maxHeight: 400 }}
+              showsHorizontalScrollIndicator={false}
+            >
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                1. You agree to have a valid and active renter's insurance
+                policy.
+              </Text>
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                2. You agree to carry proper insurance.
+              </Text>
+              <Text style={{ marginBottom: 8, fontSize: 14 }}>
+                (We recommend getting in touch with your insurance agent.)
+              </Text>
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                3. You may be required to show proof to the aircraft owner that
+                your insurance is up to date.
+              </Text>
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                4. The owner will be required to show you proof of the
+                following:
+              </Text>
+              <Text style={{ marginLeft: 16, fontSize: 14, marginBottom: 8 }}>
+                a. A current copy of their insurance policy.{"\n"}
+                b. Proof of current annual.{"\n"}
+                c. A copy of the most recent maintenance logs.{"\n"}
+              </Text>
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                5. It is also recommended that you conduct a full safety
+                walk-around and a pre-flight with any potential renters prior to
+                leasing your aircraft.
+              </Text>
+              <Text style={{ fontWeight: "bold", fontSize: 16, marginTop: 8 }}>
+                6. You agree to keep all transactions within the app.
+              </Text>
             </ScrollView>
+
             <CustomButton
-              onPress={() => setFaqModalVisible(false)}
-              title="Close"
+              onPress={async () => {
+                try {
+                  await AsyncStorage.setItem("termsAgreed", "true");
+                } catch (e) {
+                  console.warn("↪️ failed to save termsAgreed", e);
+                }
+                setTermsAgreed(true);
+                setFaqModalVisible(false);
+              }}
+              title="Agree & Proceed to View Rentals"
               backgroundColor="#3182ce"
             />
           </View>
@@ -2910,19 +3499,25 @@ useEffect(() => {
               onClose={() => setInvestModalVisible(false)}
             />
             <Text style={{ marginBottom: 16 }}>
-              Interested in investing in Ready Set Fly? Contact us at{" "}
+              Ready Set Fly is revolutionizing aviation with a modern,
+              all-in-one marketplace that seamlessly blends hourly rentals and
+              traditional listings in a single platform. Join us on this
+              exciting journey to transform how pilots, aircraft owners, and
+              aviation enthusiasts connect. For investment opportunities and
+              more details, email us at{" "}
               <Text
                 style={{ color: "#3182ce", textDecorationLine: "underline" }}
                 onPress={() =>
                   Linking.openURL(
-                    "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready,%20Set,%20Fly!"
+                    "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready%2C%20Set%2C%20Fly!"
                   )
                 }
               >
                 coryarmer@gmail.com
-              </Text>{" "}
-              for more details.
+              </Text>
+              .
             </Text>
+
             <CustomButton
               onPress={() => setInvestModalVisible(false)}
               title="Close"
@@ -3167,6 +3762,11 @@ useEffect(() => {
         accessibilityRole="button"
       >
         <Ionicons name="chatbubble-ellipses" size={32} color="white" />
+        {unreadCount > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+          </View>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -3434,33 +4034,37 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   chatBubble: {
+    borderRadius: 12,
     padding: 12,
-    borderRadius: 8,
     marginVertical: 4,
     maxWidth: "80%",
   },
   chatBubbleLeft: {
-    backgroundColor: "#edf2f7",
+    backgroundColor: "#f1f0f0",
     alignSelf: "flex-start",
   },
   chatBubbleRight: {
-    backgroundColor: "#3182ce",
+    backgroundColor: "#007aff",
     alignSelf: "flex-end",
   },
   chatSenderName: {
-    fontWeight: "bold",
-    color: "#2d3748",
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#555",
     marginBottom: 4,
   },
   chatMessageText: {
-    color: "#2d3748",
+    fontSize: 16,
+    lineHeight: 20,
+    color: "#000",
   },
   chatTimestamp: {
     fontSize: 10,
-    color: "#a0aec0",
-    marginTop: 4,
+    color: "#888",
+    marginTop: 6,
     textAlign: "right",
   },
+
   messagesList: {
     padding: 16,
   },
@@ -3687,16 +4291,19 @@ const styles = StyleSheet.create({
   uploadButton: {
     width: "100%",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#3182ce",
     borderRadius: 8,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#ebf8ff",
     alignItems: "center",
+    justifyContent: "center",
     marginBottom: 16,
   },
   uploadButtonText: {
-    color: "#2c5282",
-    fontSize: 15,
-    fontWeight: "500",
+    color: "#3182ce",
+    fontSize: 16,
+    fontWeight: "600",
   },
   saveButton: {
     width: "100%",
@@ -3736,5 +4343,105 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#2d3748",
+  },
+  // Unread message styling
+  unreadBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "#e53e3e",
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  unreadBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  dateSeparator: {
+    alignSelf: "center",
+    backgroundColor: "#e2e8f0",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginVertical: 8,
+  },
+  dateSeparatorText: {
+    fontSize: 12,
+    color: "#4a5568",
+    fontWeight: "600",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  modalHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2d3748",
+  },
+  modalHeaderClose: {
+    padding: 8,
+  },
+  modalHeaderReport: {
+    padding: 8,
+    marginLeft: 12,
+  },
+  // New styles for the profile modal
+  profileModalWrapper: {
+    width: "95%", // widen modal to 95% of screen
+    maxHeight: "90%", // allow it to go up to 90% of screen height
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    overflow: "hidden", // clip any background/borders
+  },
+  profileModalScroll: {
+    flexGrow: 1, // ensure the ScrollView expands and scrolls its content
+  },
+  profileModalContent: {
+    padding: 20,
+    paddingBottom: 40, // give extra space at bottom for Save button
+  },
+  deleteAccountButton: {
+    padding: 12,
+    marginTop: 16,
+    alignItems: "center",
+  },
+  deleteAccountText: {
+    color: "#e53e3e",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  deleteWarningText: {
+    textAlign: "center",
+    color: "#e53e3e",
+    marginTop: 2,
+    fontSize: 14,
+  },
+  uploadButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  documentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  documentText: {
+    fontSize: 15,
+    color: "#2c5282",
   },
 });
