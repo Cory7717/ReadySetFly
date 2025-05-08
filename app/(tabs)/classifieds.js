@@ -499,6 +499,7 @@ const Classifieds = () => {
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef(null);
   const [showUpButton, setShowUpButton] = useState(false);
+  const [supportModalVisible, setSupportModalVisible] = useState(false);
 
   // Pagination & refresh
   const [pageSize] = useState(20);
@@ -1066,35 +1067,52 @@ const Classifieds = () => {
   const handleReportListing = (listing) => {
     Alert.alert(
       "Report listing",
-      "Flag this listing as spam or fraudulent? A moderator will be notified.",
+      "Flag this listing as spam or fraudulent? A moderator will be notified and reports are sent to coryarmer@gmail.com.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Report",
           style: "destructive",
-          onPress: () => {
-            getFirebaseIdToken().then((token) => {
-              fetch(`${API_URL}/reportListing`, {
+          onPress: async () => {
+            try {
+              const token = await getFirebaseIdToken();
+              const res = await fetch(`${API_URL}/reportListing`, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({ listingId: listing.id }),
-              })
-                .then(() =>
-                  Alert.alert("Thank you", "The listing was reported.")
+              });
+              if (!res.ok) throw new Error("Report failed");
+  
+              const { reportCount, suspended } = await res.json();
+  
+              setListings((prev) =>
+                prev.map((l) =>
+                  l.id === listing.id
+                    ? { ...l, reportCount, status: suspended ? "suspended" : l.status }
+                    : l
                 )
-                .catch((err) => {
-                  console.error(err);
-                  Alert.alert("Error", "Could not send report.");
-                });
-            });
+              );
+  
+              if (suspended) {
+                Alert.alert(
+                  "Listing Suspended",
+                  "This listing has reached 5 reports and has been auto-suspended pending review."
+                );
+              } else {
+                Alert.alert("Thank you", "The listing was reported.");
+              }
+            } catch (err) {
+              console.error("Reporting failed:", err);
+              Alert.alert("Error", "Could not send report.");
+            }
           },
         },
       ]
     );
-  };
+  };    
 
   // Updated: Removed the old handleContactUs – now the "Information about Broker Services" button will open the broker modal.
   const handleDeleteListing = (listingId) => {
@@ -1548,37 +1566,72 @@ const Classifieds = () => {
           </ImageBackground>
         </Animated.View>
 
-        {/* New "View your listings" button */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            marginBottom: 8,
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => setViewListingsModalVisible(true)}
-            style={{ flexDirection: "row", alignItems: "center" }}
-            accessibilityLabel="View your listings"
-            accessibilityRole="button"
-          >
-            <Ionicons
-              name="list"
-              size={24}
-              color={COLORS.primary}
-              style={{ marginRight: 8 }}
-            />
-            <Text
-              style={{
-                fontSize: 16,
-                color: COLORS.primary,
-                textDecorationLine: "underline",
-              }}
-            >
-              View your listings
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Help & View Listings Row */}
+<View
+  style={{
+    flexDirection: "row",
+    justifyContent: "flex-start", // align both buttons on the left
+    alignItems: "center",
+    marginBottom: 8,
+    paddingLeft: 12,               // pull Contact Support in a bit
+    paddingRight: 16,              // keep a little right padding
+  }}
+>
+  {/* Contact Support */}
+  <TouchableOpacity
+    onPress={() => setSupportModalVisible(true)}
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+      marginRight: 32,            // space before "View your listings"
+    }}
+    accessibilityLabel="Contact Support"
+    accessibilityRole="button"
+  >
+    <Ionicons
+      name="help-circle-outline"
+      size={24}
+      color={COLORS.primary}
+    />
+    <Text
+      style={{
+        marginLeft: 6,
+        fontSize: 16,
+        color: COLORS.primary,
+        textDecorationLine: "underline",
+      }}
+    >
+      Contact Support
+    </Text>
+  </TouchableOpacity>
+
+  {/* View Your Listings */}
+  <TouchableOpacity
+    onPress={() => setViewListingsModalVisible(true)}
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+    }}
+    accessibilityLabel="View your listings"
+    accessibilityRole="button"
+  >
+    <Ionicons
+      name="list"
+      size={24}
+      color={COLORS.primary}
+      style={{ marginRight: 8 }}
+    />
+    <Text
+      style={{
+        fontSize: 16,
+        color: COLORS.primary,
+        textDecorationLine: "underline",
+      }}
+    >
+      View your listings
+    </Text>
+  </TouchableOpacity>
+</View>
 
         <Text
           style={{
@@ -4475,6 +4528,65 @@ const Classifieds = () => {
                 You haven't posted any listings yet.
               </Text>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Help & Support Modal */}
+      <Modal
+        visible={supportModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSupportModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <View
+            style={{
+              width: "80%",
+              backgroundColor: COLORS.white,
+              borderRadius: 16,
+              padding: 20,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setSupportModalVisible(false)}
+              style={{ alignSelf: "flex-end" }}
+              accessibilityLabel="Close support modal"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close" size={24} color={COLORS.black} />
+            </TouchableOpacity>
+
+            <Text
+              style={{ fontSize: 20, fontWeight: "bold", marginBottom: 12 }}
+            >
+              Help & Support
+            </Text>
+            <Text style={{ fontSize: 16, marginBottom: 24 }}>
+              Have questions or need assistance? Email our support team at:
+            </Text>
+            <TouchableOpacity
+              onPress={() => Linking.openURL("mailto:support@readysetfly.us")}
+              accessibilityLabel="Email support"
+              accessibilityRole="button"
+            >
+              <Text
+                style={{
+                  color: COLORS.primary,
+                  fontSize: 16,
+                  textDecorationLine: "underline",
+                }}
+              >
+                support@readysetfly.us
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

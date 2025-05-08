@@ -11,6 +11,7 @@ const admin = require("firebase-admin");
 const Stripe = require("stripe");
 const bodyParser = require("body-parser");
 const nodemailer = require("nodemailer");
+const { defineSecret } = require('firebase-functions/params');
 
 // Firebase Functions v2 imports
 const { onRequest } = require("firebase-functions/v2/https");
@@ -43,49 +44,44 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = Stripe(stripeSecretKey);
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const MODERATOR_EMAIL = process.env.MODERATOR_EMAIL;
-console.log("🔑  Stripe Secret in use:", process.env.STRIPE_SECRET_KEY);
+admin.logger.info("🔑  Stripe initialized.");
 
 // =====================
 // Email (Nodemailer) setup            // <-- NEW block
 // =====================
 
 // ─── SMTP (Nodemailer) setup ────────────────────────────────────────
-const {
-  SMTP_HOST: host,
-  SMTP_PORT: port,
-  SMTP_USER: user,
-  SMTP_PASS: pass,
-} = process.env;
+const SMTP_HOST = defineSecret('SMTP_HOST');
+const SMTP_PORT = defineSecret('SMTP_PORT');
+const SMTP_USER = defineSecret('SMTP_USER');
+const SMTP_PASS = defineSecret('SMTP_PASS');
 
-// disable email if any credential is missing
-let emailEnabled = true;
-if (!host || !port || !user || !pass) {
-  admin.logger.warn(
-    "⚠️ SMTP env vars missing – email disabled. " +
-      "Please set SMTP_HOST, SMTP_PORT, SMTP_USER & SMTP_PASS " +
-      "in your .env or Firebase config."
+let emailEnabled = false;
+
+let transporter = null;
+async function initTransporter() {
+  if (transporter) return;                     // only once per cold start
+  const [host, portStr, user, pass] = await Promise.all([
+    SMTP_HOST.value(),
+    SMTP_PORT.value(),
+    SMTP_USER.value(),
+    SMTP_PASS.value(),
+  ]);
+  const port = parseInt(portStr, 10);
+  if (!host || !port || !user || !pass) {
+    admin.logger.warn("⚠️ SMTP secrets missing – email disabled.");
+    return;
+  }
+  transporter = nodemailer.createTransport({ host, port, secure: port===465, auth:{ user, pass } });
+  transporter.verify(err =>
+    err
+      ? admin.logger.error("❌ SMTP config error", err)
+      : admin.logger.info("✅ SMTP transporter ready")
   );
-  emailEnabled = false;
 }
 
-const transporter = emailEnabled
-  ? nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // SSL on 465, otherwise STARTTLS
-      auth: { user, pass },
-    })
-  : null;
+// 3) Immediately fetch and configure nodemailer
 
-if (emailEnabled) {
-  transporter.verify((err, success) => {
-    if (err) {
-      admin.logger.error("❌ SMTP configuration error", err);
-    } else {
-      admin.logger.info("✅ SMTP transporter ready");
-    }
-  });
-}
 
 // how many free days each category gets
 const TRIAL_DAYS = {
@@ -106,11 +102,34 @@ const PRICE_BY_CATEGORY = {
   "Aviation Mechanic": 3000, // $30.00
   "Charter Services": 25000, // $250.00
 };
+
+const ALLOWED_ORIGINS = [
+  "https://readysetfly.us",
+  // "https://www.readysetfly.us",
+  // "https://admin.readysetfly.com",
+];
 // =====================
 // Initialize Express App
 // =====================
 const app = express();
-app.use(cors({ origin: true }));
+
+const helmet    = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+app.use(
+  cors({
+    origin: (incomingOrigin, callback) => {
+      // allow Postman / mobile apps / server-to-server calls
+      if (!incomingOrigin) return callback(null, true);
+      if (ALLOWED_ORIGINS.includes(incomingOrigin)) {
+        return callback(null, true);
+      }
+      callback(new Error(`CORS policy: origin '${incomingOrigin}' is not permitted.`));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 /**
  * ===============================
@@ -391,15 +410,24 @@ const sendNotification = async (tokens, title, body, data = {}) => {
  * Send an email to the moderators when a listing is reported      // <-- NEW helper
  */
 const sendReportEmail = async ({ listingId, reporterId, reason, comments }) => {
+  // don’t even try to send if SMTP transporter wasn’t initialized
+  if (!transporter) {
+    admin.logger.warn("SMTP transporter not initialized – skipping report email.");
+    return;
+  }
+
+  // grab your SMTP_USER secret for the “from” address
+  const fromAddr = await SMTP_USER.value();
+
   try {
     await transporter.sendMail({
-      from: `"RSF Alert" <${user}>`,
-      to: MODERATOR_EMAIL, // comma‑separated for multiple mods
+      from: `"RSF Alert" <${fromAddr}>`,
+      to: MODERATOR_EMAIL,
       subject: `⚑ Listing ${listingId} reported`,
       html: `
         <h2>Listing report received</h2>
-        <p><strong>Listing ID:</strong> ${listingId}</p>
-        <p><strong>Reporter UID:</strong> ${reporterId}</p>
+        <p><strong>Listing ID:</strong> ${listingId}</p>
+        <p><strong>Reporter UID:</strong> ${reporterId}</p>
         <p><strong>Reason:</strong> ${reason}</p>
         <p><strong>Comments:</strong> ${comments || "(none)"}</p>
       `,
@@ -2101,7 +2129,17 @@ app.use((req, res, next) => {
 // =====================
 // Export Express App as Firebase Function with Memory and Timeout Config
 // =====================
-exports.api = onRequest({ memory: "512Mi", timeoutSeconds: 60 }, app);
+exports.api = onRequest(
+  {
+    memory: "512Mi",
+    timeoutSeconds: 60,
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS]
+  },
+  async (req, res) => {
+    await initTransporter();      // now it’s safe to read secrets
+    return app(req, res);
+  }
+);
 
 exports.expireTrials = onSchedule("every 1 hours", async () => {
   const now = admin.firestore.Timestamp.now();

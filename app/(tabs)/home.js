@@ -45,6 +45,52 @@ import { CardField } from "@stripe/stripe-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 
+// ── report post setup ──────────────────────────────────────────────
+const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api";
+
+const handleReportListing = (listing) => {
+  Alert.alert(
+    "Report listing",
+    "Flag this listing as spam or fraudulent? A moderator will be notified and reports are sent to coryarmer@gmail.com.",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Report",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const token = await auth.currentUser.getIdToken(true);
+            const res = await fetch(`${API_URL}/reportListing`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ listingId: listing.id }),
+            });
+            if (!res.ok) throw new Error("Report failed");
+
+            const { reportCount, suspended } = await res.json();
+
+            if (suspended) {
+              Alert.alert(
+                "Listing Suspended",
+                "This listing has reached 5 reports and has been auto-suspended pending review."
+              );
+            } else {
+              Alert.alert("Thank you", "The listing was reported.");
+            }
+          } catch (err) {
+            console.error("Reporting failed:", err);
+            Alert.alert("Error", "Could not send report.");
+          }
+        },
+      },
+    ]
+  );
+};
+// ───────────────────────────────────────────────────────────────────
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const Home = ({ route, navigation }) => {
@@ -656,81 +702,104 @@ const Home = ({ route, navigation }) => {
     const airplaneModelDisplay = item.airplaneModel || "Unknown Model";
     const makeDisplay = item.make || "Unknown Make";
     const yearDisplay = item.year || "Unknown Year";
-
+  
     return (
-      <TouchableOpacity
-        onPress={() => {
-          if (!item.ownerId) {
-            Alert.alert(
-              "Listing Unavailable",
-              "This listing does not have a valid owner and cannot be rented."
-            );
-            return;
-          }
-          setSelectedListing(item);
-          setImageIndex(0);
-          setFullScreenModalVisible(true);
-          setFullName(user?.displayName || fullName || "Anonymous");
-          setCityStateCombined("");
-          setHasMedicalCertificate(false);
-          setHasRentersInsurance(false);
-          setFlightHours("");
-        }}
-        style={styles.newListingCardWrapper}
-        accessibilityLabel={`Select listing: ${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
-        accessibilityRole="button"
-      >
-        <View style={styles.newListingImageContainer}>
-          {item.images && item.images.length > 0 ? (
-            <ImageBackground
-              source={{ uri: item.images[0] }}
-              style={styles.newListingImageBackground}
-              imageStyle={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
-            >
-              <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.7)"]}
-                style={styles.newListingOverlay}
+      <View style={{ flex: 1, alignItems: "center", marginVertical: 8 }}>
+        <TouchableOpacity
+          onPress={() => {
+            if (!item.ownerId) {
+              Alert.alert(
+                "Listing Unavailable",
+                "This listing does not have a valid owner and cannot be rented."
+              );
+              return;
+            }
+            setSelectedListing(item);
+            setImageIndex(0);
+            setFullScreenModalVisible(true);
+            setFullName(user?.displayName || fullName || "Anonymous");
+            setCityStateCombined("");
+            setHasMedicalCertificate(false);
+            setHasRentersInsurance(false);
+            setFlightHours("");
+          }}
+          style={styles.newListingCardWrapper}
+          accessibilityLabel={`Select listing: ${yearDisplay} ${makeDisplay} ${airplaneModelDisplay}`}
+          accessibilityRole="button"
+        >
+          <View style={styles.newListingImageContainer}>
+            {item.images && item.images.length > 0 ? (
+              <ImageBackground
+                source={{ uri: item.images[0] }}
+                style={styles.newListingImageBackground}
+                imageStyle={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
               >
-                <Text style={styles.newListingLocation}>{item.location}</Text>
-                <Text style={styles.newListingRate}>
-                  ${parseFloat(item.costPerHour).toFixed(2)}/hr
-                </Text>
-              </LinearGradient>
-            </ImageBackground>
-          ) : (
-            <View style={styles.noImageContainer}>
-              <Ionicons name="image" size={50} color="#A0AEC0" />
-              <Text style={styles.noImageText}>No Image</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.newListingInfoContainer}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={styles.newListingTitle} numberOfLines={1}>
-              {`${yearDisplay} ${makeDisplay}`}
-            </Text>
-            <TouchableOpacity onPress={() => handleFavorite(item)} accessibilityLabel="Favorite listing">
-              <Ionicons
-                name={favorites.includes(item.id) ? "heart" : "heart-outline"}
-                size={24}
-                color="#FF0000"
-              />
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.7)"]}
+                  style={styles.newListingOverlay}
+                >
+                  <Text style={styles.newListingLocation}>{item.location}</Text>
+                  <Text style={styles.newListingRate}>
+                    ${parseFloat(item.costPerHour).toFixed(2)}/hr
+                  </Text>
+                </LinearGradient>
+              </ImageBackground>
+            ) : (
+              <View style={styles.noImageContainer}>
+                <Ionicons name="image" size={50} color="#A0AEC0" />
+                <Text style={styles.noImageText}>No Image</Text>
+              </View>
+            )}
           </View>
-          <Text style={styles.newListingModel} numberOfLines={1}>
-            {airplaneModelDisplay}
-          </Text>
-          <Text style={styles.newListingDescription} numberOfLines={1}>
-            {(() => {
-              const words = item.description.split(" ");
-              return words.slice(0, 5).join(" ") + (words.length > 5 ? "..." : "");
-            })()}
-          </Text>
-        </View>
-      </TouchableOpacity>
+  
+          <View style={styles.newListingInfoContainer}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={styles.newListingTitle} numberOfLines={1}>
+                {`${yearDisplay} ${makeDisplay}`}
+              </Text>
+              <TouchableOpacity onPress={() => handleFavorite(item)} accessibilityLabel="Favorite listing">
+                <Ionicons
+                  name={favorites.includes(item.id) ? "heart" : "heart-outline"}
+                  size={24}
+                  color="#FF0000"
+                />
+              </TouchableOpacity>
+            </View>
+  
+            <Text style={styles.newListingModel} numberOfLines={1}>
+              {airplaneModelDisplay}
+            </Text>
+            <Text style={styles.newListingDescription} numberOfLines={1}>
+              {(() => {
+                const words = item.description.split(" ");
+                return words.slice(0, 5).join(" ") + (words.length > 5 ? "..." : "");
+              })()}
+            </Text>
+          </View>
+        </TouchableOpacity>
+  
+        {/* centered flag button below the card */}
+        {user && item.ownerId !== user.uid && (
+          <TouchableOpacity
+            onPress={() => handleReportListing(item)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 6,
+            }}
+            accessibilityLabel="Report listing"
+            accessibilityRole="button"
+          >
+            <Text style={{ color: "#EF4444", fontSize: 12, marginRight: 4 }}>
+              Report the post above
+            </Text>
+            <Ionicons name="flag-outline" size={16} color="#EF4444" />
+          </TouchableOpacity>
+        )}
+      </View>
     );
-  };
+  };  
 
   const renderListHeader = () => (
     <>
@@ -1610,6 +1679,17 @@ const styles = StyleSheet.create({
   inactiveDot: {
     backgroundColor: "#888",
   },
+  reportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    justifyContent: "flex-end",
+  },
+  reportButtonText: {
+    color: "#EF4444",
+    fontSize: 16,
+    marginRight: 4,
+  },  
 });
 export default Home;
 
