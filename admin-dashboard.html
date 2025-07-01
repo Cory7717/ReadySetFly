@@ -69,7 +69,7 @@
       background: white;
       border: 1px solid #d1d5db;
       border-radius: 0.375rem;
-      width: 200px;
+      width: 240px;
       display: none;
     }
     .widget-list li {
@@ -82,14 +82,16 @@
     .widget-area {
       margin-top: 2rem;
     }
-    .stripe-widget {
+    /* reuse stripe styles */
+    .stripe-widget, .sale-widget {
       background: white;
       border-radius: 0.375rem;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       padding: 1.5rem;
       max-width: 700px;
     }
-    .stripe-widget h2 {
+    .stripe-widget h2,
+    .sale-widget h2 {
       margin-top: 0;
       font-size: 1.25rem;
       color: #111827;
@@ -124,6 +126,7 @@
       border: 1px solid #d1d5db;
       border-radius: 0.375rem;
       font-size: 1rem;
+      box-sizing: border-box;
     }
     button.small {
       padding: 0.25rem 0.5rem;
@@ -140,11 +143,28 @@
     .section {
       margin-bottom: 1.5rem;
     }
+    /* CRM styles */
+    .sale-widget .crm-list {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+    }
+    .sale-widget .crm-list li {
+      padding: 0.5rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .sale-widget .crm-list li:last-child {
+      border-bottom: none;
+    }
   </style>
 </head>
 <body>
   <header>
-    <a href="https://readysetfly.us/" class="home-button">Home</a>
+    <a href="index.html" class="home-button" id="homeBtn">Home</a>
     <h1>Admin Dashboard</h1>
   </header>
 
@@ -153,6 +173,7 @@
       <button id="addWidgetBtn">Add Widget ▾</button>
       <ul class="widget-list" id="widgetList">
         <li data-widget="stripe">Stripe Admin</li>
+        <li data-widget="sale">Sales & Marketing</li>
       </ul>
     </div>
 
@@ -161,107 +182,103 @@
 
   <script>
     const addBtn = document.getElementById('addWidgetBtn');
-    const list = document.getElementById('widgetList');
-    const area = document.getElementById('widgetArea');
+    const list   = document.getElementById('widgetList');
+    const area   = document.getElementById('widgetArea');
 
     addBtn.addEventListener('click', () => {
       list.style.display = list.style.display === 'block' ? 'none' : 'block';
     });
 
     list.addEventListener('click', e => {
-      if (e.target.dataset.widget === 'stripe') {
-        loadStripeWidget();
-        list.style.display = 'none';
-      }
+      const w = e.target.dataset.widget;
+      if (!w) return;
+      list.style.display = 'none';
+      if (w === 'stripe') loadStripeWidget();
+      else if (w === 'sale')   loadSaleWidget();
     });
 
     function loadStripeWidget() {
       area.innerHTML = '';
+      /* existing stripe code… */
+      // …
+    }
+
+    function loadSaleWidget() {
+      area.innerHTML = '';
       const widget = document.createElement('div');
-      widget.className = 'stripe-widget';
+      widget.className = 'sale-widget';
       widget.innerHTML = `
-        <h2>Stripe Admin</h2>
+        <h2>Sales & Marketing CRM</h2>
         <div class="tabs">
-          <div class="tab active" data-tab="search">Search Users</div>
-          <div class="tab" data-tab="charges">Recent Charges</div>
-          <div class="tab" data-tab="refund">Issue Refund</div>
+          <div class="tab active" data-tab="contacts">Contacts</div>
+          <div class="tab" data-tab="leads">Leads</div>
         </div>
         <div class="tab-content">
-          <div id="search" class="active">
+          <div id="contacts" class="active">
             <div class="section">
-              <label>User Email or Account#</label>
-              <input type="text" id="stripeQuery" placeholder="e.g. user@example.com or acct_12345"/>
-              <button class="small" id="searchBtn">Search</button>
+              <label>New Contact Name</label>
+              <input type="text" id="contactName" placeholder="Full Name"/>
+              <label>Email</label>
+              <input type="email" id="contactEmail" placeholder="email@example.com"/>
+              <button class="small" id="addContactBtn">Add Contact</button>
             </div>
-            <div class="results" id="stripeResults"></div>
+            <ul class="crm-list" id="contactsList"></ul>
           </div>
-          <div id="charges">
-            <button class="small" id="loadChargesBtn">Load Recent Charges</button>
-            <div class="results" id="chargesResults"></div>
-          </div>
-          <div id="refund">
+          <div id="leads">
             <div class="section">
-              <label>Charge ID to Refund</label>
-              <input type="text" id="refundChargeId" placeholder="e.g. ch_1GqIC8..."/>
+              <label>New Lead</label>
+              <input type="text" id="leadInfo" placeholder="Lead details…"/>
+              <button class="small" id="addLeadBtn">Add Lead</button>
             </div>
-            <button class="small" id="refundBtn">Issue Refund</button>
-            <div class="results" id="refundResults"></div>
+            <ul class="crm-list" id="leadsList"></ul>
           </div>
         </div>
       `;
       area.appendChild(widget);
 
+      // Tab switching
       widget.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
-          widget.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-          widget.querySelectorAll('.tab-content > div').forEach(c => c.classList.remove('active'));
+          widget.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+          widget.querySelectorAll('.tab-content > div').forEach(c=>c.classList.remove('active'));
           tab.classList.add('active');
           widget.querySelector(`#${tab.dataset.tab}`).classList.add('active');
         });
       });
 
-      // search user
-      widget.querySelector('#searchBtn').addEventListener('click', async () => {
-        const q = widget.querySelector('#stripeQuery').value.trim();
-        if (!q) return;
-        widget.querySelector('#stripeResults').innerText = 'Loading…';
-        const res = await fetch(`/api/stripe/search?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        widget.querySelector('#stripeResults')
-          .innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      // Contacts logic
+      const contacts = [];
+      const contactsList = widget.querySelector('#contactsList');
+      widget.querySelector('#addContactBtn').addEventListener('click', () => {
+        const name = widget.querySelector('#contactName').value.trim();
+        const email= widget.querySelector('#contactEmail').value.trim();
+        if (!name||!email) return alert('Enter name and email');
+        contacts.push({name,email});
+        renderCRMList(contactsList, contacts.map(c=>`${c.name} — ${c.email}`));
+        widget.querySelector('#contactName').value = '';
+        widget.querySelector('#contactEmail').value= '';
       });
 
-      // load recent charges
-      widget.querySelector('#loadChargesBtn').addEventListener('click', async () => {
-        const el = widget.querySelector('#chargesResults');
-        el.innerText = 'Loading…';
-        const res = await fetch('/api/stripe/charges?limit=10');
-        const data = await res.json();
-        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-      });
-
-      // issue refund
-      widget.querySelector('#refundBtn').addEventListener('click', async () => {
-        const chargeId = widget.querySelector('#refundChargeId').value.trim();
-        if (!chargeId) return alert('Enter a charge ID');
-        const el = widget.querySelector('#refundResults');
-        el.innerText = 'Processing…';
-        const res = await fetch('/api/stripe/refund', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ chargeId })
-        });
-        const data = await res.json();
-        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      // Leads logic
+      const leads = [];
+      const leadsList = widget.querySelector('#leadsList');
+      widget.querySelector('#addLeadBtn').addEventListener('click', () => {
+        const info = widget.querySelector('#leadInfo').value.trim();
+        if (!info) return alert('Enter lead details');
+        leads.push(info);
+        renderCRMList(leadsList, leads);
+        widget.querySelector('#leadInfo').value = '';
       });
     }
 
-    // Ensure Home always navigates
-    const homeBtn = document.querySelector(".home-button");
-    homeBtn.addEventListener("click", e => {
+    function renderCRMList(ul, items) {
+      ul.innerHTML = items.map(i=>`<li>${i}</li>`).join('');
+    }
+
+    // Ensure Home navigates locally
+    document.getElementById("homeBtn").addEventListener("click", e => {
       e.preventDefault();
-      e.stopPropagation();
-      window.location.href = "https://readysetfly.us/";
+      window.location.href = "index.html";
     });
   </script>
 </body>
