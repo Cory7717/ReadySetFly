@@ -3,9 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Aviation Marketplace</title>
+  <title>Ready Set Fly Admin</title>
   <style>
-    body { font-family: sans-serif; margin:0; padding:0; background:#f3f4f6 }
+    body { 
+      font-family: sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      background: #f3f4f6; 
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
     header {
       background: url('wingtip_clouds.jpg') center/cover no-repeat;
       height: 200px;
@@ -15,276 +23,53 @@
       color: white;
       text-shadow: 0 1px 3px rgba(0,0,0,0.7);
     }
-    header h1 { margin: 0; font-size: 2rem; }
-    footer { background:#1D4ED8; color:white; padding:1rem; text-align:center }
-    main { padding:1rem; max-width:960px; margin:0 auto }
-    .controls { display:flex; justify-content:space-between; flex-wrap:wrap; margin-bottom:1rem }
-    select, button { padding:.5rem; font-size:1rem; margin-left:.5rem }
-    .listing { background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.1); margin-bottom:1rem }
-    .listing img { width:100%; height:auto }
-    .listing-content { padding:1rem }
-    .listing-title { font-size:1.2rem; margin:0 0 .5rem }
-    .listing-loc { color:#9CA3AF; margin:0 }
-
-    /* Modal overlay */
-    #modalOverlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right:0; bottom:0;
-      background: rgba(0,0,0,0.5);
+    header h1 { 
+      margin: 0; 
+      font-size: 2rem; 
+    }
+    main {
+      flex: 1;
+      display: flex;
       justify-content: center;
       align-items: center;
-      z-index: 1000;
+      padding: 1rem;
     }
-    #modalOverlay.active { display: flex; }
-    .modal {
-      background: white;
-      padding: 1.5rem;
-      border-radius: 8px;
-      width: 90%;
-      max-width: 500px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      max-height: 90vh;
-      overflow-y: auto;
+    .admin-login-btn {
+      background-color: #1D4ED8;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      font-size: 1.25rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: background-color 0.2s ease;
     }
-    .modal h2 { margin-top:0; }
-    .modal label { display:block; margin-top:1rem; font-weight:bold; }
-    .modal input,
-    .modal select,
-    .modal textarea {
-      width: 100%; padding: .5rem; margin-top:.25rem;
-      border:1px solid #ccc; border-radius:4px;
-      box-sizing: border-box;
+    .admin-login-btn:hover {
+      background-color: #2563EB;
     }
-    .modal input[type="file"] { padding: 0.25rem 0; }
-    .modal textarea { resize: vertical; }
-    .modal .actions { margin-top:1.5rem; text-align: right; }
-    .modal .actions button { margin-left:.5rem; }
+    footer { 
+      background: #1D4ED8; 
+      color: white; 
+      padding: 1rem; 
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+  <header>
+    <img src="logo.png" alt="Ready Set Fly Logo" style="height: 50px; margin-right: 1rem;">
+    <h1>Ready Set Fly Admin</h1>
+  </header>
 
-<header>
-  <h1>Ready Set Fly! Aviation Marketplace</h1>
-</header>
+  <main>
+    <button class="admin-login-btn" onclick="window.location.href='/admin-login'">
+      Admin Login
+    </button>
+  </main>
 
-<main>
-  <div class="controls">
-    <div>
-      <label for="category">Category:</label>
-      <select id="category">
-        <option>Aircraft for Sale</option>
-        <option>Aviation Jobs</option>
-        <option>Flight Schools</option>
-        <option>Flight Instructors</option>
-        <option>Aviation Mechanic</option>
-        <option>Charter Services</option>
-      </select>
-    </div>
-    <div>
-      <button id="refresh">Refresh</button>
-      <button id="addListing">Add Listing</button>
-    </div>
-  </div>
-
-  <div id="listings">Loading…</div>
-</main>
-
-<footer>
-  <a href="/privacy" style="color:white; margin-right:1rem">Privacy</a>
-  <a href="/terms" style="color:white">Terms</a>
-</footer>
-
-<!-- Add Listing Modal -->
-<div id="modalOverlay">
-  <div class="modal">
-    <h2>New Listing</h2>
-    <form id="listingForm">
-      <label for="newCategory">Category</label>
-      <select id="newCategory" required>
-        <option>Aircraft for Sale</option>
-        <option>Aviation Jobs</option>
-        <option>Flight Schools</option>
-        <option>Flight Instructors</option>
-        <option>Aviation Mechanic</option>
-        <option>Charter Services</option>
-      </select>
-
-      <label for="newTitle">Title</label>
-      <input type="text" id="newTitle" placeholder="e.g. Cessna 172 for sale" required />
-
-      <label for="newCity">City</label>
-      <input type="text" id="newCity" placeholder="e.g. Austin" />
-
-      <label for="newState">State</label>
-      <input type="text" id="newState" placeholder="e.g. TX" />
-
-      <label for="newDescription">Description</label>
-      <textarea id="newDescription" rows="4" placeholder="Describe your listing…" required></textarea>
-
-      <label for="newImages">Images (up to 7)</label>
-      <input type="file" id="newImages" accept="image/*" multiple />
-
-      <div class="actions">
-        <button type="button" id="cancelBtn">Cancel</button>
-        <button type="submit">Submit</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-
-<script>
-  // Initialize Firebase
-  const firebaseConfig = {
-    apiKey:           "EXPO_PUBLIC_FIREBASE_API_KEY",
-    authDomain:       "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
-    projectId:        "EXPO_PUBLIC_FIREBASE_PROJECT_ID",
-    storageBucket:    "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET",
-    messagingSenderId:"EXPO_PUBLIC_FIREBASE_SENDER_ID",
-    appId:            "EXPO_PUBLIC_FIREBASE_APP_ID",
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db      = firebase.firestore();
-  const storage = firebase.storage();
-
-  // UI Hooks
-  const categoryEl = document.getElementById('category');
-  const listingsEl = document.getElementById('listings');
-  const refreshBtn = document.getElementById('refresh');
-  const addBtn     = document.getElementById('addListing');
-  const modal      = document.getElementById('modalOverlay');
-  const cancelBtn  = document.getElementById('cancelBtn');
-  const form       = document.getElementById('listingForm');
-
-  // Load & display listings
-  async function loadListings() {
-    listingsEl.innerHTML = 'Loading…';
-    const cat = categoryEl.value;
-    try {
-      const snap = await db.collection('listings')
-        .where('category','==',cat)
-        .orderBy('createdAt','desc')
-        .limit(20)
-        .get();
-
-      if (snap.empty) {
-        listingsEl.innerHTML = '<p style="text-align:center;color:#9CA3AF">No listings available</p>';
-        return;
-      }
-
-      listingsEl.innerHTML = '';
-      snap.forEach(doc => {
-        const item = doc.data();
-        const card = document.createElement('div');
-        card.className = 'listing';
-
-        if (item.images && item.images.length) {
-          const img = document.createElement('img');
-          img.src = item.images[0];
-          card.appendChild(img);
-        }
-
-        const c = document.createElement('div');
-        c.className = 'listing-content';
-
-        const title = item.title
-                   || item.jobTitle
-                   || item.flightSchoolDetails?.flightSchoolName
-                   || (item.firstName + ' ' + item.lastName)
-                   || 'Listing';
-        const h = document.createElement('h2');
-        h.className = 'listing-title';
-        h.textContent = title;
-        c.appendChild(h);
-
-        if (item.city || item.state) {
-          const loc = document.createElement('p');
-          loc.className = 'listing-loc';
-          loc.textContent = [item.city, item.state].filter(Boolean).join(', ');
-          c.appendChild(loc);
-        }
-
-        if (item.description) {
-          const desc = document.createElement('p');
-          desc.textContent = item.description.slice(0,100)
-                            + (item.description.length>100?'…':'');
-          c.appendChild(desc);
-        }
-
-        card.appendChild(c);
-        listingsEl.appendChild(card);
-      });
-    } catch (err) {
-      console.error(err);
-      listingsEl.innerHTML = '<p style="color:red;text-align:center">Failed to load listings.</p>';
-    }
-  }
-
-  refreshBtn.addEventListener('click', loadListings);
-  categoryEl.addEventListener('change', loadListings);
-  loadListings();
-
-  // Modal handlers
-  addBtn.addEventListener('click', () => modal.classList.add('active'));
-  cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
-
-  // Form submit
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
-
-    const category    = document.getElementById('newCategory').value;
-    const title       = document.getElementById('newTitle').value.trim();
-    const city        = document.getElementById('newCity').value.trim();
-    const state       = document.getElementById('newState').value.trim();
-    const description = document.getElementById('newDescription').value.trim();
-    const files       = Array.from(document.getElementById('newImages').files || []);
-
-    if (files.length > 7) {
-      return alert('You can upload up to 7 images only.');
-    }
-
-    // Upload images
-    const uploadPromises = files.map((file,i) => {
-      const path = `listingImages/${Date.now()}_${i}_${file.name}`;
-      return storage.ref(path)
-        .put(file)
-        .then(snap => snap.ref.getDownloadURL());
-    });
-
-    let imageURLs = [];
-    try {
-      imageURLs = await Promise.all(uploadPromises);
-    } catch(err) {
-      console.error('Upload failed', err);
-      return alert('Failed to upload images.');
-    }
-
-    // Firestore write
-    try {
-      await db.collection('listings').add({
-        category,
-        title,
-        city,
-        state,
-        description,
-        images: imageURLs,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      alert('Your listing has been submitted!');
-      form.reset();
-      modal.classList.remove('active');
-      loadListings();
-    } catch(err) {
-      console.error('Submit failed', err);
-      alert('Error submitting listing.');
-    }
-  });
-</script>
-
+  <footer>
+    &copy; 2025 Ready Set Fly, LLC
+  </footer>
 </body>
 </html>
