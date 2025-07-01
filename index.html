@@ -127,7 +127,7 @@
     &copy; 2025 Ready Set Fly, LLC
   </footer>
 
-  <script>
+   <script>
     const allowedSpecific = [
       'coryarmer@gmail.com',
       'bentley.amy24@gmail.com'
@@ -148,23 +148,41 @@
 
     function setCurrentUser(email) {
       localStorage.setItem('currentAdmin', email.toLowerCase());
+      localStorage.setItem('loginTimestamp', Date.now().toString());
     }
 
     function getCurrentUser() {
       return localStorage.getItem('currentAdmin');
     }
 
-    function clearCurrentUser() {
-      localStorage.removeItem('currentAdmin');
+    function getLoginTimestamp() {
+      return parseInt(localStorage.getItem('loginTimestamp') || '0', 10);
     }
 
-    // On load, if someone is already logged in, skip straight to dashboard
+    function clearCurrentUser() {
+      localStorage.removeItem('currentAdmin');
+      localStorage.removeItem('loginTimestamp');
+    }
+
+    // Returns true if login was within the last 7 days
+    function isSessionValid() {
+      const ts = getLoginTimestamp();
+      if (!ts) return false;
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      return (Date.now() - ts) < sevenDaysMs;
+    }
+
+    // On load, if someone is already logged in and still valid, skip to dashboard
     window.addEventListener('DOMContentLoaded', () => {
       const current = getCurrentUser();
       const accounts = getAccounts();
       if (current && accounts[current]) {
-        // user already authenticated
-        window.location.href = 'admin-dashboard.html';
+        if (isSessionValid()) {
+          window.location.href = 'admin-dashboard.html';
+        } else {
+          // session expired
+          clearCurrentUser();
+        }
       }
     });
 
@@ -192,14 +210,20 @@
     }
 
     function loginAdmin() {
+      const current = getCurrentUser();
+      const accounts = getAccounts();
+
+      // If already logged in & session valid, go straight to dashboard
+      if (current && accounts[current] && isSessionValid()) {
+        return window.location.href = 'admin-dashboard.html';
+      }
+
       const email = prompt('Enter your admin email:');
       if (!email) return;
-
       if (!isEmailAllowed(email)) {
         return alert('Access denied. Please use a permitted email.');
       }
 
-      const accounts = getAccounts();
       const storedPass = accounts[email.toLowerCase()];
       if (!storedPass) {
         return alert('No account found for that email. Please create one first.');

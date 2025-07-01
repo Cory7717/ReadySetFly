@@ -371,6 +371,18 @@ const authenticate = async (req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, res, next) => {
+  if (req.path === '/') {
+    return next();           // immediately serve “OK”
+  }
+  initTransporter()
+    .then(() => next())
+    .catch(err => {
+      console.error("SMTP init failed:", err);
+      next();
+    });
+});
+
 // ───────────────────────────────────────────────────
 // Stripe Admin: Search Customers/Accounts
 // ───────────────────────────────────────────────────
@@ -429,6 +441,12 @@ app.post("/stripe/refund", authenticate, async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+
+// simplest health‐check endpoint
+app.get("/", (req, res) => {
+  res.status(200).send("OK");
+});
+
 
 // =====================
 // Helper Functions
@@ -2217,12 +2235,9 @@ exports.api = onRequest(
   {
     memory: "512Mi",
     timeoutSeconds: 60,
-    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS]
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
   },
-  async (req, res) => {
-    await initTransporter();      // now it’s safe to read secrets
-    return app(req, res);
-  }
+  app
 );
 
 exports.expireTrials = onSchedule("every 1 hours", async () => {
