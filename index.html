@@ -21,13 +21,46 @@
 
     main { padding:1rem; max-width:960px; margin:0 auto }
     .controls { display:flex; justify-content:space-between; flex-wrap:wrap; margin-bottom:1rem }
-    select, button { padding:.5rem; font-size:1rem; }
+    select, button { padding:.5rem; font-size:1rem; margin-left:.5rem }
     .listing { background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.1); margin-bottom:1rem }
     .listing img { width:100%; height:auto }
     .listing-content { padding:1rem }
     .listing-title { font-size:1.2rem; margin:0 0 .5rem }
     .listing-sub { color:#6B7280; margin:0 0 .5rem }
     .listing-loc { color:#9CA3AF; margin:0 }
+
+    /* Modal overlay */
+    #modalOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right:0; bottom:0;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #modalOverlay.active { display: flex; }
+    .modal {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    .modal h2 { margin-top:0; }
+    .modal label { display:block; margin-top:1rem; font-weight:bold; }
+    .modal input, .modal select {
+      width: 100%; padding: .5rem; margin-top:.25rem;
+      border:1px solid #ccc; border-radius:4px;
+    }
+    .modal .actions {
+      margin-top:1.5rem;
+      text-align: right;
+    }
+    .modal .actions button {
+      margin-left:.5rem;
+    }
   </style>
 </head>
 <body>
@@ -49,7 +82,10 @@
         <option>Charter Services</option>
       </select>
     </div>
-    <button id="refresh">Refresh</button>
+    <div>
+      <button id="refresh">Refresh</button>
+      <button id="addListing">Add Listing</button>
+    </div>
   </div>
 
   <div id="listings">
@@ -62,12 +98,43 @@
   <a href="/terms" style="color:white">Terms</a>
 </footer>
 
+<!-- Add Listing Modal -->
+<div id="modalOverlay">
+  <div class="modal">
+    <h2>New Listing</h2>
+    <form id="listingForm">
+      <label for="newCategory">Category</label>
+      <select id="newCategory" required>
+        <option>Aircraft for Sale</option>
+        <option>Aviation Jobs</option>
+        <option>Flight Schools</option>
+        <option>Flight Instructors</option>
+        <option>Aviation Mechanic</option>
+        <option>Charter Services</option>
+      </select>
+
+      <label for="newTitle">Title</label>
+      <input type="text" id="newTitle" placeholder="e.g. Cessna 172 for sale" required />
+
+      <label for="newCity">City</label>
+      <input type="text" id="newCity" placeholder="e.g. Austin" />
+
+      <label for="newState">State</label>
+      <input type="text" id="newState" placeholder="e.g. TX" />
+
+      <div class="actions">
+        <button type="button" id="cancelBtn">Cancel</button>
+        <button type="submit">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-  // ——— Your Firebase config — replace with your EXPO_PUBLIC_… values ———
   const firebaseConfig = {
     apiKey:           "EXPO_PUBLIC_FIREBASE_API_KEY",
     authDomain:       "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
@@ -79,18 +146,22 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  const categoryEl = document.getElementById('category');
-  const listingsEl = document.getElementById('listings');
-  const refreshBtn  = document.getElementById('refresh');
+  const categoryEl   = document.getElementById('category');
+  const listingsEl   = document.getElementById('listings');
+  const refreshBtn   = document.getElementById('refresh');
+  const addBtn       = document.getElementById('addListing');
+  const modal        = document.getElementById('modalOverlay');
+  const cancelBtn    = document.getElementById('cancelBtn');
+  const form         = document.getElementById('listingForm');
 
   async function loadListings() {
     listingsEl.innerHTML = 'Loading…';
     const cat = categoryEl.value;
     try {
-      const q = db.collection('listings')
-                  .where('category', '==', cat)
-                  .orderBy('createdAt','desc')
-                  .limit(20);
+      const q    = db.collection('listings')
+                     .where('category','==',cat)
+                     .orderBy('createdAt','desc')
+                     .limit(20);
       const snap = await q.get();
       if (snap.empty) {
         listingsEl.innerHTML = '<p style="text-align:center;color:#9CA3AF">No listings available</p>';
@@ -102,29 +173,25 @@
         const card = document.createElement('div');
         card.className = 'listing';
 
-        // image
         if (item.images && item.images.length) {
           const img = document.createElement('img');
           img.src = item.images[0];
           card.appendChild(img);
         }
 
-        // content
         const c = document.createElement('div');
         c.className = 'listing-content';
 
-        // title
-        let title = item.title 
-                  || item.jobTitle 
-                  || item.flightSchoolDetails?.flightSchoolName 
-                  || (item.firstName + ' ' + item.lastName) 
-                  || 'Listing';
+        const title = item.title 
+                    || item.jobTitle 
+                    || item.flightSchoolDetails?.flightSchoolName 
+                    || (item.firstName + ' ' + item.lastName) 
+                    || 'Listing';
         const h = document.createElement('h2');
         h.className = 'listing-title';
         h.textContent = title;
         c.appendChild(h);
 
-        // subtitle / company / location
         if (item.companyName) {
           const sub = document.createElement('p');
           sub.className = 'listing-sub';
@@ -134,7 +201,7 @@
         if (item.city || item.state) {
           const loc = document.createElement('p');
           loc.className = 'listing-loc';
-          loc.textContent = [item.city, item.state].filter(Boolean).join(', ');
+          loc.textContent = [item.city,item.state].filter(Boolean).join(', ');
           c.appendChild(loc);
         }
 
@@ -147,10 +214,34 @@
     }
   }
 
-  // initial load
-  categoryEl.addEventListener('change', loadListings);
   refreshBtn.addEventListener('click', loadListings);
+  categoryEl.addEventListener('change', loadListings);
   loadListings();
+
+  // Modal open/close
+  addBtn.addEventListener('click', () => modal.classList.add('active'));
+  cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
+
+  // Handle new listing submission
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const newData = {
+      category:  document.getElementById('newCategory').value,
+      title:     document.getElementById('newTitle').value.trim(),
+      city:      document.getElementById('newCity').value.trim(),
+      state:     document.getElementById('newState').value.trim(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    try {
+      await db.collection('listings').add(newData);
+      form.reset();
+      modal.classList.remove('active');
+      loadListings();
+    } catch (err) {
+      console.error('Failed to submit listing', err);
+      alert('Error submitting listing.');
+    }
+  });
 </script>
 
 </body>
