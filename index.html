@@ -6,7 +6,19 @@
   <title>Aviation Marketplace</title>
   <style>
     body { font-family: sans-serif; margin:0; padding:0; background:#f3f4f6 }
-    header, footer { background:#1D4ED8; color:white; padding:1rem; text-align:center }
+    /* New header style with background image */
+    header {
+      background: url('wingtip_clouds.jpg') center/cover no-repeat;
+      height: 200px;
+      display: flex;
+      align-items: flex-end;
+      padding: 1rem;
+      color: white;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    header h1 { margin: 0; font-size: 2rem; }
+    footer { background:#1D4ED8; color:white; padding:1rem; text-align:center }
+
     main { padding:1rem; max-width:960px; margin:0 auto }
     .controls { display:flex; justify-content:space-between; flex-wrap:wrap; margin-bottom:1rem }
     select, button { padding:.5rem; font-size:1rem; }
@@ -102,7 +114,11 @@
         c.className = 'listing-content';
 
         // title
-        let title = item.title || item.jobTitle || item.flightSchoolDetails?.flightSchoolName || item.firstName + ' ' + item.lastName || 'Listing';
+        let title = item.title 
+                  || item.jobTitle 
+                  || item.flightSchoolDetails?.flightSchoolName 
+                  || (item.firstName + ' ' + item.lastName) 
+                  || 'Listing';
         const h = document.createElement('h2');
         h.className = 'listing-title';
         h.textContent = title;
