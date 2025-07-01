@@ -69,7 +69,7 @@
   <main>
     <button
       class="admin-login-btn"
-      onclick="window.location.href='/admin-login'"
+      onclick="loginAdmin()"
     >
       Admin Login
     </button>
@@ -78,5 +78,26 @@
   <footer>
     &copy; 2025 Ready Set Fly, LLC
   </footer>
+
+  <script>
+    function loginAdmin() {
+      const allowedSpecific = [
+        'coryarmer@gmail.com',
+        'bentley.amy24@gmail.com'
+      ];
+      const email = prompt('Enter your admin email:');
+      if (!email) return; // user cancelled
+
+      const domainOK = email.toLowerCase().endsWith('@readysetfly.us');
+      const specificOK = allowedSpecific.includes(email.toLowerCase());
+
+      if (domainOK || specificOK) {
+        // success: navigate to your admin dashboard
+        window.location.href = '/admin-dashboard.html';
+      } else {
+        alert('Access denied. Please use a @readysetfly.us account or an approved email.');
+      }
+    }
+  </script>
 </body>
 </html>
