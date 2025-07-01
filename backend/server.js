@@ -344,12 +344,6 @@ app.post(
 );
 
 // =====================
-// Global Body Parsing Middleware
-// =====================
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// =====================
 // Middleware for Firebase ID Token Authentication
 // =====================
 const authenticate = async (req, res, next) => {
@@ -370,6 +364,71 @@ const authenticate = async (req, res, next) => {
     return res.status(401).json({ error: "Unauthorized: Invalid token" });
   }
 };
+
+// =====================
+// Global Body Parsing Middleware
+// =====================
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ───────────────────────────────────────────────────
+// Stripe Admin: Search Customers/Accounts
+// ───────────────────────────────────────────────────
+app.get("/stripe/search", authenticate, async (req, res) => {
+  const q = req.query.q;
+  if (!q) return res.status(400).json({ error: "Missing query" });
+
+  try {
+    // first try customer lookup
+    const customers = await stripe.customers.search({
+      query: `email:'${q}' or metadata['account_number']:'${q}'`,
+      limit: 10
+    });
+
+    // if none, try account lookup
+    let accounts = [];
+    if (customers.data.length === 0) {
+      const acct = await stripe.accounts.list({ limit: 10, email: q });
+      accounts = acct.data;
+    }
+
+    return res.json({ customers: customers.data, accounts });
+  } catch (err) {
+    console.error("Error in /stripe/search:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ───────────────────────────────────────────────────
+// Stripe Admin: List Recent Charges
+// ───────────────────────────────────────────────────
+app.get("/stripe/charges", authenticate, async (req, res) => {
+  const limit = parseInt(req.query.limit, 10) || 10;
+
+  try {
+    const charges = await stripe.charges.list({ limit });
+    return res.json({ data: charges.data });
+  } catch (err) {
+    console.error("Error in /stripe/charges:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ───────────────────────────────────────────────────
+// Stripe Admin: Issue a Refund
+// ───────────────────────────────────────────────────
+app.post("/stripe/refund", authenticate, async (req, res) => {
+  const { chargeId } = req.body;
+  if (!chargeId) return res.status(400).json({ error: "Missing chargeId" });
+
+  try {
+    const refund = await stripe.refunds.create({ charge: chargeId });
+    return res.json({ refund });
+  } catch (err) {
+    console.error("Error in /stripe/refund:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 // =====================
 // Helper Functions
