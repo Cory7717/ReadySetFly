@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Classifieds Marketplace</title>
+  <style>
+    body { font-family: sans-serif; margin:0; padding:0; background:#f3f4f6 }
+    header { background:#1d4ed8; color:white; padding:1rem; text-align:center }
+    #controls { padding:1rem; display:flex; justify-content:center; gap:1rem }
+    #listings {
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(300px,1fr));
+      gap:1rem;
+      padding:1rem;
+    }
+    .card {
+      background:white; border-radius:8px; overflow:hidden;
+      box-shadow:0 2px 6px rgba(0,0,0,0.1); display:flex; flex-direction:column;
+    }
+    .card img { width:100%; height:180px; object-fit:cover }
+    .badge {
+      position:absolute; top:8px; left:8px;
+      background:rgba(0,0,0,0.7); color:white; padding:2px 6px; border-radius:4px;
+      font-size:0.75rem;
+    }
+    .content { padding:0.75rem; flex:1; display:flex; flex-direction:column }
+    .title { font-size:1.1rem; font-weight:bold; margin:0.25rem 0 }
+    .subtitle { font-size:0.9rem; color:#4a5568; margin-bottom:0.5rem }
+    .footer { margin-top:auto; font-size:0.9rem; font-weight:bold }
+    .placeholder { background:#e2e8f0; width:100%; height:180px; display:flex; align-items:center; justify-content:center; color:#a0aec0 }
+    #empty, #error { grid-column:1/-1; text-align:center; color:#718096 }
+  </style>
+</head>
+<body>
+
+  <header><h1>Classifieds Marketplace</h1></header>
+
+  <div id="controls">
+    <label>
+      Category:
+      <select id="categoryFilter">
+        <option value="">All</option>
+        <option>Aircraft for Sale</option>
+        <option>Aviation Jobs</option>
+        <option>Flight Schools</option>
+        <option>Flight Instructors</option>
+        <option>Aviation Mechanic</option>
+        <option>Charter Services</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="listings">
+    <!-- cards injected here -->
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import {
+      getFirestore, collection, query, orderBy, getDocs
+    } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    // TODO: Replace with your Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    const listingsEl = document.getElementById("listings");
+    const categoryFilter = document.getElementById("categoryFilter");
+
+    async function loadListings() {
+      listingsEl.innerHTML = ""; 
+      const cat = categoryFilter.value;
+      let q = query(
+        collection(db, "listings"),
+        orderBy("createdAt", "desc")
+      );
+      const snapshot = await getDocs(q).catch(err => {
+        listingsEl.innerHTML = '<p id="error">Failed to load listings.</p>';
+        console.error(err);
+      });
+      if (!snapshot) return;
+
+      let docs = snapshot.docs.map(d => ({ id:d.id, ...d.data() }));
+      if (cat) docs = docs.filter(d => d.category === cat);
+
+      if (docs.length === 0) {
+        listingsEl.innerHTML = '<p id="empty">No listings available</p>';
+        return;
+      }
+
+      docs.forEach(item => {
+        // decide title
+        let title = item.category === "Aviation Jobs"
+          ? (item.jobTitle || "Job")
+          : (item.title || item.flightSchoolDetails?.flightSchoolName || item.firstName + " " + item.lastName || "Listing");
+
+        // determine subtitle
+        let subtitle = item.category === "Aviation Jobs"
+          ? (item.companyName || "")
+          : `${item.city||""}${item.state? ", "+item.state : ""}`;
+
+        // image
+        const imgUrl = Array.isArray(item.images) ? item.images[0] : item.images;
+        const imgHtml = imgUrl
+          ? `<img src="${imgUrl}" alt="listing image">`
+          : `<div class="placeholder">No Image</div>`;
+
+        // price/footer
+        let footer = "";
+        if (item.category === "Aircraft for Sale") {
+          footer = `$${Number(item.salePrice||0).toLocaleString()}`;
+        } else if (item.packageType === "Basic") {
+          footer = "Free for 7 days";
+        }
+
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div style="position:relative">
+            ${imgHtml}
+            <div class="badge">${item.category}</div>
+          </div>
+          <div class="content">
+            <div class="title">${title}</div>
+            <div class="subtitle">${subtitle}</div>
+            ${footer ? `<div class="footer">${footer}</div>` : ""}
+          </div>
+        `;
+        listingsEl.append(card);
+      });
+    }
+
+    categoryFilter.addEventListener("change", loadListings);
+    loadListings();
+  </script>
+</body>
+</html>
