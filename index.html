@@ -203,10 +203,10 @@
         const c = document.createElement('div');
         c.className = 'listing-content';
 
-        const title = item.title 
-                    || item.jobTitle 
-                    || item.flightSchoolDetails?.flightSchoolName 
-                    || (item.firstName + ' ' + item.lastName) 
+        const title = item.title
+                    || item.jobTitle
+                    || item.flightSchoolDetails?.flightSchoolName
+                    || (item.firstName + ' ' + item.lastName)
                     || 'Listing';
         const h = document.createElement('h2');
         h.className = 'listing-title';
@@ -223,7 +223,8 @@
         // optionally show description snippet
         if (item.description) {
           const desc = document.createElement('p');
-          desc.textContent = item.description.slice(0, 100) + (item.description.length>100?'…':'');
+          desc.textContent = item.description.slice(0, 100)
+                             + (item.description.length > 100 ? '…' : '');
           c.appendChild(desc);
         }
 
@@ -248,6 +249,7 @@
   // ——— Handle form submit ———
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    console.log('🛫 Submit clicked, gathering data…');
 
     // gather values
     const category    = document.getElementById('newCategory').value;
@@ -263,8 +265,9 @@
 
     // upload each file to Storage
     const uploadPromises = files.map((file, i) => {
-      const ref = storage.ref().child(`listingImages/${Date.now()}_${i}_${file.name}`);
-      return ref.put(file).then(snapshot => snapshot.ref.getDownloadURL());
+      const ref = storage.ref(`listingImages/${Date.now()}_${i}_${file.name}`);
+      return ref.put(file)
+        .then(snapshot => snapshot.ref.getDownloadURL());
     });
 
     let imageURLs = [];
@@ -286,9 +289,12 @@
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
+    console.log('🗄️  Writing to Firestore:', newData);
+
     // write to Firestore
     try {
       await db.collection('listings').add(newData);
+      alert('✅ Your listing has been submitted!');
       form.reset();
       modal.classList.remove('active');
       loadListings();
