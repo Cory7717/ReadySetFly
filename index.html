@@ -17,7 +17,6 @@
     }
     header h1 { margin: 0; font-size: 2rem; }
     footer { background:#1D4ED8; color:white; padding:1rem; text-align:center }
-
     main { padding:1rem; max-width:960px; margin:0 auto }
     .controls { display:flex; justify-content:space-between; flex-wrap:wrap; margin-bottom:1rem }
     select, button { padding:.5rem; font-size:1rem; margin-left:.5rem }
@@ -25,7 +24,6 @@
     .listing img { width:100%; height:auto }
     .listing-content { padding:1rem }
     .listing-title { font-size:1.2rem; margin:0 0 .5rem }
-    .listing-sub { color:#6B7280; margin:0 0 .5rem }
     .listing-loc { color:#9CA3AF; margin:0 }
 
     /* Modal overlay */
@@ -58,17 +56,10 @@
       border:1px solid #ccc; border-radius:4px;
       box-sizing: border-box;
     }
-    .modal input[type="file"] {
-      padding: 0.25rem 0;
-    }
+    .modal input[type="file"] { padding: 0.25rem 0; }
     .modal textarea { resize: vertical; }
-    .modal .actions {
-      margin-top:1.5rem;
-      text-align: right;
-    }
-    .modal .actions button {
-      margin-left:.5rem;
-    }
+    .modal .actions { margin-top:1.5rem; text-align: right; }
+    .modal .actions button { margin-left:.5rem; }
   </style>
 </head>
 <body>
@@ -96,9 +87,7 @@
     </div>
   </div>
 
-  <div id="listings">
-    Loading…
-  </div>
+  <div id="listings">Loading…</div>
 </main>
 
 <footer>
@@ -150,7 +139,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
-  // ——— Initialize Firebase ———
+  // Initialize Firebase
   const firebaseConfig = {
     apiKey:           "EXPO_PUBLIC_FIREBASE_API_KEY",
     authDomain:       "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
@@ -163,7 +152,7 @@
   const db      = firebase.firestore();
   const storage = firebase.storage();
 
-  // ——— UI Hooks ———
+  // UI Hooks
   const categoryEl = document.getElementById('category');
   const listingsEl = document.getElementById('listings');
   const refreshBtn = document.getElementById('refresh');
@@ -172,7 +161,7 @@
   const cancelBtn  = document.getElementById('cancelBtn');
   const form       = document.getElementById('listingForm');
 
-  // ——— Load & Display Listings ———
+  // Load & display listings
   async function loadListings() {
     listingsEl.innerHTML = 'Loading…';
     const cat = categoryEl.value;
@@ -204,10 +193,10 @@
         c.className = 'listing-content';
 
         const title = item.title
-                    || item.jobTitle
-                    || item.flightSchoolDetails?.flightSchoolName
-                    || (item.firstName + ' ' + item.lastName)
-                    || 'Listing';
+                   || item.jobTitle
+                   || item.flightSchoolDetails?.flightSchoolName
+                   || (item.firstName + ' ' + item.lastName)
+                   || 'Listing';
         const h = document.createElement('h2');
         h.className = 'listing-title';
         h.textContent = title;
@@ -216,22 +205,20 @@
         if (item.city || item.state) {
           const loc = document.createElement('p');
           loc.className = 'listing-loc';
-          loc.textContent = [item.city,item.state].filter(Boolean).join(', ');
+          loc.textContent = [item.city, item.state].filter(Boolean).join(', ');
           c.appendChild(loc);
         }
 
-        // optionally show description snippet
         if (item.description) {
           const desc = document.createElement('p');
-          desc.textContent = item.description.slice(0, 100)
-                             + (item.description.length > 100 ? '…' : '');
+          desc.textContent = item.description.slice(0,100)
+                            + (item.description.length>100?'…':'');
           c.appendChild(desc);
         }
 
         card.appendChild(c);
         listingsEl.appendChild(card);
       });
-
     } catch (err) {
       console.error(err);
       listingsEl.innerHTML = '<p style="color:red;text-align:center">Failed to load listings.</p>';
@@ -242,16 +229,14 @@
   categoryEl.addEventListener('change', loadListings);
   loadListings();
 
-  // ——— Modal open/close ———
+  // Modal handlers
   addBtn.addEventListener('click', () => modal.classList.add('active'));
   cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
 
-  // ——— Handle form submit ———
+  // Form submit
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    console.log('🛫 Submit clicked, gathering data…');
 
-    // gather values
     const category    = document.getElementById('newCategory').value;
     const title       = document.getElementById('newTitle').value.trim();
     const city        = document.getElementById('newCity').value.trim();
@@ -263,43 +248,39 @@
       return alert('You can upload up to 7 images only.');
     }
 
-    // upload each file to Storage
-    const uploadPromises = files.map((file, i) => {
-      const ref = storage.ref(`listingImages/${Date.now()}_${i}_${file.name}`);
-      return ref.put(file)
-        .then(snapshot => snapshot.ref.getDownloadURL());
+    // Upload images
+    const uploadPromises = files.map((file,i) => {
+      const path = `listingImages/${Date.now()}_${i}_${file.name}`;
+      return storage.ref(path)
+        .put(file)
+        .then(snap => snap.ref.getDownloadURL());
     });
 
     let imageURLs = [];
     try {
       imageURLs = await Promise.all(uploadPromises);
-    } catch (uploadErr) {
-      console.error('Image upload failed', uploadErr);
+    } catch(err) {
+      console.error('Upload failed', err);
       return alert('Failed to upload images.');
     }
 
-    // build Firestore data
-    const newData = {
-      category,
-      title,
-      city,
-      state,
-      description,
-      images: imageURLs,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    console.log('🗄️  Writing to Firestore:', newData);
-
-    // write to Firestore
+    // Firestore write
     try {
-      await db.collection('listings').add(newData);
-      alert('✅ Your listing has been submitted!');
+      await db.collection('listings').add({
+        category,
+        title,
+        city,
+        state,
+        description,
+        images: imageURLs,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert('Your listing has been submitted!');
       form.reset();
       modal.classList.remove('active');
       loadListings();
-    } catch (err) {
-      console.error('Failed to submit listing', err);
+    } catch(err) {
+      console.error('Submit failed', err);
       alert('Error submitting listing.');
     }
   });
