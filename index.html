@@ -35,7 +35,7 @@
       padding: 2rem 1rem;
       gap: 2rem;
     }
-    /* New button row container */
+    /* Button row container */
     .button-row {
       width: 100%;
       display: flex;
@@ -94,36 +94,41 @@
       margin: 0.75rem 0 0;
     }
     footer { 
+      position: relative;
       background: #1D4ED8; 
       color: white; 
       padding: 1rem; 
       text-align: center;
     }
+    /* Logo in footer */
+    #footerLogo {
+      position: absolute;
+      left: 1rem;
+      bottom: 1rem;
+      height: 50px;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    #footerLogo:hover {
+      transform: translateY(-2px);
+    }
   </style>
 </head>
 <body>
   <header>
-    <img
-      src="../../Assets/images/RSF_Logo_02232025.png"
-      alt="Ready Set Fly Logo"
-      style="height: 50px; margin-right: 1rem;"
-    />
     <h1>Ready Set Fly Admin</h1>
   </header>
 
   <main>
     <div class="button-row">
-      <!-- Left: existing admin controls -->
       <div class="admin-area" id="adminArea">
-        <button class="btn" onclick="loginAdmin()">
+        <button class="btn" id="adminLoginBtn">
           Admin Login
         </button>
         <div class="create-link" onclick="createAdmin()">
           Create Admin Account
         </div>
       </div>
-
-      <!-- Right: new view buttons -->
       <div class="view-area">
         <button class="btn" onclick="viewRentals()">
           View Rentals
@@ -147,6 +152,11 @@
 
   <footer>
     &copy; 2025 Ready Set Fly, LLC
+    <img
+      src="../../Assets/images/RSF_Logo_02232025.png"
+      alt="Ready Set Fly Logo"
+      id="footerLogo"
+    />
   </footer>
 
   <script>
@@ -201,6 +211,10 @@
       } else {
         clearCurrentUser();
       }
+
+      // Hook login to footer logo
+      document.getElementById('footerLogo').addEventListener('click', loginAdmin);
+      document.getElementById('adminLoginBtn').addEventListener('click', loginAdmin);
     });
 
     function createAdmin() {
@@ -254,7 +268,6 @@
       }
     }
 
-    // Stubs for new buttons
     function viewRentals() {
       window.location.href = 'rentals.html';
     }
