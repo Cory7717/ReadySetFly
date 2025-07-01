@@ -82,7 +82,6 @@
     .widget-area {
       margin-top: 2rem;
     }
-    /* reuse stripe styles */
     .stripe-widget, .sale-widget {
       background: white;
       border-radius: 0.375rem;
@@ -143,7 +142,6 @@
     .section {
       margin-bottom: 1.5rem;
     }
-    /* CRM styles */
     .sale-widget .crm-list {
       list-style: none;
       padding: 0;
@@ -199,8 +197,84 @@
 
     function loadStripeWidget() {
       area.innerHTML = '';
-      /* existing stripe code… */
-      // …
+      const widget = document.createElement('div');
+      widget.className = 'stripe-widget';
+      widget.innerHTML = `
+        <h2>Stripe Admin</h2>
+        <div class="tabs">
+          <div class="tab active" data-tab="search">Search Users</div>
+          <div class="tab" data-tab="charges">Recent Charges</div>
+          <div class="tab" data-tab="refund">Issue Refund</div>
+        </div>
+        <div class="tab-content">
+          <div id="search" class="active">
+            <div class="section">
+              <label>User Email or Account#</label>
+              <input type="text" id="stripeQuery" placeholder="e.g. user@example.com or acct_12345"/>
+              <button class="small" id="searchBtn">Search</button>
+            </div>
+            <div class="results" id="stripeResults"></div>
+          </div>
+          <div id="charges">
+            <button class="small" id="loadChargesBtn">Load Recent Charges</button>
+            <div class="results" id="chargesResults"></div>
+          </div>
+          <div id="refund">
+            <div class="section">
+              <label>Charge ID to Refund</label>
+              <input type="text" id="refundChargeId" placeholder="e.g. ch_1GqIC8..."/>
+            </div>
+            <button class="small" id="refundBtn">Issue Refund</button>
+            <div class="results" id="refundResults"></div>
+          </div>
+        </div>
+      `;
+      area.appendChild(widget);
+
+      // Tab switching
+      widget.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          widget.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          widget.querySelectorAll('.tab-content > div').forEach(c => c.classList.remove('active'));
+          tab.classList.add('active');
+          widget.querySelector(`#${tab.dataset.tab}`).classList.add('active');
+        });
+      });
+
+      // search user
+      widget.querySelector('#searchBtn').addEventListener('click', async () => {
+        const q = widget.querySelector('#stripeQuery').value.trim();
+        if (!q) return;
+        widget.querySelector('#stripeResults').innerText = 'Loading…';
+        const res = await fetch(`/api/stripe/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        widget.querySelector('#stripeResults')
+          .innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      });
+
+      // load recent charges
+      widget.querySelector('#loadChargesBtn').addEventListener('click', async () => {
+        const el = widget.querySelector('#chargesResults');
+        el.innerText = 'Loading…';
+        const res = await fetch('/api/stripe/charges?limit=10');
+        const data = await res.json();
+        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      });
+
+      // issue refund
+      widget.querySelector('#refundBtn').addEventListener('click', async () => {
+        const chargeId = widget.querySelector('#refundChargeId').value.trim();
+        if (!chargeId) return alert('Enter a charge ID');
+        const el = widget.querySelector('#refundResults');
+        el.innerText = 'Processing…';
+        const res = await fetch('/api/stripe/refund', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ chargeId })
+        });
+        const data = await res.json();
+        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      });
     }
 
     function loadSaleWidget() {
@@ -236,7 +310,6 @@
       `;
       area.appendChild(widget);
 
-      // Tab switching
       widget.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
           widget.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -246,7 +319,6 @@
         });
       });
 
-      // Contacts logic
       const contacts = [];
       const contactsList = widget.querySelector('#contactsList');
       widget.querySelector('#addContactBtn').addEventListener('click', () => {
@@ -259,7 +331,6 @@
         widget.querySelector('#contactEmail').value= '';
       });
 
-      // Leads logic
       const leads = [];
       const leadsList = widget.querySelector('#leadsList');
       widget.querySelector('#addLeadBtn').addEventListener('click', () => {
@@ -275,7 +346,6 @@
       ul.innerHTML = items.map(i=>`<li>${i}</li>`).join('');
     }
 
-    // Ensure Home navigates locally
     document.getElementById("homeBtn").addEventListener("click", e => {
       e.preventDefault();
       window.location.href = "index.html";
