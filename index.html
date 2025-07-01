@@ -6,7 +6,6 @@
   <title>Aviation Marketplace</title>
   <style>
     body { font-family: sans-serif; margin:0; padding:0; background:#f3f4f6 }
-    /* New header style with background image */
     header {
       background: url('wingtip_clouds.jpg') center/cover no-repeat;
       height: 200px;
@@ -45,15 +44,24 @@
       padding: 1.5rem;
       border-radius: 8px;
       width: 90%;
-      max-width: 400px;
+      max-width: 500px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      max-height: 90vh;
+      overflow-y: auto;
     }
     .modal h2 { margin-top:0; }
     .modal label { display:block; margin-top:1rem; font-weight:bold; }
-    .modal input, .modal select {
+    .modal input,
+    .modal select,
+    .modal textarea {
       width: 100%; padding: .5rem; margin-top:.25rem;
       border:1px solid #ccc; border-radius:4px;
+      box-sizing: border-box;
     }
+    .modal input[type="file"] {
+      padding: 0.25rem 0;
+    }
+    .modal textarea { resize: vertical; }
     .modal .actions {
       margin-top:1.5rem;
       text-align: right;
@@ -122,6 +130,12 @@
       <label for="newState">State</label>
       <input type="text" id="newState" placeholder="e.g. TX" />
 
+      <label for="newDescription">Description</label>
+      <textarea id="newDescription" rows="4" placeholder="Describe your listing…" required></textarea>
+
+      <label for="newImages">Images (up to 7)</label>
+      <input type="file" id="newImages" accept="image/*" multiple />
+
       <div class="actions">
         <button type="button" id="cancelBtn">Cancel</button>
         <button type="submit">Submit</button>
@@ -133,8 +147,10 @@
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
+  // ——— Initialize Firebase ———
   const firebaseConfig = {
     apiKey:           "EXPO_PUBLIC_FIREBASE_API_KEY",
     authDomain:       "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
@@ -144,29 +160,34 @@
     appId:            "EXPO_PUBLIC_FIREBASE_APP_ID",
   };
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  const db      = firebase.firestore();
+  const storage = firebase.storage();
 
-  const categoryEl   = document.getElementById('category');
-  const listingsEl   = document.getElementById('listings');
-  const refreshBtn   = document.getElementById('refresh');
-  const addBtn       = document.getElementById('addListing');
-  const modal        = document.getElementById('modalOverlay');
-  const cancelBtn    = document.getElementById('cancelBtn');
-  const form         = document.getElementById('listingForm');
+  // ——— UI Hooks ———
+  const categoryEl = document.getElementById('category');
+  const listingsEl = document.getElementById('listings');
+  const refreshBtn = document.getElementById('refresh');
+  const addBtn     = document.getElementById('addListing');
+  const modal      = document.getElementById('modalOverlay');
+  const cancelBtn  = document.getElementById('cancelBtn');
+  const form       = document.getElementById('listingForm');
 
+  // ——— Load & Display Listings ———
   async function loadListings() {
     listingsEl.innerHTML = 'Loading…';
     const cat = categoryEl.value;
     try {
-      const q    = db.collection('listings')
-                     .where('category','==',cat)
-                     .orderBy('createdAt','desc')
-                     .limit(20);
-      const snap = await q.get();
+      const snap = await db.collection('listings')
+        .where('category','==',cat)
+        .orderBy('createdAt','desc')
+        .limit(20)
+        .get();
+
       if (snap.empty) {
         listingsEl.innerHTML = '<p style="text-align:center;color:#9CA3AF">No listings available</p>';
         return;
       }
+
       listingsEl.innerHTML = '';
       snap.forEach(doc => {
         const item = doc.data();
@@ -192,12 +213,6 @@
         h.textContent = title;
         c.appendChild(h);
 
-        if (item.companyName) {
-          const sub = document.createElement('p');
-          sub.className = 'listing-sub';
-          sub.textContent = item.companyName;
-          c.appendChild(sub);
-        }
         if (item.city || item.state) {
           const loc = document.createElement('p');
           loc.className = 'listing-loc';
@@ -205,9 +220,17 @@
           c.appendChild(loc);
         }
 
+        // optionally show description snippet
+        if (item.description) {
+          const desc = document.createElement('p');
+          desc.textContent = item.description.slice(0, 100) + (item.description.length>100?'…':'');
+          c.appendChild(desc);
+        }
+
         card.appendChild(c);
         listingsEl.appendChild(card);
       });
+
     } catch (err) {
       console.error(err);
       listingsEl.innerHTML = '<p style="color:red;text-align:center">Failed to load listings.</p>';
@@ -218,20 +241,52 @@
   categoryEl.addEventListener('change', loadListings);
   loadListings();
 
-  // Modal open/close
+  // ——— Modal open/close ———
   addBtn.addEventListener('click', () => modal.classList.add('active'));
   cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
 
-  // Handle new listing submission
+  // ——— Handle form submit ———
   form.addEventListener('submit', async e => {
     e.preventDefault();
+
+    // gather values
+    const category    = document.getElementById('newCategory').value;
+    const title       = document.getElementById('newTitle').value.trim();
+    const city        = document.getElementById('newCity').value.trim();
+    const state       = document.getElementById('newState').value.trim();
+    const description = document.getElementById('newDescription').value.trim();
+    const files       = Array.from(document.getElementById('newImages').files || []);
+
+    if (files.length > 7) {
+      return alert('You can upload up to 7 images only.');
+    }
+
+    // upload each file to Storage
+    const uploadPromises = files.map((file, i) => {
+      const ref = storage.ref().child(`listingImages/${Date.now()}_${i}_${file.name}`);
+      return ref.put(file).then(snapshot => snapshot.ref.getDownloadURL());
+    });
+
+    let imageURLs = [];
+    try {
+      imageURLs = await Promise.all(uploadPromises);
+    } catch (uploadErr) {
+      console.error('Image upload failed', uploadErr);
+      return alert('Failed to upload images.');
+    }
+
+    // build Firestore data
     const newData = {
-      category:  document.getElementById('newCategory').value,
-      title:     document.getElementById('newTitle').value.trim(),
-      city:      document.getElementById('newCity').value.trim(),
-      state:     document.getElementById('newState').value.trim(),
+      category,
+      title,
+      city,
+      state,
+      description,
+      images: imageURLs,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
+
+    // write to Firestore
     try {
       await db.collection('listings').add(newData);
       form.reset();
