@@ -103,7 +103,7 @@
   </header>
 
   <main>
-    <div class="admin-area">
+    <div class="admin-area" id="adminArea">
       <button class="admin-login-btn" onclick="loginAdmin()">
         Admin Login
       </button>
@@ -146,6 +146,28 @@
       return e.endsWith('@readysetfly.us') || allowedSpecific.includes(e);
     }
 
+    function setCurrentUser(email) {
+      localStorage.setItem('currentAdmin', email.toLowerCase());
+    }
+
+    function getCurrentUser() {
+      return localStorage.getItem('currentAdmin');
+    }
+
+    function clearCurrentUser() {
+      localStorage.removeItem('currentAdmin');
+    }
+
+    // On load, if someone is already logged in, skip straight to dashboard
+    window.addEventListener('DOMContentLoaded', () => {
+      const current = getCurrentUser();
+      const accounts = getAccounts();
+      if (current && accounts[current]) {
+        // user already authenticated
+        window.location.href = 'admin-dashboard.html';
+      }
+    });
+
     function createAdmin() {
       const email = prompt('Enter your admin email:');
       if (!email) return;
@@ -163,6 +185,7 @@
       const accounts = getAccounts();
       accounts[email.toLowerCase()] = pass;
       saveAccounts(accounts);
+      setCurrentUser(email);
 
       alert('Account created! Redirecting to dashboard…');
       window.location.href = 'admin-dashboard.html';
@@ -184,6 +207,7 @@
 
       const pass = prompt('Enter your password:');
       if (pass === storedPass) {
+        setCurrentUser(email);
         window.location.href = 'admin-dashboard.html';
       } else {
         alert('Incorrect password.');
