@@ -7,15 +7,19 @@
   <style>
     body { font-family: sans-serif; margin:0; padding:0; background:#f3f4f6 }
     header {
-      background: url('wingtip_clouds.jpg') center/cover no-repeat;
-      height: 200px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding-bottom: 1rem;
-      color: white;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-    }
+  /* make sure the path is correct relative to this HTML file */
+  background-image: url('../../Assets/images/wingtip_clouds.jpg');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  height: 200px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 1rem;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
     header h1 { margin: 0; font-size: 2rem; }
 
     #controls {
