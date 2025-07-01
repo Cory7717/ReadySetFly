@@ -6,13 +6,14 @@
   <title>Ready Set Fly Admin</title>
   <style>
     body { 
-      font-family: sans-serif; 
+      font-family: 'Segoe UI', Roboto, sans-serif; 
       margin: 0; 
       padding: 0; 
       background: #f3f4f6; 
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+      color: #1f2937;
     }
     header {
       background: url('../../Assets/images/wingtip_clouds.jpg') center/cover no-repeat;
@@ -31,10 +32,15 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      padding: 1rem;
-      gap: 1rem;
+      padding: 2rem 1rem;
+      gap: 2rem;
+    }
+    .admin-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
     }
     .admin-login-btn {
       background-color: #1D4ED8;
@@ -45,10 +51,11 @@
       border-radius: 0.5rem;
       cursor: pointer;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      transition: background-color 0.2s ease;
+      transition: background-color 0.2s ease, transform 0.1s ease;
     }
     .admin-login-btn:hover {
       background-color: #2563EB;
+      transform: translateY(-2px);
     }
     .create-link {
       font-size: 0.9rem;
@@ -58,6 +65,24 @@
     }
     .create-link:hover {
       color: #2563EB;
+    }
+    .hero {
+      max-width: 600px;
+      text-align: center;
+      font-size: 1rem;
+      line-height: 1.6;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 0.5rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .hero h2 {
+      margin-top: 0;
+      font-size: 1.75rem;
+      color: #111827;
+    }
+    .hero p {
+      margin: 0.75rem 0 0;
     }
     footer { 
       background: #1D4ED8; 
@@ -78,11 +103,23 @@
   </header>
 
   <main>
-    <button class="admin-login-btn" onclick="loginAdmin()">
-      Admin Login
-    </button>
-    <div class="create-link" onclick="createAdmin()">
-      Create Admin Account
+    <div class="admin-area">
+      <button class="admin-login-btn" onclick="loginAdmin()">
+        Admin Login
+      </button>
+      <div class="create-link" onclick="createAdmin()">
+        Create Admin Account
+      </div>
+    </div>
+
+    <div class="hero">
+      <h2>Your gateway to the skies.</h2>
+      <p>
+        Discover top-rated aircraft rentals, connect with trusted owners,
+        and experience the new way to rent aircraft. Plus, for owners—
+        let your aircraft pay for itself by tapping into a dynamic
+        rental marketplace.
+      </p>
     </div>
   </main>
 
