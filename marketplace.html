@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Classifieds Marketplace</title>
+  <title>Aviation Marketplace</title>
   <style>
     body { font-family: sans-serif; margin:0; padding:0; background:#f3f4f6 }
     header { background:#1d4ed8; color:white; padding:1rem; text-align:center }
@@ -34,7 +34,7 @@
 </head>
 <body>
 
-  <header><h1>Classifieds Marketplace</h1></header>
+  <header><h1>Aviation Marketplace</h1></header>
 
   <div id="controls">
     <label>
@@ -61,18 +61,20 @@
       getFirestore, collection, query, orderBy, getDocs
     } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    // TODO: Replace with your Firebase config
+    // Your Firebase config from .env
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
+      authDomain: "ready-set-fly-71506.firebaseapp.com",
+      projectId: "ready-set-fly-71506",
+      storageBucket: "ready-set-fly-71506.appspot.com",
+      messagingSenderId: "64600529166",
+      appId: "1:64600529166:android:98d989ad25482d03895f5f"
     };
 
+    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db  = getFirestore(app);
+
     const listingsEl = document.getElementById("listings");
     const categoryFilter = document.getElementById("categoryFilter");
 
@@ -83,13 +85,14 @@
         collection(db, "listings"),
         orderBy("createdAt", "desc")
       );
+
       const snapshot = await getDocs(q).catch(err => {
         listingsEl.innerHTML = '<p id="error">Failed to load listings.</p>';
-        console.error(err);
+        console.error("Firestore error:", err);
       });
       if (!snapshot) return;
 
-      let docs = snapshot.docs.map(d => ({ id:d.id, ...d.data() }));
+      let docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       if (cat) docs = docs.filter(d => d.category === cat);
 
       if (docs.length === 0) {
@@ -98,26 +101,22 @@
       }
 
       docs.forEach(item => {
-        // decide title
         let title = item.category === "Aviation Jobs"
           ? (item.jobTitle || "Job")
           : (item.title || item.flightSchoolDetails?.flightSchoolName || item.firstName + " " + item.lastName || "Listing");
 
-        // determine subtitle
         let subtitle = item.category === "Aviation Jobs"
           ? (item.companyName || "")
-          : `${item.city||""}${item.state? ", "+item.state : ""}`;
+          : `${item.city || ""}${item.state ? ", " + item.state : ""}`;
 
-        // image
         const imgUrl = Array.isArray(item.images) ? item.images[0] : item.images;
         const imgHtml = imgUrl
           ? `<img src="${imgUrl}" alt="listing image">`
           : `<div class="placeholder">No Image</div>`;
 
-        // price/footer
         let footer = "";
         if (item.category === "Aircraft for Sale") {
-          footer = `$${Number(item.salePrice||0).toLocaleString()}`;
+          footer = `$${Number(item.salePrice || 0).toLocaleString()}`;
         } else if (item.packageType === "Basic") {
           footer = "Free for 7 days";
         }
