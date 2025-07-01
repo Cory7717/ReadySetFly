@@ -323,7 +323,7 @@
       const current = localStorage.getItem(SESSION_KEY);
       const accounts = getAccounts();
       if (current && accounts[current] && isSessionValid()) {
-        window.location.href = "admin/admin-dashboard.html";
+        window.location.href = "admin-dashboard.html";
       } else {
         clearCurrentUser();
       }
@@ -366,7 +366,7 @@
       }
 
       setCurrentUser(email);
-      window.location.href = "admin/admin-dashboard.html";
+      window.location.href = "admin-dashboard.html";
     }
 
     function submitCreate() {
@@ -387,7 +387,7 @@
 
       setCurrentUser(email);
       alert("Account created—redirecting to dashboard.");
-      window.location.href = "admin/admin-dashboard.html";
+      window.location.href = "admin-dashboard.html";
     }
 
     function viewRentals() {
