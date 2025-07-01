@@ -48,7 +48,10 @@
       box-shadow:0 2px 6px rgba(0,0,0,0.1);
       display:flex;
       flex-direction:column;
+      cursor: pointer;
+      transition: transform 0.1s;
     }
+    .card:hover { transform: translateY(-2px); }
     .card img { width:100%; height:180px; object-fit:cover }
     .badge {
       position:absolute; top:8px; left:8px;
@@ -64,12 +67,53 @@
       display:flex; align-items:center; justify-content:center; color:#a0aec0
     }
     #empty, #error { grid-column:1/-1; text-align:center; color:#718096 }
+
+    /* Modal Styles */
+    #modalBackdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal {
+      background: white;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 90%;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      animation: fadeIn 0.2s ease-out;
+    }
+    #modal header {
+      padding: 1rem;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #modal header h2 { margin: 0; font-size: 1.5rem; }
+    #modal .close-btn {
+      background: transparent;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    #modal .body {
+      padding: 1rem;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>Aviation Marketplace</h1>
+    <h1>Ready Set Fly Marketplace</h1>
   </header>
 
   <div id="controls">
@@ -95,6 +139,17 @@
     <!-- cards injected here -->
   </div>
 
+  <!-- Modal Markup -->
+  <div id="modalBackdrop">
+    <div id="modal">
+      <header>
+        <h2 id="modalTitle"></h2>
+        <button class="close-btn" id="closeModal">×</button>
+      </header>
+      <div class="body" id="modalBody"></div>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import {
@@ -116,6 +171,17 @@
     const categoryFilter = document.getElementById("categoryFilter");
     const searchInput    = document.getElementById("searchInput");
 
+    // Modal elements
+    const backdrop   = document.getElementById('modalBackdrop');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody  = document.getElementById('modalBody');
+    const closeModal = document.getElementById('closeModal');
+
+    closeModal.addEventListener('click', () => backdrop.style.display = 'none');
+    backdrop.addEventListener('click', e => {
+      if (e.target === backdrop) backdrop.style.display = 'none';
+    });
+
     async function loadListings() {
       listingsEl.innerHTML = "";
       const cat  = categoryFilter.value.trim().toLowerCase();
@@ -133,23 +199,14 @@
 
       let docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // === apply filters ===
-      if (cat) {
-        docs = docs.filter(d => (d.category || "").toLowerCase() === cat);
-      }
-      if (term) {
-        docs = docs.filter(d => {
-          const title = (
-            d.title ||
-            d.jobTitle ||
-            d.flightSchoolDetails?.flightSchoolName ||
-            `${d.firstName || ""} ${d.lastName || ""}`
-          ).toLowerCase();
-          const city  = (d.city || "").toLowerCase();
-          const state = (d.state || "").toLowerCase();
-          return title.includes(term) || city.includes(term) || state.includes(term);
-        });
-      }
+      // apply filters
+      if (cat)  docs = docs.filter(d => (d.category || '').toLowerCase() === cat);
+      if (term) docs = docs.filter(d => {
+        const title = ((d.title || d.jobTitle || d.flightSchoolDetails?.flightSchoolName) + '').toLowerCase();
+        const city  = (d.city || '').toLowerCase();
+        const state = (d.state || '').toLowerCase();
+        return title.includes(term) || city.includes(term) || state.includes(term);
+      });
 
       if (docs.length === 0) {
         listingsEl.innerHTML = '<p id="empty">No listings match your filters.</p>';
@@ -157,48 +214,60 @@
       }
 
       docs.forEach(item => {
-        const title = item.category === "Aviation Jobs"
-          ? (item.jobTitle || "Job")
-          : (item.title || item.flightSchoolDetails?.flightSchoolName || `${item.firstName || ""} ${item.lastName || ""}` || "Listing");
-
-        const subtitle = item.category === "Aviation Jobs"
-          ? (item.companyName || "")
-          : `${item.city || ""}${item.state ? ", " + item.state : ""}`;
-
-        const imgUrl = Array.isArray(item.images) ? item.images[0] : item.images;
-        const imgHtml = imgUrl
-          ? `<img src="${imgUrl}" alt="listing image">`
-          : `<div class="placeholder">No Image</div>`;
-
-        let footerText = "";
-        if (item.category === "Aircraft for Sale") {
-          footerText = `$${Number(item.salePrice || 0).toLocaleString()}`;
-        } else if (item.packageType === "Basic") {
-          footerText = "Free for 7 days";
-        }
-
         const card = document.createElement("div");
         card.className = "card";
-        card.innerHTML = `
-          <div style="position:relative">
-            ${imgHtml}
-            <div class="badge">${item.category}</div>
-          </div>
-          <div class="content">
-            <div class="title">${title}</div>
-            <div class="subtitle">${subtitle}</div>
-            ${footerText ? `<div class="footer">${footerText}</div>` : ""}
-          </div>
-        `;
+        card.innerHTML = getCardInnerHTML(item);
+        card.addEventListener('click', () => openModal(item));
         listingsEl.append(card);
       });
     }
 
-    // re-load on filter change
+    function getCardInnerHTML(item) {
+      const imgUrl = Array.isArray(item.images) ? item.images[0] : item.images;
+      const imgHtml = imgUrl
+        ? `<img src="${imgUrl}" alt="listing image">`
+        : `<div class="placeholder">No Image</div>`;
+
+      const title = item.category === "Aviation Jobs"
+        ? (item.jobTitle || "Job")
+        : (item.title || item.flightSchoolDetails?.flightSchoolName || `${item.firstName || ''} ${item.lastName || ''}`);
+
+      const subtitle = item.category === "Aviation Jobs"
+        ? (item.companyName || "")
+        : `${item.city || ''}${item.state ? ', ' + item.state : ''}`;
+
+      let footer = '';
+      if (item.category === 'Aircraft for Sale') footer = `<div class="footer">$${Number(item.salePrice||0).toLocaleString()}</div>`;
+      else if (item.packageType === 'Basic') footer = `<div class="footer">Free for 7 days</div>`;
+
+      return `
+        <div style="position:relative">
+          ${imgHtml}
+          <div class="badge">${item.category}</div>
+        </div>
+        <div class="content">
+          <div class="title">${title}</div>
+          <div class="subtitle">${subtitle}</div>
+          ${footer}
+        </div>
+      `;
+    }
+
+    function openModal(item) {
+      modalTitle.textContent = item.title || item.jobTitle || 'Listing';
+      // build detail view
+      modalBody.innerHTML = `
+        <p><strong>Category:</strong> ${item.category}</p>
+        <p><strong>Location:</strong> ${item.city || ''}${item.state ? ', ' + item.state : ''}</p>
+        ${item.description ? `<p>${item.description}</p>` : ''}
+        ${item.images && item.images.length ? item.images.map(url => `<img src="${url}" style="width:100%; margin-top:8px;"/>`).join('') : ''}
+      `;
+      backdrop.style.display = 'flex';
+    }
+
     categoryFilter.addEventListener("change", loadListings);
     searchInput.addEventListener("input", loadListings);
 
-    // initial load
     loadListings();
   </script>
 </body>
