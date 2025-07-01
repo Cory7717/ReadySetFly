@@ -6,8 +6,35 @@
   <title>Aviation Marketplace</title>
   <style>
     body { font-family: sans-serif; margin:0; padding:0; background:#f3f4f6 }
-    header { background:#1d4ed8; color:white; padding:1rem; text-align:center }
-    #controls { padding:1rem; display:flex; justify-content:center; gap:1rem }
+    header {
+      background: url('wingtip_clouds.jpg') center/cover no-repeat;
+      height: 200px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 1rem;
+      color: white;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    header h1 { margin: 0; font-size: 2rem; }
+
+    #controls {
+      padding:1rem;
+      display:flex;
+      justify-content:center;
+      gap:1rem;
+      flex-wrap: wrap;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    #controls input,
+    #controls select {
+      padding: 0.5rem;
+      font-size: 1rem;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+    }
+
     #listings {
       display:grid;
       grid-template-columns:repeat(auto-fill, minmax(300px,1fr));
@@ -15,8 +42,12 @@
       padding:1rem;
     }
     .card {
-      background:white; border-radius:8px; overflow:hidden;
-      box-shadow:0 2px 6px rgba(0,0,0,0.1); display:flex; flex-direction:column;
+      background:white;
+      border-radius:8px;
+      overflow:hidden;
+      box-shadow:0 2px 6px rgba(0,0,0,0.1);
+      display:flex;
+      flex-direction:column;
     }
     .card img { width:100%; height:180px; object-fit:cover }
     .badge {
@@ -28,15 +59,24 @@
     .title { font-size:1.1rem; font-weight:bold; margin:0.25rem 0 }
     .subtitle { font-size:0.9rem; color:#4a5568; margin-bottom:0.5rem }
     .footer { margin-top:auto; font-size:0.9rem; font-weight:bold }
-    .placeholder { background:#e2e8f0; width:100%; height:180px; display:flex; align-items:center; justify-content:center; color:#a0aec0 }
+    .placeholder {
+      background:#e2e8f0; width:100%; height:180px;
+      display:flex; align-items:center; justify-content:center; color:#a0aec0
+    }
     #empty, #error { grid-column:1/-1; text-align:center; color:#718096 }
   </style>
 </head>
 <body>
 
-  <header><h1>Aviation Marketplace</h1></header>
+  <header>
+    <h1>Aviation Marketplace</h1>
+  </header>
 
   <div id="controls">
+    <label>
+      Search:
+      <input type="text" id="searchInput" placeholder="e.g. Cessna, Dallas…">
+    </label>
     <label>
       Category:
       <select id="categoryFilter">
@@ -61,7 +101,6 @@
       getFirestore, collection, query, orderBy, getDocs
     } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    // Your Firebase config from .env
     const firebaseConfig = {
       apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
       authDomain: "ready-set-fly-71506.firebaseapp.com",
@@ -70,22 +109,22 @@
       messagingSenderId: "64600529166",
       appId: "1:64600529166:android:98d989ad25482d03895f5f"
     };
-
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db  = getFirestore(app);
 
-    const listingsEl = document.getElementById("listings");
+    const listingsEl     = document.getElementById("listings");
     const categoryFilter = document.getElementById("categoryFilter");
+    const searchInput    = document.getElementById("searchInput");
 
     async function loadListings() {
-      listingsEl.innerHTML = ""; 
-      const cat = categoryFilter.value;
+      listingsEl.innerHTML = "";
+      const cat  = categoryFilter.value.trim().toLowerCase();
+      const term = searchInput.value.trim().toLowerCase();
+
       let q = query(
         collection(db, "listings"),
         orderBy("createdAt", "desc")
       );
-
       const snapshot = await getDocs(q).catch(err => {
         listingsEl.innerHTML = '<p id="error">Failed to load listings.</p>';
         console.error("Firestore error:", err);
@@ -93,19 +132,36 @@
       if (!snapshot) return;
 
       let docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (cat) docs = docs.filter(d => d.category === cat);
+
+      // === apply filters ===
+      if (cat) {
+        docs = docs.filter(d => (d.category || "").toLowerCase() === cat);
+      }
+      if (term) {
+        docs = docs.filter(d => {
+          const title = (
+            d.title ||
+            d.jobTitle ||
+            d.flightSchoolDetails?.flightSchoolName ||
+            `${d.firstName || ""} ${d.lastName || ""}`
+          ).toLowerCase();
+          const city  = (d.city || "").toLowerCase();
+          const state = (d.state || "").toLowerCase();
+          return title.includes(term) || city.includes(term) || state.includes(term);
+        });
+      }
 
       if (docs.length === 0) {
-        listingsEl.innerHTML = '<p id="empty">No listings available</p>';
+        listingsEl.innerHTML = '<p id="empty">No listings match your filters.</p>';
         return;
       }
 
       docs.forEach(item => {
-        let title = item.category === "Aviation Jobs"
+        const title = item.category === "Aviation Jobs"
           ? (item.jobTitle || "Job")
-          : (item.title || item.flightSchoolDetails?.flightSchoolName || item.firstName + " " + item.lastName || "Listing");
+          : (item.title || item.flightSchoolDetails?.flightSchoolName || `${item.firstName || ""} ${item.lastName || ""}` || "Listing");
 
-        let subtitle = item.category === "Aviation Jobs"
+        const subtitle = item.category === "Aviation Jobs"
           ? (item.companyName || "")
           : `${item.city || ""}${item.state ? ", " + item.state : ""}`;
 
@@ -114,11 +170,11 @@
           ? `<img src="${imgUrl}" alt="listing image">`
           : `<div class="placeholder">No Image</div>`;
 
-        let footer = "";
+        let footerText = "";
         if (item.category === "Aircraft for Sale") {
-          footer = `$${Number(item.salePrice || 0).toLocaleString()}`;
+          footerText = `$${Number(item.salePrice || 0).toLocaleString()}`;
         } else if (item.packageType === "Basic") {
-          footer = "Free for 7 days";
+          footerText = "Free for 7 days";
         }
 
         const card = document.createElement("div");
@@ -131,14 +187,18 @@
           <div class="content">
             <div class="title">${title}</div>
             <div class="subtitle">${subtitle}</div>
-            ${footer ? `<div class="footer">${footer}</div>` : ""}
+            ${footerText ? `<div class="footer">${footerText}</div>` : ""}
           </div>
         `;
         listingsEl.append(card);
       });
     }
 
+    // re-load on filter change
     categoryFilter.addEventListener("change", loadListings);
+    searchInput.addEventListener("input", loadListings);
+
+    // initial load
     loadListings();
   </script>
 </body>
