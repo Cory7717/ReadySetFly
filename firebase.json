@@ -3,12 +3,6 @@
     {
       "source": "backend",
       "codebase": "default",
-      "env": {
-        "SMTP_HOST": "smtp.gmail.com",
-        "SMTP_PORT": "465",
-        "SMTP_USER": "coryarmer@gmail.com",
-        "SMTP_PASS": "mpwibhvjliumpdnr"
-      },
       "ignore": [
         "node_modules",
         ".git",

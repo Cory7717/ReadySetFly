@@ -32,28 +32,36 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      align-items: center;
       padding: 2rem 1rem;
       gap: 2rem;
     }
-    .admin-area {
+    /* New button row container */
+    .button-row {
+      width: 100%;
       display: flex;
-      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .admin-area,
+    .view-area {
+      display: flex;
       align-items: center;
       gap: 0.5rem;
     }
-    .admin-login-btn {
+    /* Shared button styling */
+    .btn {
       background-color: #1D4ED8;
       color: white;
       border: none;
-      padding: 1rem 2rem;
-      font-size: 1.25rem;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
       border-radius: 0.5rem;
       cursor: pointer;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       transition: background-color 0.2s ease, transform 0.1s ease;
     }
-    .admin-login-btn:hover {
+    .btn:hover {
       background-color: #2563EB;
       transform: translateY(-2px);
     }
@@ -68,6 +76,7 @@
     }
     .hero {
       max-width: 600px;
+      margin: 0 auto;
       text-align: center;
       font-size: 1rem;
       line-height: 1.6;
@@ -103,12 +112,25 @@
   </header>
 
   <main>
-    <div class="admin-area" id="adminArea">
-      <button class="admin-login-btn" onclick="loginAdmin()">
-        Admin Login
-      </button>
-      <div class="create-link" onclick="createAdmin()">
-        Create Admin Account
+    <div class="button-row">
+      <!-- Left: existing admin controls -->
+      <div class="admin-area" id="adminArea">
+        <button class="btn" onclick="loginAdmin()">
+          Admin Login
+        </button>
+        <div class="create-link" onclick="createAdmin()">
+          Create Admin Account
+        </div>
+      </div>
+
+      <!-- Right: new view buttons -->
+      <div class="view-area">
+        <button class="btn" onclick="viewRentals()">
+          View Rentals
+        </button>
+        <button class="btn" onclick="viewMarketplace()">
+          View Marketplace
+        </button>
       </div>
     </div>
 
@@ -116,7 +138,7 @@
       <h2>Your gateway to the skies.</h2>
       <p>
         Discover top-rated aircraft rentals, connect with trusted owners,
-        and experience the new way to rent aircraft. Plus, for owners—
+        and experience the new way to rent aircraft. Plus, for owners— 
         let your aircraft pay for itself by tapping into a dynamic
         rental marketplace.
       </p>
@@ -127,7 +149,7 @@
     &copy; 2025 Ready Set Fly, LLC
   </footer>
 
-   <script>
+  <script>
     const allowedSpecific = [
       'coryarmer@gmail.com',
       'bentley.amy24@gmail.com'
@@ -164,7 +186,6 @@
       localStorage.removeItem('loginTimestamp');
     }
 
-    // Returns true if login was within the last 7 days
     function isSessionValid() {
       const ts = getLoginTimestamp();
       if (!ts) return false;
@@ -172,17 +193,13 @@
       return (Date.now() - ts) < sevenDaysMs;
     }
 
-    // On load, if someone is already logged in and still valid, skip to dashboard
     window.addEventListener('DOMContentLoaded', () => {
       const current = getCurrentUser();
       const accounts = getAccounts();
-      if (current && accounts[current]) {
-        if (isSessionValid()) {
-          window.location.href = 'admin-dashboard.html';
-        } else {
-          // session expired
-          clearCurrentUser();
-        }
+      if (current && accounts[current] && isSessionValid()) {
+        window.location.href = 'admin-dashboard.html';
+      } else {
+        clearCurrentUser();
       }
     });
 
@@ -213,7 +230,6 @@
       const current = getCurrentUser();
       const accounts = getAccounts();
 
-      // If already logged in & session valid, go straight to dashboard
       if (current && accounts[current] && isSessionValid()) {
         return window.location.href = 'admin-dashboard.html';
       }
@@ -236,6 +252,14 @@
       } else {
         alert('Incorrect password.');
       }
+    }
+
+    // Stubs for new buttons
+    function viewRentals() {
+      window.location.href = 'rentals.html';
+    }
+    function viewMarketplace() {
+      window.location.href = 'marketplace.html';
     }
   </script>
 </body>

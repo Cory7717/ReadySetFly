@@ -1,4 +1,4 @@
-require("dotenv").config();
+// require("dotenv").config();
 
 // const functions = require('firebase‑functions');
 
@@ -39,12 +39,20 @@ if (!admin.logger) {
 // =====================
 // Configuration Constants
 // =====================
+// =====================
+// Configuration Constants
+// =====================
 const ALLOWED_PACKAGES = ["Basic", "Featured", "Enhanced", "Charter Services"]; // Note: 'FreeTrial' is handled separately.
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripe = Stripe(stripeSecretKey);
-const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-const MODERATOR_EMAIL = process.env.MODERATOR_EMAIL;
-admin.logger.info("🔑  Stripe initialized.");
+
+// Step 4: Load Stripe & moderator secrets via Firebase Functions v2 params
+const STRIPE_SECRET_KEY      = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_WEBHOOK_SECRET  = defineSecret('STRIPE_WEBHOOK_SECRET');
+const MODERATOR_EMAIL_SECRET = defineSecret('MODERATOR_EMAIL');
+
+// Initialize Stripe and moderator email at runtime
+// REMOVE this block-scoped initialization to avoid redeclaration error.
+// Stripe and related secrets are initialized in initStripeAndEmail().
+
 
 // =====================
 // Email (Nodemailer) setup            // <-- NEW block
@@ -117,6 +125,19 @@ const ALLOWED_ORIGINS = [
 // =====================
 const app = express();
 
+// right after you create `const app = express();`
+app.use(async (req, res, next) => {
+  try {
+    await initStripeAndEmail();
+    await initTransporter();      // also ensure your mailer is ready
+    next();
+  } catch (err) {
+    // if you really need, you can log but still continue
+    console.error("Failed to init secrets:", err);
+    next();
+  }
+});
+
 // CORS middleware
 app.use(
   cors({
@@ -132,6 +153,33 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+let stripe;
+let stripeWebhookSecret;
+let moderatorEmail;
+
+// only run once per cold start
+async function initStripeAndEmail() {
+  if (stripe) return;  
+
+  // grab all your secrets in parallel
+  const [
+    stripeKey,
+    webhookSecret,
+    modEmail,
+  ] = await Promise.all([
+    STRIPE_SECRET_KEY.value(),
+    STRIPE_WEBHOOK_SECRET.value(),
+    MODERATOR_EMAIL_SECRET.value(),
+  ]);
+
+  stripe            = new Stripe(stripeKey);
+  stripeWebhookSecret = webhookSecret;
+  moderatorEmail    = modEmail;
+
+  // optionally log
+  admin.logger.info("🔑 Stripe & moderator-email ready.");
+}
 
 /**
  * ===============================
@@ -371,17 +419,6 @@ const authenticate = async (req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use((req, res, next) => {
-  if (req.path === '/') {
-    return next();           // immediately serve “OK”
-  }
-  initTransporter()
-    .then(() => next())
-    .catch(err => {
-      console.error("SMTP init failed:", err);
-      next();
-    });
-});
 
 // ───────────────────────────────────────────────────
 // Stripe Admin: Search Customers/Accounts
@@ -501,7 +538,7 @@ const sendReportEmail = async ({ listingId, reporterId, reason, comments }) => {
 
     await transporter.sendMail({
       from: `"RSF Alert" <${fromAddr}>`,
-      to: MODERATOR_EMAIL,
+      to: moderatorEmail,
       subject: `⚑ Listing ${listingId} reported`,
       html: `
         <h2>Listing report received</h2>
@@ -2234,8 +2271,8 @@ app.use((req, res, next) => {
 exports.api = onRequest(
   {
     memory: "512Mi",
-    timeoutSeconds: 60,
-    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+    timeoutSeconds: 120,
+    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MODERATOR_EMAIL_SECRET],
   },
   app
 );
