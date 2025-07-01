@@ -149,6 +149,69 @@ const migrateAirplanesFields = async () => {
 };
 
 /**
+ * Fetch live + YTD balances from Stripe and write into each user doc.
+ */
+const migrateStripeBalances = async () => {
+  console.log('🔄 Starting migration of Stripe balances into users...');
+  try {
+    const usersSnap = await db.collection('users').where('stripeAccountId', '!=', null).get();
+    if (usersSnap.empty) {
+      console.log('ℹ️ No users with stripeAccountId found.');
+      return;
+    }
+
+    let updatedCount = 0;
+    for (const userDoc of usersSnap.docs) {
+      const { stripeAccountId } = userDoc.data();
+      if (!stripeAccountId) continue;
+
+      // 1) live balance
+      const bal = await stripe.balance.retrieve({ stripeAccount: stripeAccountId });
+      const availableAmount = bal.available.reduce((sum, b) => sum + b.amount, 0);
+
+      // 2) YTD: sum all balance transactions since Jan 1
+      const startOfYear = Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
+      let ytdAmount = 0;
+      // paginate if needed
+      let hasMore = true, lastId = null;
+      while (hasMore) {
+        const params = {
+          limit: 100,
+          created: { gte: startOfYear },
+          stripeAccount: stripeAccountId,
+        };
+        if (lastId) params.starting_after = lastId;
+
+        const tx = await stripe.balanceTransactions.list(params);
+        for (const item of tx.data) ytdAmount += item.amount;
+        if (tx.has_more) {
+          lastId = tx.data[tx.data.length - 1].id;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      // 3) pull totalWithdrawn from existing Firestore if you want to preserve history:
+      const existing = userDoc.data().totalWithdrawn ?? 0;
+
+      await userDoc.ref.set({
+        availableBalance: availableAmount,
+        ytdBalance: ytdAmount,
+        totalWithdrawn: existing
+      }, { merge: true });
+
+      updatedCount++;
+      console.log(`✅ [${userDoc.id}] wrote available=${availableAmount}, ytd=${ytdAmount}`);
+    }
+
+    console.log(`🎉 Done migrating Stripe balances for ${updatedCount} user(s).`);
+  } catch (err) {
+    console.error('❌ Error in migrateStripeBalances:', err);
+  }
+};
+
+
+/**
  * Migrate and validate the 'rentalRequestId' field in the 'rentalRequests' subcollections within 'owners'.
  */
 const migrateRentalRequestIds = async () => {

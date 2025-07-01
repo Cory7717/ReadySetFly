@@ -1061,58 +1061,57 @@ const Classifieds = () => {
     }
   };
 
-  // ───────────────────────────────────────────────────────────
-  // NEW: Flag / Report a listing
-  // ───────────────────────────────────────────────────────────
-  const handleReportListing = (listing) => {
-    Alert.alert(
-      "Report listing",
-      "Flag this listing as spam or fraudulent? A moderator will be notified and reports are sent to coryarmer@gmail.com.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Report",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const token = await getFirebaseIdToken();
-              const res = await fetch(`${API_URL}/reportListing`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ listingId: listing.id }),
-              });
-              if (!res.ok) throw new Error("Report failed");
-  
-              const { reportCount, suspended } = await res.json();
-  
-              setListings((prev) =>
-                prev.map((l) =>
-                  l.id === listing.id
-                    ? { ...l, reportCount, status: suspended ? "suspended" : l.status }
-                    : l
-                )
+  // Drop-in replacement for handleReportListing in classifieds.js
+const handleReportListing = (listing) => {
+  Alert.alert(
+    "Report listing",
+    "Flag this listing as spam or fraudulent? A moderator will be notified and reports are sent to support@readysetfly.us.",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Report",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const token = await getFirebaseIdToken();
+            const res = await fetch(`${API_URL}/reportListing`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                listingId: listing.id,
+                reason: "Spam",    // ← required field
+                comments: ""       // ← optional
+              }),
+            });
+            if (!res.ok) throw new Error("Report failed");
+            const { reportCount, suspended } = await res.json();
+            setListings((prev) =>
+              prev.map((l) =>
+                l.id === listing.id
+                  ? { ...l, reportCount, status: suspended ? "suspended" : l.status }
+                  : l
+              )
+            );
+            if (suspended) {
+              Alert.alert(
+                "Listing Suspended",
+                "This listing has reached 5 reports and has been auto-suspended pending review."
               );
-  
-              if (suspended) {
-                Alert.alert(
-                  "Listing Suspended",
-                  "This listing has reached 5 reports and has been auto-suspended pending review."
-                );
-              } else {
-                Alert.alert("Thank you", "The listing was reported.");
-              }
-            } catch (err) {
-              console.error("Reporting failed:", err);
-              Alert.alert("Error", "Could not send report.");
+            } else {
+              Alert.alert("Thank you", "The listing was reported.");
             }
-          },
+          } catch (err) {
+            console.error("Reporting failed:", err);
+            Alert.alert("Error", "Could not send report.");
+          }
         },
-      ]
-    );
-  };    
+      },
+    ]
+  );
+};   
 
   // Updated: Removed the old handleContactUs – now the "Information about Broker Services" button will open the broker modal.
   const handleDeleteListing = (listingId) => {
@@ -2015,7 +2014,7 @@ const Classifieds = () => {
                 const subject = encodeURIComponent(
                   "Information About Broker Services"
                 );
-                const mailtoUrl = `mailto:coryarmer@gmail.com?subject=${subject}`;
+                const mailtoUrl = `mailto:sales@readysetfly.us?subject=${subject}`;
                 Linking.openURL(mailtoUrl).catch((error) => {
                   console.error("Error opening mail app:", error);
                   Alert.alert("Error", "Unable to open mail app.");

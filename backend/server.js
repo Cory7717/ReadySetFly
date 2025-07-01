@@ -111,11 +111,13 @@ const ALLOWED_ORIGINS = [
 // =====================
 // Initialize Express App
 // =====================
+
+// =====================
+// Initialize Express App
+// =====================
 const app = express();
 
-const helmet    = require('helmet');
-const rateLimit = require('express-rate-limit');
-
+// CORS middleware
 app.use(
   cors({
     origin: (incomingOrigin, callback) => {
@@ -406,20 +408,20 @@ const sendNotification = async (tokens, title, body, data = {}) => {
   }
 };
 
-/**
- * Send an email to the moderators when a listing is reported      // <-- NEW helper
- */
+// Replace your existing sendReportEmail with this:
+
 const sendReportEmail = async ({ listingId, reporterId, reason, comments }) => {
-  // don’t even try to send if SMTP transporter wasn’t initialized
+  // Ensure transporter has been initialized
+  await initTransporter();
   if (!transporter) {
     admin.logger.warn("SMTP transporter not initialized – skipping report email.");
     return;
   }
 
-  // grab your SMTP_USER secret for the “from” address
-  const fromAddr = await SMTP_USER.value();
-
   try {
+    // grab your SMTP_USER secret for the “from” address
+    const fromAddr = await SMTP_USER.value();
+
     await transporter.sendMail({
       from: `"RSF Alert" <${fromAddr}>`,
       to: MODERATOR_EMAIL,
@@ -432,6 +434,7 @@ const sendReportEmail = async ({ listingId, reporterId, reason, comments }) => {
         <p><strong>Comments:</strong> ${comments || "(none)"}</p>
       `,
     });
+
     admin.logger.info(`Report email for ${listingId} sent.`);
   } catch (err) {
     admin.logger.error("sendReportEmail error:", err);
@@ -1488,56 +1491,78 @@ app.post("/retrieve-connected-account", authenticate, async (req, res) => {
 });
 
 // ===================================================================
-// Get Stripe Balance Endpoint (now returns pendingAmount AND ytdAmount)
-// ===================================================================
+// Drop-in replacement for the existing /get-stripe-balance endpoint.
+// Keeps availableAmount and pendingAmount logic, replaces YTD calculation
+// with a Firestore sum over your payments subcollection.
+
 app.get("/get-stripe-balance", authenticate, async (req, res) => {
   try {
     // 1) Load the owner’s Firestore record
-    const ownerDoc = await db.collection("users").doc(req.user.uid).get();
-    if (!ownerDoc.exists) {
+    const ownerSnapshot = await db.collection("users").doc(req.user.uid).get();
+    if (!ownerSnapshot.exists) {
       return res.status(404).json({ error: "Owner not found" });
     }
-    const ownerData = ownerDoc.data();
-    if (!ownerData.stripeAccountId) {
+    const { stripeAccountId: accountId } = ownerSnapshot.data();
+    if (!accountId) {
       return res.status(400).json({ error: "Stripe account not connected" });
     }
-    const accountId = ownerData.stripeAccountId;
 
-    // 2) Retrieve the connected account’s current balance
+    // 2) Retrieve the connected account’s current balance from Stripe
     const balance = await stripe.balance.retrieve(
       {},
       { stripeAccount: accountId }
     );
-    // Sum up pending
-    let pendingAmount = 0;
-    if (Array.isArray(balance.pending)) {
-      for (const p of balance.pending) {
-        pendingAmount += p.amount;
-      }
+
+    // Sum up the “available” balance
+    let availableAmount = 0;
+    for (const a of balance.available || []) {
+      availableAmount += a.amount;
     }
 
-    // 3) Calculate Year‑to‑Date earnings by listing all balance transactions since Jan 1
-    // ── 3) Calculate Year-to-Date earnings from Firestore “payments” ────────────
-    const startOfYearTs = admin.firestore.Timestamp.fromDate(
+    // Sum up the “pending” balance
+    let pendingAmount = 0;
+    for (const p of balance.pending || []) {
+      pendingAmount += p.amount;
+    }
+
+    // ——————————————————————————————
+    // 3) Year-to-Date gross volume: sum all payments recorded in Firestore
+    // ——————————————————————————————
+    const startOfYear = admin.firestore.Timestamp.fromDate(
       new Date(new Date().getFullYear(), 0, 1)
     );
     const paymentsSnap = await db
       .collection("users")
       .doc(req.user.uid)
       .collection("payments")
-      .where("createdAt", ">=", startOfYearTs)
+      .where("createdAt", ">=", startOfYear)
       .get();
 
     let ytdAmount = 0;
-    paymentsSnap.forEach((doc) => {
-      const { netAmount = 0 } = doc.data();
-      ytdAmount += netAmount;
+    paymentsSnap.forEach(doc => {
+      const { netAmount } = doc.data();
+      if (typeof netAmount === "number") {
+        ytdAmount += netAmount;
+      }
     });
 
-    // ── 4) Return both values (in cents) ─────────────────────────────────────────
-    return res.status(200).json({ pendingAmount, ytdAmount });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
+    // 4) Send back all three figures (in cents)
+    return res.status(200).json({
+      availableAmount,
+      pendingAmount,
+      ytdAmount,
+    });
+  } catch (err) {
+    console.error("Error in /get-stripe-balance:", err);
+    if (
+      err.type === "StripeInvalidRequestError" &&
+      err.message.includes("does not have access")
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Connected account not linked to this platform." });
+    }
+    return res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 });
 

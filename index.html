@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Aviation Marketplace</title>
+  <style>
+    body { font-family: sans-serif; margin:0; padding:0; background:#f3f4f6 }
+    header, footer { background:#1D4ED8; color:white; padding:1rem; text-align:center }
+    main { padding:1rem; max-width:960px; margin:0 auto }
+    .controls { display:flex; justify-content:space-between; flex-wrap:wrap; margin-bottom:1rem }
+    select, button { padding:.5rem; font-size:1rem; }
+    .listing { background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.1); margin-bottom:1rem }
+    .listing img { width:100%; height:auto }
+    .listing-content { padding:1rem }
+    .listing-title { font-size:1.2rem; margin:0 0 .5rem }
+    .listing-sub { color:#6B7280; margin:0 0 .5rem }
+    .listing-loc { color:#9CA3AF; margin:0 }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Ready Set Fly! Aviation Marketplace</h1>
+</header>
+
+<main>
+  <div class="controls">
+    <div>
+      <label for="category">Category:</label>
+      <select id="category">
+        <option>Aircraft for Sale</option>
+        <option>Aviation Jobs</option>
+        <option>Flight Schools</option>
+        <option>Flight Instructors</option>
+        <option>Aviation Mechanic</option>
+        <option>Charter Services</option>
+      </select>
+    </div>
+    <button id="refresh">Refresh</button>
+  </div>
+
+  <div id="listings">
+    Loading…
+  </div>
+</main>
+
+<footer>
+  <a href="/privacy" style="color:white; margin-right:1rem">Privacy</a>
+  <a href="/terms" style="color:white">Terms</a>
+</footer>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+  // ——— Your Firebase config — replace with your EXPO_PUBLIC_… values ———
+  const firebaseConfig = {
+    apiKey:           "EXPO_PUBLIC_FIREBASE_API_KEY",
+    authDomain:       "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN",
+    projectId:        "EXPO_PUBLIC_FIREBASE_PROJECT_ID",
+    storageBucket:    "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET",
+    messagingSenderId:"EXPO_PUBLIC_FIREBASE_SENDER_ID",
+    appId:            "EXPO_PUBLIC_FIREBASE_APP_ID",
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const categoryEl = document.getElementById('category');
+  const listingsEl = document.getElementById('listings');
+  const refreshBtn  = document.getElementById('refresh');
+
+  async function loadListings() {
+    listingsEl.innerHTML = 'Loading…';
+    const cat = categoryEl.value;
+    try {
+      const q = db.collection('listings')
+                  .where('category', '==', cat)
+                  .orderBy('createdAt','desc')
+                  .limit(20);
+      const snap = await q.get();
+      if (snap.empty) {
+        listingsEl.innerHTML = '<p style="text-align:center;color:#9CA3AF">No listings available</p>';
+        return;
+      }
+      listingsEl.innerHTML = '';
+      snap.forEach(doc => {
+        const item = doc.data();
+        const card = document.createElement('div');
+        card.className = 'listing';
+
+        // image
+        if (item.images && item.images.length) {
+          const img = document.createElement('img');
+          img.src = item.images[0];
+          card.appendChild(img);
+        }
+
+        // content
+        const c = document.createElement('div');
+        c.className = 'listing-content';
+
+        // title
+        let title = item.title || item.jobTitle || item.flightSchoolDetails?.flightSchoolName || item.firstName + ' ' + item.lastName || 'Listing';
+        const h = document.createElement('h2');
+        h.className = 'listing-title';
+        h.textContent = title;
+        c.appendChild(h);
+
+        // subtitle / company / location
+        if (item.companyName) {
+          const sub = document.createElement('p');
+          sub.className = 'listing-sub';
+          sub.textContent = item.companyName;
+          c.appendChild(sub);
+        }
+        if (item.city || item.state) {
+          const loc = document.createElement('p');
+          loc.className = 'listing-loc';
+          loc.textContent = [item.city, item.state].filter(Boolean).join(', ');
+          c.appendChild(loc);
+        }
+
+        card.appendChild(c);
+        listingsEl.appendChild(card);
+      });
+    } catch (err) {
+      console.error(err);
+      listingsEl.innerHTML = '<p style="color:red;text-align:center">Failed to load listings.</p>';
+    }
+  }
+
+  // initial load
+  categoryEl.addEventListener('change', loadListings);
+  refreshBtn.addEventListener('click', loadListings);
+  loadListings();
+</script>
+
+</body>
+</html>

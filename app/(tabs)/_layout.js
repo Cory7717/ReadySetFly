@@ -11,8 +11,8 @@ import {
   Feather,
   AntDesign,
   FontAwesome,
-  Octicons, 
-  FontAwesome6
+  Octicons,
+  FontAwesome6,
 } from "@expo/vector-icons";
 import { createStackNavigator } from "@react-navigation/stack";
 
@@ -62,7 +62,6 @@ const TabsLayout = () => {
           },
         }}
       >
-        
         <Tabs.Screen
           name="classifieds"
           options={{
@@ -86,17 +85,18 @@ const TabsLayout = () => {
         <Tabs.Screen
           name="home"
           options={{
-            title: "Home",
+            title: "Rentals",
             headerShown: false,
             headerTitle: "Listings",
             headerStyle: {
               backgroundColor: "#f2f2f2",
             },
             tabBarIcon: ({ color }) => (
-              <AntDesign name="home" size={32} color={color} />
+              <Ionicons name="airplane-outline" size={32} color={color} />
             ),
           }}
         />
+
         <Tabs.Screen
           name="owner"
           options={{
@@ -117,8 +117,6 @@ const TabsLayout = () => {
             ),
           }}
         />
-        
-        
       </Tabs>
     </>
   );

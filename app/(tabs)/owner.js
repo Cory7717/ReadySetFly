@@ -387,41 +387,41 @@ const OwnerProfile = ({ ownerId }) => {
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
 
   // NEW: New state for account type ("Owner", "Renter", or "Both")
- // ─── User Role ─────────────────────────────────────────────────────────────
-const [userRole, setUserRole] = useState("");
+  // ─── User Role ─────────────────────────────────────────────────────────────
+  const [userRole, setUserRole] = useState("");
 
-// fetch once, defaulting to empty string if accountType is undefined
-useEffect(() => {
-  if (!user) return;
+  // fetch once, defaulting to empty string if accountType is undefined
+  useEffect(() => {
+    if (!user) return;
 
-  const userDocRef = doc(db, "users", user.uid);
-  getDoc(userDocRef)
-    .then(docSnap => {
-      const role = docSnap.exists()
-        ? (docSnap.data().accountType ?? "")
-        : "";
-      setUserRole(role);
-    })
-    .catch(error => {
-      console.error("Error fetching user role:", error);
-    });
-}, [user]);
+    const userDocRef = doc(db, "users", user.uid);
+    getDoc(userDocRef)
+      .then((docSnap) => {
+        const role = docSnap.exists() ? docSnap.data().accountType ?? "" : "";
+        setUserRole(role);
+      })
+      .catch((error) => {
+        console.error("Error fetching user role:", error);
+      });
+  }, [user]);
 
-// block pure renters (but allow "Both")
-useEffect(() => {
-  if (userRole.toLowerCase() === "renter") {
-    Alert.alert(
-      "Access Denied",
-      "This section is for aircraft owners. Please use the renter section."
-    );
-    navigation.goBack();
-  }
-}, [userRole]);
+  // block pure renters (but allow "Both")
+  useEffect(() => {
+    if (userRole.toLowerCase() === "renter") {
+      Alert.alert(
+        "Access Denied",
+        "This section is for aircraft owners. Please use the renter section."
+      );
+      navigation.goBack();
+    }
+  }, [userRole]);
 
-// ─── Other OwnerProfile State ─────────────────────────────────────────────
-const [manageRentalModalVisible, setManageRentalModalVisible] = useState(false);
-const [connectedAccountModalVisible, setConnectedAccountModalVisible] = useState(false);
-const [liveBalance, setLiveBalance] = useState(null);
+  // ─── Other OwnerProfile State ─────────────────────────────────────────────
+  const [manageRentalModalVisible, setManageRentalModalVisible] =
+    useState(false);
+  const [connectedAccountModalVisible, setConnectedAccountModalVisible] =
+    useState(false);
+  const [liveBalance, setLiveBalance] = useState(null);
 
   // NEW: State for Update Profile Modal (newly added)
   const [updateProfileModalVisible, setUpdateProfileModalVisible] =
@@ -631,6 +631,34 @@ const [liveBalance, setLiveBalance] = useState(null);
   // NEW: State for an optional input of a Stripe Account ID when retrieving an existing account.
   const [existingStripeAccountId, setExistingStripeAccountId] = useState("");
 
+  // --- add this handler up in your component, near your other Stripe functions ---
+  const handleSwitchStripeAccount = async () => {
+    const acct = existingStripeAccountId.trim();
+    const stripeAccountIdRegex = /^acct_[A-Za-z0-9]+$/;
+    if (!stripeAccountIdRegex.test(acct)) {
+      Alert.alert(
+        "Invalid Stripe Account ID",
+        "Please enter a valid Stripe Account ID (acct_XXXXXXXXXXXX)."
+      );
+      return;
+    }
+    try {
+      // update React state
+      setStripeAccountId(acct);
+      setIsStripeConnected(true);
+      // persist to Firestore
+      const profileRef = doc(db, "users", resolvedOwnerId);
+      await updateDoc(profileRef, { stripeAccountId: acct });
+      Alert.alert("Success", "Stripe account switched successfully.");
+      setConnectedAccountModalVisible(false);
+    } catch (err) {
+      console.error("Error switching Stripe account:", err);
+      Alert.alert(
+        "Error",
+        "Unable to switch Stripe account. Please try again."
+      );
+    }
+  };
   /**
    * Helper function to automatically send state data to Firestore.
    */
@@ -671,19 +699,19 @@ const [liveBalance, setLiveBalance] = useState(null);
       Alert.alert("Error", "User is not authenticated. Please log in.");
       return;
     }
-  
+
     try {
       // 1) Read the user's root document
-      const profileDocRef  = doc(db, "users", resolvedOwnerId);
+      const profileDocRef = doc(db, "users", resolvedOwnerId);
       const profileDocSnap = await getDoc(profileDocRef);
-  
+
       if (profileDocSnap.exists()) {
         const profile = profileDocSnap.data();
-  
+
         // Hydrate profileData WITH firstName, lastName, fullName
         setProfileData({
           firstName: profile.firstName || "",
-          lastName:  profile.lastName  || "",
+          lastName: profile.lastName || "",
           fullName:
             profile.fullName ||
             `${profile.firstName || ""} ${profile.lastName || ""}`.trim() ||
@@ -691,9 +719,9 @@ const [liveBalance, setLiveBalance] = useState(null);
             "",
           contact: profile.profileData?.contact || "",
           address: profile.profileData?.address || "",
-          email: profile.profileData?.email   || user?.email   || "",
+          email: profile.profileData?.email || user?.email || "",
         });
-  
+
         // Hydrate costData and flags
         setCostData(
           profile.costData || {
@@ -713,7 +741,7 @@ const [liveBalance, setLiveBalance] = useState(null);
         );
         setCostSaved(!!profile.costData);
         setShowCalculator(!!profile.costData);
-  
+
         // Hydrate aircraftDetails
         setAircraftDetails(
           profile.aircraftDetails || {
@@ -729,7 +757,7 @@ const [liveBalance, setLiveBalance] = useState(null);
             mainImage: "",
           }
         );
-  
+
         // ─── NEW: Hydrate Stripe info ───
         setStripeAccountId(profile.stripeAccountId || null);
         setIsStripeConnected(!!profile.stripeAccountId);
@@ -737,7 +765,7 @@ const [liveBalance, setLiveBalance] = useState(null);
       } else {
         console.log("No owner profile data found.");
       }
-  
+
       // 2) Load this owner's aircraft listings
       const airplanesRef = collection(db, "airplanes");
       const q = query(
@@ -750,14 +778,14 @@ const [liveBalance, setLiveBalance] = useState(null);
         id: docSnap.id,
         ...docSnap.data(),
       }));
-  
+
       setUserListings(aircrafts);
       setAllAircrafts(aircrafts);
     } catch (error) {
       console.error("Error fetching owner data:", error);
       Alert.alert("Error", "Failed to fetch saved data.");
     }
-  }, [resolvedOwnerId, user]);  
+  }, [resolvedOwnerId, user]);
 
   // ─── ensure this sits immediately after fetchOwnerData ───
   useEffect(() => {
@@ -791,7 +819,6 @@ const [liveBalance, setLiveBalance] = useState(null);
     }, [fetchOwnerData, resolvedOwnerId])
   );
 
-  // … the rest of your component …
   useEffect(() => {
     if (resolvedOwnerId) {
       autoSaveDataToFirestore("profileData", profileData);
@@ -825,8 +852,9 @@ const [liveBalance, setLiveBalance] = useState(null);
         });
         const data = await response.json();
         if (response.ok) {
-          setLiveBalance(data.pendingAmount);
+          setLiveBalance(data.availableAmount);
           setYtdBalance(data.ytdAmount);
+          console.log("⚡️ stripe-balance payload:", data);
         } else {
           console.error("Error fetching live balance:", data.error);
         }
@@ -834,11 +862,13 @@ const [liveBalance, setLiveBalance] = useState(null);
         console.error("Error fetching live balance:", e);
       }
     };
-
-    if (withdrawModalVisible) {
-      fetchStripeBalance();
-    }
-  }, [withdrawModalVisible, user]);
+  
+    // Don’t try until we know who the user is
+    if (!user) return;
+  
+    // Always fetch on mount / user change, and again whenever either modal toggles
+    fetchStripeBalance();
+  }, [user, withdrawModalVisible, connectedAccountModalVisible]);  
 
   /**
    * Function to handle connecting Stripe account.
@@ -2310,15 +2340,15 @@ const [liveBalance, setLiveBalance] = useState(null);
   };
 
   // ––– Define displayName for the header –––
- const displayName = (
-   <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>
-     {profileData.fullName ||
-      user?.displayName ||
-      user?.providerData?.[0]?.displayName ||
-      "User"}
-   </Text>
- );
- // –––––––––––––––––––––––––––––––––––––––––
+  const displayName = (
+    <Text style={{ fontSize: 20, fontWeight: "bold", color: "#fff" }}>
+      {profileData.fullName ||
+        user?.displayName ||
+        user?.providerData?.[0]?.displayName ||
+        "User"}
+    </Text>
+  );
+  // –––––––––––––––––––––––––––––––––––––––––
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -2335,29 +2365,28 @@ const [liveBalance, setLiveBalance] = useState(null);
         contentContainerStyle={{ paddingBottom: 16 }}
       >
         {/* Header Section */}
-{/* Header Section */}
-<ImageBackground
-  source={wingtipClouds}
-  style={{ height: 224 }}
-  resizeMode="cover"
->
-  <TouchableOpacity onPress={() => setUpdateProfileModalVisible(true)}>
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 16,
-        paddingTop: 24,
-      }}
-    >
-      <View>
-        <Text style={{ fontSize: 14, color: "#fff" }}>Welcome</Text>
-        {displayName}
-      </View>
-    </View>
-  </TouchableOpacity>
-</ImageBackground>
+        <ImageBackground
+          source={wingtipClouds}
+          style={{ height: 224 }}
+          resizeMode="cover"
+        >
+          <TouchableOpacity onPress={() => setUpdateProfileModalVisible(true)}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingHorizontal: 16,
+                paddingTop: 24,
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: 14, color: "#fff" }}>Welcome</Text>
+                {displayName}
+              </View>
+            </View>
+          </TouchableOpacity>
+        </ImageBackground>
 
         <View
           style={{
@@ -4060,11 +4089,10 @@ const [liveBalance, setLiveBalance] = useState(null);
         </View>
       </Modal>
 
-      {/* Updated Withdraw Funds Modal */}
       <Modal
         visible={withdrawModalVisible}
         animationType="slide"
-        transparent={true}
+        transparent
         onRequestClose={() => setWithdrawModalVisible(false)}
       >
         <KeyboardAvoidingView
@@ -4072,58 +4100,38 @@ const [liveBalance, setLiveBalance] = useState(null);
           style={{ flex: 1 }}
           keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
         >
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "rgba(0,0,0,0.5)",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                width: "88%",
-                maxHeight: "90%",
-                backgroundColor: "#fff",
-                borderRadius: 8,
-                padding: 24,
-              }}
-            >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalContent}>
               <ModalHeader
                 title="Payment Information"
                 onClose={() => setWithdrawModalVisible(false)}
               />
 
               {/* Live balance (pending deposits) */}
-              <Text style={{ fontSize: 16, marginBottom: 16 }}>
-                Live Balance: $
+              <Text style={styles.modalText}>
+                Live Balance:{" "}
                 {liveBalance != null
-                  ? (liveBalance / 100).toFixed(2)
-                  : (availableBalance / 100).toFixed(2)}
+                  ? `$${(liveBalance / 100).toFixed(2)}`
+                  : `Loading…`}
               </Text>
 
-              {/* NEW: Year‑to‑Date balance pulled live from Stripe */}
-              <Text
-                style={{ fontSize: 16, marginBottom: 16, fontWeight: "bold" }}
-              >
-                Year‑to‑Date Balance: $
+              {/* Year-to-Date balance pulled live from Stripe */}
+              <Text style={[styles.modalText, { fontWeight: "600" }]}>
+                YTD Earnings:{" "}
                 {ytdBalance != null
-                  ? (ytdBalance / 100).toFixed(2)
-                  : "Loading..."}
+                  ? `$${(ytdBalance / 100).toFixed(2)}`
+                  : `Loading…`}
               </Text>
 
               {/* Total withdrawn (historical) */}
-              <Text
-                style={{ fontSize: 14, marginBottom: 16, color: "#4a5568" }}
-              >
-                Total Withdrawn: ${(totalWithdrawn / 100).toFixed(2)}
+              <Text style={[styles.modalText, { color: "#4A5568" }]}>
+                Total Withdrawn: {`$${(totalWithdrawn / 100).toFixed(2)}`}
               </Text>
 
               <CustomButton
                 onPress={() => setWithdrawModalVisible(false)}
                 title="Close"
-                backgroundColor="#f56565"
-                accessibilityLabel="Close payment information"
+                backgroundColor="#F56565"
               />
 
               {loading && (
@@ -4167,7 +4175,7 @@ const [liveBalance, setLiveBalance] = useState(null);
             />
             <Text style={{ marginBottom: 16 }}>
               Stripe is a payment processing platform that allows you to
-              securely handle payments and transfers. Connecting your Stripe
+              securely handle payments and transfers. Connecting/Creating a Stripe
               account enables you to receive payments directly to your bank
               account. For more information, tap Press Connect Stripe Account
               and it will direct you to the Stripe website for more details.
@@ -4212,21 +4220,24 @@ const [liveBalance, setLiveBalance] = useState(null);
 
             {stripeAccountId ? (
               <>
+                {/* Account ID */}
                 <Text style={{ fontSize: 16, marginBottom: 12 }}>
                   Your Stripe Account ID:
                   {"\n"}
                   <Text style={{ fontWeight: "bold" }}>{stripeAccountId}</Text>
                 </Text>
 
-                {/* YTD balance */}
+                {/* Year-to-Date Balance */}
                 <Text style={{ fontSize: 16, marginBottom: 24 }}>
-                  Year‑to‑Date Balance:{" "}
+                  Year-to-Date Earnings:{" "}
                   <Text style={{ fontWeight: "bold" }}>
-                    ${(totalWithdrawn / 100).toFixed(2)}
+                    {ytdBalance != null
+                      ? `$${(ytdBalance / 100).toFixed(2)}`
+                      : "Loading..."}
                   </Text>
                 </Text>
 
-                {/* Updated Contact Support link */}
+                {/* Contact Support */}
                 <TouchableOpacity
                   onPress={() =>
                     Linking.openURL("https://support.stripe.com/contact/login")
@@ -4241,7 +4252,7 @@ const [liveBalance, setLiveBalance] = useState(null);
                       textDecorationLine: "underline",
                     }}
                   >
-                    Contact Support
+                    Contact Stripe Support
                   </Text>
                 </TouchableOpacity>
               </>
@@ -4251,10 +4262,35 @@ const [liveBalance, setLiveBalance] = useState(null);
               </Text>
             )}
 
+            {/* Switch Account */}
+            <Text style={{ fontSize: 14, marginBottom: 8 }}>
+              Or enter a different Stripe Account ID to switch:
+            </Text>
+            <TextInput
+              placeholder="acct_XXXXXXXXXXXX"
+              value={existingStripeAccountId}
+              onChangeText={setExistingStripeAccountId}
+              autoCapitalize="none"
+              style={{
+                borderWidth: 1,
+                borderColor: "#ccc",
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+              }}
+            />
+            <CustomButton
+              onPress={handleSwitchStripeAccount}
+              title="Switch Account"
+              backgroundColor="#3182ce"
+            />
+
+            {/* Close */}
             <CustomButton
               onPress={() => setConnectedAccountModalVisible(false)}
               title="Close"
-              backgroundColor="#3182ce"
+              backgroundColor="#f56565"
+              style={{ marginTop: 12 }}
             />
           </View>
         </View>
@@ -4804,5 +4840,22 @@ const styles = {
     color: "white",
     fontSize: 10,
     fontWeight: "bold",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "88%",
+    maxHeight: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 24,
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 16,
   },
 };

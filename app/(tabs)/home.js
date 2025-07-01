@@ -51,7 +51,7 @@ const API_URL = "https://us-central1-ready-set-fly-71506.cloudfunctions.net/api"
 const handleReportListing = (listing) => {
   Alert.alert(
     "Report listing",
-    "Flag this listing as spam or fraudulent? A moderator will be notified and reports are sent to coryarmer@gmail.com.",
+    "Flag this listing as spam or fraudulent? A moderator will be notified and reports are sent to support@readysetfly.us.",
     [
       { text: "Cancel", style: "cancel" },
       {

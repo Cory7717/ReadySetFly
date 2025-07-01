@@ -111,7 +111,7 @@ const App = () => {
   };
 
   const handleNeedHelp = () => {
-    const email = "coryarmer@gmail.com";
+    const email = "support@readysetfly.us";
     const subject = "Support - Ready, Set, Fly!";
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
     RNLinking.openURL(url).catch((err) =>
