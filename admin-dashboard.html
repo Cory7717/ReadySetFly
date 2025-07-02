@@ -46,36 +46,54 @@
     }
     .widget-control { margin-bottom: 1.5rem; }
     .widget-control button {
-      background-color: #2563EB; color: white; border: none;
-      padding: 0.75rem 1.5rem; font-size: 1rem; border-radius: 0.375rem;
-      cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      background-color: #2563EB;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       transition: background-color 0.2s;
     }
     .widget-control button:hover { background-color: #1E40AF; }
     .widget-list {
-      list-style: none; margin: 0.5rem 0 0; padding: 0;
-      background: white; border: 1px solid #d1d5db; border-radius: 0.375rem;
-      width: 240px; display: none;
+      list-style: none;
+      margin: 0.5rem 0 0;
+      padding: 0;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      width: 240px;
+      display: none;
     }
     .widget-list li {
-      padding: 0.5rem 1rem; cursor: pointer;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
     }
     .widget-list li:hover { background: #f3f4f6; }
     .widget-area { margin-top: 2rem; }
 
     .stripe-widget, .sale-widget {
-      background: white; border-radius: 0.375rem;
+      background: white;
+      border-radius: 0.375rem;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      padding: 1.5rem; max-width: 700px;
+      padding: 1.5rem;
+      max-width: 700px;
     }
     .stripe-widget h2, .sale-widget h2 {
-      margin-top: 0; font-size: 1.25rem; color: #111827;
+      margin-top: 0;
+      font-size: 1.25rem;
+      color: #111827;
     }
     .tabs {
-      display: flex; gap: 1rem; margin-top: 1rem;
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
     }
     .tab {
-      padding: 0.5rem 1rem; cursor: pointer;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
       border-bottom: 2px solid transparent;
     }
     .tab.active {
@@ -86,27 +104,39 @@
     .tab-content > div { display: none; }
     .tab-content > .active { display: block; }
     input, select, textarea {
-      width: 100%; padding: 0.5rem; margin-top: 0.5rem;
-      border: 1px solid #d1d5db; border-radius: 0.375rem;
-      font-size: 1rem; box-sizing: border-box;
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      font-size: 1rem;
+      box-sizing: border-box;
     }
     button.small {
-      padding: 0.25rem 0.5rem; font-size: 0.875rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.875rem;
       margin-top: 0.5rem;
     }
     .results pre {
-      background: #f9fafb; padding: 1rem;
-      border-radius: 0.375rem; overflow-x: auto;
+      background: #f9fafb;
+      padding: 1rem;
+      border-radius: 0.375rem;
+      overflow-x: auto;
       font-size: 0.875rem;
     }
     .section { margin-bottom: 1.5rem; }
     .sale-widget .crm-list {
-      list-style: none; padding: 0; margin: 0.5rem 0;
-      max-height: 200px; overflow-y: auto;
-      border: 1px solid #d1d5db; border-radius: 0.375rem;
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
     }
     .sale-widget .crm-list li {
-      padding: 0.5rem; border-bottom: 1px solid #e5e7eb;
+      padding: 0.5rem;
+      border-bottom: 1px solid #e5e7eb;
     }
     .sale-widget .crm-list li:last-child {
       border-bottom: none;
@@ -115,9 +145,9 @@
 </head>
 <body>
   <header>
-  <a href="index.html" class="home-button">Home</a>
-  <h1>Admin Dashboard</h1>
-</header>
+    <a href="index.html" class="home-button">Home</a>
+    <h1>Admin Dashboard</h1>
+  </header>
 
   <main>
     <div class="widget-control">
@@ -145,7 +175,7 @@
       if (!w) return;
       list.style.display = 'none';
       if (w === 'stripe') loadStripeWidget();
-      else if (w === 'sale') loadSaleWidget();
+      else if (w === 'sale')   loadSaleWidget();
     });
 
     function loadStripeWidget() {
@@ -184,7 +214,7 @@
       `;
       area.appendChild(widget);
 
-      // tab logic
+      // Tab switching
       widget.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
           widget.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -194,18 +224,48 @@
         });
       });
 
-      // search
+      // User search
       widget.querySelector('#searchBtn').addEventListener('click', async () => {
         const q = widget.querySelector('#stripeQuery').value.trim();
         if (!q) return;
-        widget.querySelector('#stripeResults').innerText = 'Loading…';
-        const res = await fetch(`/api/stripe/search?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        widget.querySelector('#stripeResults')
-          .innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        const resultsEl = widget.querySelector('#stripeResults');
+        resultsEl.innerText = 'Loading…';
+        try {
+          const res = await fetch(`/api/stripe/search?q=${encodeURIComponent(q)}`);
+          if (!res.ok) throw new Error(res.statusText);
+          const { customer, paymentMethods = [] } = await res.json();
+          let html = '';
+          if (customer) {
+            html += `
+              <h3>Customer Info</h3>
+              <ul>
+                <li><strong>ID:</strong> ${customer.id}</li>
+                <li><strong>Email:</strong> ${customer.email || '—'}</li>
+                <li><strong>Name:</strong> ${customer.name || '—'}</li>
+                <li><strong>Created:</strong> ${new Date(customer.created * 1000).toLocaleString()}</li>
+              </ul>`;
+          } else {
+            html += `<p>No customer found for “${q}”.</p>`;
+          }
+          if (paymentMethods.length) {
+            html += `<h4>Payment Methods (${paymentMethods.length})</h4><ul>`;
+            paymentMethods.forEach(pm => {
+              html += `
+                <li>
+                  <strong>${pm.type.toUpperCase()}</strong> ending in
+                  ${pm.card?.last4 || pm.bank_account?.last4 || '----'}
+                  (exp ${pm.card?.exp_month}/${pm.card?.exp_year})
+                </li>`;
+            });
+            html += `</ul>`;
+          }
+          resultsEl.innerHTML = html;
+        } catch (err) {
+          resultsEl.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+        }
       });
 
-      // charges
+      // Recent charges
       widget.querySelector('#loadChargesBtn').addEventListener('click', async () => {
         const el = widget.querySelector('#chargesResults');
         el.innerText = 'Loading…';
@@ -214,7 +274,7 @@
         el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
       });
 
-      // refund
+      // Issue refund
       widget.querySelector('#refundBtn').addEventListener('click', async () => {
         const chargeId = widget.querySelector('#refundChargeId').value.trim();
         if (!chargeId) return alert('Enter a charge ID');
@@ -263,30 +323,30 @@
       `;
       area.appendChild(widget);
 
-      // tabs
+      // Tabs for sale widget
       widget.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
-          widget.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-          widget.querySelectorAll('.tab-content > div').forEach(c=>c.classList.remove('active'));
+          widget.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          widget.querySelectorAll('.tab-content > div').forEach(c => c.classList.remove('active'));
           tab.classList.add('active');
           widget.querySelector(`#${tab.dataset.tab}`).classList.add('active');
         });
       });
 
-      // contacts
+      // Contacts logic
       const contacts = [];
       const contactsList = widget.querySelector('#contactsList');
       widget.querySelector('#addContactBtn').addEventListener('click', () => {
         const name  = widget.querySelector('#contactName').value.trim();
         const email = widget.querySelector('#contactEmail').value.trim();
-        if (!name||!email) return alert('Enter name and email');
-        contacts.push({name,email});
-        renderList(contactsList, contacts.map(c=>`${c.name} — ${c.email}`));
+        if (!name || !email) return alert('Enter name and email');
+        contacts.push({ name, email });
+        renderList(contactsList, contacts.map(c => `${c.name} — ${c.email}`));
         widget.querySelector('#contactName').value = '';
         widget.querySelector('#contactEmail').value= '';
       });
 
-      // leads
+      // Leads logic
       const leads = [];
       const leadsList = widget.querySelector('#leadsList');
       widget.querySelector('#addLeadBtn').addEventListener('click', () => {
@@ -299,7 +359,7 @@
     }
 
     function renderList(ul, items) {
-      ul.innerHTML = items.map(i=>`<li>${i}</li>`).join('');
+      ul.innerHTML = items.map(i => `<li>${i}</li>`).join('');
     }
   </script>
 </body>
