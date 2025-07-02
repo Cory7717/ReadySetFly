@@ -56,9 +56,9 @@
 
       .view-area {
         display: flex;
-        justify-content: space-between; /* push icon to right */
-        align-items: center;
-        gap: 0.5rem;
+        flex-direction: column; /* stack view-buttons over app-promo */
+        align-items: center; /* center everything horizontally */
+        gap: 1rem; /* space between rows */
       }
       .btn {
         background-color: #1d4ed8;
@@ -224,13 +224,37 @@
         gap: 0.5rem;
       }
 
+      .social-link {
+        display: inline-block;
+        margin-top: 0.5rem; /* small gap above Instagram logo */
+      }
+
       .social-link img {
         width: 32px;
         height: 32px;
+        transition: transform 0.1s ease;
+      }
+
+      .social-link img:hover {
+        transform: translateY(-2px);
+      }
+      .app-promo {
+        text-align: center;
+        max-width: 320px;
+      }
+
+      .app-promo p {
+        margin: 0 0 0.5rem;
+        font-size: 0.9rem;
+      }
+
+      .app-promo img {
+        width: 120px;
         cursor: pointer;
         transition: transform 0.1s ease;
       }
-      .social-link img:hover {
+
+      .app-promo img:hover {
         transform: translateY(-2px);
       }
     </style>
@@ -241,35 +265,46 @@
     </header>
 
     <main>
-  <div class="view-area">
-    <!-- 1. View buttons -->
-    <div class="view-buttons">
-      <button class="btn" onclick="viewRentals()">View Rentals</button>
-      <button class="btn" onclick="viewMarketplace()">View Marketplace</button>
-    </div>
+      <div class="view-area">
+        <!-- 1. Buttons centered -->
+        <div class="view-buttons">
+          <button class="btn" onclick="viewRentals()">View Rentals</button>
+          <button class="btn" onclick="viewMarketplace()">
+            View Marketplace
+          </button>
+        </div>
 
-    <!-- 2. App promo in the center -->
-    <div class="app-promo">
-      <p>For full access to rentals and marketplace in your area, download the app today.</p>
-      <a href="https://play.google.com/store/apps/details?id=com.readysetfly" target="_blank" rel="noopener">
-        <img src="../../Assets/images/playstore.png" alt="Get it on Google Play" />
-      </a>
-    </div>
-
-    <!-- 3. Instagram link on the far right -->
-    <a
-      href="https://instagram.com/readysetflyus"
-      target="_blank"
-      rel="noopener"
-      class="social-link"
-      aria-label="Connect with us on Instagram"
-    >
-      <img
-        src="../../Assets/images/instagram-logo.png"
-        alt="Instagram logo"
-      />
-    </a>
-  </div>
+        <!-- 2. Promo text just below buttons -->
+        <div class="app-promo">
+          <p>
+            For full access to rentals and marketplace in your area, download
+            the app today.
+          </p>
+          <a
+            href="https://play.google.com/store/apps/details?id=com.readysetfly"
+            target="_blank"
+            rel="noopener"
+          >
+            <img
+              src="../../Assets/images/playstore.png"
+              alt="Get it on Google Play"
+            />
+          </a>
+          <!-- 3. Instagram below the Play Store badge -->
+          <a
+            href="https://instagram.com/readysetflyus"
+            target="_blank"
+            rel="noopener"
+            class="social-link"
+            aria-label="Connect with us on Instagram"
+          >
+            <img
+              src="../../Assets/images/instagram-logo.png"
+              alt="Instagram logo"
+            />
+          </a>
+        </div>
+      </div>
       <div class="hero">
         <h2>Your gateway to the skies.</h2>
         <p>
