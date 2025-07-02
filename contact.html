@@ -1,0 +1,148 @@
+<!-- contact.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Contact Us – Ready Set Fly</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f3f4f6;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      color: #1f2937;
+    }
+    header {
+      background-image: url("../../Assets/images/wingtip_clouds.jpg");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: cover;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    header h1 {
+      font-size: 2rem;
+      margin: 0;
+    }
+    main {
+      flex: 1;
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .contact-form {
+      background: white;
+      padding: 2rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 480px;
+    }
+    .contact-form label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+    }
+    .contact-form input,
+    .contact-form textarea {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid #cbd5e0;
+      border-radius: 0.25rem;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    .contact-form textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+    .contact-form button {
+      background-color: #1d4ed8;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .contact-form button:hover {
+      background-color: #2563eb;
+    }
+    @media (max-width: 600px) {
+  header h1 {
+    font-size: 1.5rem;
+  }
+
+  main {
+    padding: 1rem 0.5rem;
+  }
+
+  .contact-form {
+    padding: 1.5rem;
+    margin: 0 1rem; /* extra side gutter */
+  }
+}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Contact Us</h1>
+  </header>
+
+  <main>
+    <form id="contactForm" class="contact-form">
+      <label for="firstName">First Name</label>
+      <input type="text" id="firstName" name="firstName" required />
+
+      <label for="lastName">Last Name</label>
+      <input type="text" id="lastName" name="lastName" required />
+
+      <label for="email">Email Address</label>
+      <input type="email" id="email" name="email" required />
+
+      <label for="message">Your Message</label>
+      <textarea id="message" name="message" required></textarea>
+
+      <button type="submit">Send Message</button>
+    </form>
+  </main>
+
+  <script>
+    document.getElementById("contactForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        firstName: form.firstName.value,
+        lastName:  form.lastName.value,
+        email:     form.email.value,
+        message:   form.message.value
+      };
+
+      try {
+        const res = await fetch("/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error("Network response was not ok");
+        alert("Thanks! Your message has been sent.");
+        form.reset();
+      } catch (err) {
+        console.error(err);
+        alert("Sorry, there was an error sending your message.");
+      }
+    });
+  </script>
+</body>
+</html>

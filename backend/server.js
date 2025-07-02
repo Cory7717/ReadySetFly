@@ -419,6 +419,46 @@ const authenticate = async (req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ─── Contact Form Endpoint ─────────────────────────────────────────
+app.post("/contact", async (req, res) => {
+  // Grab & sanitize incoming fields
+  const { firstName, lastName, email, message } = req.body || {};
+  if (!firstName || !lastName || !email || !message) {
+    return res.status(400).json({ error: "All fields are required." });
+  }
+
+  try {
+    // ensure transporter is ready
+    await initTransporter();
+    if (!transporter) {
+      return res
+        .status(500)
+        .json({ error: "Email service not configured." });
+    }
+
+    // send the mail
+    await transporter.sendMail({
+      from: `"Ready Set Fly Contact" <${await SMTP_USER.value()}>`,
+      to: "coryarmer@gmail.com",
+      subject: "New Contact Us Message",
+      text: `
+First Name: ${firstName}
+Last Name:  ${lastName}
+Email:      ${email}
+
+Message:
+${message}
+      `,
+    });
+
+    return res.status(200).json({ success: true, message: "Message sent." });
+  } catch (err) {
+    admin.logger.error("Error in /contact:", err);
+    return res
+      .status(500)
+      .json({ error: "Failed to send message. Please try again." });
+  }
+});
 
 // ───────────────────────────────────────────────────
 // Stripe Admin: Search Customers/Accounts
