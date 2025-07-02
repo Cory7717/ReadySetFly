@@ -287,121 +287,126 @@
   </div>
 
   <script>
-    const ALLOWED_SPECIFIC = [
-      "coryarmer@gmail.com",
-      "bentley.amy24@gmail.com",
-    ];
-    const SESSION_KEY   = "currentAdmin";
-    const ACCOUNTS_KEY  = "adminAccounts";
-    const LOGIN_TS_KEY  = "loginTimestamp";
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const ALLOWED_SPECIFIC = [
+    "coryarmer@gmail.com",
+    "bentley.amy24@gmail.com",
+  ];
+  const SESSION_KEY   = "currentAdmin";
+  const ACCOUNTS_KEY  = "adminAccounts";
+  const LOGIN_TS_KEY  = "loginTimestamp";
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-    function getAccounts() {
-      return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}");
-    }
-    function saveAccounts(accts) {
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accts));
-    }
-    function isEmailAllowed(email) {
-      const e = email.toLowerCase();
-      return e.endsWith("@readysetfly.us") || ALLOWED_SPECIFIC.includes(e);
-    }
-    function setCurrentUser(email) {
-      localStorage.setItem(SESSION_KEY, email.toLowerCase());
-      localStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
-    }
-    function clearCurrentUser() {
-      localStorage.removeItem(SESSION_KEY);
-      localStorage.removeItem(LOGIN_TS_KEY);
-    }
-    function isSessionValid() {
-      const ts = parseInt(localStorage.getItem(LOGIN_TS_KEY) || "0", 10);
-      return ts && (Date.now() - ts) < SEVEN_DAYS_MS;
-    }
+  // Detect if we're on the index page (so we only clear session there)
+  const onIndexPage = location.pathname.endsWith("index.html") || location.pathname === "/";
 
-    function checkAutoRedirect() {
-      const current = localStorage.getItem(SESSION_KEY);
-      const accounts = getAccounts();
-      if (current && accounts[current] && isSessionValid()) {
-        window.location.href = "admin-dashboard.html";
-      } else {
-        clearCurrentUser();
-      }
-    }
+  function getAccounts() {
+    return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}");
+  }
+  function saveAccounts(accts) {
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accts));
+  }
+  function isEmailAllowed(email) {
+    const e = email.toLowerCase();
+    return e.endsWith("@readysetfly.us") || ALLOWED_SPECIFIC.includes(e);
+  }
+  function setCurrentUser(email) {
+    localStorage.setItem(SESSION_KEY, email.toLowerCase());
+    localStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
+  }
+  function clearCurrentUser() {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LOGIN_TS_KEY);
+  }
+  function isSessionValid() {
+    const ts = parseInt(localStorage.getItem(LOGIN_TS_KEY) || "0", 10);
+    return ts && (Date.now() - ts) < SEVEN_DAYS_MS;
+  }
 
-    // show/hide modals
-    function loginAdmin() {
-      document.getElementById("loginModal").style.display = "flex";
-    }
-    function closeLogin() {
-      document.getElementById("loginModal").style.display = "none";
-    }
-    function createAdmin() {
-      document.getElementById("createModal").style.display = "flex";
-    }
-    function closeCreate() {
-      document.getElementById("createModal").style.display = "none";
-    }
+  function checkAutoRedirect() {
+    const current = localStorage.getItem(SESSION_KEY);
+    const accounts = getAccounts();
 
-    // toggle password visibility
-    document.querySelectorAll(".toggle-eye").forEach(el => {
-      el.addEventListener("click", () => {
-        const inp = document.getElementById(el.dataset.target);
-        inp.type = inp.type === "password" ? "text" : "password";
-      });
-    });
-
-    // form submissions
-    function submitLogin() {
-      const email = document.getElementById("loginEmail").value.trim();
-      const pass  = document.getElementById("loginPassword").value;
-      if (!email || !pass) return alert("Enter both email and password.");
-
-      const accounts = getAccounts();
-      if (!accounts[email.toLowerCase()]) {
-        return alert("No account found. Please create one.");
-      }
-      if (accounts[email.toLowerCase()] !== pass) {
-        return alert("Incorrect password.");
-      }
-
-      setCurrentUser(email);
+    if (current && accounts[current] && isSessionValid()) {
       window.location.href = "admin-dashboard.html";
+    } else {
+      // only clear on the index page, not after navigating back from dashboard
+      if (onIndexPage) clearCurrentUser();
     }
+  }
 
-    function submitCreate() {
-      const email = document.getElementById("createEmail").value.trim();
-      const pass  = document.getElementById("createPassword").value;
-      const pass2 = document.getElementById("createPassword2").value;
-      if (!email || !pass || !pass2) return alert("Fill all fields.");
-      if (!isEmailAllowed(email)) {
-        return alert("Email must be @readysetfly.us or approved.");
-      }
-      if (pass !== pass2) {
-        return alert("Passwords do not match.");
-      }
+  // show/hide modals
+  function loginAdmin() {
+    document.getElementById("loginModal").style.display = "flex";
+  }
+  function closeLogin() {
+    document.getElementById("loginModal").style.display = "none";
+  }
+  function createAdmin() {
+    document.getElementById("createModal").style.display = "flex";
+  }
+  function closeCreate() {
+    document.getElementById("createModal").style.display = "none";
+  }
 
-      const accounts = getAccounts();
-      accounts[email.toLowerCase()] = pass;
-      saveAccounts(accounts);
-
-      setCurrentUser(email);
-      alert("Account created—redirecting to dashboard.");
-      window.location.href = "admin-dashboard.html";
-    }
-
-    function viewRentals() {
-      window.location.href = "rentals.html";
-    }
-    function viewMarketplace() {
-      window.location.href = "marketplace.html";
-    }
-
-    window.addEventListener("DOMContentLoaded", () => {
-      checkAutoRedirect();
-      document.getElementById("footerLogo").addEventListener("click", loginAdmin);
-      document.getElementById("footerCreate").addEventListener("click", createAdmin);
+  // toggle password visibility
+  document.querySelectorAll(".toggle-eye").forEach(el => {
+    el.addEventListener("click", () => {
+      const inp = document.getElementById(el.dataset.target);
+      inp.type = inp.type === "password" ? "text" : "password";
     });
-  </script>
+  });
+
+  // form submissions
+  function submitLogin() {
+    const email = document.getElementById("loginEmail").value.trim();
+    const pass  = document.getElementById("loginPassword").value;
+    if (!email || !pass) return alert("Enter both email and password.");
+
+    const accounts = getAccounts();
+    if (!accounts[email.toLowerCase()]) {
+      return alert("No account found. Please create one.");
+    }
+    if (accounts[email.toLowerCase()] !== pass) {
+      return alert("Incorrect password.");
+    }
+
+    setCurrentUser(email);
+    window.location.href = "admin-dashboard.html";
+  }
+
+  function submitCreate() {
+    const email = document.getElementById("createEmail").value.trim();
+    const pass  = document.getElementById("createPassword").value;
+    const pass2 = document.getElementById("createPassword2").value;
+    if (!email || !pass || !pass2) return alert("Fill all fields.");
+    if (!isEmailAllowed(email)) {
+      return alert("Email must be @readysetfly.us or approved.");
+    }
+    if (pass !== pass2) {
+      return alert("Passwords do not match.");
+    }
+
+    const accounts = getAccounts();
+    accounts[email.toLowerCase()] = pass;
+    saveAccounts(accounts);
+
+    setCurrentUser(email);
+    alert("Account created—redirecting to dashboard.");
+    window.location.href = "admin-dashboard.html";
+  }
+
+  function viewRentals() {
+    window.location.href = "rentals.html";
+  }
+  function viewMarketplace() {
+    window.location.href = "marketplace.html";
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    checkAutoRedirect();
+    document.getElementById("footerLogo").addEventListener("click", loginAdmin);
+    document.getElementById("footerCreate").addEventListener("click", createAdmin);
+  });
+</script>
 </body>
 </html>
