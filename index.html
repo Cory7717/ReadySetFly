@@ -230,14 +230,13 @@
       }
 
       .social-link img {
-        width: 32px;
-        height: 32px;
-        transition: transform 0.1s ease;
-      }
-
-      .social-link img:hover {
-        transform: translateY(-2px);
-      }
+    width: 32px;
+    height: 32px;
+    transition: transform 0.1s ease;
+  }
+  .social-link img:hover {
+    transform: translateY(-2px);
+  }
       .app-promo {
         text-align: center;
         max-width: 320px;
@@ -257,6 +256,14 @@
       .app-promo img:hover {
         transform: translateY(-2px);
       }
+      .store-badge {
+    width: 120px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+  .store-badge:hover {
+    transform: translateY(-2px);
+  }
     </style>
   </head>
   <body>
@@ -265,37 +272,51 @@
     </header>
 
     <main>
-      <div class="view-area">
-        <!-- 1. Buttons centered -->
-        <div class="view-buttons">
-          <button class="btn" onclick="viewRentals()">View Rentals</button>
-          <button class="btn" onclick="viewMarketplace()">
-            View Marketplace
-          </button>
-        </div>
+    <div class="view-area">
+      <!-- 1. Buttons centered -->
+      <div class="view-buttons">
+        <button class="btn" onclick="viewRentals()">View Rentals</button>
+        <button class="btn" onclick="viewMarketplace()">
+          View Marketplace
+        </button>
+      </div>
 
-        <!-- 2. Promo text just below buttons -->
-        <div class="app-promo">
-          <p>
-            For full access to rentals and marketplace in your area, download
-            the app today.
-          </p>
+      <!-- 2. Promo text just below buttons -->
+      <div class="app-promo">
+        <p>
+          For full access to rentals and marketplace in your area, download
+          the app today.
+        </p>
+
+        <!-- store badges side-by-side -->
+        <div class="badges" style="display:flex; gap:0.5rem; justify-content:center;">
           <a
             href="https://play.google.com/store/apps/details?id=com.readysetfly"
-            target="_blank"
-            rel="noopener"
+            target="_blank" rel="noopener"
           >
             <img
               src="../../Assets/images/playstore.png"
               alt="Get it on Google Play"
+              class="store-badge"
             />
           </a>
-          <!-- 3. Instagram below the Play Store badge -->
+          <a
+            href="https://apps.apple.com/app/idXXXXXXXXX"
+            target="_blank" rel="noopener"
+          >
+            <img
+              src="../../Assets/images/appstore.png"
+              alt="Download on the App Store"
+              class="store-badge"
+            />
+          </a>
+        </div>
+
+        <!-- 3. Instagram below the badges -->
+        <div class="social-link" style="margin-top:0.5rem;">
           <a
             href="https://instagram.com/readysetflyus"
-            target="_blank"
-            rel="noopener"
-            class="social-link"
+            target="_blank" rel="noopener"
             aria-label="Connect with us on Instagram"
           >
             <img
@@ -305,6 +326,7 @@
           </a>
         </div>
       </div>
+    </div>
       <div class="hero">
         <h2>Your gateway to the skies.</h2>
         <p>
