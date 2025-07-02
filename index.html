@@ -100,16 +100,16 @@
     }
 
     footer {
-      position: relative;
-      background: #1d4ed8;
-      color: white;
-      padding: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem; /* space between items on desktop */
-      flex-wrap: wrap; /* allow wrapping on narrow screens */
-    }
+  position: relative;
+  background: #1d4ed8;
+  color: white;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* spread logo, create, and contact */
+  gap: 1rem; /* space between items on desktop */
+  flex-wrap: wrap; /* allow wrapping on narrow screens */
+}
 
     #footerLogo {
       height: 50px;
@@ -207,6 +207,14 @@
     .modal-buttons button:hover {
       background: #2563eb;
     }
+
+    #footerContact {
+      font-size: 0.9rem;
+      color: white;
+      cursor: pointer;
+      text-decoration: underline;
+      margin-left: auto; /* pushes it to the far right */
+    }
   </style>
 </head>
 <body>
@@ -230,7 +238,7 @@
     </div>
   </main>
 
-  <footer>
+ <footer>
     &copy; 2025 Ready Set Fly, LLC
     <img
       src="../../Assets/images/RSF_Logo_02232025.png"
@@ -238,6 +246,7 @@
       id="footerLogo"
     />
     <div id="footerCreate">Create Admin Account</div>
+    <div id="footerContact">Contact Us</div>
   </footer>
 
   <!-- LOGIN MODAL -->
@@ -403,10 +412,13 @@
   }
 
   window.addEventListener("DOMContentLoaded", () => {
-    checkAutoRedirect();
-    document.getElementById("footerLogo").addEventListener("click", loginAdmin);
-    document.getElementById("footerCreate").addEventListener("click", createAdmin);
+  checkAutoRedirect();
+  document.getElementById("footerLogo").addEventListener("click", loginAdmin);
+  document.getElementById("footerCreate").addEventListener("click", createAdmin);
+  document.getElementById("footerContact").addEventListener("click", () => {
+    window.location.href = "contact.html";
   });
+});
 </script>
 </body>
 </html>
