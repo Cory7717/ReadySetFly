@@ -11,7 +11,7 @@ const admin = require("firebase-admin");
 const Stripe = require("stripe");
 const bodyParser = require("body-parser");
 const nodemailer = require("nodemailer");
-const { defineSecret } = require('firebase-functions/params');
+const { defineSecret } = require("firebase-functions/params");
 
 // Firebase Functions v2 imports
 const { onRequest } = require("firebase-functions/v2/https");
@@ -45,30 +45,29 @@ if (!admin.logger) {
 const ALLOWED_PACKAGES = ["Basic", "Featured", "Enhanced", "Charter Services"]; // Note: 'FreeTrial' is handled separately.
 
 // Step 4: Load Stripe & moderator secrets via Firebase Functions v2 params
-const STRIPE_SECRET_KEY      = defineSecret('STRIPE_SECRET_KEY');
-const STRIPE_WEBHOOK_SECRET  = defineSecret('STRIPE_WEBHOOK_SECRET');
-const MODERATOR_EMAIL_SECRET = defineSecret('MODERATOR_EMAIL');
+const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
+const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
+const MODERATOR_EMAIL_SECRET = defineSecret("MODERATOR_EMAIL");
 
 // Initialize Stripe and moderator email at runtime
 // REMOVE this block-scoped initialization to avoid redeclaration error.
 // Stripe and related secrets are initialized in initStripeAndEmail().
-
 
 // =====================
 // Email (Nodemailer) setup            // <-- NEW block
 // =====================
 
 // ─── SMTP (Nodemailer) setup ────────────────────────────────────────
-const SMTP_HOST = defineSecret('SMTP_HOST');
-const SMTP_PORT = defineSecret('SMTP_PORT');
-const SMTP_USER = defineSecret('SMTP_USER');
-const SMTP_PASS = defineSecret('SMTP_PASS');
+const SMTP_HOST = defineSecret("SMTP_HOST");
+const SMTP_PORT = defineSecret("SMTP_PORT");
+const SMTP_USER = defineSecret("SMTP_USER");
+const SMTP_PASS = defineSecret("SMTP_PASS");
 
 let emailEnabled = false;
 
 let transporter = null;
 async function initTransporter() {
-  if (transporter) return;                     // only once per cold start
+  if (transporter) return; // only once per cold start
   const [host, portStr, user, pass] = await Promise.all([
     SMTP_HOST.value(),
     SMTP_PORT.value(),
@@ -76,12 +75,17 @@ async function initTransporter() {
     SMTP_PASS.value(),
   ]);
   const port = parseInt(portStr, 10);
-  if (!host || !port || !user || !pass) {
-    admin.logger.warn("⚠️ SMTP secrets missing – email disabled.");
-    return;
-  }
-  transporter = nodemailer.createTransport({ host, port, secure: port===465, auth:{ user, pass } });
-  transporter.verify(err =>
+if (!host || Number.isNaN(port) || !user || !pass) {
+  admin.logger.warn("⚠️ SMTP secrets missing or invalid – email disabled.");
+  return;
+}
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+  transporter.verify((err) =>
     err
       ? admin.logger.error("❌ SMTP config error", err)
       : admin.logger.info("✅ SMTP transporter ready")
@@ -89,7 +93,6 @@ async function initTransporter() {
 }
 
 // 3) Immediately fetch and configure nodemailer
-
 
 // how many free days each category gets
 const TRIAL_DAYS = {
@@ -125,11 +128,18 @@ const ALLOWED_ORIGINS = [
 // =====================
 const app = express();
 
+// 1) Health-check (no async/init middleware in the way)
+app.get("/", (req, res) => {
+  res.status(200).send("OK");
+});
 // right after you create `const app = express();`
 app.use(async (req, res, next) => {
+   // don’t block health checks
+  if (req.path === "/") return next();
+
   try {
     await initStripeAndEmail();
-    await initTransporter();      // also ensure your mailer is ready
+    await initTransporter(); // also ensure your mailer is ready
     next();
   } catch (err) {
     // if you really need, you can log but still continue
@@ -147,7 +157,9 @@ app.use(
       if (ALLOWED_ORIGINS.includes(incomingOrigin)) {
         return callback(null, true);
       }
-      callback(new Error(`CORS policy: origin '${incomingOrigin}' is not permitted.`));
+      callback(
+        new Error(`CORS policy: origin '${incomingOrigin}' is not permitted.`)
+      );
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -160,22 +172,18 @@ let moderatorEmail;
 
 // only run once per cold start
 async function initStripeAndEmail() {
-  if (stripe) return;  
+  if (stripe) return;
 
   // grab all your secrets in parallel
-  const [
-    stripeKey,
-    webhookSecret,
-    modEmail,
-  ] = await Promise.all([
+  const [stripeKey, webhookSecret, modEmail] = await Promise.all([
     STRIPE_SECRET_KEY.value(),
     STRIPE_WEBHOOK_SECRET.value(),
     MODERATOR_EMAIL_SECRET.value(),
   ]);
 
-  stripe            = new Stripe(stripeKey);
+  stripe = new Stripe(stripeKey);
   stripeWebhookSecret = webhookSecret;
-  moderatorEmail    = modEmail;
+  moderatorEmail = modEmail;
 
   // optionally log
   admin.logger.info("🔑 Stripe & moderator-email ready.");
@@ -431,9 +439,7 @@ app.post("/contact", async (req, res) => {
     // ensure transporter is ready
     await initTransporter();
     if (!transporter) {
-      return res
-        .status(500)
-        .json({ error: "Email service not configured." });
+      return res.status(500).json({ error: "Email service not configured." });
     }
 
     // send the mail
@@ -471,7 +477,7 @@ app.get("/stripe/search", authenticate, async (req, res) => {
     // first try customer lookup
     const customers = await stripe.customers.search({
       query: `email:'${q}' or metadata['account_number']:'${q}'`,
-      limit: 10
+      limit: 10,
     });
 
     // if none, try account lookup
@@ -521,15 +527,18 @@ app.get("/stripe/refund", authenticate, async (req, res) => {
 
 app.get("/stripe/reports", authenticate, async (req, res) => {
   // initialize a fresh stripe client
-  const stripeClient = require("stripe")(process.env.STRIPE_SECRET_KEY);
+ const stripeClient = stripe;
 
   // compute unix timestamps for those windows
-  const now       = Math.floor(Date.now() / 1000);
-  const startToday= Math.floor(new Date().setUTCHours(0,0,0,0) / 1000);
+  const now = Math.floor(Date.now() / 1000);
+  const startToday = Math.floor(new Date().setUTCHours(0, 0, 0, 0) / 1000);
   const startYest = startToday - 86400;
-  const startMon  = Math.floor(
-    new Date(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)
-      .getTime() / 1000
+  const startMon = Math.floor(
+    new Date(
+      new Date().getUTCFullYear(),
+      new Date().getUTCMonth(),
+      1
+    ).getTime() / 1000
   );
   const startYear = Math.floor(
     new Date(new Date().getUTCFullYear(), 0, 1).getTime() / 1000
@@ -543,27 +552,26 @@ app.get("/stripe/reports", authenticate, async (req, res) => {
       const params = { limit: 100, created: { gte, lt } };
       if (lastId) params.starting_after = lastId;
       const page = await stripeClient.charges.list(params);
-      page.data.forEach(c => { sum += c.amount; });
-      lastId = page.data.length === 100
-        ? page.data[page.data.length - 1].id
-        : null;
+      page.data.forEach((c) => {
+        sum += c.amount;
+      });
+      lastId =
+        page.data.length === 100 ? page.data[page.data.length - 1].id : null;
     } while (lastId);
     return Math.round(sum / 100); // convert cents → dollars
   }
 
   const yesterday = await sumWindow(startYest, startToday);
-  const mtd       = await sumWindow(startMon,   now);
-  const ytd       = await sumWindow(startYear,  now);
+  const mtd = await sumWindow(startMon, now);
+  const ytd = await sumWindow(startYear, now);
 
   res.json({ yesterday, mtd, ytd });
 });
 
-
 // simplest health‐check endpoint
-app.get("/", (req, res) => {
-  res.status(200).send("OK");
-});
-
+// app.get("/", (req, res) => {
+//   res.status(200).send("OK");
+// });
 
 // =====================
 // Helper Functions
@@ -608,7 +616,9 @@ const sendReportEmail = async ({ listingId, reporterId, reason, comments }) => {
   // Ensure transporter has been initialized
   await initTransporter();
   if (!transporter) {
-    admin.logger.warn("SMTP transporter not initialized – skipping report email.");
+    admin.logger.warn(
+      "SMTP transporter not initialized – skipping report email."
+    );
     return;
   }
 
@@ -742,11 +752,9 @@ app.post("/createListing", authenticate, async (req, res) => {
     if (missingFields.length > 0) {
       admin.logger.warn(`Missing required fields: ${missingFields.join(", ")}`);
       res.setHeader("Content-Type", "application/json");
-      return res
-        .status(400)
-        .json({
-          error: `Missing required fields: ${missingFields.join(", ")}`,
-        });
+      return res.status(400).json({
+        error: `Missing required fields: ${missingFields.join(", ")}`,
+      });
     }
     // For Flight Schools, ensure that flightSchoolDetails exists and has a non-empty flightSchoolEmail.
     if (category === "Flight Schools") {
@@ -755,12 +763,10 @@ app.post("/createListing", authenticate, async (req, res) => {
         !listingDetails.flightSchoolDetails.flightSchoolEmail
       ) {
         res.setHeader("Content-Type", "application/json");
-        return res
-          .status(400)
-          .json({
-            error:
-              "Missing required field: flightSchoolDetails.flightSchoolEmail",
-          });
+        return res.status(400).json({
+          error:
+            "Missing required field: flightSchoolDetails.flightSchoolEmail",
+        });
       }
     }
     // NEW: For Charter Services, verify that charterServiceDetails exists with required keys.
@@ -775,12 +781,10 @@ app.post("/createListing", authenticate, async (req, res) => {
           `Missing required fields in charterServiceDetails for category Charter Services`
         );
         res.setHeader("Content-Type", "application/json");
-        return res
-          .status(400)
-          .json({
-            error:
-              "Missing required fields: charterServiceName, charterServiceLocation, charterServiceEmail",
-          });
+        return res.status(400).json({
+          error:
+            "Missing required fields: charterServiceName, charterServiceLocation, charterServiceEmail",
+        });
       }
     }
     let finalSalePrice = 0;
@@ -805,11 +809,9 @@ app.post("/createListing", authenticate, async (req, res) => {
         if (isNaN(parsedSalePrice) || parsedSalePrice <= 0) {
           admin.logger.warn(`Invalid salePrice: ${salePrice}`);
           res.setHeader("Content-Type", "application/json");
-          return res
-            .status(400)
-            .json({
-              error: "Invalid salePrice. It must be a positive number.",
-            });
+          return res.status(400).json({
+            error: "Invalid salePrice. It must be a positive number.",
+          });
         }
         finalSalePrice = parsedSalePrice;
         finalPackageCost = calculateTotalCost(selectedPricing);
@@ -953,11 +955,9 @@ app.put("/updateListing", authenticate, async (req, res) => {
       categoryRequirements[sanitizedListingDetails.category];
     if (!reqCategoryRequirements) {
       res.setHeader("Content-Type", "application/json");
-      return res
-        .status(400)
-        .json({
-          error: `Invalid category: ${sanitizedListingDetails.category}`,
-        });
+      return res.status(400).json({
+        error: `Invalid category: ${sanitizedListingDetails.category}`,
+      });
     }
 
     let freeListing =
@@ -987,11 +987,9 @@ app.put("/updateListing", authenticate, async (req, res) => {
     );
     if (missingFields.length > 0) {
       res.setHeader("Content-Type", "application/json");
-      return res
-        .status(400)
-        .json({
-          error: `Missing required fields: ${missingFields.join(", ")}`,
-        });
+      return res.status(400).json({
+        error: `Missing required fields: ${missingFields.join(", ")}`,
+      });
     }
     // For Flight Schools, ensure that flightSchoolDetails exists and has a non-empty flightSchoolEmail.
     if (sanitizedListingDetails.category === "Flight Schools") {
@@ -1000,12 +998,10 @@ app.put("/updateListing", authenticate, async (req, res) => {
         !sanitizedListingDetails.flightSchoolDetails.flightSchoolEmail
       ) {
         res.setHeader("Content-Type", "application/json");
-        return res
-          .status(400)
-          .json({
-            error:
-              "Missing required field: flightSchoolDetails.flightSchoolEmail",
-          });
+        return res.status(400).json({
+          error:
+            "Missing required field: flightSchoolDetails.flightSchoolEmail",
+        });
       }
     }
     // NEW: For Charter Services, ensure that charterServiceDetails exists and contains the required keys.
@@ -1017,12 +1013,10 @@ app.put("/updateListing", authenticate, async (req, res) => {
         !sanitizedListingDetails.charterServiceDetails.charterServiceEmail
       ) {
         res.setHeader("Content-Type", "application/json");
-        return res
-          .status(400)
-          .json({
-            error:
-              "Missing required fields: charterServiceName, charterServiceLocation, charterServiceEmail",
-          });
+        return res.status(400).json({
+          error:
+            "Missing required fields: charterServiceName, charterServiceLocation, charterServiceEmail",
+        });
       }
     }
     // Modified location check: Use incoming lat/lng if available; otherwise, fall back to existing listingData.location.
@@ -1047,11 +1041,9 @@ app.put("/updateListing", authenticate, async (req, res) => {
     }
     if (isNaN(latitude) || isNaN(longitude)) {
       res.setHeader("Content-Type", "application/json");
-      return res
-        .status(400)
-        .json({
-          error: "Invalid location data. 'lat' and 'lng' must be numbers.",
-        });
+      return res.status(400).json({
+        error: "Invalid location data. 'lat' and 'lng' must be numbers.",
+      });
     }
 
     let finalSalePrice = listingData.salePrice;
@@ -1076,11 +1068,9 @@ app.put("/updateListing", authenticate, async (req, res) => {
         const parsedSalePrice = parseFloat(sanitizedSalePrice);
         if (isNaN(parsedSalePrice) || parsedSalePrice <= 0) {
           res.setHeader("Content-Type", "application/json");
-          return res
-            .status(400)
-            .json({
-              error: "Invalid salePrice. It must be a positive number.",
-            });
+          return res.status(400).json({
+            error: "Invalid salePrice. It must be a positive number.",
+          });
         }
         finalSalePrice = parsedSalePrice;
       }
@@ -1635,12 +1625,10 @@ app.post("/create-connected-account", authenticate, async (req, res) => {
       type: "account_onboarding",
     });
     res.setHeader("Content-Type", "application/json");
-    res
-      .status(200)
-      .json({
-        message: "Connected account created",
-        accountLinkUrl: accountLink.url,
-      });
+    res.status(200).json({
+      message: "Connected account created",
+      accountLinkUrl: accountLink.url,
+    });
   } catch (error) {
     const errorMessage = error.message || "Internal Server Error";
     admin.logger.error("Error creating connected account:", error);
@@ -1733,7 +1721,7 @@ app.get("/get-stripe-balance", authenticate, async (req, res) => {
       .get();
 
     let ytdAmount = 0;
-    paymentsSnap.forEach(doc => {
+    paymentsSnap.forEach((doc) => {
       const { netAmount } = doc.data();
       if (typeof netAmount === "number") {
         ytdAmount += netAmount;
@@ -1756,7 +1744,9 @@ app.get("/get-stripe-balance", authenticate, async (req, res) => {
         .status(400)
         .json({ error: "Connected account not linked to this platform." });
     }
-    return res.status(500).json({ error: err.message || "Internal Server Error" });
+    return res
+      .status(500)
+      .json({ error: err.message || "Internal Server Error" });
   }
 });
 
@@ -2342,11 +2332,11 @@ app.use((err, req, res, next) => {
 // ───────────────────────────────────────────────────
 // Admin: Search App Users by name or UID
 // ───────────────────────────────────────────────────
-app.get('/api/users/search', authenticate, async (req, res) => {
-  const q = (req.query.q || '').trim();
-  if (!q) return res.status(400).json({ error: 'Missing query' });
+app.get("/api/users/search", authenticate, async (req, res) => {
+  const q = (req.query.q || "").trim();
+  if (!q) return res.status(400).json({ error: "Missing query" });
   try {
-    const usersRef = db.collection('users');
+    const usersRef = db.collection("users");
     const results = [];
 
     // 1) Try exact UID lookup
@@ -2357,29 +2347,29 @@ app.get('/api/users/search', authenticate, async (req, res) => {
 
     // 2) Firestore doesn't support OR in one query, so do two name queries
     const nameQ = usersRef
-      .orderBy('firstName')
+      .orderBy("firstName")
       .startAt(q)
-      .endAt(q + '\uf8ff')
+      .endAt(q + "\uf8ff")
       .limit(10);
     const lastQ = usersRef
-      .orderBy('lastName')
+      .orderBy("lastName")
       .startAt(q)
-      .endAt(q + '\uf8ff')
+      .endAt(q + "\uf8ff")
       .limit(10);
 
-    const [snap1, snap2] = await Promise.all([ nameQ.get(), lastQ.get() ]);
-    snap1.forEach(doc => {
-      if (!results.find(u => u.uid === doc.id))
+    const [snap1, snap2] = await Promise.all([nameQ.get(), lastQ.get()]);
+    snap1.forEach((doc) => {
+      if (!results.find((u) => u.uid === doc.id))
         results.push({ uid: doc.id, ...doc.data() });
     });
-    snap2.forEach(doc => {
-      if (!results.find(u => u.uid === doc.id))
+    snap2.forEach((doc) => {
+      if (!results.find((u) => u.uid === doc.id))
         results.push({ uid: doc.id, ...doc.data() });
     });
 
     res.json({ users: results.slice(0, 10) });
   } catch (err) {
-    console.error('Error in /api/users/search:', err);
+    console.error("Error in /api/users/search:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2387,20 +2377,20 @@ app.get('/api/users/search', authenticate, async (req, res) => {
 // ───────────────────────────────────────────────────
 // Admin: Fetch all current listings for a given user
 // ───────────────────────────────────────────────────
-app.get('/api/users/:uid/listings', authenticate, async (req, res) => {
+app.get("/api/users/:uid/listings", authenticate, async (req, res) => {
   const { uid } = req.params;
   try {
     // Optionally, you could verify the user exists first
     const listingsSnap = await db
-      .collection('listings')
-      .where('ownerId', '==', uid)
-      .where('expired', '==', false)       // only active/current
-      .orderBy('createdAt', 'desc')
+      .collection("listings")
+      .where("ownerId", "==", uid)
+      .where("expired", "==", false) // only active/current
+      .orderBy("createdAt", "desc")
       .get();
 
-    const listings = listingsSnap.docs.map(doc => ({
+    const listings = listingsSnap.docs.map((doc) => ({
       id: doc.id,
-      ...doc.data()
+      ...doc.data(),
     }));
 
     res.json({ listings });
@@ -2409,7 +2399,6 @@ app.get('/api/users/:uid/listings', authenticate, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // Handle undefined routes
 app.use((req, res, next) => {
@@ -2424,7 +2413,15 @@ exports.api = onRequest(
   {
     memory: "512Mi",
     timeoutSeconds: 120,
-    secrets: [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MODERATOR_EMAIL_SECRET],
+    secrets: [
+      SMTP_HOST,
+      SMTP_PORT,
+      SMTP_USER,
+      SMTP_PASS,
+      STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET,
+      MODERATOR_EMAIL_SECRET,
+    ],
   },
   app
 );
