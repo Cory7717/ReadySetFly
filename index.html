@@ -228,9 +228,15 @@
   margin-bottom: 0.5rem;
 }
 
-  .social-link img:hover {
-    transform: translateY(-2px);
-  }
+  /* Instagram logo sizing & hover */
+.social-link img {
+  width: 32px;
+  height: 32px;
+  transition: transform 0.1s ease;
+}
+.social-link img:hover {
+  transform: translateY(-2px);
+}
   .ig-text {
   font-size: 0.9rem;
   text-decoration: underline;
@@ -260,12 +266,8 @@
 }
 .store-badge:hover {
   transform: translateY(-2px);
+
 }
-.social-link img {
-    width: 32px;
-    height: 32px;
-    transition: transform 0.1s ease;
-  }
   .play-badge-container {
   margin-bottom: 0.75rem;
 }
@@ -320,16 +322,20 @@
       />
     </a>
   </div>
-  <!-- 2) Instagram text link -->
-  <div class="social-link">
-    <a
-      href="https://instagram.com/readysetflyus"
-      target="_blank" rel="noopener"
-      class="ig-text"
-    >
-      Follow us on Instagram
-    </a>
-  </div>
+ <div class="social-link">
+  <a
+    href="https://instagram.com/readysetflyus"
+    target="_blank"
+    rel="noopener"
+    aria-label="Connect with us on Instagram"
+  >
+    <img
+      src="../../Assets/images/instagram-logo.png"
+      alt="Instagram logo"
+    />
+  </a>
+  <span class="ig-text">Follow us on Instagram</span>
+</div>
 </div>
 
       <div class="hero">
