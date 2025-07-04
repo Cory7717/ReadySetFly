@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -15,6 +16,7 @@
       flex-direction: column;
       min-height: 100vh;
     }
+
     header {
       background: #1D4ED8;
       color: white;
@@ -23,10 +25,12 @@
       align-items: center;
       justify-content: space-between;
     }
+
     header h1 {
       margin: 0;
       font-size: 1.5rem;
     }
+
     .home-button {
       background-color: #2563EB;
       color: white;
@@ -34,17 +38,23 @@
       padding: 0.5rem 1rem;
       font-size: 1rem;
       border-radius: 0.375rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       transition: background-color 0.2s;
     }
+
     .home-button:hover {
       background-color: #1E40AF;
     }
+
     main {
       flex: 1;
       padding: 2rem;
     }
-    .widget-control { margin-bottom: 1.5rem; }
+
+    .widget-control {
+      margin-bottom: 1.5rem;
+    }
+
     .widget-control button {
       background-color: #2563EB;
       color: white;
@@ -53,10 +63,14 @@
       font-size: 1rem;
       border-radius: 0.375rem;
       cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       transition: background-color 0.2s;
     }
-    .widget-control button:hover { background-color: #1E40AF; }
+
+    .widget-control button:hover {
+      background-color: #1E40AF;
+    }
+
     .widget-list {
       list-style: none;
       margin: 0.5rem 0 0;
@@ -67,43 +81,68 @@
       width: 240px;
       display: none;
     }
+
     .widget-list li {
       padding: 0.5rem 1rem;
       cursor: pointer;
     }
-    .widget-list li:hover { background: #f3f4f6; }
-    .widget-area { margin-top: 2rem; }
 
-    .stripe-widget, .sale-widget {
+    .widget-list li:hover {
+      background: #f3f4f6;
+    }
+
+    .widget-area {
+      margin-top: 2rem;
+    }
+
+    .stripe-widget,
+    .sale-widget {
       background: white;
       border-radius: 0.375rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       padding: 1.5rem;
       max-width: 700px;
     }
-    .stripe-widget h2, .sale-widget h2 {
+
+    .stripe-widget h2,
+    .sale-widget h2 {
       margin-top: 0;
       font-size: 1.25rem;
       color: #111827;
     }
+
     .tabs {
       display: flex;
       gap: 1rem;
       margin-top: 1rem;
     }
+
     .tab {
       padding: 0.5rem 1rem;
       cursor: pointer;
       border-bottom: 2px solid transparent;
     }
+
     .tab.active {
       border-color: #1D4ED8;
       font-weight: bold;
     }
-    .tab-content { margin-top: 1rem; }
-    .tab-content > div { display: none; }
-    .tab-content > .active { display: block; }
-    input, select, textarea {
+
+    .tab-content {
+      margin-top: 1rem;
+    }
+
+    .tab-content>div {
+      display: none;
+    }
+
+    .tab-content>.active {
+      display: block;
+    }
+
+    input,
+    select,
+    textarea {
       width: 100%;
       padding: 0.5rem;
       margin-top: 0.5rem;
@@ -112,11 +151,13 @@
       font-size: 1rem;
       box-sizing: border-box;
     }
+
     button.small {
       padding: 0.25rem 0.5rem;
       font-size: 0.875rem;
       margin-top: 0.5rem;
     }
+
     .results pre {
       background: #f9fafb;
       padding: 1rem;
@@ -124,7 +165,11 @@
       overflow-x: auto;
       font-size: 0.875rem;
     }
-    .section { margin-bottom: 1.5rem; }
+
+    .section {
+      margin-bottom: 1.5rem;
+    }
+
     .sale-widget .crm-list {
       list-style: none;
       padding: 0;
@@ -134,23 +179,26 @@
       border: 1px solid #d1d5db;
       border-radius: 0.375rem;
     }
+
     .sale-widget .crm-list li {
       padding: 0.5rem;
       border-bottom: 1px solid #e5e7eb;
     }
+
     .sale-widget .crm-list li:last-child {
       border-bottom: none;
     }
   </style>
 </head>
+
 <body>
   <header>
-  <a href="index.html" class="home-button">Home</a>
-  <h1>Admin Dashboard</h1>
-  <button id="logoutBtn" style="background:transparent;border:none;color:white;font-size:1rem;cursor:pointer;">
-    Log Out
-  </button>
-</header>
+    <a href="index.html" class="home-button">Home</a>
+    <h1>Admin Dashboard</h1>
+    <button id="logoutBtn" style="background:transparent;border:none;color:white;font-size:1rem;cursor:pointer;">
+      Log Out
+    </button>
+  </header>
 
   <main>
     <div class="widget-control">
@@ -165,22 +213,22 @@
     <div class="widget-area" id="widgetArea"></div>
   </main>
   <!-- Firebase App (the core Firebase SDK) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<!-- Firebase Auth -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script>
-  // Initialize Firebase
-  const firebaseConfig = {
-    apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
-    authDomain: "ready-set-fly-71506.firebaseapp.com",
-    // …etc (match your web app config)
-  };
-  firebase.initializeApp(firebaseConfig);
-</script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <!-- Firebase Auth -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
+      authDomain: "ready-set-fly-71506.firebaseapp.com",
+      // …etc (match your web app config)
+    };
+    firebase.initializeApp(firebaseConfig);
+  </script>
   <script>
     const addBtn = document.getElementById('addWidgetBtn');
-    const list   = document.getElementById('widgetList');
-    const area   = document.getElementById('widgetArea');
+    const list = document.getElementById('widgetList');
+    const area = document.getElementById('widgetArea');
 
     addBtn.addEventListener('click', () => {
       list.style.display = list.style.display === 'block' ? 'none' : 'block';
@@ -191,8 +239,8 @@
       if (!w) return;
       list.style.display = 'none';
       if (w === 'stripe') loadStripeWidget();
-      else if (w === 'sale')   loadSaleWidget();
-      else if (w === 'users')  loadUserWidget();
+      else if (w === 'sale') loadSaleWidget();
+      else if (w === 'users') loadUserWidget();
     });
 
     function loadStripeWidget() {
@@ -200,40 +248,40 @@
       const widget = document.createElement('div');
       widget.className = 'stripe-widget';
       widget.innerHTML = `
-        <h2>Stripe Admin</h2>
-        <div class="tabs">
-          <div class="tab active" data-tab="search">Search Users</div>
-          <div class="tab" data-tab="charges">Recent Charges</div>
-          <div class="tab" data-tab="refund">Issue Refund</div>
-          <div class="tab" data-tab="reports">Reports</div>
+    <h2>Stripe Admin</h2>
+    <div class="tabs">
+      <div class="tab active" data-tab="search">Search Users</div>
+      <div class="tab" data-tab="charges">Recent Charges</div>
+      <div class="tab" data-tab="refund">Issue Refund</div>
+      <div class="tab" data-tab="reports">Reports</div>
+    </div>
+    <div class="tab-content">
+      <div id="search" class="active">
+        <div class="section">
+          <label>User Email or Account#</label>
+          <input type="text" id="stripeQuery" placeholder="e.g. user@example.com or acct_12345"/>
+          <button class="small" id="searchBtn">Search</button>
         </div>
-        <div class="tab-content">
-          <div id="search" class="active">
-            <div class="section">
-              <label>User Email or Account#</label>
-              <input type="text" id="stripeQuery" placeholder="e.g. user@example.com or acct_12345"/>
-              <button class="small" id="searchBtn">Search</button>
-            </div>
-            <div class="results" id="stripeResults"></div>
-          </div>
-          <div id="charges">
-            <button class="small" id="loadChargesBtn">Load Recent Charges</button>
-            <div class="results" id="chargesResults"></div>
-          </div>
-          <div id="refund">
-            <div class="section">
-              <label>Charge ID to Refund</label>
-              <input type="text" id="refundChargeId" placeholder="e.g. ch_1GqIC8..."/>
-            </div>
-            <button class="small" id="refundBtn">Issue Refund</button>
-            <div class="results" id="refundResults"></div>
-          </div>
-          <div id="reports">
-     <button class="small" id="loadReportsBtn">Load Reports</button>
-     <div class="results" id="reportsResults"></div>
-   </div>
+        <div class="results" id="stripeResults"></div>
+      </div>
+      <div id="charges">
+        <button class="small" id="loadChargesBtn">Load Recent Charges</button>
+        <div class="results" id="chargesResults"></div>
+      </div>
+      <div id="refund">
+        <div class="section">
+          <label>Charge ID to Refund</label>
+          <input type="text" id="refundChargeId" placeholder="e.g. ch_1GqIC8..."/>
         </div>
-      `;
+        <button class="small" id="refundBtn">Issue Refund</button>
+        <div class="results" id="refundResults"></div>
+      </div>
+      <div id="reports">
+        <button class="small" id="loadReportsBtn">Load Reports</button>
+        <div class="results" id="reportsResults"></div>
+      </div>
+    </div>
+  `;
       area.appendChild(widget);
 
       // Tab switching
@@ -246,7 +294,7 @@
         });
       });
 
-      // User search
+      // Search handler
       widget.querySelector('#searchBtn').addEventListener('click', async () => {
         const q = widget.querySelector('#stripeQuery').value.trim();
         if (!q) return;
@@ -255,10 +303,102 @@
         try {
           const res = await fetch(`/api/stripe/search?q=${encodeURIComponent(q)}`);
           if (!res.ok) throw new Error(res.statusText);
-          const { customer, paymentMethods = [] } = await res.json();
+          const { customers, accounts } = await res.json();
           let html = '';
-          if (customer) {
-            html += `
+          if (customers.length) {
+            html += `<h3>Customers (${customers.length})</h3><ul>` +
+              customers.map(c => `<li>${c.id} — ${c.email || '—'}</li>`).join('') +
+              `</ul>`;
+          }
+          if (accounts.length) {
+            html += `<h3>Accounts (${accounts.length})</h3><ul>` +
+              accounts.map(a => `<li>${a.id} — ${a.email || '—'}</li>`).join('') +
+              `</ul>`;
+          }
+          resultsEl.innerHTML = html || `<p>No results for “${q}”.</p>`;
+        } catch (err) {
+          widget.querySelector('#stripeResults').innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+        }
+      });
+
+      // Charges handler
+      widget.querySelector('#loadChargesBtn').addEventListener('click', async () => {
+        const el = widget.querySelector('#chargesResults');
+        el.innerText = 'Loading…';
+        try {
+          const res = await fetch('/api/stripe/charges?limit=10');
+          if (!res.ok) throw new Error(res.statusText);
+          const { data } = await res.json();
+          el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        } catch (err) {
+          el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+        }
+      });
+
+      // Refund handler
+      widget.querySelector('#refundBtn').addEventListener('click', async () => {
+        const chargeId = widget.querySelector('#refundChargeId').value.trim();
+        if (!chargeId) return alert('Enter a charge ID');
+        const el = widget.querySelector('#refundResults');
+        el.innerText = 'Processing…';
+        try {
+          const res = await fetch('/api/stripe/refund', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chargeId })
+          });
+          if (!res.ok) throw new Error(res.statusText);
+          const data = await res.json();
+          el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        } catch (err) {
+          el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+        }
+      });
+
+      // Reports handler
+      widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
+        const el = widget.querySelector('#reportsResults');
+        el.innerText = 'Loading…';
+        try {
+          const res = await fetch('/api/stripe/reports');
+          if (!res.ok) throw new Error(res.statusText);
+          const { yesterday, mtd, ytd } = await res.json();
+          el.innerHTML = `
+        <h4>Revenue Reports</h4>
+        <ul>
+          <li><strong>Yesterday:</strong> $${Number(yesterday).toLocaleString()}</li>
+          <li><strong>Month-to-Date:</strong> $${Number(mtd).toLocaleString()}</li>
+          <li><strong>Year-to-Date:</strong> $${Number(ytd).toLocaleString()}</li>
+        </ul>`;
+        } catch (err) {
+          el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+        }
+      });
+    }
+
+    // Tab switching
+    widget.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        widget.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        widget.querySelectorAll('.tab-content > div').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        widget.querySelector(`#${tab.dataset.tab}`).classList.add('active');
+      });
+    });
+
+    // User search
+    widget.querySelector('#searchBtn').addEventListener('click', async () => {
+      const q = widget.querySelector('#stripeQuery').value.trim();
+      if (!q) return;
+      const resultsEl = widget.querySelector('#stripeResults');
+      resultsEl.innerText = 'Loading…';
+      try {
+        const res = await fetch(`/api/stripe/search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) throw new Error(res.statusText);
+        const { customer, paymentMethods = [] } = await res.json();
+        let html = '';
+        if (customer) {
+          html += `
               <h3>Customer Info</h3>
               <ul>
                 <li><strong>ID:</strong> ${customer.id}</li>
@@ -266,73 +406,50 @@
                 <li><strong>Name:</strong> ${customer.name || '—'}</li>
                 <li><strong>Created:</strong> ${new Date(customer.created * 1000).toLocaleString()}</li>
               </ul>`;
-          } else {
-            html += `<p>No customer found for “${q}”.</p>`;
-          }
-          if (paymentMethods.length) {
-            html += `<h4>Payment Methods (${paymentMethods.length})</h4><ul>`;
-            paymentMethods.forEach(pm => {
-              html += `
+        } else {
+          html += `<p>No customer found for “${q}”.</p>`;
+        }
+        if (paymentMethods.length) {
+          html += `<h4>Payment Methods (${paymentMethods.length})</h4><ul>`;
+          paymentMethods.forEach(pm => {
+            html += `
                 <li>
                   <strong>${pm.type.toUpperCase()}</strong> ending in
                   ${pm.card?.last4 || pm.bank_account?.last4 || '----'}
                   (exp ${pm.card?.exp_month}/${pm.card?.exp_year})
                 </li>`;
-            });
-            html += `</ul>`;
-          }
-          resultsEl.innerHTML = html;
-        } catch (err) {
-          resultsEl.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+          });
+          html += `</ul>`;
         }
-      });
+        resultsEl.innerHTML = html;
+      } catch (err) {
+        resultsEl.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+      }
+    });
 
-      // Recent charges
-      widget.querySelector('#loadChargesBtn').addEventListener('click', async () => {
-        const el = widget.querySelector('#chargesResults');
-        el.innerText = 'Loading…';
-        const res = await fetch('/api/stripe/charges?limit=10');
-        const data = await res.json();
-        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-      });
+    // Recent charges
+    widget.querySelector('#loadChargesBtn').addEventListener('click', async () => {
+      const el = widget.querySelector('#chargesResults');
+      el.innerText = 'Loading…';
+      const res = await fetch('/api/stripe/charges?limit=10');
+      const data = await res.json();
+      el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    });
 
-      // Issue refund
-      widget.querySelector('#refundBtn').addEventListener('click', async () => {
-        const chargeId = widget.querySelector('#refundChargeId').value.trim();
-        if (!chargeId) return alert('Enter a charge ID');
-        const el = widget.querySelector('#refundResults');
-        el.innerText = 'Processing…';
-        const res = await fetch('/api/stripe/refund', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ chargeId })
-        });
-        const data = await res.json();
-        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    // Issue refund
+    widget.querySelector('#refundBtn').addEventListener('click', async () => {
+      const chargeId = widget.querySelector('#refundChargeId').value.trim();
+      if (!chargeId) return alert('Enter a charge ID');
+      const el = widget.querySelector('#refundResults');
+      el.innerText = 'Processing…';
+      const res = await fetch('/api/stripe/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chargeId })
       });
-    }
-    // Reports
-widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
-  const el = widget.querySelector('#reportsResults');
-  el.innerText = 'Loading…';
-  try {
-    // your backend needs an endpoint that returns { yesterday, mtd, ytd }
-    const res = await fetch('/stripe/reports');
-    if (!res.ok) throw new Error(res.statusText);
-    const { yesterday, mtd, ytd } = await res.json();
-
-    el.innerHTML = `
-      <h4>Revenue Reports</h4>
-      <ul>
-        <li><strong>Yesterday:</strong> $${Number(yesterday).toLocaleString()}</li>
-        <li><strong>Month-to-Date:</strong> $${Number(mtd).toLocaleString()}</li>
-        <li><strong>Year-to-Date:</strong> $${Number(ytd).toLocaleString()}</li>
-      </ul>
-    `;
-  } catch (err) {
-    el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
-  }
-});
+      const data = await res.json();
+      el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    });
 
     function loadSaleWidget() {
       area.innerHTML = '';
@@ -381,13 +498,13 @@ widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
       const contacts = [];
       const contactsList = widget.querySelector('#contactsList');
       widget.querySelector('#addContactBtn').addEventListener('click', () => {
-        const name  = widget.querySelector('#contactName').value.trim();
+        const name = widget.querySelector('#contactName').value.trim();
         const email = widget.querySelector('#contactEmail').value.trim();
         if (!name || !email) return alert('Enter name and email');
         contacts.push({ name, email });
         renderList(contactsList, contacts.map(c => `${c.name} — ${c.email}`));
         widget.querySelector('#contactName').value = '';
-        widget.querySelector('#contactEmail').value= '';
+        widget.querySelector('#contactEmail').value = '';
       });
 
       // Leads logic
@@ -406,10 +523,10 @@ widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
       ul.innerHTML = items.map(i => `<li>${i}</li>`).join('');
     }
     function loadUserWidget() {
-  area.innerHTML = '';
-  const widget = document.createElement('div');
-  widget.className = 'stripe-widget'; // reuse same card styles
-  widget.innerHTML = `
+      area.innerHTML = '';
+      const widget = document.createElement('div');
+      widget.className = 'stripe-widget'; // reuse same card styles
+      widget.innerHTML = `
     <h2>User Search</h2>
     <div class="section">
       <label>Search by First/Last Name or UID</label>
@@ -419,86 +536,105 @@ widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
     <ul id="userList" class="crm-list"></ul>
     <div id="userDetails"></div>
   `;
-  area.appendChild(widget);
+      area.appendChild(widget);
 
-  // 1) Search click
-  widget.querySelector('#userSearchBtn').addEventListener('click', async () => {
-    const q = widget.querySelector('#userQuery').value.trim();
-    if (!q) return alert('Enter a name or UID');
-    const listEl = widget.querySelector('#userList');
-    listEl.innerHTML = '<li>Searching…</li>';
-    try {
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`);
-      const { users } = await res.json();
-      if (!users.length) {
-        listEl.innerHTML = '<li>No users found.</li>';
-        return;
-      }
-      listEl.innerHTML = users
-        .map(u => `<li data-uid="${u.uid}">${u.firstName || '–'} ${u.lastName || '–'} — ${u.uid}</li>`)
-        .join('');
-    } catch (err) {
-      listEl.innerHTML = `<li style="color:red">Error: ${err.message}</li>`;
-    }
-  });
+      // 1) Search click
+      widget.querySelector('#userSearchBtn').addEventListener('click', async () => {
+        const q = widget.querySelector('#userQuery').value.trim();
+        if (!q) return alert('Enter a name or UID');
+        const listEl = widget.querySelector('#userList');
+        listEl.innerHTML = '<li>Searching…</li>';
+        try {
+          const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`);
+          const { users } = await res.json();
+          if (!users.length) {
+            listEl.innerHTML = '<li>No users found.</li>';
+            return;
+          }
+          listEl.innerHTML = users
+            .map(u => `<li data-uid="${u.uid}">${u.firstName || '–'} ${u.lastName || '–'} — ${u.uid}</li>`)
+            .join('');
+        } catch (err) {
+          listEl.innerHTML = `<li style="color:red">Error: ${err.message}</li>`;
+        }
+      });
 
-  // 2) Click on one user → load their listings
-  widget.querySelector('#userList').addEventListener('click', async e => {
-    const li = e.target.closest('li[data-uid]');
-    if (!li) return;
-    const uid = li.dataset.uid;
-    // show loading
-    const details = widget.querySelector('#userDetails');
-    details.innerHTML = '<p>Loading user details…</p>';
-    try {
-      // Fetch profile & listings in parallel
-      const [ userDoc, listingsRes ] = await Promise.all([
-        db  // you’ll need to have a global 'db' or re-fetch via your API
-          ? Promise.resolve({}) // if you have client-side firebase SDK initialized
-          : fetch(`/api/users/search?q=${uid}`).then(r=>r.json()).then(j=>j.users[0]||{}),
-        fetch(`/api/users/${uid}/listings`).then(r=>r.json())
-      ]);
+      // 2) Click on one user → load their listings
+      widget.querySelector('#userList').addEventListener('click', async e => {
+        const li = e.target.closest('li[data-uid]');
+        if (!li) return;
+        const uid = li.dataset.uid;
+        // show loading
+        const details = widget.querySelector('#userDetails');
+        details.innerHTML = '<p>Loading user details…</p>';
+        try {
+          // Fetch profile & listings in parallel
+          const [userDoc, listingsRes] = await Promise.all([
+            db  // you’ll need to have a global 'db' or re-fetch via your API
+              ? Promise.resolve({}) // if you have client-side firebase SDK initialized
+              : fetch(`/api/users/search?q=${uid}`).then(r => r.json()).then(j => j.users[0] || {}),
+            fetch(`/api/users/${uid}/listings`).then(r => r.json())
+          ]);
 
-      const { listings } = listingsRes;
-      let html = `
+          const { listings } = listingsRes;
+          let html = `
         <h3>User: ${userDoc.firstName || ''} ${userDoc.lastName || ''}</h3>
         <p><strong>UID:</strong> ${uid}</p>
         <p><strong>Email:</strong> ${userDoc.email || '–'}</p>
         <h4>Current Listings (${listings.length})</h4>
       `;
-      if (listings.length) {
-        html += '<ul class="crm-list">';
-        listings.forEach(l => {
-          html += `
+          if (listings.length) {
+            html += '<ul class="crm-list">';
+            listings.forEach(l => {
+              html += `
             <li>
-              <strong>${l.title||l.category||'Untitled'}</strong>
+              <strong>${l.title || l.category || 'Untitled'}</strong>
               <br/>
-              Status: ${l.status||'–'} 
-              ${l.trialExpiry?`<br/>Expires: ${new Date(l.trialExpiry._seconds*1000).toLocaleDateString()}`:''}
+              Status: ${l.status || '–'} 
+              ${l.trialExpiry ? `<br/>Expires: ${new Date(l.trialExpiry._seconds * 1000).toLocaleDateString()}` : ''}
             </li>`;
-        });
-        html += '</ul>';
-      } else {
-        html += '<p>(no active listings)</p>';
-      }
-      details.innerHTML = html;
-    } catch (err) {
-      details.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+            });
+            html += '</ul>';
+          } else {
+            html += '<p>(no active listings)</p>';
+          }
+          details.innerHTML = html;
+        } catch (err) {
+          details.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+        }
+      });
     }
-  });
-}
-// ─── Log Out Button ──────────────────────────────────────────────────
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-  try {
-    // If you use Firebase Auth on the client:
-    await firebase.auth().signOut();
+  </script>
 
-    // Then redirect to your main site:
-    window.location.href = 'https://readysetfly.us';
-  } catch (err) {
-    alert('Error signing out: ' + err.message);
-  }
-});
+  <!-- ─── SESSION HELPERS ─────────────────────────────────────────────── -->
+  <script>
+    // 1) session keys & clear helper
+    const SESSION_KEY = "currentAdmin";
+    const LOGIN_TS_KEY = "loginTimestamp";
+    function clearCurrentUser() {
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(LOGIN_TS_KEY);
+    }
+  </script>
+  <!-- ─── LOGOUT BUTTON HANDLER ───────────────────────────────────────── -->
+  <script>
+    document
+      .getElementById('logoutBtn')
+      .addEventListener('click', async () => {
+        // 2) clear your “admin” session
+        clearCurrentUser();
+
+        // 3) if you’re using Firebase Auth on the client, sign out there too
+        try {
+          await firebase.auth().signOut();
+        } catch (err) {
+          console.warn('Firebase signOut error:', err);
+        }
+
+        // 4) redirect back to your login/index page
+        window.location.href = 'index.html';
+      });
   </script>
 </body>
+
 </html>
