@@ -225,9 +225,8 @@
       }
 
       .social-link {
-        display: inline-block;
-        margin-top: 0.5rem; /* small gap above Instagram logo */
-      }
+  margin-bottom: 0.5rem;
+}
 
       .social-link img {
     width: 32px;
@@ -237,10 +236,17 @@
   .social-link img:hover {
     transform: translateY(-2px);
   }
+  .ig-text {
+  font-size: 0.9rem;
+  text-decoration: underline;
+  color: #1d4ed8;
+  cursor: pointer;
+}
       .app-promo {
-        text-align: center;
-        max-width: 320px;
-      }
+  text-align: center;
+  max-width: 320px;
+  margin: 0 auto;
+}
 
       .app-promo p {
         margin: 0 0 0.5rem;
@@ -256,14 +262,22 @@
       .app-promo img:hover {
         transform: translateY(-2px);
       }
-      .store-badge {
-    width: 120px;
-    cursor: pointer;
-    transition: transform 0.1s ease;
-  }
-  .store-badge:hover {
-    transform: translateY(-2px);
-  }
+      .appstore-container {
+  margin-top: 0.5rem;
+}
+
+/* Common badge styling */
+.store-badge {
+  width: 120px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.store-badge:hover {
+  transform: translateY(-2px);
+}
+  .play-badge-container {
+  margin-bottom: 0.75rem;
+}
     </style>
   </head>
   <body>
@@ -288,8 +302,8 @@
     the app today.
   </p>
 
-  <!-- badges + Instagram all inside one grid container -->
-  <div class="badges">
+  <!-- 1) Google Play badge -->
+  <div class="play-badge-container">
     <a
       href="https://play.google.com/store/apps/details?id=com.readysetfly"
       target="_blank" rel="noopener"
@@ -300,6 +314,21 @@
         class="store-badge"
       />
     </a>
+  </div>
+
+  <!-- 2) Instagram text link -->
+  <div class="social-link">
+    <a
+      href="https://instagram.com/readysetflyus"
+      target="_blank" rel="noopener"
+      class="ig-text"
+    >
+      Follow us on Instagram
+    </a>
+  </div>
+
+  <!-- 3) App Store badge -->
+  <div class="appstore-container">
     <a
       href="https://apps.apple.com/app/idXXXXXXXXX"
       target="_blank" rel="noopener"
@@ -310,23 +339,9 @@
         class="store-badge"
       />
     </a>
-
-    <!-- Instagram sits in the 2nd column on the 2nd row -->
-    <div class="social-link">
-      <a
-        href="https://instagram.com/readysetflyus"
-        target="_blank" rel="noopener"
-        aria-label="Connect with us on Instagram"
-      >
-        <img
-          src="../../Assets/images/instagram-logo.png"
-          alt="Instagram logo"
-        />
-      </a>
-      <span>Follow us on Instagram</span>
-    </div>
   </div>
 </div>
+
       <div class="hero">
         <h2>Your gateway to the skies.</h2>
         <p>
