@@ -145,9 +145,12 @@
 </head>
 <body>
   <header>
-    <a href="index.html" class="home-button">Home</a>
-    <h1>Admin Dashboard</h1>
-  </header>
+  <a href="index.html" class="home-button">Home</a>
+  <h1>Admin Dashboard</h1>
+  <button id="logoutBtn" style="background:transparent;border:none;color:white;font-size:1rem;cursor:pointer;">
+    Log Out
+  </button>
+</header>
 
   <main>
     <div class="widget-control">
@@ -161,7 +164,19 @@
 
     <div class="widget-area" id="widgetArea"></div>
   </main>
-
+  <!-- Firebase App (the core Firebase SDK) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<!-- Firebase Auth -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script>
+  // Initialize Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
+    authDomain: "ready-set-fly-71506.firebaseapp.com",
+    // …etc (match your web app config)
+  };
+  firebase.initializeApp(firebaseConfig);
+</script>
   <script>
     const addBtn = document.getElementById('addWidgetBtn');
     const list   = document.getElementById('widgetList');
@@ -472,6 +487,18 @@ widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
     }
   });
 }
+// ─── Log Out Button ──────────────────────────────────────────────────
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  try {
+    // If you use Firebase Auth on the client:
+    await firebase.auth().signOut();
+
+    // Then redirect to your main site:
+    window.location.href = 'https://readysetfly.us';
+  } catch (err) {
+    alert('Error signing out: ' + err.message);
+  }
+});
   </script>
 </body>
 </html>
