@@ -1,551 +1,609 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Welcome to Ready Set Fly!</title>
     <style>
-      body {
-        font-family: "Segoe UI", Roboto, sans-serif;
-        margin: 0;
-        padding: 0;
-        background: #f3f4f6;
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-        color: #1f2937;
-      }
-
-      header {
-        position: relative; /* allow absolute children */
-        background-image: url("../../Assets/images/wingtip_clouds.jpg");
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: cover;
-        height: 200px;
-        display: flex;
-        align-items: flex-end; /* keep existing behavior */
-        padding: 1rem;
-        color: white;
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-      }
-
-      .hero-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 2rem;
-        font-weight: bold;
-        text-align: center;
-        line-height: 1.2;
-        padding: 0.5rem 1rem;
-        background: rgba(0, 0, 0, 0.4); /* semi-transparent backdrop */
-        border-radius: 0.5rem;
-        max-width: 90%;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-      }
-
-      main {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        padding: 2rem 1rem;
-        gap: 2rem;
-      }
-
-      .view-area {
-        display: flex;
-        flex-direction: column; /* stack view-buttons over app-promo */
-        align-items: center; /* center everything horizontally */
-        gap: 1rem; /* space between rows */
-      }
-      .btn {
-        background-color: #1d4ed8;
-        color: white;
-        border: none;
-        padding: 0.75rem 1.5rem;
-        font-size: 1rem;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: background-color 0.2s ease, transform 0.1s ease;
-      }
-
-      .btn:hover {
-        background-color: #2563eb;
-        transform: translateY(-2px);
-      }
-
-      .hero {
-        max-width: 600px;
-        margin: 0 auto;
-        text-align: center;
-        font-size: 1rem;
-        line-height: 1.6;
-        padding: 1rem;
-        background: rgba(255, 255, 255, 0.8);
-        border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      }
-
-      .hero h2 {
-        margin-top: 0;
-        font-size: 1.75rem;
-        color: #111827;
-      }
-
-      .hero p {
-        margin: 0.75rem 0 0;
-      }
-
-      footer {
-        position: relative;
-        background: #1d4ed8;
-        color: white;
-        padding: 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between; /* spread logo, create, and contact */
-        gap: 1rem; /* space between items on desktop */
-        flex-wrap: wrap; /* allow wrapping on narrow screens */
-      }
-
-      #footerLogo {
-        height: 50px;
-        cursor: pointer;
-        transition: transform 0.1s;
-      }
-      #footerLogo:hover {
-        transform: translateY(-2px);
-      }
-
-      #footerCreate {
-        font-size: 0.9rem;
-        color: white;
-        cursor: pointer;
-        text-decoration: underline;
-      }
-
-      /* responsive adjustments */
-      @media (max-width: 600px) {
-        footer {
-          flex-direction: column;
-          gap: 0.5rem;
+        body {
+            font-family: "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            color: #1f2937;
         }
+
+        header {
+            position: relative;
+            /* allow absolute children */
+            background-image: url("../../Assets/images/wingtip_clouds.jpg");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: cover;
+            height: 200px;
+            display: flex;
+            align-items: flex-end;
+            /* keep existing behavior */
+            padding: 1rem;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+        }
+
         .hero-text {
-          font-size: 1.5rem;
-          padding: 0.25rem 0.5rem;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1.2;
+            padding: 0.5rem 1rem;
+            background: rgba(0, 0, 0, 0.4);
+            /* semi-transparent backdrop */
+            border-radius: 0.5rem;
+            max-width: 90%;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
-        #footerLogo,
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem 1rem;
+            gap: 2rem;
+        }
+
+        .view-area {
+            display: flex;
+            flex-direction: column;
+            /* stack view-buttons over app-promo */
+            align-items: center;
+            /* center everything horizontally */
+            gap: 1rem;
+            /* space between rows */
+        }
+
+        .btn {
+            background-color: #1d4ed8;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .btn:hover {
+            background-color: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .hero {
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+            font-size: 1rem;
+            line-height: 1.6;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .hero h2 {
+            margin-top: 0;
+            font-size: 1.75rem;
+            color: #111827;
+        }
+
+        .hero p {
+            margin: 0.75rem 0 0;
+        }
+
+        footer {
+            position: relative;
+            background: #1d4ed8;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            /* spread logo, create, and contact */
+            gap: 1rem;
+            /* space between items on desktop */
+            flex-wrap: wrap;
+            /* allow wrapping on narrow screens */
+        }
+
+        #footerLogo {
+            height: 50px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        #footerLogo:hover {
+            transform: translateY(-2px);
+        }
+
         #footerCreate {
-          position: static;
-          margin: 0; /* reset any absolute offsets */
+            font-size: 0.9rem;
+            color: white;
+            cursor: pointer;
+            text-decoration: underline;
         }
-      }
 
-      /* Modal Styles */
-      .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.4);
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-      }
-      .modal-content {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 0.5rem;
-        width: 90%;
-        max-width: 320px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      }
-      .modal-content h3 {
-        margin-top: 0;
-        margin-bottom: 1rem;
-      }
-      .modal-content label {
-        display: block;
-        margin-bottom: 0.75rem;
-        font-size: 0.9rem;
-      }
-      .modal-content input {
-        width: 100%;
-        padding: 0.5rem;
-        font-size: 1rem;
-        margin-top: 0.25rem;
-        border: 1px solid #cbd5e0;
-        border-radius: 0.25rem;
-        box-sizing: border-box;
-      }
-      .password-wrapper {
-        position: relative;
-      }
-      .password-wrapper .toggle-eye {
-        position: absolute;
-        right: 0.5rem;
-        top: 50%;
-        transform: translateY(-50%);
-        cursor: pointer;
-      }
-      .modal-buttons {
-        margin-top: 1rem;
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.5rem;
-      }
-      .modal-buttons button {
-        padding: 0.5rem 1rem;
-        border: none;
-        background: #1d4ed8;
-        color: white;
-        border-radius: 0.25rem;
-        cursor: pointer;
-      }
-      .modal-buttons button:hover {
-        background: #2563eb;
-      }
+        /* responsive adjustments */
+        @media (max-width: 600px) {
+            footer {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
 
-      #footerContact {
-        font-size: 0.9rem;
-        color: white;
-        cursor: pointer;
-        text-decoration: underline;
-        margin-left: auto; /* pushes it to the far right */
-      }
+            .hero-text {
+                font-size: 1.5rem;
+                padding: 0.25rem 0.5rem;
+            }
 
-      .view-buttons {
-        display: flex;
-        gap: 0.5rem;
-      }
+            #footerLogo,
+            #footerCreate {
+                position: static;
+                margin: 0;
+                /* reset any absolute offsets */
+            }
+        }
 
-    /* Instagram link */
-.social-link {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 320px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+        }
+
+        .modal-content label {
+            display: block;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 1rem;
+            margin-top: 0.25rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 0.25rem;
+            box-sizing: border-box;
+        }
+
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-wrapper .toggle-eye {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
+
+        .modal-buttons {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        .modal-buttons button {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: #1d4ed8;
+            color: white;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+
+        .modal-buttons button:hover {
+            background: #2563eb;
+        }
+
+        #footerContact {
+            font-size: 0.9rem;
+            color: white;
+            cursor: pointer;
+            text-decoration: underline;
+            margin-left: auto;
+            /* pushes it to the far right */
+        }
+
+        .view-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Instagram link */
+        .social-link {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .social-link img {
+            width: 32px;
+            height: 32px;
+            transition: transform 0.1s ease;
+        }
+
+        .social-link img:hover {
+            transform: translateY(-2px);
+        }
+
+        .ig-text {
+            margin-top: 0.25rem;
+            font-size: 0.9rem;
+            text-decoration: underline;
+            color: #1d4ed8;
+            cursor: pointer;
+        }
+
+        .app-promo {
+            text-align: center;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .app-promo p {
+            margin: 0 0 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .appstore-container {
+            margin-top: 0.5rem;
+        }
+
+        .store-buttons {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        /* Store badge common styling */
+        .store-badge {
+            width: 120px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .store-badge:hover {
+            transform: translateY(-2px);
+        }
+
+        .play-badge-container {
+            margin-bottom: 0.75rem;
+        }
+        /* hero list & bold styling */
+.hero strong {
+  font-weight: 600;
+  color: #111827;
 }
-.social-link img {
-  width: 32px;
-  height: 32px;
-  transition: transform 0.1s ease;
+.hero ul {
+  list-style: disc inside;
+  margin: 1rem 0;
+  padding-left: 1.25rem;
 }
-.social-link img:hover {
-  transform: translateY(-2px);
-}
-.ig-text {
-  margin-top: 0.25rem;
-  font-size: 0.9rem;
-  text-decoration: underline;
-  color: #1d4ed8;
-  cursor: pointer;
-}
-      .app-promo {
-  text-align: center;
-  max-width: 320px;
-  margin: 0 auto;
+.hero li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
 }
 
-      .app-promo p {
-        margin: 0 0 0.5rem;
-        font-size: 0.9rem;
-      }
-
-      .appstore-container {
-  margin-top: 0.5rem;
-}
-.store-buttons {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-/* Store badge common styling */
-.store-badge {
-  width: 120px;
-  cursor: pointer;
-  transition: transform 0.1s ease;
-}
-.store-badge:hover {
-  transform: translateY(-2px);
-}
-  .play-badge-container {
-  margin-bottom: 0.75rem;
-}
     </style>
-  </head>
-  <body>
+</head>
+
+<body>
     <header>
-      <div class="hero-text">Welcome to Ready Set Fly!</div>
+        <div class="hero-text">Welcome to Ready Set Fly!</div>
     </header>
 
     <main>
         <div class="hero">
-        <h2>Your gateway to the skies.</h2>
-        <p>
-          Discover top-rated aircraft rentals, connect with trusted owners, and
-          experience the new way to rent aircraft. Plus, for owners— let your
-          aircraft pay for itself by tapping into a dynamic rental marketplace.
-        </p>
-      </div>
-    <div class="view-area">
-      <!-- 1. Buttons centered -->
-      <div class="view-buttons">
-        <button class="btn" onclick="viewRentals()">View Rentals</button>
-        <button class="btn" onclick="viewMarketplace()">
-          View Marketplace
-        </button>
-      </div>
-<!-- Replace your existing .app-promo block with this -->
-<div class="app-promo">
+  <h2>Your gateway to the skies.</h2>
+
   <p>
-    For full access to rentals and marketplace in your area, download
-    the app today.
+    Discover America's premier aircraft rental marketplace—where pilots and
+    aviation enthusiasts can effortlessly browse and book top-rated airplanes
+    for personal or business flights. Connect directly with vetted aircraft
+    owners, compare competitive hourly rates, and unlock exclusive access to
+    private Cessnas, Pipers, Beechcrafts, and more. Whether you’re planning a
+    cross-country trip or just practicing circuits, our streamlined booking
+    platform and real-time availability calendar make renting a plane as easy
+    as hailing a rideshare.
   </p>
 
-  <!-- 1) Badges side by side -->
-  <div class="store-buttons">
-    <a
-      href="https://play.google.com/store/apps/details?id=com.readysetfly"
-      target="_blank" rel="noopener"
-    >
-      <img
-        src="../../Assets/images/googleplaystore.png"
-        alt="Get it on Google Play"
-        class="store-badge"
-      />
-    </a>
-    <a
-      href="https://apps.apple.com/app/idXXXXXXXXX"
-      target="_blank" rel="noopener"
-    >
-      <img
-        src="../../Assets/images/appleplaystore.jpg"
-        alt="Download on the App Store"
-        class="store-badge"
-      />
-    </a>
-  </div>
+  <strong>Key Features for Renters &amp; Owners</strong>
+  <ul>
+    <li>
+      <strong>Extensive Fleet Selection:</strong> Filter by aircraft type,
+      location, price, and owner rating.
+    </li>
+    <li>
+      <strong>Trusted Owner Network:</strong> All owners are
+      background-checked and rated by real pilots.
+    </li>
+    <li>
+      <strong>Instant Online Booking:</strong> View live availability, book
+      in seconds, and manage your rental right from your dashboard.
+    </li>
+    <li>
+      <strong>Secure Payments &amp; Insurance:</strong> Automated invoicing,
+      payment splitting, and optional insurance add-ons ensure peace of mind.
+    </li>
+    <li>
+      <strong>Owner Revenue Optimization:</strong> Dynamic pricing tools,
+      calendar sync, and built-in messaging keep your schedule full.
+    </li>
+  </ul>
 
-  <!-- 2) Instagram logo + text -->
-  <div class="social-link">
-    <a
-      href="https://instagram.com/readysetflyus"
-      target="_blank"
-      rel="noopener"
-      aria-label="Connect with us on Instagram"
-    >
-      <img
-        src="../../Assets/images/instagram-logo.png"
-        alt="Instagram logo"
-      />
-    </a>
-    <span class="ig-text">Follow us on Instagram</span>
-  </div>
+  <p>
+    Take off with confidence—rent or list your next aircraft today on Ready
+    Set Fly’s all-in-one aviation rental platform.
+  </p>
 </div>
+        <div class="view-area">
+            <!-- 1. Buttons centered -->
+            <div class="view-buttons">
+                <button class="btn" onclick="viewRentals()">View Rentals</button>
+                <button class="btn" onclick="viewMarketplace()">
+                    View Marketplace
+                </button>
+            </div>
+            <!-- Replace your existing .app-promo block with this -->
+            <div class="app-promo">
+                <p>
+                    For full access to rentals and marketplace in your area, download
+                    the app today.
+                </p>
 
-      
+                <!-- 1) Badges side by side -->
+                <div class="store-buttons">
+                    <a href="https://play.google.com/store/apps/details?id=com.readysetfly" target="_blank"
+                        rel="noopener">
+                        <img src="../../Assets/images/googleplaystore.png" alt="Get it on Google Play"
+                            class="store-badge" />
+                    </a>
+                    <a href="https://apps.apple.com/app/idXXXXXXXXX" target="_blank" rel="noopener">
+                        <img src="../../Assets/images/appleplaystore.jpg" alt="Download on the App Store"
+                            class="store-badge" />
+                    </a>
+                </div>
+
+                <!-- 2) Instagram logo + text -->
+                <div class="social-link">
+                    <a href="https://instagram.com/readysetflyus" target="_blank" rel="noopener"
+                        aria-label="Connect with us on Instagram">
+                        <img src="../../Assets/images/instagram-logo.png" alt="Instagram logo" />
+                    </a>
+                    <span class="ig-text">Follow us on Instagram</span>
+                </div>
+            </div>
+
+
     </main>
 
     <footer>
-      &copy; 2025 Ready Set Fly, LLC
-      <img
-        src="../../Assets/images/RSF_Logo_02232025.png"
-        alt="Ready Set Fly Logo"
-        id="footerLogo"
-      />
-      <div id="footerCreate">Create Admin Account</div>
-      <div id="footerContact">Contact Us</div>
+        &copy; 2025 Ready Set Fly, LLC
+        <img src="../../Assets/images/RSF_Logo_02232025.png" alt="Ready Set Fly Logo" id="footerLogo" />
+        <div id="footerCreate">Create Admin Account</div>
+        <div id="footerContact">Contact Us</div>
     </footer>
 
     <!-- LOGIN MODAL -->
     <div id="loginModal" class="modal">
-      <div class="modal-content">
-        <h3>Admin Login</h3>
-        <label
-          >Email:
-          <input type="email" id="loginEmail" />
-        </label>
-        <label
-          >Password:
-          <div class="password-wrapper">
-            <input type="password" id="loginPassword" />
-            <span class="toggle-eye" data-target="loginPassword">👁️</span>
-          </div>
-        </label>
-        <div class="modal-buttons">
-          <button onclick="submitLogin()">Log In</button>
-          <button onclick="closeLogin()">Cancel</button>
+        <div class="modal-content">
+            <h3>Admin Login</h3>
+            <label>Email:
+                <input type="email" id="loginEmail" />
+            </label>
+            <label>Password:
+                <div class="password-wrapper">
+                    <input type="password" id="loginPassword" />
+                    <span class="toggle-eye" data-target="loginPassword">👁️</span>
+                </div>
+            </label>
+            <div class="modal-buttons">
+                <button onclick="submitLogin()">Log In</button>
+                <button onclick="closeLogin()">Cancel</button>
+            </div>
         </div>
-      </div>
     </div>
 
     <!-- CREATE ADMIN MODAL -->
     <div id="createModal" class="modal">
-      <div class="modal-content">
-        <h3>Create Admin Account</h3>
-        <label
-          >Email:
-          <input type="email" id="createEmail" />
-        </label>
-        <label
-          >Password:
-          <div class="password-wrapper">
-            <input type="password" id="createPassword" />
-            <span class="toggle-eye" data-target="createPassword">👁️</span>
-          </div>
-        </label>
-        <label
-          >Confirm Password:
-          <div class="password-wrapper">
-            <input type="password" id="createPassword2" />
-            <span class="toggle-eye" data-target="createPassword2">👁️</span>
-          </div>
-        </label>
-        <div class="modal-buttons">
-          <button onclick="submitCreate()">Create</button>
-          <button onclick="closeCreate()">Cancel</button>
+        <div class="modal-content">
+            <h3>Create Admin Account</h3>
+            <label>Email:
+                <input type="email" id="createEmail" />
+            </label>
+            <label>Password:
+                <div class="password-wrapper">
+                    <input type="password" id="createPassword" />
+                    <span class="toggle-eye" data-target="createPassword">👁️</span>
+                </div>
+            </label>
+            <label>Confirm Password:
+                <div class="password-wrapper">
+                    <input type="password" id="createPassword2" />
+                    <span class="toggle-eye" data-target="createPassword2">👁️</span>
+                </div>
+            </label>
+            <div class="modal-buttons">
+                <button onclick="submitCreate()">Create</button>
+                <button onclick="closeCreate()">Cancel</button>
+            </div>
         </div>
-      </div>
     </div>
 
     <script>
-      const ALLOWED_SPECIFIC = [
-        "coryarmer@gmail.com",
-        "bentley.amy24@gmail.com",
-      ];
-      const SESSION_KEY = "currentAdmin";
-      const ACCOUNTS_KEY = "adminAccounts";
-      const LOGIN_TS_KEY = "loginTimestamp";
-      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+        const ALLOWED_SPECIFIC = [
+            "coryarmer@gmail.com",
+            "bentley.amy24@gmail.com",
+        ];
+        const SESSION_KEY = "currentAdmin";
+        const ACCOUNTS_KEY = "adminAccounts";
+        const LOGIN_TS_KEY = "loginTimestamp";
+        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-      // Detect if we're on the index page (so we only clear session there)
-      const onIndexPage =
-        location.pathname.endsWith("index.html") || location.pathname === "/";
+        // Detect if we're on the index page (so we only clear session there)
+        const onIndexPage =
+            location.pathname.endsWith("index.html") || location.pathname === "/";
 
-      function getAccounts() {
-        return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}");
-      }
-      function saveAccounts(accts) {
-        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accts));
-      }
-      function isEmailAllowed(email) {
-        const e = email.toLowerCase();
-        return e.endsWith("@readysetfly.us") || ALLOWED_SPECIFIC.includes(e);
-      }
-      function setCurrentUser(email) {
-        localStorage.setItem(SESSION_KEY, email.toLowerCase());
-        localStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
-      }
-      function clearCurrentUser() {
-        localStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem(LOGIN_TS_KEY);
-      }
-      function isSessionValid() {
-        const ts = parseInt(localStorage.getItem(LOGIN_TS_KEY) || "0", 10);
-        return ts && Date.now() - ts < SEVEN_DAYS_MS;
-      }
-
-      function checkAutoRedirect() {
-        const current = localStorage.getItem(SESSION_KEY);
-        const accounts = getAccounts();
-
-        if (current && accounts[current] && isSessionValid()) {
-          window.location.href = "admin-dashboard.html";
-        } else {
-          // only clear on the index page, not after navigating back from dashboard
-          if (onIndexPage) clearCurrentUser();
+        function getAccounts() {
+            return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "{}");
         }
-      }
+        function saveAccounts(accts) {
+            localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accts));
+        }
+        function isEmailAllowed(email) {
+            const e = email.toLowerCase();
+            return e.endsWith("@readysetfly.us") || ALLOWED_SPECIFIC.includes(e);
+        }
+        function setCurrentUser(email) {
+            localStorage.setItem(SESSION_KEY, email.toLowerCase());
+            localStorage.setItem(LOGIN_TS_KEY, Date.now().toString());
+        }
+        function clearCurrentUser() {
+            localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(LOGIN_TS_KEY);
+        }
+        function isSessionValid() {
+            const ts = parseInt(localStorage.getItem(LOGIN_TS_KEY) || "0", 10);
+            return ts && Date.now() - ts < SEVEN_DAYS_MS;
+        }
 
-      // show/hide modals
-      function loginAdmin() {
-        document.getElementById("loginModal").style.display = "flex";
-      }
-      function closeLogin() {
-        document.getElementById("loginModal").style.display = "none";
-      }
-      function createAdmin() {
-        document.getElementById("createModal").style.display = "flex";
-      }
-      function closeCreate() {
-        document.getElementById("createModal").style.display = "none";
-      }
+        function checkAutoRedirect() {
+            const current = localStorage.getItem(SESSION_KEY);
+            const accounts = getAccounts();
 
-      // toggle password visibility
-      document.querySelectorAll(".toggle-eye").forEach((el) => {
-        el.addEventListener("click", () => {
-          const inp = document.getElementById(el.dataset.target);
-          inp.type = inp.type === "password" ? "text" : "password";
+            if (current && accounts[current] && isSessionValid()) {
+                window.location.href = "admin-dashboard.html";
+            } else {
+                // only clear on the index page, not after navigating back from dashboard
+                if (onIndexPage) clearCurrentUser();
+            }
+        }
+
+        // show/hide modals
+        function loginAdmin() {
+            document.getElementById("loginModal").style.display = "flex";
+        }
+        function closeLogin() {
+            document.getElementById("loginModal").style.display = "none";
+        }
+        function createAdmin() {
+            document.getElementById("createModal").style.display = "flex";
+        }
+        function closeCreate() {
+            document.getElementById("createModal").style.display = "none";
+        }
+
+        // toggle password visibility
+        document.querySelectorAll(".toggle-eye").forEach((el) => {
+            el.addEventListener("click", () => {
+                const inp = document.getElementById(el.dataset.target);
+                inp.type = inp.type === "password" ? "text" : "password";
+            });
         });
-      });
 
-      // form submissions
-      function submitLogin() {
-        const email = document.getElementById("loginEmail").value.trim();
-        const pass = document.getElementById("loginPassword").value;
-        if (!email || !pass) return alert("Enter both email and password.");
+        // form submissions
+        function submitLogin() {
+            const email = document.getElementById("loginEmail").value.trim();
+            const pass = document.getElementById("loginPassword").value;
+            if (!email || !pass) return alert("Enter both email and password.");
 
-        const accounts = getAccounts();
-        if (!accounts[email.toLowerCase()]) {
-          return alert("No account found. Please create one.");
-        }
-        if (accounts[email.toLowerCase()] !== pass) {
-          return alert("Incorrect password.");
-        }
+            const accounts = getAccounts();
+            if (!accounts[email.toLowerCase()]) {
+                return alert("No account found. Please create one.");
+            }
+            if (accounts[email.toLowerCase()] !== pass) {
+                return alert("Incorrect password.");
+            }
 
-        setCurrentUser(email);
-        window.location.href = "admin-dashboard.html";
-      }
-
-      function submitCreate() {
-        const email = document.getElementById("createEmail").value.trim();
-        const pass = document.getElementById("createPassword").value;
-        const pass2 = document.getElementById("createPassword2").value;
-        if (!email || !pass || !pass2) return alert("Fill all fields.");
-        if (!isEmailAllowed(email)) {
-          return alert("Email must be @readysetfly.us or approved.");
-        }
-        if (pass !== pass2) {
-          return alert("Passwords do not match.");
+            setCurrentUser(email);
+            window.location.href = "admin-dashboard.html";
         }
 
-        const accounts = getAccounts();
-        accounts[email.toLowerCase()] = pass;
-        saveAccounts(accounts);
+        function submitCreate() {
+            const email = document.getElementById("createEmail").value.trim();
+            const pass = document.getElementById("createPassword").value;
+            const pass2 = document.getElementById("createPassword2").value;
+            if (!email || !pass || !pass2) return alert("Fill all fields.");
+            if (!isEmailAllowed(email)) {
+                return alert("Email must be @readysetfly.us or approved.");
+            }
+            if (pass !== pass2) {
+                return alert("Passwords do not match.");
+            }
 
-        setCurrentUser(email);
-        alert("Account created—redirecting to dashboard.");
-        window.location.href = "admin-dashboard.html";
-      }
+            const accounts = getAccounts();
+            accounts[email.toLowerCase()] = pass;
+            saveAccounts(accounts);
 
-      function viewRentals() {
-        window.location.href = "rentals.html";
-      }
-      function viewMarketplace() {
-        window.location.href = "marketplace.html";
-      }
+            setCurrentUser(email);
+            alert("Account created—redirecting to dashboard.");
+            window.location.href = "admin-dashboard.html";
+        }
 
-      window.addEventListener("DOMContentLoaded", () => {
-        checkAutoRedirect();
-        document
-          .getElementById("footerLogo")
-          .addEventListener("click", loginAdmin);
-        document
-          .getElementById("footerCreate")
-          .addEventListener("click", createAdmin);
-        document
-          .getElementById("footerContact")
-          .addEventListener("click", () => {
-            window.location.href = "contact.html";
-          });
-      });
+        function viewRentals() {
+            window.location.href = "rentals.html";
+        }
+        function viewMarketplace() {
+            window.location.href = "marketplace.html";
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            checkAutoRedirect();
+            document
+                .getElementById("footerLogo")
+                .addEventListener("click", loginAdmin);
+            document
+                .getElementById("footerCreate")
+                .addEventListener("click", createAdmin);
+            document
+                .getElementById("footerContact")
+                .addEventListener("click", () => {
+                    window.location.href = "contact.html";
+                });
+        });
     </script>
-  </body>
+</body>
+
 </html>
