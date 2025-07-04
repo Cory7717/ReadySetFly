@@ -188,6 +188,7 @@
           <div class="tab active" data-tab="search">Search Users</div>
           <div class="tab" data-tab="charges">Recent Charges</div>
           <div class="tab" data-tab="refund">Issue Refund</div>
+          <div class="tab" data-tab="reports">Reports</div>
         </div>
         <div class="tab-content">
           <div id="search" class="active">
@@ -210,6 +211,10 @@
             <button class="small" id="refundBtn">Issue Refund</button>
             <div class="results" id="refundResults"></div>
           </div>
+          <div id="reports">
+     <button class="small" id="loadReportsBtn">Load Reports</button>
+     <div class="results" id="reportsResults"></div>
+   </div>
         </div>
       `;
       area.appendChild(widget);
@@ -289,6 +294,29 @@
         el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
       });
     }
+    // Reports
+widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
+  const el = widget.querySelector('#reportsResults');
+  el.innerText = 'Loading…';
+  try {
+    // your backend needs an endpoint that returns { yesterday, mtd, ytd }
+    const res = await fetch('/api/stripe/reports');
+    if (!res.ok) throw new Error(res.statusText);
+    const { yesterday, mtd, ytd } = await res.json();
+
+    el.innerHTML = `
+      <h4>Revenue Reports</h4>
+      <ul>
+        <li><strong>Yesterday:</strong> $${Number(yesterday).toLocaleString()}</li>
+        <li><strong>Month-to-Date:</strong> $${Number(mtd).toLocaleString()}</li>
+        <li><strong>Year-to-Date:</strong> $${Number(ytd).toLocaleString()}</li>
+      </ul>
+    `;
+  } catch (err) {
+    el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+  }
+});
+
 
     function loadSaleWidget() {
       area.innerHTML = '';

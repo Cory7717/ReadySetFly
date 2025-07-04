@@ -506,7 +506,7 @@ app.get("/stripe/charges", authenticate, async (req, res) => {
 // ───────────────────────────────────────────────────
 // Stripe Admin: Issue a Refund
 // ───────────────────────────────────────────────────
-app.post("/stripe/refund", authenticate, async (req, res) => {
+app.get("/stripe/refund", authenticate, async (req, res) => {
   const { chargeId } = req.body;
   if (!chargeId) return res.status(400).json({ error: "Missing chargeId" });
 
@@ -518,6 +518,46 @@ app.post("/stripe/refund", authenticate, async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+
+app.get("/stripe/reports", authenticate, async (req, res) => {
+  // initialize a fresh stripe client
+  const stripeClient = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+  // compute unix timestamps for those windows
+  const now       = Math.floor(Date.now() / 1000);
+  const startToday= Math.floor(new Date().setUTCHours(0,0,0,0) / 1000);
+  const startYest = startToday - 86400;
+  const startMon  = Math.floor(
+    new Date(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)
+      .getTime() / 1000
+  );
+  const startYear = Math.floor(
+    new Date(new Date().getUTCFullYear(), 0, 1).getTime() / 1000
+  );
+
+  // helper to page through charges and sum amounts
+  async function sumWindow(gte, lt) {
+    let sum = 0;
+    let lastId = null;
+    do {
+      const params = { limit: 100, created: { gte, lt } };
+      if (lastId) params.starting_after = lastId;
+      const page = await stripeClient.charges.list(params);
+      page.data.forEach(c => { sum += c.amount; });
+      lastId = page.data.length === 100
+        ? page.data[page.data.length - 1].id
+        : null;
+    } while (lastId);
+    return Math.round(sum / 100); // convert cents → dollars
+  }
+
+  const yesterday = await sumWindow(startYest, startToday);
+  const mtd       = await sumWindow(startMon,   now);
+  const ytd       = await sumWindow(startYear,  now);
+
+  res.json({ yesterday, mtd, ytd });
+});
+
 
 // simplest health‐check endpoint
 app.get("/", (req, res) => {
