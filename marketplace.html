@@ -31,6 +31,28 @@
       background: white;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
+      /* Add inside your existing <style> */
+  #upButton {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    display: none;            /* hidden by default */
+    width: 3rem;
+    height: 3rem;
+    border: none;
+    border-radius: 50%;
+    background: #1D4ED8;      /* blue circle */
+    color: white;
+    font-size: 1.25rem;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    z-index: 1000;
+    transition: opacity 0.3s ease;
+  }
+  #upButton.show {
+    display: block;
+    opacity: 1;
+  }
     #controls input,
     #controls select {
       padding: 0.5rem;
@@ -153,6 +175,8 @@
       <div class="body" id="modalBody"></div>
     </div>
   </div>
+  <!-- Add this just inside your <body>, e.g. right after <div id="modalBackdrop">…</div> -->
+  <button id="upButton" title="Go to top">↑</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
@@ -185,6 +209,23 @@
     backdrop.addEventListener('click', e => {
       if (e.target === backdrop) backdrop.style.display = 'none';
     });
+    
+      /* Add at the end of your existing <script type="module">, before loadListings(); */
+  const upButton = document.getElementById('upButton');
+
+  // Show or hide button when scrolling
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 200) {
+      upButton.classList.add('show');
+    } else {
+      upButton.classList.remove('show');
+    }
+  });
+
+  // Smooth scroll to top when clicked
+  upButton.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 
     async function loadListings() {
       listingsEl.innerHTML = "";
