@@ -2339,6 +2339,78 @@ app.use((err, req, res, next) => {
   }
 });
 
+// ───────────────────────────────────────────────────
+// Admin: Search App Users by name or UID
+// ───────────────────────────────────────────────────
+app.get('/api/users/search', authenticate, async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: 'Missing query' });
+  try {
+    const usersRef = db.collection('users');
+    const results = [];
+
+    // 1) Try exact UID lookup
+    const byId = await usersRef.doc(q).get();
+    if (byId.exists) {
+      results.push({ uid: byId.id, ...byId.data() });
+    }
+
+    // 2) Firestore doesn't support OR in one query, so do two name queries
+    const nameQ = usersRef
+      .orderBy('firstName')
+      .startAt(q)
+      .endAt(q + '\uf8ff')
+      .limit(10);
+    const lastQ = usersRef
+      .orderBy('lastName')
+      .startAt(q)
+      .endAt(q + '\uf8ff')
+      .limit(10);
+
+    const [snap1, snap2] = await Promise.all([ nameQ.get(), lastQ.get() ]);
+    snap1.forEach(doc => {
+      if (!results.find(u => u.uid === doc.id))
+        results.push({ uid: doc.id, ...doc.data() });
+    });
+    snap2.forEach(doc => {
+      if (!results.find(u => u.uid === doc.id))
+        results.push({ uid: doc.id, ...doc.data() });
+    });
+
+    res.json({ users: results.slice(0, 10) });
+  } catch (err) {
+    console.error('Error in /api/users/search:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ───────────────────────────────────────────────────
+// Admin: Fetch all current listings for a given user
+// ───────────────────────────────────────────────────
+app.get('/api/users/:uid/listings', authenticate, async (req, res) => {
+  const { uid } = req.params;
+  try {
+    // Optionally, you could verify the user exists first
+    const listingsSnap = await db
+      .collection('listings')
+      .where('ownerId', '==', uid)
+      .where('expired', '==', false)       // only active/current
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const listings = listingsSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    res.json({ listings });
+  } catch (err) {
+    console.error(`Error in /api/users/${uid}/listings:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Handle undefined routes
 app.use((req, res, next) => {
   res.setHeader("Content-Type", "application/json");
