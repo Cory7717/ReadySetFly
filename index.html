@@ -224,11 +224,12 @@
         gap: 0.5rem;
       }
 
-      .social-link {
-  margin-bottom: 0.5rem;
+    /* Instagram link */
+.social-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
-
-  /* Instagram logo sizing & hover */
 .social-link img {
   width: 32px;
   height: 32px;
@@ -237,7 +238,8 @@
 .social-link img:hover {
   transform: translateY(-2px);
 }
-  .ig-text {
+.ig-text {
+  margin-top: 0.25rem;
   font-size: 0.9rem;
   text-decoration: underline;
   color: #1d4ed8;
@@ -257,8 +259,14 @@
       .appstore-container {
   margin-top: 0.5rem;
 }
-
-/* Common badge styling */
+.store-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+/* Store badge common styling */
 .store-badge {
   width: 120px;
   cursor: pointer;
@@ -266,7 +274,6 @@
 }
 .store-badge:hover {
   transform: translateY(-2px);
-
 }
   .play-badge-container {
   margin-bottom: 0.75rem;
@@ -287,16 +294,15 @@
           View Marketplace
         </button>
       </div>
-
-      <!-- Replace your existing .app-promo block with this -->
+<!-- Replace your existing .app-promo block with this -->
 <div class="app-promo">
   <p>
     For full access to rentals and marketplace in your area, download
     the app today.
   </p>
 
-  <!-- 1) Google Play badge -->
-  <div class="play-badge-container">
+  <!-- 1) Badges side by side -->
+  <div class="store-buttons">
     <a
       href="https://play.google.com/store/apps/details?id=com.readysetfly"
       target="_blank" rel="noopener"
@@ -307,10 +313,6 @@
         class="store-badge"
       />
     </a>
-  </div>
-
-  <!-- 3) App Store badge -->
-  <div class="appstore-container">
     <a
       href="https://apps.apple.com/app/idXXXXXXXXX"
       target="_blank" rel="noopener"
@@ -322,20 +324,22 @@
       />
     </a>
   </div>
- <div class="social-link">
-  <a
-    href="https://instagram.com/readysetflyus"
-    target="_blank"
-    rel="noopener"
-    aria-label="Connect with us on Instagram"
-  >
-    <img
-      src="../../Assets/images/instagram-logo.png"
-      alt="Instagram logo"
-    />
-  </a>
-  <span class="ig-text">Follow us on Instagram</span>
-</div>
+
+  <!-- 2) Instagram logo + text -->
+  <div class="social-link">
+    <a
+      href="https://instagram.com/readysetflyus"
+      target="_blank"
+      rel="noopener"
+      aria-label="Connect with us on Instagram"
+    >
+      <img
+        src="../../Assets/images/instagram-logo.png"
+        alt="Instagram logo"
+      />
+    </a>
+    <span class="ig-text">Follow us on Instagram</span>
+  </div>
 </div>
 
       <div class="hero">
