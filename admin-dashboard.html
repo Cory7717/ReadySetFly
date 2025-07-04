@@ -244,10 +244,10 @@
     });
 
     function loadStripeWidget() {
-      area.innerHTML = '';
-      const widget = document.createElement('div');
-      widget.className = 'stripe-widget';
-      widget.innerHTML = `
+  area.innerHTML = '';
+  const widget = document.createElement('div');
+  widget.className = 'stripe-widget';
+  widget.innerHTML = `
     <h2>Stripe Admin</h2>
     <div class="tabs">
       <div class="tab active" data-tab="search">Search Users</div>
@@ -277,104 +277,132 @@
         <div class="results" id="refundResults"></div>
       </div>
       <div id="reports">
+        <div class="section">
+          <label>Report Type</label>
+          <select id="reportType">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+        <div class="section" id="monthPicker" style="display:none;">
+          <label>Select Month</label>
+          <input type="month" id="reportMonth"/>
+        </div>
         <button class="small" id="loadReportsBtn">Load Reports</button>
         <div class="results" id="reportsResults"></div>
       </div>
     </div>
   `;
-      area.appendChild(widget);
+  area.appendChild(widget);
 
-      // Tab switching
-      widget.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-          widget.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-          widget.querySelectorAll('.tab-content > div').forEach(c => c.classList.remove('active'));
-          tab.classList.add('active');
-          widget.querySelector(`#${tab.dataset.tab}`).classList.add('active');
-        });
-      });
+  // Tab switching
+  widget.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      widget.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      widget.querySelectorAll('.tab-content > div').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      widget.querySelector(`#${tab.dataset.tab}`).classList.add('active');
+    });
+  });
 
-      // Search handler
-      widget.querySelector('#searchBtn').addEventListener('click', async () => {
-        const q = widget.querySelector('#stripeQuery').value.trim();
-        if (!q) return;
-        const resultsEl = widget.querySelector('#stripeResults');
-        resultsEl.innerText = 'Loading…';
-        try {
-          const res = await fetch(`/api/stripe/search?q=${encodeURIComponent(q)}`);
-          if (!res.ok) throw new Error(res.statusText);
-          const { customers, accounts } = await res.json();
-          let html = '';
-          if (customers.length) {
-            html += `<h3>Customers (${customers.length})</h3><ul>` +
-              customers.map(c => `<li>${c.id} — ${c.email || '—'}</li>`).join('') +
-              `</ul>`;
-          }
-          if (accounts.length) {
-            html += `<h3>Accounts (${accounts.length})</h3><ul>` +
-              accounts.map(a => `<li>${a.id} — ${a.email || '—'}</li>`).join('') +
-              `</ul>`;
-          }
-          resultsEl.innerHTML = html || `<p>No results for “${q}”.</p>`;
-        } catch (err) {
-          widget.querySelector('#stripeResults').innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
-        }
-      });
-
-      // Charges handler
-      widget.querySelector('#loadChargesBtn').addEventListener('click', async () => {
-        const el = widget.querySelector('#chargesResults');
-        el.innerText = 'Loading…';
-        try {
-          const res = await fetch('/api/stripe/charges?limit=10');
-          if (!res.ok) throw new Error(res.statusText);
-          const { data } = await res.json();
-          el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-        } catch (err) {
-          el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
-        }
-      });
-
-      // Refund handler
-      widget.querySelector('#refundBtn').addEventListener('click', async () => {
-        const chargeId = widget.querySelector('#refundChargeId').value.trim();
-        if (!chargeId) return alert('Enter a charge ID');
-        const el = widget.querySelector('#refundResults');
-        el.innerText = 'Processing…';
-        try {
-          const res = await fetch('/api/stripe/refund', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chargeId })
-          });
-          if (!res.ok) throw new Error(res.statusText);
-          const data = await res.json();
-          el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-        } catch (err) {
-          el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
-        }
-      });
-
-      // Reports handler
-      widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
-        const el = widget.querySelector('#reportsResults');
-        el.innerText = 'Loading…';
-        try {
-          const res = await fetch('/api/stripe/reports');
-          if (!res.ok) throw new Error(res.statusText);
-          const { yesterday, mtd, ytd } = await res.json();
-          el.innerHTML = `
-        <h4>Revenue Reports</h4>
-        <ul>
-          <li><strong>Yesterday:</strong> $${Number(yesterday).toLocaleString()}</li>
-          <li><strong>Month-to-Date:</strong> $${Number(mtd).toLocaleString()}</li>
-          <li><strong>Year-to-Date:</strong> $${Number(ytd).toLocaleString()}</li>
-        </ul>`;
-        } catch (err) {
-          el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
-        }
-      });
+  // Search handler
+  widget.querySelector('#searchBtn').addEventListener('click', async () => {
+    const q = widget.querySelector('#stripeQuery').value.trim();
+    if (!q) return;
+    const resultsEl = widget.querySelector('#stripeResults');
+    resultsEl.innerText = 'Loading…';
+    try {
+      const res = await fetch(`/api/stripe/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) throw new Error(res.statusText);
+      const { customers, accounts } = await res.json();
+      let html = '';
+      if (customers.length) {
+        html += `<h3>Customers (${customers.length})</h3><ul>` +
+          customers.map(c => `<li>${c.id} — ${c.email || '—'}</li>`).join('') +
+          `</ul>`;
+      }
+      if (accounts.length) {
+        html += `<h3>Accounts (${accounts.length})</h3><ul>` +
+          accounts.map(a => `<li>${a.id} — ${a.email || '—'}</li>`).join('') +
+          `</ul>`;
+      }
+      resultsEl.innerHTML = html || `<p>No results for “${q}”.</p>`;
+    } catch (err) {
+      widget.querySelector('#stripeResults').innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
     }
+  });
+
+  // Charges handler
+  widget.querySelector('#loadChargesBtn').addEventListener('click', async () => {
+    const el = widget.querySelector('#chargesResults');
+    el.innerText = 'Loading…';
+    try {
+      const res = await fetch('/api/stripe/charges?limit=10');
+      if (!res.ok) throw new Error(res.statusText);
+      const { data } = await res.json();
+      el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    } catch (err) {
+      el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+    }
+  });
+
+  // Refund handler
+  widget.querySelector('#refundBtn').addEventListener('click', async () => {
+    const chargeId = widget.querySelector('#refundChargeId').value.trim();
+    if (!chargeId) return alert('Enter a charge ID');
+    const el = widget.querySelector('#refundResults');
+    el.innerText = 'Processing…';
+    try {
+      const res = await fetch('/api/stripe/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chargeId })
+      });
+      if (!res.ok) throw new Error(res.statusText);
+      const data = await res.json();
+      el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    } catch (err) {
+      el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+    }
+  });
+
+  // Show/hide month picker
+  const reportTypeSel = widget.querySelector('#reportType');
+  const monthPicker   = widget.querySelector('#monthPicker');
+  reportTypeSel.addEventListener('change', () => {
+    monthPicker.style.display = reportTypeSel.value === 'monthly' ? 'block' : 'none';
+  });
+
+  // Reports handler (updated)
+  widget.querySelector('#loadReportsBtn').addEventListener('click', async () => {
+    const type = reportTypeSel.value;
+    const params = new URLSearchParams({ type });
+    if (type === 'monthly') {
+      const m = widget.querySelector('#reportMonth').value;
+      if (!m) return alert('Please select a month.');
+      params.append('month', m);
+    }
+    const el = widget.querySelector('#reportsResults');
+    el.innerText = 'Loading…';
+    try {
+      const res = await fetch(`/api/stripe/reports?${params.toString()}`);
+      if (!res.ok) throw new Error(res.statusText);
+      const data = await res.json();
+      let html = `<h4>${type.charAt(0).toUpperCase() + type.slice(1)} Report</h4>`;
+      if (type === 'daily') {
+        html += '<ul>' + data.daily.map(d => `<li>${d.date}: $${d.total}</li>`).join('') + '</ul>';
+      } else if (type === 'weekly') {
+        html += `<p>Total this week: $${data.weekly.total}</p>`;
+      } else {
+        html += `<p>Total for ${widget.querySelector('#reportMonth').value}: $${data.monthly.total}</p>`;
+      }
+      el.innerHTML = html;
+    } catch (err) {
+      el.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+    }
+  });
+}
 
     // Tab switching
     widget.querySelectorAll('.tab').forEach(tab => {
