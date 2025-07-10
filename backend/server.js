@@ -531,34 +531,38 @@ exports.expireTrials = onSchedule("every 1 hours", async () => {
   await batch.commit();
 });
 
-// ─── Contact Form Endpoint ─────────────────────────────────────────
+// contact.html email handler
+
 app.post("/contact", async (req, res) => {
-  // Grab & sanitize incoming fields
   const { firstName, lastName, email, message } = req.body || {};
   if (!firstName || !lastName || !email || !message) {
     return res.status(400).json({ error: "All fields are required." });
   }
 
   try {
-    // ensure transporter is ready
     await initTransporter();
     if (!transporter) {
       return res.status(500).json({ error: "Email service not configured." });
     }
 
-    // send the mail
-    await transporter.sendMail({
-      from: `"Ready Set Fly Contact" <${await SMTP_USER.value()}>`,
-      to: "coryarmer@gmail.com",
-      subject: "New Contact Us Message",
-      text: `
+    // build dynamic From address
+    const fromAddress = `"Ready Set Fly Contact" <${await SMTP_USER.value()}>`;
+
+    // build a single string for the body
+    const mailText = `
 First Name: ${firstName}
 Last Name:  ${lastName}
 Email:      ${email}
 
 Message:
 ${message}
-      `,
+`.trim();
+
+    await transporter.sendMail({
+      from: fromAddress,
+      to: "coryarmer@gmail.com",
+      subject: "New Contact Us Message",
+      text: mailText,
     });
 
     return res.status(200).json({ success: true, message: "Message sent." });
