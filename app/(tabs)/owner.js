@@ -189,10 +189,8 @@ const OwnerProfile = ({ ownerId }) => {
   const pulse = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef();
   const prevMessagesCount = useRef(0);
-  // Add this:
   const flatListRef = useRef(null);
   const [ownerTermsAgreed, setOwnerTermsAgreed] = useState(false);
-  // on mount, check whether the owner has already agreed
   useEffect(() => {
     (async () => {
       try {
@@ -378,13 +376,9 @@ const OwnerProfile = ({ ownerId }) => {
     setChatThreads(unique);
   };
 
-  // NEW: New state for FAQ and Invest modals
   const [faqModalVisible, setFaqModalVisible] = useState(false);
-  const [investModalVisible, setInvestModalVisible] = useState(false);
 
   const [chatListModalVisible, setChatListModalVisible] = useState(false);
-  // NEW: New state for Privacy Policy Modal
-  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
 
   // NEW: New state for account type ("Owner", "Renter", or "Both")
   // ─── User Role ─────────────────────────────────────────────────────────────
@@ -478,16 +472,13 @@ const OwnerProfile = ({ ownerId }) => {
   const [userListings, setUserListings] = useState([]);
   const [rentalHistory, setRentalHistory] = useState([]);
   const [ratings, setRatings] = useState({});
-  // availableBalance is stored in cents, but we display in dollars.
   const [availableBalance, setAvailableBalance] = useState(0);
-  // NEW: totalWithdrawn is stored in cents as well.
   const [totalWithdrawn, setTotalWithdrawn] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [rentalRequests, setRentalRequests] = useState([]);
   const [activeRentals, setActiveRentals] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedListingDetails, setSelectedListingDetails] = useState(null);
-  // NEW: Messaging states
   const [messageInput, setMessageInput] = useState("");
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -500,7 +491,6 @@ const OwnerProfile = ({ ownerId }) => {
   const [selectedAircraftIds, setSelectedAircraftIds] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // 1) Add this **above** your existing single‐thread useEffect
   // 1) Up near your other callbacks/hooks:
   const closeMessageModal = useCallback(() => {
     setMessageModalVisible(false);
@@ -602,15 +592,11 @@ const OwnerProfile = ({ ownerId }) => {
 
   // Updated Withdraw Funds modal state remains for showing info only
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
-
-  // State for "View More" Active Rentals Modal with Pagination
   const [viewMoreModalVisible, setViewMoreModalVisible] = useState(false);
   const [activeRentalsPage, setActiveRentalsPage] = useState([]);
   const [lastActiveRentalDoc, setLastActiveRentalDoc] = useState(null);
   const [hasMoreActiveRentals, setHasMoreActiveRentals] = useState(true);
   const ACTIVE_RENTALS_PAGE_SIZE = 10;
-
-  // State for Cleanup Loading
   const [cleanupLoading, setCleanupLoading] = useState(false);
 
   // State for Stripe Account
@@ -1249,7 +1235,6 @@ const OwnerProfile = ({ ownerId }) => {
       .toFixed(2);
   };
 
-  // End of Part 1
   /**
    * Function to handle sending messages in chat threads.
    */
@@ -1720,9 +1705,6 @@ const OwnerProfile = ({ ownerId }) => {
     autoCloseRentals();
   }, [activeRentals]);
 
-  /**
-   * Function to handle opening chat for an active rental.
-   */
   /**
    * Function to handle opening chat for an active rental.
    */
@@ -2454,24 +2436,6 @@ const OwnerProfile = ({ ownerId }) => {
           >
             <Ionicons name="person-circle-outline" size={36} color="#3182ce" />
             <Text style={{ marginTop: 4 }}>Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setInvestModalVisible(true)}
-            style={{ alignItems: "center" }}
-            accessibilityLabel="Invest in Ready Set Fly"
-          >
-            <Ionicons name="rocket-outline" size={36} color="#3182ce" />
-            <Text style={{ marginTop: 4, textAlign: "center", fontSize: 12 }}>
-              Invest in R S F?
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPrivacyModalVisible(true)}
-            style={{ alignItems: "center" }}
-            accessibilityLabel="Privacy Policy"
-          >
-            <Ionicons name="lock-closed-outline" size={36} color="#3182ce" />
-            <Text style={{ marginTop: 4 }}>Privacy Policy</Text>
           </TouchableOpacity>
         </View>
 
@@ -4460,139 +4424,6 @@ const OwnerProfile = ({ ownerId }) => {
         </View>
       </Modal>
 
-      {/* Invest Modal */}
-      <Modal
-        visible={investModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setInvestModalVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <View
-            style={{
-              width: "88%",
-              backgroundColor: "#fff",
-              borderRadius: 8,
-              padding: 24,
-            }}
-          >
-            <ModalHeader
-              title="Invest in Ready Set Fly?"
-              onClose={() => setInvestModalVisible(false)}
-            />
-            <Text style={{ marginBottom: 16 }}>
-              Ready Set Fly is revolutionizing aviation with a modern,
-              all-in-one marketplace that seamlessly blends hourly rentals and
-              traditional listings in a single platform. Join us on this
-              exciting journey to transform how pilots, aircraft owners, and
-              aviation enthusiasts connect. For investment opportunities and
-              more details, email us at{" "}
-              <Text
-                style={{ color: "#3182ce", textDecorationLine: "underline" }}
-                onPress={() =>
-                  Linking.openURL(
-                    "mailto:coryarmer@gmail.com?subject=Interested%20in%20Investing%20in%20Ready%2C%20Set%2C%20Fly!"
-                  )
-                }
-              >
-                coryarmer@gmail.com
-              </Text>
-              .
-            </Text>
-
-            <CustomButton
-              onPress={() => setInvestModalVisible(false)}
-              title="Close"
-              backgroundColor="#3182ce"
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Privacy Policy Modal */}
-      <Modal
-        visible={privacyModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setPrivacyModalVisible(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <View
-            style={{
-              width: "88%",
-              backgroundColor: "#fff",
-              borderRadius: 8,
-              padding: 24,
-              maxHeight: "80%",
-            }}
-          >
-            <ModalHeader
-              title="Privacy Policy & Sensitive Data Policy"
-              onClose={() => setPrivacyModalVisible(false)}
-            />
-            <ScrollView style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                Effective Date: March 17th, 2025
-              </Text>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                This Privacy Policy explains how we collect, use, disclose, and
-                safeguard your information when you use our application. We are
-                committed to protecting your personal data and ensuring your
-                privacy.
-              </Text>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                1. Information We Collect: We may collect personal information,
-                such as your name, email address, contact details, and usage
-                data. Sensitive data is handled with strict security measures.
-              </Text>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                2. How We Use Your Information: Your data is used to provide and
-                improve our services, communicate with you, and comply with
-                legal obligations.
-              </Text>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                3. Data Sharing and Disclosure: We do not sell your personal
-                data. Information may be shared with trusted partners only as
-                necessary to perform services or as required by law.
-              </Text>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                4. Security: We implement a variety of security measures to
-                maintain the safety of your personal information.
-              </Text>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                5. Your Rights: You have the right to access, update, or request
-                deletion of your personal information. Please contact us to
-                exercise these rights.
-              </Text>
-              <Text style={{ fontSize: 14, marginBottom: 8 }}>
-                6. Changes to This Policy: We may update this Privacy Policy
-                from time to time. Any changes will be posted in the
-                application.
-              </Text>
-            </ScrollView>
-            <CustomButton
-              onPress={() => setPrivacyModalVisible(false)}
-              title="Close"
-              backgroundColor="#3182ce"
-              accessibilityLabel="Close Privacy Policy"
-            />
-          </View>
-        </View>
-      </Modal>
       <Modal
         visible={chatListModalVisible}
         animationType="slide"

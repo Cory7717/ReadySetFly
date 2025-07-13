@@ -311,21 +311,23 @@
         .play-badge-container {
             margin-bottom: 0.75rem;
         }
-        /* hero list & bold styling */
-.hero strong {
-  font-weight: 600;
-  color: #111827;
-}
-.hero ul {
-  list-style: disc inside;
-  margin: 1rem 0;
-  padding-left: 1.25rem;
-}
-.hero li {
-  margin-bottom: 0.5rem;
-  line-height: 1.5;
-}
 
+        /* hero list & bold styling */
+        .hero strong {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .hero ul {
+            list-style: disc inside;
+            margin: 1rem 0;
+            padding-left: 1.25rem;
+        }
+
+        .hero li {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
     </style>
 </head>
 
@@ -336,48 +338,48 @@
 
     <main>
         <div class="hero">
-  <h2>Your gateway to the skies.</h2>
+            <h2>Your gateway to the skies.</h2>
 
-  <p>
-    Discover the premier aircraft rental and traditional marketplace—where pilots and
-    aviation enthusiasts can effortlessly browse and book top-rated airplanes
-    for personal or business flights. Connect directly with vetted aircraft
-    owners, compare competitive hourly rates, and unlock exclusive access to
-    private Cessnas, Pipers, Beechcrafts, and more. Whether you’re planning a
-    cross-country trip or just practicing circuits, our streamlined booking
-    platform and real-time availability calendar make renting a plane as easy
-    as hailing a rideshare.
-  </p>
+            <p>
+                Discover the premier aircraft rental and traditional marketplace—where pilots and
+                aviation enthusiasts can effortlessly browse and book top-rated airplanes
+                for personal or business flights. Connect directly with vetted aircraft
+                owners, compare competitive hourly rates, and unlock exclusive access to
+                private Cessnas, Pipers, Beechcrafts, and more. Whether you’re planning a
+                cross-country trip or just practicing circuits, our streamlined booking
+                platform and real-time availability calendar make renting a plane as easy
+                as hailing a rideshare.
+            </p>
 
-  <strong>Key Features for Renters &amp; Owners</strong>
-  <ul>
-    <li>
-      <strong>Extensive Fleet Selection:</strong> Filter by aircraft type,
-      location, price, and owner rating.
-    </li>
-    <li>
-      <strong>Trusted Owner Network:</strong> All owners are
-      background-checked and rated by real pilots.
-    </li>
-    <li>
-      <strong>Instant Online Booking:</strong> View live availability, book
-      in seconds, and manage your rental right from your dashboard.
-    </li>
-    <li>
-      <strong>Secure Payments &amp; Insurance:</strong> Automated invoicing,
-      payment splitting, and optional insurance add-ons ensure peace of mind.
-    </li>
-    <li>
-      <strong>Owner Revenue Optimization:</strong> Dynamic pricing tools,
-      calendar sync, and built-in messaging keep your schedule full.
-    </li>
-  </ul>
+            <strong>Key Features for Renters &amp; Owners</strong>
+            <ul>
+                <li>
+                    <strong>Extensive Fleet Selection:</strong> Filter by aircraft type,
+                    location, price, and owner rating.
+                </li>
+                <li>
+                    <strong>Trusted Owner Network:</strong> All owners are
+                    background-checked and rated by real pilots.
+                </li>
+                <li>
+                    <strong>Instant Online Booking:</strong> View live availability, book
+                    in seconds, and manage your rental right from your dashboard.
+                </li>
+                <li>
+                    <strong>Secure Payments &amp; Insurance:</strong> Automated invoicing,
+                    payment splitting, and optional insurance add-ons ensure peace of mind.
+                </li>
+                <li>
+                    <strong>Owner Revenue Optimization:</strong> Dynamic pricing tools,
+                    calendar sync, and built-in messaging keep your schedule full.
+                </li>
+            </ul>
 
-  <p>
-    Take off with confidence—rent or list your next aircraft today on Ready
-    Set Fly’s all-in-one aviation rental platform.
-  </p>
-</div>
+            <p>
+                Take off with confidence—rent or list your next aircraft today on Ready
+                Set Fly’s all-in-one aviation rental platform.
+            </p>
+        </div>
         <div class="view-area">
             <!-- 1. Buttons centered -->
             <div class="view-buttons">
@@ -450,27 +452,42 @@
     <div id="createModal" class="modal">
         <div class="modal-content">
             <h3>Create Admin Account</h3>
+
+            <!-- 1) Email + send-code button -->
             <label>Email:
                 <input type="email" id="createEmail" />
             </label>
-            <label>Password:
+            <button type="button" id="sendCodeBtn" class="small" style="margin-top:0.5rem;">
+                Send Verification Code
+            </button>
+
+            <!-- 2) Code entry (hidden until code sent) -->
+            <label id="codeLabel" style="display:none; margin-top:1rem;">Verification Code:
+                <input type="text" id="createVerificationCode" maxlength="6" />
+            </label>
+
+            <!-- 3) Existing password fields -->
+            <label style="display:block; margin-top:1rem;">Password:
                 <div class="password-wrapper">
                     <input type="password" id="createPassword" />
                     <span class="toggle-eye" data-target="createPassword">👁️</span>
                 </div>
             </label>
-            <label>Confirm Password:
+            <label>
+                Confirm Password:
                 <div class="password-wrapper">
                     <input type="password" id="createPassword2" />
                     <span class="toggle-eye" data-target="createPassword2">👁️</span>
                 </div>
             </label>
+
             <div class="modal-buttons">
                 <button onclick="submitCreate()">Create</button>
                 <button onclick="closeCreate()">Cancel</button>
             </div>
         </div>
     </div>
+
 
     <script>
         const ALLOWED_SPECIFIC = [
@@ -543,44 +560,99 @@
             });
         });
 
-        // form submissions
-        function submitLogin() {
-            const email = document.getElementById("loginEmail").value.trim();
-            const pass = document.getElementById("loginPassword").value;
-            if (!email || !pass) return alert("Enter both email and password.");
+        window.addEventListener("DOMContentLoaded", () => {
+            checkAutoRedirect();
+            document.getElementById("footerLogo").addEventListener("click", loginAdmin);
+            document.getElementById("footerCreate").addEventListener("click", createAdmin);
+            document.getElementById("footerContact").addEventListener("click", () => {
+                window.location.href = "contact.html";
+            });
 
-            const accounts = getAccounts();
-            if (!accounts[email.toLowerCase()]) {
-                return alert("No account found. Please create one.");
-            }
-            if (accounts[email.toLowerCase()] !== pass) {
-                return alert("Incorrect password.");
-            }
+            // ─── SEND CODE BUTTON ────────────────────────────────────────────────
+            document.getElementById('sendCodeBtn').addEventListener('click', async () => {
+                const email = document.getElementById('createEmail').value.trim().toLowerCase();
+                if (!email.endsWith('@readysetfly.us')) {
+                    return alert('You must use a @readysetfly.us email.');
+                }
+                try {
+                    const res = await fetch('/api/sendVerificationCode', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email })
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    alert('Verification code sent to ' + email);
+                    document.getElementById('codeLabel').style.display = 'block';
+                } catch (err) {
+                    alert('Error sending code: ' + err.message);
+                }
+            });
 
-            setCurrentUser(email);
-            window.location.href = "admin-dashboard.html";
-        }
+            // ─── OVERRIDE submitCreate WITH VERIFICATION ──────────────────────────
+            window.submitCreate = async function () {
+                const email = document.getElementById('createEmail').value.trim().toLowerCase();
+                const code = document.getElementById('createVerificationCode').value.trim();
+                const pass = document.getElementById('createPassword').value;
+                const pass2 = document.getElementById('createPassword2').value;
 
-        function submitCreate() {
-            const email = document.getElementById("createEmail").value.trim();
-            const pass = document.getElementById("createPassword").value;
-            const pass2 = document.getElementById("createPassword2").value;
-            if (!email || !pass || !pass2) return alert("Fill all fields.");
-            if (!isEmailAllowed(email)) {
-                return alert("Email must be @readysetfly.us or approved.");
-            }
-            if (pass !== pass2) {
-                return alert("Passwords do not match.");
-            }
+                if (!email || !pass || !pass2) {
+                    return alert('Fill all fields.');
+                }
+                if (!email.endsWith('@readysetfly.us')) {
+                    return alert('Email must be @readysetfly.us.');
+                }
+                if (!code) {
+                    return alert('Enter the 6-digit verification code.');
+                }
 
-            const accounts = getAccounts();
-            accounts[email.toLowerCase()] = pass;
-            saveAccounts(accounts);
+                // verify the code
+                try {
+                    const verifyRes = await fetch('/api/verifyCode', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, code })
+                    });
+                    const { valid } = await verifyRes.json();
+                    if (!valid) return alert('Invalid or expired code.');
+                } catch (err) {
+                    return alert('Verification error: ' + err.message);
+                }
 
-            setCurrentUser(email);
-            alert("Account created—redirecting to dashboard.");
-            window.location.href = "admin-dashboard.html";
-        }
+                if (pass !== pass2) {
+                    return alert('Passwords do not match.');
+                }
+
+                // save account locally
+                const accounts = getAccounts();
+                accounts[email] = pass;
+                saveAccounts(accounts);
+
+                setCurrentUser(email);
+                alert('Account created—redirecting to dashboard.');
+                window.location.href = "admin-dashboard.html";
+            };
+        });
+
+        // function submitCreate() {
+        //     const email = document.getElementById("createEmail").value.trim();
+        //     const pass = document.getElementById("createPassword").value;
+        //     const pass2 = document.getElementById("createPassword2").value;
+        //     if (!email || !pass || !pass2) return alert("Fill all fields.");
+        //     if (!isEmailAllowed(email)) {
+        //         return alert("Email must be @readysetfly.us or approved.");
+        //     }
+        //     if (pass !== pass2) {
+        //         return alert("Passwords do not match.");
+        //     }
+
+        //     const accounts = getAccounts();
+        //     accounts[email.toLowerCase()] = pass;
+        //     saveAccounts(accounts);
+
+        //     setCurrentUser(email);
+        //     alert("Account created—redirecting to dashboard.");
+        //     window.location.href = "admin-dashboard.html";
+        // }
 
         function viewRentals() {
             window.location.href = "rentals.html";
@@ -589,20 +661,20 @@
             window.location.href = "marketplace.html";
         }
 
-        window.addEventListener("DOMContentLoaded", () => {
-            checkAutoRedirect();
-            document
-                .getElementById("footerLogo")
-                .addEventListener("click", loginAdmin);
-            document
-                .getElementById("footerCreate")
-                .addEventListener("click", createAdmin);
-            document
-                .getElementById("footerContact")
-                .addEventListener("click", () => {
-                    window.location.href = "contact.html";
-                });
-        });
+        // window.addEventListener("DOMContentLoaded", () => {
+        //     checkAutoRedirect();
+        //     document
+        //         .getElementById("footerLogo")
+        //         .addEventListener("click", loginAdmin);
+        //     document
+        //         .getElementById("footerCreate")
+        //         .addEventListener("click", createAdmin);
+        //     document
+        //         .getElementById("footerContact")
+        //         .addEventListener("click", () => {
+        //             window.location.href = "contact.html";
+        //         });
+        // });
     </script>
 </body>
 

@@ -572,6 +572,74 @@ ${message}
   }
 });
 
+// ───────────────────────────────────────────────────────────────
+// Email verification for @readysetfly.us admin sign-up
+// ───────────────────────────────────────────────────────────────
+
+// How long codes stay valid, and where we store them
+const VERIFICATION_COLLECTION = "emailVerifications";
+const CODE_TTL_MINUTES      = 15;
+
+// 1) Send a 6-digit code to the given email
+// ────────────────────────────────────────────────
+// 1) Send a 6-digit code to the given email (with rate-limit)
+// ────────────────────────────────────────────────
+app.post("/api/sendVerificationCode", async (req, res) => {
+  const { email } = req.body || {};
+  const key = email && email.toLowerCase();
+
+  // 1️⃣ Basic validation
+  if (!key || !key.endsWith("@readysetfly.us")) {
+    return res
+      .status(400)
+      .json({ error: "Must supply a @readysetfly.us email." });
+  }
+
+  const ref = db.collection(VERIFICATION_COLLECTION).doc(key);
+
+  // 2️⃣ Rate-limit: only one code per minute
+  const snap = await ref.get();
+  if (snap.exists) {
+    const { createdAt } = snap.data();
+    if (Date.now() - createdAt.toMillis() < 60 * 1000) {
+      return res
+        .status(429)
+        .json({ error: "Too many requests. Try again in a minute." });
+    }
+  }
+
+  // 3️⃣ Generate & store new code + timestamps
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const now = admin.firestore.Timestamp.now();
+  const expiresAt = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000)
+  );
+
+  await ref.set({ code, createdAt: now, expiresAt });
+
+  // 4️⃣ Send it by email
+  await initTransporter();
+  if (!transporter) {
+    return res
+      .status(500)
+      .json({ error: "Email service not configured." });
+  }
+
+  const fromAddr = `"Ready Set Fly Admin" <${await SMTP_USER.value()}>`;
+  try {
+    await transporter.sendMail({
+      from:    fromAddr,
+      to:      key,
+      subject: "Your ReadySetFly Verification Code",
+      text:    `Your verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes.`
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    admin.logger.error("Error sending verification email:", err);
+    return res.status(500).json({ error: "Failed to send code." });
+  }
+});
+
 // ───────────────────────────────────────────────────
 // Stripe Admin: Search Customers/Accounts
 // ───────────────────────────────────────────────────
@@ -1778,11 +1846,10 @@ app.post("/retrieve-connected-account", authenticate, async (req, res) => {
   }
 });
 
-// ===================================================================
-// Drop-in replacement for the existing /get-stripe-balance endpoint.
-// Keeps availableAmount and pendingAmount logic, replaces YTD calculation
-// with a Firestore sum over your payments subcollection.
-
+// ─────────────────────────────────────────────────────────────────────
+// Drop-in replacement for /get-stripe-balance
+// Returns available, pending, and YTD net amounts (in cents)
+// ─────────────────────────────────────────────────────────────────────
 app.get("/get-stripe-balance", authenticate, async (req, res) => {
   try {
     // 1) Load the owner’s Firestore record
@@ -1813,9 +1880,7 @@ app.get("/get-stripe-balance", authenticate, async (req, res) => {
       pendingAmount += p.amount;
     }
 
-    // ——————————————————————————————
     // 3) Year-to-Date gross volume: sum all payments recorded in Firestore
-    // ——————————————————————————————
     const startOfYear = admin.firestore.Timestamp.fromDate(
       new Date(new Date().getFullYear(), 0, 1)
     );
