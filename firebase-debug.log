@@ -1,0 +1,16 @@
+[debug] [2025-07-13T22:06:40.549Z] ----------------------------------------------------------------------
+[debug] [2025-07-13T22:06:40.554Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\carme\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions:default
+[debug] [2025-07-13T22:06:40.555Z] CLI Version:   13.35.1
+[debug] [2025-07-13T22:06:40.556Z] Platform:      win32
+[debug] [2025-07-13T22:06:40.556Z] Node Version:  v18.20.4
+[debug] [2025-07-13T22:06:40.557Z] Time:          Sun Jul 13 2025 17:06:40 GMT-0500 (Central Daylight Time)
+[debug] [2025-07-13T22:06:40.558Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-13T22:06:41.000Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-13T22:06:41.000Z] > authorizing via signed-in user (coryarmer@gmail.com)
+[debug] [2025-07-13T22:06:41.003Z] [iam] checking project ready-set-fly-71506 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-07-13T22:06:41.006Z] Checked if tokens are valid: true, expires at: 1752446957811
+[debug] [2025-07-13T22:06:41.006Z] Checked if tokens are valid: true, expires at: 1752446957811
+[debug] [2025-07-13T22:06:41.008Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/ready-set-fly-71506:testIamPermissions [none]
+[debug] [2025-07-13T22:06:41.008Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/ready-set-fly-71506:testIamPermissions x-goog-quota-user=projects/ready-set-fly-71506
+[debug] [2025-07-13T22:06:41.008Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ready-set-fly-71506:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}

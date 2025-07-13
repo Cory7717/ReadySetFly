@@ -175,17 +175,20 @@ async function initStripeAndEmail() {
   if (stripe) return;
 
   // grab all your secrets in parallel
-  const [stripeKey, webhookSecret, modEmail] = await Promise.all([
+  const [stripeKeyRaw, webhookSecret, modEmail] = await Promise.all([
     STRIPE_SECRET_KEY.value(),
     STRIPE_WEBHOOK_SECRET.value(),
     MODERATOR_EMAIL_SECRET.value(),
   ]);
 
+  // If the secret was accidentally stored as "STRIPE_SECRET_KEY=sk_live_…",
+  // strip off that prefix so Stripe sees only the raw key.
+  const stripeKey = stripeKeyRaw.replace(/^STRIPE_SECRET_KEY=/, "").trim();
+
   stripe = new Stripe(stripeKey);
   stripeWebhookSecret = webhookSecret;
   moderatorEmail = modEmail;
 
-  // optionally log
   admin.logger.info("🔑 Stripe & moderator-email ready.");
 }
 
@@ -492,11 +495,6 @@ app.get("/api/users/:uid/listings", authenticate, async (req, res) => {
   }
 });
 
-// Handle undefined routes
-app.use((req, res, next) => {
-  res.setHeader("Content-Type", "application/json");
-  res.status(404).json({ error: "Route not found" });
-});
 
 // =====================
 // Export Express App as Firebase Function with Memory and Timeout Config
@@ -2422,6 +2420,12 @@ exports.expireAircraftListings = onSchedule("every 1 hours", async () => {
   await batch.commit();
   admin.logger.info("expireAircraftListings: committed expiry batch");
   return null;
+});
+
+// Handle undefined routes
+app.use((req, res, next) => {
+  res.setHeader("Content-Type", "application/json");
+  res.status(404).json({ error: "Route not found" });
 });
 
 // ===================================================================
