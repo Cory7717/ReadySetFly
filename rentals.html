@@ -148,65 +148,76 @@
         // 1. Import the functions you need from the SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import {
-            getFirestore, collection, query, where, orderBy, getDocs
+            getFirestore, collection, query, where, orderBy, onSnapshot
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
         // 2. Your web app's Firebase configuration (replace with your config)
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
+            authDomain: "ready-set-fly-71506.firebaseapp.com",
+            projectId: "ready-set-fly-71506",
+            storageBucket: "ready-set-fly-71506.appspot.com",
+            messagingSenderId: "64600529166",
+            appId: "1:64600529166:android:98d989ad25482d03895f5f"
         };
 
         // 3. Initialize Firebase & Firestore
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+  const db  = getFirestore(app);
 
-        // 4. Fetch listings and render
-        async function loadListings() {
-            const listingsContainer = document.getElementById('listings');
-            const q = query(
-                collection(db, 'airplanes'),
-                where('isListed', '==', true),
-                orderBy('createdAt', 'desc')
-            );
-            try {
-                const snapshot = await getDocs(q);
-                snapshot.forEach(docSnap => {
-                    const data = docSnap.data();
-                    // Parse aircraftModel like in your RN code
-                    const [year = "", make = "", ...rest] = (data.aircraftModel || "").split(' ');
-                    const model = rest.join(' ') || 'Unknown Model';
-                    const imgUrl = Array.isArray(data.images) ? data.images[0] : data.images;
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    card.innerHTML = `
-            <img src="${imgUrl || 'https://via.placeholder.com/300x160?text=No+Image'}" alt="Aircraft image">
-            <div class="card-content">
-              <div class="card-title">${year} ${make}</div>
-              <div class="card-sub">${model}</div>
-              <div class="card-sub">Location: ${data.location || 'Unknown'}</div>
-              <div class="card-footer">${parseFloat(data.costPerHour || 0).toFixed(2)}/hr</div>
-              <div class="card-desc">${(data.description || 'No description').split(' ').slice(0, 10).join(' ')}${(data.description || '').split(' ').length > 10 ? '…' : ''}</div>
+  // 3) Build the query
+  const listingsContainer = document.getElementById('listings');
+  const q = query(
+    collection(db, 'airplanes'),
+    where('isListed', '==', true),
+    orderBy('createdAt', 'desc')
+  );
+
+  // 4) Real-time listener (drops in whenever data changes)
+  onSnapshot(q,
+    snapshot => {
+      listingsContainer.innerHTML = ''; // clear old cards
+
+      if (snapshot.empty) {
+        listingsContainer.innerHTML = `
+          <p style="grid-column:1/-1;text-align:center;color:#718096;">
+            No listings available
+          </p>`;
+        return;
+      }
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const [year = "", make = "", ...rest] = (data.aircraftModel || "").split(' ');
+        const model = rest.join(' ') || 'Unknown Model';
+        const imgUrl = Array.isArray(data.images) ? data.images[0] : data.images;
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <img src="${imgUrl || 'https://via.placeholder.com/300x160?text=No+Image'}" alt="Aircraft image">
+          <div class="card-content">
+            <div class="card-title">${year} ${make}</div>
+            <div class="card-sub">${model}</div>
+            <div class="card-sub">Location: ${data.location || 'Unknown'}</div>
+            <div class="card-footer">${parseFloat(data.costPerHour || 0).toFixed(2)}/hr</div>
+            <div class="card-desc">
+              ${(data.description || 'No description').split(' ').slice(0,10).join(' ')}
+              ${(data.description || '').split(' ').length > 10 ? '…' : ''}
             </div>
-          `;
-                    listingsContainer.appendChild(card);
-                });
-                if (snapshot.empty) {
-                    listingsContainer.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#718096;">No listings available</p>';
-                }
-            } catch (err) {
-                console.error('Error loading listings:', err);
-                listingsContainer.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#e53e3e;">Failed to load listings.</p>';
-            }
-        }
-
-        // 5. Kick it off
-        loadListings();
-    </script>
+          </div>`;
+        listingsContainer.appendChild(card);
+      });
+    },
+    err => {
+      console.error('Error listening to listings:', err);
+      listingsContainer.innerHTML = `
+        <p style="grid-column:1/-1;text-align:center;color:#e53e3e;">
+          Failed to load listings.
+        </p>`;
+    }
+  );
+</script>
 </body>
 
 </html>

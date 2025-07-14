@@ -338,143 +338,142 @@
         </svg>
     </button>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import {
-            getFirestore, collection, query, orderBy, getDocs
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+   <!-- DROP-IN REAL-TIME LISTENER SCRIPT -->
+<script type="module">
+  import { initializeApp }
+    from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    query,
+    orderBy,
+    onSnapshot
+  } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
-            authDomain: "ready-set-fly-71506.firebaseapp.com",
-            projectId: "ready-set-fly-71506",
-            storageBucket: "ready-set-fly-71506.appspot.com",
-            messagingSenderId: "64600529166",
-            appId: "1:64600529166:android:98d989ad25482d03895f5f"
-        };
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+  // 1) Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
+    authDomain: "ready-set-fly-71506.firebaseapp.com",
+    projectId: "ready-set-fly-71506",
+    storageBucket: "ready-set-fly-71506.appspot.com",
+    messagingSenderId: "64600529166",
+    appId: "1:64600529166:android:98d989ad25482d03895f5f"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
 
-        const listingsEl = document.getElementById("listings");
-        const categoryFilter = document.getElementById("categoryFilter");
-        const searchInput = document.getElementById("searchInput");
+  // 2) UI & modal refs
+  const listingsEl     = document.getElementById("listings");
+  const categoryFilter = document.getElementById("categoryFilter");
+  const searchInput    = document.getElementById("searchInput");
+  const backdrop       = document.getElementById("modalBackdrop");
+  const modalTitle     = document.getElementById("modalTitle");
+  const modalBody      = document.getElementById("modalBody");
+  const closeModal     = document.getElementById("closeModal");
 
-        // Modal elements
-        const backdrop = document.getElementById('modalBackdrop');
-        const modalTitle = document.getElementById('modalTitle');
-        const modalBody = document.getElementById('modalBody');
-        const closeModal = document.getElementById('closeModal');
+  closeModal.addEventListener("click", () => backdrop.style.display = "none");
+  backdrop.addEventListener("click", e => {
+    if (e.target === backdrop) backdrop.style.display = "none";
+  });
 
-        closeModal.addEventListener('click', () => backdrop.style.display = 'none');
-        backdrop.addEventListener('click', e => {
-            if (e.target === backdrop) backdrop.style.display = 'none';
-        });
+  // 3) In-memory cache
+  let allDocs = [];
 
-        /* Add at the end of your existing <script type="module">, before loadListings(); */
-        const upButton = document.getElementById('upButton');
+  // 4) Real-time listener
+  const listingsQuery = query(
+    collection(db, "listings"),
+    orderBy("createdAt", "desc")
+  );
+  onSnapshot(listingsQuery,
+    snapshot => {
+      allDocs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderFiltered();
+    },
+    err => {
+      console.error("Firestore listen error:", err);
+      listingsEl.innerHTML = '<p id="error">Failed to load listings.</p>';
+    }
+  );
 
-        // Show or hide button when scrolling
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 200) {
-                upButton.classList.add('show');
-            } else {
-                upButton.classList.remove('show');
-            }
-        });
+  // 5) Re-render on filters
+  categoryFilter.addEventListener("change", renderFiltered);
+  searchInput   .addEventListener("input",  renderFiltered);
 
-        // Smooth scroll to top when clicked
-        upButton.addEventListener('click', () => {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
+  // 6) Filter + render
+  function renderFiltered() {
+    const cat  = categoryFilter.value.trim().toLowerCase();
+    const term = searchInput.value.trim().toLowerCase();
+    let docs = allDocs;
 
-        async function loadListings() {
-            listingsEl.innerHTML = "";
-            const cat = categoryFilter.value.trim().toLowerCase();
-            const term = searchInput.value.trim().toLowerCase();
+    if (cat)  docs = docs.filter(d => (d.category||"").toLowerCase() === cat);
+    if (term) docs = docs.filter(d => {
+      const t = (d.title || d.jobTitle || "").toLowerCase();
+      return t.includes(term)
+          || (d.city  || "").toLowerCase().includes(term)
+          || (d.state || "").toLowerCase().includes(term);
+    });
 
-            let q = query(
-                collection(db, "listings"),
-                orderBy("createdAt", "desc")
-            );
-            const snapshot = await getDocs(q).catch(err => {
-                listingsEl.innerHTML = '<p id="error">Failed to load listings.</p>';
-                console.error("Firestore error:", err);
-            });
-            if (!snapshot) return;
+    if (!docs.length) {
+      listingsEl.innerHTML = '<p id="empty">No listings match your filters.</p>';
+      return;
+    }
 
-            let docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    listingsEl.innerHTML = "";
+    docs.forEach(item => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = getCardInnerHTML(item);
+      card.addEventListener("click", () => openModal(item));
+      listingsEl.append(card);
+    });
+  }
 
-            // apply filters
-            if (cat) docs = docs.filter(d => (d.category || '').toLowerCase() === cat);
-            if (term) docs = docs.filter(d => {
-                const title = ((d.title || d.jobTitle || d.flightSchoolDetails?.flightSchoolName) + '').toLowerCase();
-                const city = (d.city || '').toLowerCase();
-                const state = (d.state || '').toLowerCase();
-                return title.includes(term) || city.includes(term) || state.includes(term);
-            });
+  // 7) Card + modal helpers
+  function getCardInnerHTML(item) {
+    const imgUrl = Array.isArray(item.images) ? item.images[0] : item.images;
+    const imgHtml = imgUrl
+      ? `<img src="${imgUrl}" alt="listing image">`
+      : `<div class="placeholder">No Image</div>`;
 
-            if (docs.length === 0) {
-                listingsEl.innerHTML = '<p id="empty">No listings match your filters.</p>';
-                return;
-            }
+    const title = item.category === "Aviation Jobs"
+      ? (item.jobTitle || "Job")
+      : (item.title || item.flightSchoolDetails?.flightSchoolName || "");
 
-            docs.forEach(item => {
-                const card = document.createElement("div");
-                card.className = "card";
-                card.innerHTML = getCardInnerHTML(item);
-                card.addEventListener('click', () => openModal(item));
-                listingsEl.append(card);
-            });
-        }
+    const subtitle = item.category === "Aviation Jobs"
+      ? (item.companyName || "")
+      : `${item.city || ""}${item.state ? ", " + item.state : ""}`;
 
-        function getCardInnerHTML(item) {
-            const imgUrl = Array.isArray(item.images) ? item.images[0] : item.images;
-            const imgHtml = imgUrl
-                ? `<img src="${imgUrl}" alt="listing image">`
-                : `<div class="placeholder">No Image</div>`;
+    let footer = "";
+    if (item.category === "Aircraft for Sale")
+      footer = `<div class="footer">$${Number(item.salePrice||0).toLocaleString()}</div>`;
+    else if (item.packageType === "Basic")
+      footer = `<div class="footer">Free for 7 days</div>`;
 
-            const title = item.category === "Aviation Jobs"
-                ? (item.jobTitle || "Job")
-                : (item.title || item.flightSchoolDetails?.flightSchoolName || `${item.firstName || ''} ${item.lastName || ''}`);
+    return `
+      <div style="position:relative">
+        ${imgHtml}
+        <div class="badge">${item.category}</div>
+      </div>
+      <div class="content">
+        <div class="title">${title}</div>
+        <div class="subtitle">${subtitle}</div>
+        ${footer}
+      </div>
+    `;
+  }
 
-            const subtitle = item.category === "Aviation Jobs"
-                ? (item.companyName || "")
-                : `${item.city || ''}${item.state ? ', ' + item.state : ''}`;
-
-            let footer = '';
-            if (item.category === 'Aircraft for Sale') footer = `<div class="footer">$${Number(item.salePrice || 0).toLocaleString()}</div>`;
-            else if (item.packageType === 'Basic') footer = `<div class="footer">Free for 7 days</div>`;
-
-            return `
-        <div style="position:relative">
-          ${imgHtml}
-          <div class="badge">${item.category}</div>
-        </div>
-        <div class="content">
-          <div class="title">${title}</div>
-          <div class="subtitle">${subtitle}</div>
-          ${footer}
-        </div>
-      `;
-        }
-
-        function openModal(item) {
-            modalTitle.textContent = item.title || item.jobTitle || 'Listing';
-            // build detail view
-            modalBody.innerHTML = `
-        <p><strong>Category:</strong> ${item.category}</p>
-        <p><strong>Location:</strong> ${item.city || ''}${item.state ? ', ' + item.state : ''}</p>
-        ${item.description ? `<p>${item.description}</p>` : ''}
-        ${item.images && item.images.length ? item.images.map(url => `<img src="${url}" style="width:100%; margin-top:8px;"/>`).join('') : ''}
-      `;
-            backdrop.style.display = 'flex';
-        }
-
-        categoryFilter.addEventListener("change", loadListings);
-        searchInput.addEventListener("input", loadListings);
-
-        loadListings();
-    </script>
+  function openModal(item) {
+    modalTitle.textContent = item.title || item.jobTitle || "Listing";
+    modalBody.innerHTML = `
+      <p><strong>Category:</strong> ${item.category}</p>
+      <p><strong>Location:</strong> ${item.city || ""}${item.state ? ", " + item.state : ""}</p>
+      ${item.description ? `<p>${item.description}</p>` : ""}
+      ${item.images?.map(url => `<img src="${url}" style="width:100%;margin-top:8px;">`).join("")}
+    `;
+    backdrop.style.display = "flex";
+  }
+</script>
+<!-- END DROP-IN SCRIPT -->
 </body>
 
 </html>
