@@ -38,6 +38,9 @@ serviceAccountKey.json
 
 # Ignore backend environment variables
 rsf_app_backup/backend/.env
+# Ignore backend .env
+/backend/.env
+
 
 # Ignore functions directory (if deleted)
 functions/
