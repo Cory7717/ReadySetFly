@@ -29,7 +29,12 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+backend/.env
+.env.*
+*.env
 .env*.local
+*.local
 
 # typescript
 *.tsbuildinfo
@@ -37,14 +42,13 @@ yarn-error.*
 serviceAccountKey.json
 
 # Ignore backend environment variables
-rsf_app_backup/backend/.env
-# Ignore backend .env
-/backend/.env
+# (Removed incorrect path rsf_app_backup/backend/.env; explicit backend/.env already above)
 
+# Ignore backend .env
+# (Covered above by backend/.env and patterns)
 
 # Ignore functions directory (if deleted)
 functions/
 
 # Ignore general sensitive files
-*.local
-*.env
+# (Consolidated into env section above)
