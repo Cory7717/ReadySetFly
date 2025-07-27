@@ -118,7 +118,7 @@
     </form>
   </main>
 
-  <script>
+    <script>
     document.getElementById("contactForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const form = e.target;
@@ -130,7 +130,8 @@
       };
 
       try {
-        const res = await fetch("/api/contact", {
+        // Changed endpoint from /api/contact to /contact
+        const res = await fetch("/contact", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
@@ -144,5 +145,6 @@
       }
     });
   </script>
+
 </body>
 </html>
