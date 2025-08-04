@@ -21,6 +21,34 @@
     /*────────────────────────────────────────────────────
       Variables & Reset
     ─────────────────────────────────────────────────────*/
+    /* new compact modal header */
+#modalHeader {
+  height: 15vh;                       /* about a quarter of the 60vh page header */
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+  overflow: hidden;
+}
+
+#modalHeader::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);        /* dark overlay for text contrast */
+}
+
+#modalHeader h2 {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 1rem;
+  margin: 0;
+  color: #fff;
+  z-index: 1;
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+}
+
     :root {
       --color-primary: #4f46e5;
       --color-primary-hover: #4338ca;
@@ -340,13 +368,14 @@
     <!-- Cards will be injected here -->
   </div>
 
-  <!-- MODAL MARKUP -->
+   <!-- MODAL MARKUP -->
   <div id="modalBackdrop">
     <div id="modal">
-      <header>
+      <!-- compact listing “hero” header -->
+      <div id="modalHeader">
         <h2 id="modalTitle"></h2>
         <button class="close-btn" id="closeModal">×</button>
-      </header>
+      </div>
       <div class="body" id="modalBody"></div>
     </div>
   </div>
@@ -482,17 +511,33 @@
       `;
     }
 
-    function openModal(item) {
-      modalTitle.textContent = item.title || item.jobTitle || "Listing";
-      modalBody.innerHTML = `
-        <p><strong>Category:</strong> ${item.category}</p>
-        <p><strong>Location:</strong> ${item.city || ""}${item.state ? ", " + item.state : ""}</p>
-        ${item.description ? `<p>${item.description}</p>` : ""}
-        ${item.images?.map(url => `<img src="${url}" style="width:100%;margin-top:8px;">`).join("")}
-      `;
-      backdrop.style.display = "flex";
-    }
+   function openModal(item) {
+  // 1) set the header background to the first image (or none)
+  const headerEl = document.getElementById("modalHeader");
+  const firstImg = Array.isArray(item.images) ? item.images[0] : item.images;
+  headerEl.style.backgroundImage = firstImg
+    ? `url('${firstImg}')`
+    : "none";
 
+  // 2) fill in title (the <h2> inside #modalHeader)
+  document.getElementById("modalTitle").textContent =
+    item.title || item.jobTitle || "Listing";
+
+  // 3) fill in the detail body
+  document.getElementById("modalBody").innerHTML = `
+    <p><strong>Category:</strong> ${item.category}</p>
+    <p><strong>Location:</strong> ${item.city || ""}${
+      item.state ? ", " + item.state : ""
+    }</p>
+    ${item.description ? `<p>${item.description}</p>` : ""}
+    ${item.images
+      ?.map((url) => `<img src="${url}" style="width:100%;margin-top:8px;">`)
+      .join("")}
+  `;
+
+  // 4) show the modal
+  document.getElementById("modalBackdrop").style.display = "flex";
+}
     // 8) Scroll-to-top
     const upBtn = document.getElementById("upButton");
     window.addEventListener("scroll", () => {
