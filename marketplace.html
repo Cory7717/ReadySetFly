@@ -1,483 +1,506 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5JJ0LMDQ4F"></script>
-    <script> window.dataLayer = window.dataLayer || []; function gtag() { dataLayer.push(arguments); } gtag('js', new Date()); gtag('config', 'G-5JJ0LMDQ4F'); </script>
-    <meta charset="UTF-8" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Aviation Marketplace</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f3f4f6
-        }
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-5JJ0LMDQ4F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-5JJ0LMDQ4F');
+  </script>
 
-        header {
-            /* make sure the path is correct relative to this HTML file */
-            background-image: url('../../Assets/images/wingtip_clouds.jpg');
-            background-repeat: no-repeat;
-            background-position: center center;
-            background-size: cover;
-            height: 200px;
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            padding-bottom: 1rem;
-            color: white;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aviation Marketplace</title>
 
-        header h1 {
-            margin: 0;
-            font-size: 2rem;
-        }
+  <!-- Modern “Inter” font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
-        #controls {
-            padding: 1rem;
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-            background: white;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
+  <style>
+    /*────────────────────────────────────────────────────
+      Variables & Reset
+    ─────────────────────────────────────────────────────*/
+    :root {
+      --color-primary: #4f46e5;
+      --color-primary-hover: #4338ca;
+      --color-bg: #f9fafb;
+      --color-text: #1f2937;
+      --color-muted: #6b7280;
+      --radius: 0.5rem;
+      --transition: 0.3s ease;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0; padding: 0;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
 
-        /* make sure this goes BEFORE your #upButton.show rules */
-        #upButton {
-            position: fixed;
-            right: 1.5rem;
-            bottom: 1.5rem;
-            display: none;
-            /* hidden by default */
-            width: 3rem;
-            height: 3rem;
-            border: none;
-            border-radius: 50%;
-            background: #1D4ED8;
-            /* blue circle */
-            color: white;
-            font-size: 1.25rem;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            transition: opacity 0.3s ease;
-        }
+    /*────────────────────────────────────────────────────
+      HERO HEADER
+    ─────────────────────────────────────────────────────*/
+    header {
+      position: relative;
+      height: 60vh;
+      background: url('../../Assets/images/wingtip_clouds.jpg') center/cover no-repeat;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+    }
+    header h1 {
+      position: relative;
+      color: #fff;
+      font-size: clamp(2rem,5vw,3rem);
+      font-weight: 700;
+      padding: 1rem;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
 
-        /* Add inside your existing <style> */
-        #upButton svg {
-            width: 1.5rem;
-            height: 1.5rem;
-        }
+    /*────────────────────────────────────────────────────
+      SEARCH HERO
+    ─────────────────────────────────────────────────────*/
+    .search-hero {
+      max-width: 600px;
+      margin: 1rem auto;
+      padding: 1rem;
+      background: rgba(255,255,255,0.8);
+      border-radius: var(--radius);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .search-hero h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #111827;
+    }
+    .search-hero p {
+      margin-top: 0.5rem;
+      color: #070707;
+      line-height: 1.4;
+    }
+    .search-hero ul {
+      list-style: disc inside;
+      margin-top: 0.75rem;
+      padding-left: 1.25rem;
+    }
+    .search-hero li {
+      margin-bottom: 0.5rem;
+      line-height: 1.4;
+      color: #030303;
+    }
+    .search-hero strong {
+      font-weight: 600;
+      color: #080808;
+    }
 
-        #upButton.show {
-            display: block;
-            opacity: 1;
-        }
+    /*────────────────────────────────────────────────────
+      FILTER CONTROLS
+    ─────────────────────────────────────────────────────*/
+    #controls {
+      padding: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    #controls label {
+      font-size: 0.9rem;
+      color: var(--color-text);
+    }
+    #controls input,
+    #controls select {
+      padding: 0.5rem;
+      font-size: 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: var(--radius);
+    }
 
-        #controls input,
-        #controls select {
-            padding: 0.5rem;
-            font-size: 1rem;
-            border: 1px solid #cbd5e0;
-            border-radius: 4px;
-        }
+    /*────────────────────────────────────────────────────
+      LISTINGS GRID
+    ─────────────────────────────────────────────────────*/
+    #listings {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px,1fr));
+      gap: 1rem;
+      padding: 1rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      transition: transform var(--transition);
+    }
+    .card:hover {
+      transform: translateY(-2px);
+    }
+    .card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+    }
+    .placeholder {
+      background: #e2e8f0;
+      width: 100%;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #a0aec0;
+    }
+    .badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+    }
+    .content {
+      padding: 0.75rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    .footer {
+      margin-top: auto;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+    #empty, #error {
+      grid-column: 1/-1;
+      text-align: center;
+      color: var(--color-muted);
+    }
 
-        #listings {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
-            padding: 1rem;
-        }
+    /*────────────────────────────────────────────────────
+      MODAL OVERLAY
+    ─────────────────────────────────────────────────────*/
+    #modalBackdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 1000;
+    }
+    #modal {
+      background: #fff;
+      border-radius: var(--radius);
+      width: 90%;
+      max-width: 600px;
+      max-height: 90%;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      animation: fadeIn 0.2s ease-out;
+    }
+    #modal header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    #modal header h2 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+    #modal .close-btn {
+      background: transparent;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    #modal .body {
+      padding: 1rem;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
-        .card {
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
+    /*────────────────────────────────────────────────────
+      SCROLL-TO-TOP BUTTON
+    ─────────────────────────────────────────────────────*/
+    #upButton {
+      position: fixed;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      display: none;
+      width: 3rem;
+      height: 3rem;
+      border: none;
+      border-radius: 50%;
+      background: var(--color-primary);
+      color: #fff;
+      font-size: 1.25rem;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      z-index: 1000;
+      transition: opacity var(--transition);
+    }
+    #upButton svg {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+    #upButton.show {
+      display: block;
+      opacity: 1;
+    }
 
-        .card:hover {
-            transform: translateY(-2px);
-        }
-
-        .card img {
-            width: 100%;
-            height: 180px;
-            object-fit: cover
-        }
-
-        .badge {
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-        }
-
-        .content {
-            padding: 0.75rem;
-            flex: 1;
-            display: flex;
-            flex-direction: column
-        }
-
-        .title {
-            font-size: 1.1rem;
-            font-weight: bold;
-            margin: 0.25rem 0
-        }
-
-        .subtitle {
-            font-size: 0.9rem;
-            color: #4a5568;
-            margin-bottom: 0.5rem
-        }
-
-        .footer {
-            margin-top: auto;
-            font-size: 0.9rem;
-            font-weight: bold
-        }
-
-        .placeholder {
-            background: #e2e8f0;
-            width: 100%;
-            height: 180px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #a0aec0
-        }
-
-        #empty,
-        #error {
-            grid-column: 1/-1;
-            text-align: center;
-            color: #718096
-        }
-
-        /* Modal Styles */
-        #modalBackdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #modal {
-            background: white;
-            border-radius: 8px;
-            max-width: 600px;
-            width: 90%;
-            max-height: 90%;
-            overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            animation: fadeIn 0.2s ease-out;
-        }
-
-        #modal header {
-            padding: 1rem;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        #modal header h2 {
-            margin: 0;
-            font-size: 1.5rem;
-        }
-
-        #modal .close-btn {
-            background: transparent;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
-
-        #modal .body {
-            padding: 1rem;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* search-hero banner (matches index.html .hero styling) */
-        .search-hero {
-            max-width: 600px;
-            margin: 0 auto 1rem;
-            /* center + bottom spacing */
-            padding: 1rem;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        .search-hero h2 {
-            margin: 0;
-            font-size: 1.5rem;
-            color: #111827;
-            /* darker heading text */
-            font-weight: 600;
-        }
-
-        .search-hero p {
-            margin: 0.5rem 0 0;
-            font-size: 1rem;
-            color: #070707;
-            line-height: 1.4;
-        }
-
-        .search-hero ul {
-            list-style: disc inside;
-            margin: 0.75rem 0 0;
-            padding-left: 1.25rem;
-        }
-
-        .search-hero li {
-            margin-bottom: 0.5rem;
-            line-height: 1.4;
-            color: #030303;
-        }
-
-        .search-hero strong {
-            color: #080808;
-            font-weight: 600;
-        }
-    </style>
+    @media (max-width: 600px) {
+      #listings {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 
 <body>
+  <header>
+    <h1>Ready Set Fly Marketplace</h1>
+  </header>
 
-    <header>
-        <h1>Ready Set Fly Marketplace</h1>
-    </header>
-    <!-- HERO SEARCH BANNER -->
-    <div class="search-hero">
-        <h2>Search Everything General Aviation</h2>
-        <p>
-            Your all-in-one General Aviation marketplace: browse and book
-            <strong>aircraft rentals</strong>, discover top-rated
-            <strong>flight schools & training</strong>, explore
-            <strong>pilot job listings</strong>, compare
-            <strong>charter services</strong>, and connect with
-            <strong>maintenance & avionics providers</strong>—all from one hub.
-        </p>
+  <!-- HERO SEARCH BANNER -->
+  <div class="search-hero">
+    <h2>Search Everything General Aviation</h2>
+    <p>
+      Your all-in-one General Aviation marketplace: browse and book
+      <strong>aircraft rentals</strong>, discover top-rated
+      <strong>flight schools & training</strong>, explore
+      <strong>pilot job listings</strong>, compare
+      <strong>charter services</strong>, and connect with
+      <strong>maintenance & avionics providers</strong>—all from one hub.
+    </p>
+    <ul>
+      <li><strong>Aircraft Rentals:</strong> Private Cessnas, Pipers, Beechcrafts & more.</li>
+      <li><strong>Flight Schools & Training:</strong> Part-141 & Part-61 schools nationwide.</li>
+      <li><strong>Aviation Job Board:</strong> CFIs, dispatchers, mechanics, charter pilots.</li>
+      <li><strong>Charter Services:</strong> On-demand regional & cross-country flights.</li>
+      <li><strong>Maintenance & Avionics:</strong> Inspections, upgrades, repair shops.</li>
+      <li><strong>Aviation Events & Networking:</strong> Fly-ins, seminars, pilot communities.</li>
+    </ul>
+  </div>
 
-        <ul>
-            <li><strong>Aircraft Rentals:</strong> Private Cessnas, Pipers, Beechcrafts & more.</li>
-            <li><strong>Flight Schools & Training:</strong> Part-141 & part-61 schools nationwide.</li>
-            <li><strong>Aviation Job Board:</strong> CFIs, dispatchers, mechanics, charter pilots.</li>
-            <li><strong>Charter Services:</strong> On-demand regional & cross-country flights.</li>
-            <li><strong>Maintenance & Avionics:</strong> Inspections, upgrades, repair shops.</li>
-            <li><strong>Aviation Events & Networking:</strong> Fly-ins, seminars, pilot communities.</li>
-        </ul>
+  <!-- FILTER CONTROLS -->
+  <div id="controls">
+    <label>
+      Search:
+      <input type="text" id="searchInput" placeholder="e.g. Cessna, Dallas…">
+    </label>
+    <label>
+      Category:
+      <select id="categoryFilter">
+        <option value="">All</option>
+        <option>Aircraft for Sale</option>
+        <option>Aviation Jobs</option>
+        <option>Flight Schools</option>
+        <option>Flight Instructors</option>
+        <option>Aviation Mechanic</option>
+        <option>Charter Services</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- LISTINGS GRID -->
+  <div id="listings">
+    <!-- Cards will be injected here -->
+  </div>
+
+  <!-- MODAL MARKUP -->
+  <div id="modalBackdrop">
+    <div id="modal">
+      <header>
+        <h2 id="modalTitle"></h2>
+        <button class="close-btn" id="closeModal">×</button>
+      </header>
+      <div class="body" id="modalBody"></div>
     </div>
+  </div>
 
-    <div id="controls">
-        <label>
-            Search:
-            <input type="text" id="searchInput" placeholder="e.g. Cessna, Dallas…">
-        </label>
-        <label>
-            Category:
-            <select id="categoryFilter">
-                <option value="">All</option>
-                <option>Aircraft for Sale</option>
-                <option>Aviation Jobs</option>
-                <option>Flight Schools</option>
-                <option>Flight Instructors</option>
-                <option>Aviation Mechanic</option>
-                <option>Charter Services</option>
-            </select>
-        </label>
-    </div>
+  <!-- SCROLL-TO-TOP BUTTON -->
+  <button id="upButton" title="Go to top">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
 
-    <div id="listings">
-        <!-- cards injected here -->
-    </div>
+  <!-- DROP-IN REAL-TIME LISTENER SCRIPT -->
+  <script type="module">
+    import { initializeApp }
+      from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      orderBy,
+      onSnapshot
+    } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    <!-- Modal Markup -->
-    <div id="modalBackdrop">
-        <div id="modal">
-            <header>
-                <h2 id="modalTitle"></h2>
-                <button class="close-btn" id="closeModal">×</button>
-            </header>
-            <div class="body" id="modalBody"></div>
+    // 1) Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
+      authDomain: "ready-set-fly-71506.firebaseapp.com",
+      projectId: "ready-set-fly-71506",
+      storageBucket: "ready-set-fly-71506.appspot.com",
+      messagingSenderId: "64600529166",
+      appId: "1:64600529166:android:98d989ad25482d03895f5f"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    // 2) UI & modal refs
+    const listingsEl     = document.getElementById("listings");
+    const categoryFilter = document.getElementById("categoryFilter");
+    const searchInput    = document.getElementById("searchInput");
+    const backdrop       = document.getElementById("modalBackdrop");
+    const modalTitle     = document.getElementById("modalTitle");
+    const modalBody      = document.getElementById("modalBody");
+    const closeModal     = document.getElementById("closeModal");
+
+    closeModal.addEventListener("click", () => backdrop.style.display = "none");
+    backdrop.addEventListener("click", e => {
+      if (e.target === backdrop) backdrop.style.display = "none";
+    });
+
+    // 3) In-memory cache
+    let allDocs = [];
+
+    // 4) Real-time listener
+    const listingsQuery = query(
+      collection(db, "listings"),
+      orderBy("createdAt", "desc")
+    );
+    onSnapshot(listingsQuery,
+      snapshot => {
+        allDocs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderFiltered();
+      },
+      err => {
+        console.error("Firestore listen error:", err);
+        listingsEl.innerHTML = '<p id="error">Failed to load listings.</p>';
+      }
+    );
+
+    // 5) Re-render on filters
+    categoryFilter.addEventListener("change", renderFiltered);
+    searchInput   .addEventListener("input",  renderFiltered);
+
+    // 6) Filter + render
+    function renderFiltered() {
+      const cat  = categoryFilter.value.trim().toLowerCase();
+      const term = searchInput.value.trim().toLowerCase();
+      let docs = allDocs;
+
+      if (cat)  docs = docs.filter(d => (d.category||"").toLowerCase() === cat);
+      if (term) docs = docs.filter(d => {
+        const t = (d.title || d.jobTitle || "").toLowerCase();
+        return t.includes(term)
+            || (d.city  || "").toLowerCase().includes(term)
+            || (d.state || "").toLowerCase().includes(term);
+      });
+
+      if (!docs.length) {
+        listingsEl.innerHTML = '<p id="empty">No listings match your filters.</p>';
+        return;
+      }
+
+      listingsEl.innerHTML = "";
+      docs.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = getCardInnerHTML(item);
+        card.addEventListener("click", () => openModal(item));
+        listingsEl.append(card);
+      });
+    }
+
+    // 7) Card + modal helpers
+    function getCardInnerHTML(item) {
+      const imgUrl = Array.isArray(item.images) ? item.images[0] : item.images;
+      const imgHtml = imgUrl
+        ? `<img src="${imgUrl}" alt="listing image">`
+        : `<div class="placeholder">No Image</div>`;
+
+      const title = item.category === "Aviation Jobs"
+        ? (item.jobTitle || "Job")
+        : (item.title || item.flightSchoolDetails?.flightSchoolName || "");
+
+      const subtitle = item.category === "Aviation Jobs"
+        ? (item.companyName || "")
+        : `${item.city || ""}${item.state ? ", " + item.state : ""}`;
+
+      let footer = "";
+      if (item.category === "Aircraft for Sale")
+        footer = `<div class="footer">$${Number(item.salePrice||0).toLocaleString()}</div>`;
+      else if (item.packageType === "Basic")
+        footer = `<div class="footer">Free for 7 days</div>`;
+
+      return `
+        <div style="position:relative">
+          ${imgHtml}
+          <div class="badge">${item.category}</div>
         </div>
-    </div>
-    <!-- Add this just inside your <body>, e.g. right after <div id="modalBackdrop">…</div> -->
-    <button id="upButton" title="Go to top">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round" />
-        </svg>
-    </button>
-
-   <!-- DROP-IN REAL-TIME LISTENER SCRIPT -->
-<script type="module">
-  import { initializeApp }
-    from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-  import {
-    getFirestore,
-    collection,
-    query,
-    orderBy,
-    onSnapshot
-  } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-  // 1) Firebase config
-  const firebaseConfig = {
-    apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
-    authDomain: "ready-set-fly-71506.firebaseapp.com",
-    projectId: "ready-set-fly-71506",
-    storageBucket: "ready-set-fly-71506.appspot.com",
-    messagingSenderId: "64600529166",
-    appId: "1:64600529166:android:98d989ad25482d03895f5f"
-  };
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
-
-  // 2) UI & modal refs
-  const listingsEl     = document.getElementById("listings");
-  const categoryFilter = document.getElementById("categoryFilter");
-  const searchInput    = document.getElementById("searchInput");
-  const backdrop       = document.getElementById("modalBackdrop");
-  const modalTitle     = document.getElementById("modalTitle");
-  const modalBody      = document.getElementById("modalBody");
-  const closeModal     = document.getElementById("closeModal");
-
-  closeModal.addEventListener("click", () => backdrop.style.display = "none");
-  backdrop.addEventListener("click", e => {
-    if (e.target === backdrop) backdrop.style.display = "none";
-  });
-
-  // 3) In-memory cache
-  let allDocs = [];
-
-  // 4) Real-time listener
-  const listingsQuery = query(
-    collection(db, "listings"),
-    orderBy("createdAt", "desc")
-  );
-  onSnapshot(listingsQuery,
-    snapshot => {
-      allDocs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      renderFiltered();
-    },
-    err => {
-      console.error("Firestore listen error:", err);
-      listingsEl.innerHTML = '<p id="error">Failed to load listings.</p>';
-    }
-  );
-
-  // 5) Re-render on filters
-  categoryFilter.addEventListener("change", renderFiltered);
-  searchInput   .addEventListener("input",  renderFiltered);
-
-  // 6) Filter + render
-  function renderFiltered() {
-    const cat  = categoryFilter.value.trim().toLowerCase();
-    const term = searchInput.value.trim().toLowerCase();
-    let docs = allDocs;
-
-    if (cat)  docs = docs.filter(d => (d.category||"").toLowerCase() === cat);
-    if (term) docs = docs.filter(d => {
-      const t = (d.title || d.jobTitle || "").toLowerCase();
-      return t.includes(term)
-          || (d.city  || "").toLowerCase().includes(term)
-          || (d.state || "").toLowerCase().includes(term);
-    });
-
-    if (!docs.length) {
-      listingsEl.innerHTML = '<p id="empty">No listings match your filters.</p>';
-      return;
+        <div class="content">
+          <div class="title">${title}</div>
+          <div class="subtitle">${subtitle}</div>
+          ${footer}
+        </div>
+      `;
     }
 
-    listingsEl.innerHTML = "";
-    docs.forEach(item => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = getCardInnerHTML(item);
-      card.addEventListener("click", () => openModal(item));
-      listingsEl.append(card);
+    function openModal(item) {
+      modalTitle.textContent = item.title || item.jobTitle || "Listing";
+      modalBody.innerHTML = `
+        <p><strong>Category:</strong> ${item.category}</p>
+        <p><strong>Location:</strong> ${item.city || ""}${item.state ? ", " + item.state : ""}</p>
+        ${item.description ? `<p>${item.description}</p>` : ""}
+        ${item.images?.map(url => `<img src="${url}" style="width:100%;margin-top:8px;">`).join("")}
+      `;
+      backdrop.style.display = "flex";
+    }
+
+    // 8) Scroll-to-top
+    const upBtn = document.getElementById("upButton");
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 300) upBtn.classList.add("show");
+      else upBtn.classList.remove("show");
     });
-  }
-
-  // 7) Card + modal helpers
-  function getCardInnerHTML(item) {
-    const imgUrl = Array.isArray(item.images) ? item.images[0] : item.images;
-    const imgHtml = imgUrl
-      ? `<img src="${imgUrl}" alt="listing image">`
-      : `<div class="placeholder">No Image</div>`;
-
-    const title = item.category === "Aviation Jobs"
-      ? (item.jobTitle || "Job")
-      : (item.title || item.flightSchoolDetails?.flightSchoolName || "");
-
-    const subtitle = item.category === "Aviation Jobs"
-      ? (item.companyName || "")
-      : `${item.city || ""}${item.state ? ", " + item.state : ""}`;
-
-    let footer = "";
-    if (item.category === "Aircraft for Sale")
-      footer = `<div class="footer">$${Number(item.salePrice||0).toLocaleString()}</div>`;
-    else if (item.packageType === "Basic")
-      footer = `<div class="footer">Free for 7 days</div>`;
-
-    return `
-      <div style="position:relative">
-        ${imgHtml}
-        <div class="badge">${item.category}</div>
-      </div>
-      <div class="content">
-        <div class="title">${title}</div>
-        <div class="subtitle">${subtitle}</div>
-        ${footer}
-      </div>
-    `;
-  }
-
-  function openModal(item) {
-    modalTitle.textContent = item.title || item.jobTitle || "Listing";
-    modalBody.innerHTML = `
-      <p><strong>Category:</strong> ${item.category}</p>
-      <p><strong>Location:</strong> ${item.city || ""}${item.state ? ", " + item.state : ""}</p>
-      ${item.description ? `<p>${item.description}</p>` : ""}
-      ${item.images?.map(url => `<img src="${url}" style="width:100%;margin-top:8px;">`).join("")}
-    `;
-    backdrop.style.display = "flex";
-  }
-</script>
-<!-- END DROP-IN SCRIPT -->
+    upBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  </script>
+  <!-- END DROP-IN SCRIPT -->
 </body>
-
 </html>
