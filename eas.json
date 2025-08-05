@@ -11,14 +11,15 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk",
-        "image": "ubuntu-22.04-jdk-17-ndk-r26b"  // specify a build image with a proper Java setup
+        "buildType": "app-bundle",
+        "image": "ubuntu-22.04-jdk-17-ndk-r26b"
       }
     },
     "production": {
       "autoIncrement": true,
       "android": {
-        "image": "ubuntu-22.04-jdk-17-ndk-r26b"  // updated to a valid value
+        "buildType": "app-bundle",
+        "image": "ubuntu-22.04-jdk-17-ndk-r26b"
       }
     }
   },

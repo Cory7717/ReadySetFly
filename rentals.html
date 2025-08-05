@@ -2,226 +2,324 @@
 <html lang="en">
 
 <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5JJ0LMDQ4F"></script>
-    <script> window.dataLayer = window.dataLayer || []; function gtag() { dataLayer.push(arguments); } gtag('js', new Date()); gtag('config', 'G-5JJ0LMDQ4F'); </script>
-    <meta charset="UTF-8" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Aircraft Rentals</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f7fafc;
-        }
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-5JJ0LMDQ4F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-5JJ0LMDQ4F');
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aircraft Rentals</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f7fafc;
+    }
 
-        header {
-            background: #3182ce;
-            color: white;
-            padding: 1rem;
-            text-align: center;
-        }
+    header {
+      background: #3182ce;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
 
-        #listings {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1rem;
-            padding: 1rem;
-        }
+    #listings {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      padding: 1rem;
+    }
 
-        .card {
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-        }
+    .card {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+    }
 
-        .card img {
-            width: 100%;
-            height: 160px;
-            object-fit: cover;
-        }
+    .card img {
+      width: 100%;
+      height: 160px;
+      object-fit: cover;
+    }
 
-        .card-content {
-            padding: 0.75rem;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
+    .card-content {
+      padding: 0.75rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
 
-        .card-title {
-            font-size: 1.1rem;
-            font-weight: bold;
-            margin: 0.5rem 0 0.25rem;
-        }
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin: 0.5rem 0 0.25rem;
+    }
 
-        .card-sub {
-            font-size: 0.9rem;
-            color: #4a5568;
-            margin-bottom: 0.5rem;
-        }
+    .card-sub {
+      font-size: 0.9rem;
+      color: #4a5568;
+      margin-bottom: 0.5rem;
+    }
 
-        .card-desc {
-            font-size: 0.85rem;
-            color: #718096;
-            flex: 1;
-        }
+    .card-desc {
+      font-size: 0.85rem;
+      color: #718096;
+      flex: 1;
+    }
 
-        .card-footer {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
+    .card-footer {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
 
-        /* hero-box: same look as .search-hero on other pages */
-        .hero-box {
-            max-width: 600px;
-            margin: 1rem auto;
-            padding: 1rem;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
+    /* hero-box: same look as .search-hero on other pages */
+    .hero-box {
+      max-width: 600px;
+      margin: 1rem auto;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 0.5rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
 
-        .hero-box h2 {
-            margin: 0;
-            font-size: 1.5rem;
-            color: #111827;
-            font-weight: 600;
-        }
+    .hero-box h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #111827;
+      font-weight: 600;
+    }
 
-        .hero-box p {
-            margin: 0.5rem 0 0;
-            font-size: 1rem;
-            color: #374151;
-            line-height: 1.4;
-        }
+    .hero-box p {
+      margin: 0.5rem 0 0;
+      font-size: 1rem;
+      color: #374151;
+      line-height: 1.4;
+    }
 
-        .hero-box ul {
-            list-style: disc inside;
-            margin: 0.75rem 0 0;
-            padding-left: 1.25rem;
-        }
+    .hero-box ul {
+      list-style: disc inside;
+      margin: 0.75rem 0 0;
+      padding-left: 1.25rem;
+    }
 
-        .hero-box li {
-            margin-bottom: 0.5rem;
-            line-height: 1.4;
-            color: #374151;
-        }
+    .hero-box li {
+      margin-bottom: 0.5rem;
+      line-height: 1.4;
+      color: #374151;
+    }
 
-        .hero-box strong {
-            color: #111827;
-            font-weight: 600;
-        }
-    </style>
+    .hero-box strong {
+      color: #111827;
+      font-weight: 600;
+    }
+
+    /* Modal styles */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal-content {
+      background: #fff;
+      border-radius: 8px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow-y: auto;
+      position: relative;
+      padding: 1rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.75rem;
+      background: none;
+      border: none;
+      font-size: 2rem;
+      line-height: 1;
+      cursor: pointer;
+      color: #333;
+    }
+
+    .modal-content img {
+      width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+  </style>
 </head>
 
 <body>
 
-    <header>
-        <h1>Aircraft Rental Marketplace</h1>
-    </header>
-    <!-- HERO BOX: all-in-one GA marketplace SEO -->
-    <div class="hero-box">
-        <h2>Find Airplane & Helicopter Rentals, Charters & More</h2>
-        <p>
-            Your ultimate General Aviation hub: <strong>airplane rentals</strong>,
-            <strong>helicopter rentals</strong>, on-demand
-            <strong>charter services</strong>, and everything GA—right here.
-        </p>
-        <ul>
-            <li><strong>Airplane Rentals:</strong> Cessna, Piper, Beechcraft & more.</li>
-            <li><strong>Helicopter Rentals:</strong> Robinson R44, Bell 206, Airbus H125.</li>
-            <li><strong>Aircraft Charters:</strong> Regional & cross-country flights.</li>
-            <li><strong>Maintenance & Avionics:</strong> Inspections, upgrades, repair.</li>
-            <li><strong>Pilot Training & Jobs:</strong> Flight schools, CFIs, dispatchers.</li>
-            <li><strong>GA Marketplace:</strong> Sales, leasing, insurance & events.</li>
-        </ul>
+  <header>
+    <h1>Aircraft Rental Marketplace</h1>
+  </header>
+
+  <!-- HERO BOX: all-in-one GA marketplace SEO -->
+  <div class="hero-box">
+    <h2>Find Airplane & Helicopter Rentals, Charters & More</h2>
+    <p>
+      Your ultimate General Aviation hub:
+      <strong>airplane rentals</strong>,
+      <strong>helicopter rentals</strong>, on-demand
+      <strong>charter services</strong>, and everything GA—right here.
+    </p>
+    <ul>
+      <li><strong>Airplane Rentals:</strong> Cessna, Piper, Beechcraft & more.</li>
+      <li><strong>Helicopter Rentals:</strong> Robinson R44, Bell 206, Airbus H125.</li>
+      <li><strong>Aircraft Charters:</strong> Regional & cross-country flights.</li>
+      <li><strong>Maintenance & Avionics:</strong> Inspections, upgrades, repair.</li>
+      <li><strong>Pilot Training & Jobs:</strong> Flight schools, CFIs, dispatchers.</li>
+      <li><strong>GA Marketplace:</strong> Sales, leasing, insurance & events.</li>
+    </ul>
+  </div>
+
+  <div id="listings">
+    <!-- Cards will be injected here -->
+  </div>
+
+  <!-- Modal overlay -->
+  <div id="listingModal" class="modal hidden">
+    <div class="modal-content">
+      <button id="modalClose" class="modal-close">&times;</button>
+      <img id="modalImage" src="" alt="Aircraft image">
+      <h2 id="modalTitle"></h2>
+      <p id="modalSub"></p>
+      <p id="modalLocation"></p>
+      <p id="modalCost"></p>
+      <p id="modalDesc"></p>
     </div>
+  </div>
 
-    <div id="listings">
-        <!-- Cards will be injected here -->
-    </div>
+  <!-- Firebase SDK + Listing & Modal Logic -->
+  <script type="module">
+    // 1. Import the functions you need from the SDKs
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import {
+      getFirestore, collection, query, where, orderBy, onSnapshot
+    } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    <!-- Firebase SDK -->
-    <script type="module">
-        // 1. Import the functions you need from the SDKs
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import {
-            getFirestore, collection, query, where, orderBy, onSnapshot
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    // 2. Your web app's Firebase configuration (replace with your config)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
+      authDomain: "ready-set-fly-71506.firebaseapp.com",
+      projectId: "ready-set-fly-71506",
+      storageBucket: "ready-set-fly-71506.appspot.com",
+      messagingSenderId: "64600529166",
+      appId: "1:64600529166:android:98d989ad25482d03895f5f"
+    };
 
-        // 2. Your web app's Firebase configuration (replace with your config)
-        const firebaseConfig = {
-            apiKey: "AIzaSyCb1HOS7u-T8fLvzX1bQeLGTjxvDWsM9Cw",
-            authDomain: "ready-set-fly-71506.firebaseapp.com",
-            projectId: "ready-set-fly-71506",
-            storageBucket: "ready-set-fly-71506.appspot.com",
-            messagingSenderId: "64600529166",
-            appId: "1:64600529166:android:98d989ad25482d03895f5f"
-        };
+    // 3. Initialize Firebase & Firestore
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-        // 3. Initialize Firebase & Firestore
-        const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
+    // 4. Build the query
+    const listingsContainer = document.getElementById('listings');
+    const q = query(
+      collection(db, 'airplanes'),
+      where('isListed', '==', true),
+      orderBy('createdAt', 'desc')
+    );
 
-  // 3) Build the query
-  const listingsContainer = document.getElementById('listings');
-  const q = query(
-    collection(db, 'airplanes'),
-    where('isListed', '==', true),
-    orderBy('createdAt', 'desc')
-  );
+    // 5. Real-time listener (drops in whenever data changes)
+    onSnapshot(q,
+      snapshot => {
+        listingsContainer.innerHTML = ''; // clear old cards
 
-  // 4) Real-time listener (drops in whenever data changes)
-  onSnapshot(q,
-    snapshot => {
-      listingsContainer.innerHTML = ''; // clear old cards
+        if (snapshot.empty) {
+          listingsContainer.innerHTML = `
+            <p style="grid-column:1/-1;text-align:center;color:#718096;">
+              No listings available
+            </p>`;
+          return;
+        }
 
-      if (snapshot.empty) {
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          const [year = "", make = "", ...rest] = (data.aircraftModel || "").split(' ');
+          const model = rest.join(' ') || 'Unknown Model';
+          const imgUrl = Array.isArray(data.images) ? data.images[0] : data.images;
+
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <img src="${imgUrl || 'https://via.placeholder.com/300x160?text=No+Image'}" alt="Aircraft image">
+            <div class="card-content">
+              <div class="card-title">${year} ${make}</div>
+              <div class="card-sub">${model}</div>
+              <div class="card-sub">Location: ${data.location || 'Unknown'}</div>
+              <div class="card-footer">${parseFloat(data.costPerHour || 0).toFixed(2)}/hr</div>
+              <div class="card-desc">
+                ${(data.description || 'No description').split(' ').slice(0,10).join(' ')}
+                ${(data.description || '').split(' ').length > 10 ? '…' : ''}
+              </div>
+            </div>`;
+
+          // make each card pressable:
+          card.style.cursor = 'pointer';
+          card.addEventListener('click', () => showModal(data));
+
+          listingsContainer.appendChild(card);
+        });
+      },
+      err => {
+        console.error('Error listening to listings:', err);
         listingsContainer.innerHTML = `
-          <p style="grid-column:1/-1;text-align:center;color:#718096;">
-            No listings available
+          <p style="grid-column:1/-1;text-align:center;color:#e53e3e;">
+            Failed to load listings.
           </p>`;
-        return;
       }
+    );
 
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const [year = "", make = "", ...rest] = (data.aircraftModel || "").split(' ');
-        const model = rest.join(' ') || 'Unknown Model';
-        const imgUrl = Array.isArray(data.images) ? data.images[0] : data.images;
+    // ─────── Modal wiring ───────
+    const modal      = document.getElementById('listingModal');
+    const closeBtn   = document.getElementById('modalClose');
+    const modalImage = document.getElementById('modalImage');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalSub   = document.getElementById('modalSub');
+    const modalLoc   = document.getElementById('modalLocation');
+    const modalCost  = document.getElementById('modalCost');
+    const modalDesc  = document.getElementById('modalDesc');
 
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-          <img src="${imgUrl || 'https://via.placeholder.com/300x160?text=No+Image'}" alt="Aircraft image">
-          <div class="card-content">
-            <div class="card-title">${year} ${make}</div>
-            <div class="card-sub">${model}</div>
-            <div class="card-sub">Location: ${data.location || 'Unknown'}</div>
-            <div class="card-footer">${parseFloat(data.costPerHour || 0).toFixed(2)}/hr</div>
-            <div class="card-desc">
-              ${(data.description || 'No description').split(' ').slice(0,10).join(' ')}
-              ${(data.description || '').split(' ').length > 10 ? '…' : ''}
-            </div>
-          </div>`;
-        listingsContainer.appendChild(card);
-      });
-    },
-    err => {
-      console.error('Error listening to listings:', err);
-      listingsContainer.innerHTML = `
-        <p style="grid-column:1/-1;text-align:center;color:#e53e3e;">
-          Failed to load listings.
-        </p>`;
+    function showModal(data) {
+      modalImage.src         = Array.isArray(data.images) ? data.images[0] : data.images;
+      modalTitle.textContent = data.aircraftModel || 'Unknown Model';
+      modalSub.textContent   = `Model: ${data.aircraftModel || '–'}`;
+      modalLoc.textContent   = `Location: ${data.location || '–'}`;
+      modalCost.textContent  = `Cost: $${parseFloat(data.costPerHour||0).toFixed(2)}/hr`;
+      modalDesc.textContent  = data.description || 'No description available.';
+      modal.classList.remove('hidden');
     }
-  );
-</script>
+
+    closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', e => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  </script>
+
 </body>
 
 </html>
