@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Delete Your ReadySetFly Account</title>
+  <style>
+    body { font-family: sans-serif; background: #f7fafc; color: #333; margin: 0; padding: 2rem; }
+    main { max-width: 480px; margin: auto; background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    h1 { margin-top: 0; }
+    a.button, button { display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; border: none; border-radius: 4px; background: #3182ce; color: #fff; text-decoration: none; cursor: pointer; }
+    form input { width: 100%; padding: 0.5rem; margin-top: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Delete Your Account</h1>
+    <p>We're sorry to see you go! To permanently delete your ReadySetFly account and all associated data, you can:</p>
+
+    <h2>1) Send us an email</h2>
+    <p>
+      Click the button below to open your email client with a pre-filled deletion request:
+    </p>
+    <a
+      class="button"
+      href="mailto:support@readysetfly.us?subject=Account%20Deletion%20Request&body=Please%20delete%20my%20ReadySetFly%20account%20associated%20with%20this%20email."
+    >
+      Email Support to Delete Account
+    </a>
+
+    <h2>2) Or fill out this form</h2>
+    <form action="/api/delete-account" method="POST">
+      <label for="email">Your account email address:</label>
+      <input
+        type="email"
+        id="email"
+        name="email"
+        placeholder="you@example.com"
+        required
+      />
+      <button type="submit">Request Account Deletion</button>
+    </form>
+
+    <h2>What happens next?</h2>
+    <ol>
+      <li>Within 48 hours, you’ll receive a confirmation email from <code>support@readysetfly.us</code>.</li>
+      <li>Click the link in that email to verify your deletion request.</li>
+      <li>Your account and all personal data will be permanently removed within 30 days.</li>
+    </ol>
+
+    <p>
+      This deletion workflow is free, user-initiated, and reversible only by you—fully compliant with
+      <strong>Google Play</strong> and <strong>Apple App Store</strong> policies.
+    </p>
+  </main>
+</body>
+</html>
