@@ -152,6 +152,13 @@
     </div>
 
     <div class="pill">
+      <span>Section:</span>
+      <select id="sectionSelect" aria-label="Section" disabled>
+        <option value="__all">View All</option>
+      </select>
+    </div>
+
+    <div class="pill">
       <span>Rooms in hotel:</span>
       <input id="roomsInput" type="number" min="1" step="1" value="134" aria-label="Rooms in hotel"/>
     </div>
@@ -197,6 +204,7 @@
     const hotelSel = document.getElementById('hotelSelect');
     const periodInp = document.getElementById('periodInput');
     const viewSelect = document.getElementById('viewSelect');
+    const sectionSelect = document.getElementById('sectionSelect');
     const roomsInput = document.getElementById('roomsInput');
     const btnSample = document.getElementById('btnSample');
     const btnExportNotes = document.getElementById('btnExportNotes');
@@ -209,8 +217,9 @@
     const invClose = document.getElementById('invClose');
 
     // ---------- State
-    let extracted = null; // { sections:{...}, paths:[] }
+    let extracted = null; // { sections:{}, paths:[] }
     let currentFilter = '';
+    let selectedSection = '__all';
     const ROOMS_KEY='pl_rooms_in_hotel';
 
     // ---------- Utils & Formatters
@@ -218,7 +227,7 @@
     const fmtN = n => new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(Number(n)||0);
     const fmtPct = n => new Intl.NumberFormat('en-US',{style:'percent',maximumFractionDigits:1}).format(isFinite(n)?n:0);
 
-    const escHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39'}[c]));
+    const escHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const parseNum = v => {
       if(v==null) return 0;
       const s = String(v).replace(/[$,%()]/g, m => (m==='('||m===')') ? '' : '').replace(/,/g,'').trim();
@@ -368,8 +377,12 @@
       if(extracted) renderAll(extracted); // refresh occupancy
     });
 
-    // React to view/period changes
+    // React to view/period/section changes
     [periodInp, viewSelect].forEach(el => el.addEventListener('change', ()=> { if(extracted) renderAll(extracted); }));
+    sectionSelect.addEventListener('change', ()=>{
+      selectedSection = sectionSelect.value || '__all';
+      if(extracted) renderAll(extracted);
+    });
 
     // Upload / parse
     fileInput.addEventListener('change', async (e)=>{
@@ -378,12 +391,42 @@
       try{
         const wb = await readWorkbook(f);
         extracted = extractFromWorkbook(wb);
+        populateSectionFilter(extracted);
         renderAll(extracted);
       }catch(err){
         console.error('Upload parse error:', err);
         alert('Upload failed: ' + (err?.message || 'Unknown error — see console for details.'));
       }
     });
+
+    // Populate section dropdown from parsed data
+    function populateSectionFilter(data){
+      const sel = sectionSelect;
+      const prior = sel.value;
+      sel.innerHTML = '';
+      const optAll = document.createElement('option');
+      optAll.value = '__all';
+      optAll.textContent = 'View All';
+      sel.appendChild(optAll);
+
+      const names = Object.keys(data.sections || {}).sort((a,b)=> a.localeCompare(b));
+      names.forEach(n=>{
+        const o = document.createElement('option');
+        o.value = n;
+        o.textContent = n;
+        sel.appendChild(o);
+      });
+
+      sel.disabled = names.length === 0;
+      // Try to keep prior selection if still valid
+      if(prior && (prior==='__all' || names.includes(prior))){
+        sel.value = prior;
+        selectedSection = prior;
+      } else {
+        sel.value = '__all';
+        selectedSection = '__all';
+      }
+    }
 
     function extractFromWorkbook(wb){
       const sections = {};
@@ -494,31 +537,24 @@
       }
 
       if(view === 'quarter'){
-        // quarters for selected year up to selected quarter; include only quarters that have at least one month present
         const selQ = quarterOf(m);
-        const qDefs = {
-          1: [0,1,2],   // Jan, Feb, Mar
-          2: [3,4,5],   // Apr, May, Jun
-          3: [6,7,8],   // Jul, Aug, Sep
-          4: [9,10,11]  // Oct, Nov, Dec
-        };
+        const qDefs = { 1:[0,1,2], 2:[3,4,5], 3:[6,7,8], 4:[9,10,11] };
         const quarterMap = {};
         const cols = [];
-        for(let q=1; q<=selQ; q++){
-          const monthsIdx = qDefs[q];
-          const labels = monthsIdx
+        for(let q=1;q<=selQ;q++){
+          const labels = qDefs[q]
             .map(mi => ymToLabel(y, mi))
             .filter(lbl => monthsOnly.includes(lbl));
           if(labels.length){
             const qLabel = `Q${q} ${y}`;
-            quarterMap[qLabel] = labels; // month labels included in this quarter
+            quarterMap[qLabel] = labels;
             cols.push(qLabel);
           }
         }
         return {cols, includeTTM:false, quarterMap};
       }
 
-      // rolling12: last 12 months ending at selected month
+      // rolling12
       const cols = [];
       for(let i=11;i>=0;i--){
         const date = new Date(y, m, 1);
@@ -542,7 +578,11 @@
 
       const roomsCount = Math.max(1, parseInt(roomsInput.value||'134',10));
 
-      Object.keys(data.sections).forEach(sec=>{
+      // Determine which sections to show based on dropdown
+      const allSectionNames = Object.keys(data.sections);
+      const sectionsToShow = (selectedSection==='__all') ? allSectionNames : allSectionNames.filter(s => s===selectedSection);
+
+      sectionsToShow.forEach(sec=>{
         const secNode = data.sections[sec];
         const headers = (secNode && secNode._headers) ? secNode._headers.slice() : [];
 
@@ -606,13 +646,10 @@
 
             const isNumericRooms = NUMERIC_ROOM_REGEX.test(cat);
 
-            // Value getter per column (month or quarter or TTM)
             function getColVal(colLabel){
               if(quarterMap && quarterMap[colLabel]){
-                // Quarter: sum its months
                 return quarterMap[colLabel].reduce((a,mon)=> a + (row.Columns[mon]||0), 0);
               }
-              // Month/rolling/YTD direct columns or TTM
               return row.Columns[colLabel]||0;
             }
 
@@ -642,12 +679,11 @@
 
           // Computed Occupancy % based on visible columns
           if(availableRow && occupiedRow){
-            // For occupancy, we recompute per displayed column (month or quarter; TTM uses combined visible months)
             function daysForCol(colLabel){
               if(quarterMap && quarterMap[colLabel]){
                 return quarterMap[colLabel].reduce((a,mon)=> a + daysInMonthLabel(mon), 0);
               }
-              if(colLabel==='TTM') return 0; // handled via subtotal calc below
+              if(colLabel==='TTM') return 0;
               return daysInMonthLabel(colLabel);
             }
             function occupiedForCol(colLabel){
@@ -662,7 +698,7 @@
             let sumOcc = 0;
 
             viewHeaders.forEach(h=>{
-              if(h==='TTM') return; // we'll compute subtotal-based occupancy separately
+              if(h==='TTM') return;
               const d = daysForCol(h);
               const occRooms = occupiedForCol(h);
               const base = roomsCount * d;
@@ -672,7 +708,6 @@
               sumOcc += occRooms;
             });
 
-            // Subtotal occupancy over visible months (across all quarters if in quarter mode)
             const occSubtotal = (sumDays>0 && roomsCount>0) ? (sumOcc / (roomsCount * sumDays)) : 0;
 
             const occTr = document.createElement('tr');
@@ -680,7 +715,6 @@
               <th class="left">Occupancy % (computed)</th>
               ${viewHeaders.map(h=>{
                 if(h==='TTM'){
-                  // show same subtotal-based occupancy in TTM column for uniformity
                   return `<td class="">${fmtPct(occSubtotal)}</td>`;
                 }
                 return `<td class="">${fmtPct(occVals[h] ?? 0)}</td>`;
@@ -789,7 +823,7 @@
       w.print();
     });
 
-    // Sample with Room Statistics and Rooms to preview all modes
+    // Sample with Room Statistics and Rooms to preview all modes + section dropdown
     if (btnSample) btnSample.addEventListener('click',()=>{
       const headers = ['Aug 2024','Sep 2024','Oct 2024','Nov 2024','Dec 2024','Jan 2025','Feb 2025','Mar 2025','Apr 2025','May 2025','Jun 2025','Jul 2025','TTM'];
       function row(h,vals){
@@ -813,9 +847,17 @@
             'Transient - Rack Rate': row(headers,[98096,100120,102330,101220,98000,95000,97000,99000,100500,101800,102200,103400,1317726]),
             'Group': row(headers,[22000,21000,23000,24000,21000,20000,22000,23000,24000,25000,26000,27000,280000])
           }
+        },
+        'Administrative & General':{
+          _headers: headers, _hasTTM:true,
+          '_flat':{
+            'Admin & General': row(headers,[6000,6100,6050,6200,5900,6300,6400,6500,6200,6100,6150,6300,75550]),
+            'Credit Card Fees': row(headers,[2200,2100,2250,2300,2400,2500,2450,2550,2600,2650,2700,2750,29650])
+          }
         }
       };
       extracted = { sections, paths:[] };
+      populateSectionFilter(extracted);
       renderAll(extracted);
     });
   })();
