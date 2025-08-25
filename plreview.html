@@ -1,0 +1,824 @@
+<!-- /public/pl-coupa.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>P&L Review — Expandable · Coupa-Linked</title>
+
+  <style>
+    :root{
+      --ink:#2c3e50; --ink-soft:#7f8c8d; --bg:#f5f7ff; --panel:#ffffff;
+      --brand:#3498db; --brand-d:#2c80bb; --edge:#e6ecf7; --edge-2:#dfe7f5;
+      --chip:#eef3fb;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg); margin:0; color:var(--ink); padding:24px
+    }
+
+    .header{
+      background:#34495e; color:#fff; padding:20px; border-radius:14px;
+      margin-bottom:16px; box-shadow:0 6px 16px rgba(0,0,0,.08)
+    }
+    .header h1{margin:0; font-size:20px; font-weight:800; letter-spacing:.2px}
+
+    .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:18px}
+    .subtools{display:flex; gap:8px; flex-wrap:wrap}
+
+    .pill{
+      background:var(--panel); border:1px solid var(--edge); border-radius:999px;
+      padding:6px 10px; display:flex; align-items:center; gap:8px;
+      box-shadow:0 2px 8px rgba(0,0,0,.03)
+    }
+    .pill select,
+    .pill input[type="month"],
+    .pill input[type="number"],
+    .pill input[type="search"]{
+      border:none; outline:none; background:transparent; color:var(--ink);
+      font-size:14px; padding:4px 2px
+    }
+    .pill input[type="number"]{width:90px}
+
+    .btn{
+      padding:8px 12px; border-radius:10px; border:1px solid var(--edge);
+      cursor:pointer; background:var(--panel); font-weight:600; transition:.15s ease-in-out;
+      box-shadow:0 2px 8px rgba(0,0,0,.03)
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn:active{transform:translateY(0)}
+    .btn.primary{background:var(--brand); color:#fff; border-color:transparent}
+    .btn.primary:hover{background:var(--brand-d)}
+
+    .section{
+      margin-bottom:16px; border:1px solid var(--edge-2); border-radius:14px; overflow:hidden;
+      background:var(--panel); box-shadow:0 6px 16px rgba(0,0,0,.06)
+    }
+    .section-header{
+      background:#2c3e50; color:#fff; padding:12px 14px; cursor:pointer; font-weight:800;
+      display:flex; justify-content:space-between; align-items:center; letter-spacing:.2px;
+      user-select:none
+    }
+    .chev{transition:transform .15s}
+    .collapsed .chev{transform:rotate(-90deg)}
+    .inner{padding:10px 12px}
+
+    .subhead{
+      background:var(--chip); border:1px solid var(--edge); padding:10px 12px; border-radius:12px;
+      display:flex; justify-content:space-between; align-items:center; margin:10px 0; cursor:pointer;
+      user-select:none; font-weight:700
+    }
+    .subhead.sub-collapsed + .subbody{display:none}
+
+    table{
+      border-collapse:separate; border-spacing:0; width:100%; margin:6px 0 12px; font-size:14px;
+      overflow:hidden; border-radius:12px; border:1px solid var(--edge)
+    }
+    thead th{
+      position:sticky; top:0; z-index:1; background:#f8fbff; border-bottom:1px solid var(--edge);
+      padding:10px 8px; font-weight:800; text-align:center
+    }
+    th.left{text-align:left}
+    tbody td, tbody th{
+      border-top:1px solid var(--edge); padding:10px 8px; text-align:center; background:#fff
+    }
+    tbody tr:nth-child(2n) td, tbody tr:nth-child(2n) th{background:#fcfdff}
+
+    td.amount{cursor:pointer; font-variant-numeric:tabular-nums; white-space:nowrap}
+    td.amount:hover{background:#f0f7ff}
+
+    td.notes-cell textarea{
+      width:220px; min-height:44px; resize:vertical; padding:8px 10px; border:1px solid var(--edge);
+      border-radius:10px; font-size:13px; background:#fff; outline:none; box-shadow:inset 0 1px 3px rgba(0,0,0,.03)
+    }
+    td.notes-cell textarea:focus{
+      border-color:var(--brand); box-shadow:0 0 0 3px rgba(52,152,219,.12), inset 0 1px 3px rgba(0,0,0,.03)
+    }
+
+    #plHostEmpty{
+      padding:24px; border:2px dashed var(--edge); border-radius:14px; text-align:center;
+      color:var(--ink-soft); background:rgba(255,255,255,.6)
+    }
+
+    .modal{position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center}
+    .modal.show{display:flex}
+    .modal-card{
+      background:#fff; padding:20px; border-radius:14px; max-width:900px; width:96%; max-height:84vh; overflow:auto;
+      box-shadow:0 10px 28px rgba(0,0,0,.25)
+    }
+    .modal-card h3{margin:0 0 10px; font-size:18px}
+    .modal-card table{margin:0}
+
+    @media print{
+      .no-print{display:none !important}
+      .header,.toolbar{display:none}
+      body{padding:0; background:#fff}
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🧾 P&L Review — Expandable · Coupa-Linked</h1>
+  </div>
+
+  <div class="toolbar">
+    <label class="btn primary" for="fileInput">Upload P&L (.xlsx/.xls/.csv)</label>
+    <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none"/>
+
+    <div class="pill">
+      <span>Hotel:</span>
+      <select id="hotelSelect" aria-label="Hotel">
+        <option value="MCR-ATX">MCR-ATX (Austin FFI)</option>
+        <option value="MCR-DFW">MCR-DFW</option>
+        <option value="MCR-JFK">MCR-JFK</option>
+      </select>
+    </div>
+
+    <div class="pill">
+      <span>Period:</span>
+      <input id="periodInput" type="month" value="2025-07" aria-label="Period"/>
+    </div>
+
+    <div class="pill">
+      <span>View:</span>
+      <select id="viewSelect" aria-label="View mode">
+        <option value="rolling12">Rolling 12</option>
+        <option value="ytd">YTD</option>
+        <option value="quarter">Quarter</option>
+        <option value="month">Month</option>
+      </select>
+    </div>
+
+    <div class="pill">
+      <span>Rooms in hotel:</span>
+      <input id="roomsInput" type="number" min="1" step="1" value="134" aria-label="Rooms in hotel"/>
+    </div>
+
+    <div class="subtools">
+      <button class="btn" id="btnSample">Load Sample</button>
+      <button class="btn" id="btnExpandAll">Expand all</button>
+      <button class="btn" id="btnCollapseAll">Collapse all</button>
+      <div class="pill">
+        <span>Filter:</span>
+        <input id="filterInput" type="search" placeholder="Type to filter categories…">
+      </div>
+      <button class="btn" id="btnExportNotes">Download Notes PDF</button>
+    </div>
+  </div>
+
+  <div id="plHost">
+    <div id="plHostEmpty">Upload a P&L to begin. You can also click “Load Sample”.</div>
+  </div>
+
+  <!-- Invoice Modal -->
+  <div class="modal" id="invModal">
+    <div class="modal-card">
+      <h3 id="invTitle">Invoices</h3>
+      <table>
+        <thead><tr><th>ID</th><th>Supplier</th><th>Date</th><th>Total</th><th>Link</th></tr></thead>
+        <tbody id="invBody"></tbody>
+      </table>
+      <div style="margin-top:10px;text-align:right">
+        <button class="btn" id="invClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- XLSX library -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script>
+  (function(){
+    // ---------- DOM
+    const host = document.getElementById('plHost');
+    const fileInput = document.getElementById('fileInput');
+    const hotelSel = document.getElementById('hotelSelect');
+    const periodInp = document.getElementById('periodInput');
+    const viewSelect = document.getElementById('viewSelect');
+    const roomsInput = document.getElementById('roomsInput');
+    const btnSample = document.getElementById('btnSample');
+    const btnExportNotes = document.getElementById('btnExportNotes');
+    const btnExpandAll = document.getElementById('btnExpandAll');
+    const btnCollapseAll = document.getElementById('btnCollapseAll');
+    const filterInput = document.getElementById('filterInput');
+    const invModal = document.getElementById('invModal');
+    const invTitle = document.getElementById('invTitle');
+    const invBody = document.getElementById('invBody');
+    const invClose = document.getElementById('invClose');
+
+    // ---------- State
+    let extracted = null; // { sections:{...}, paths:[] }
+    let currentFilter = '';
+    const ROOMS_KEY='pl_rooms_in_hotel';
+
+    // ---------- Utils & Formatters
+    const fmtC = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n)||0);
+    const fmtN = n => new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(Number(n)||0);
+    const fmtPct = n => new Intl.NumberFormat('en-US',{style:'percent',maximumFractionDigits:1}).format(isFinite(n)?n:0);
+
+    const escHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39'}[c]));
+    const parseNum = v => {
+      if(v==null) return 0;
+      const s = String(v).replace(/[$,%()]/g, m => (m==='('||m===')') ? '' : '').replace(/,/g,'').trim();
+      if(!s) return 0;
+      let f = parseFloat(s);
+      if(/\(.+\)/.test(String(v))) f = -Math.abs(f);
+      return Number.isFinite(f) ? f : 0;
+    };
+
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    function toMonthYear(mmddyyyy){
+      if(!mmddyyyy) return null;
+      const m = mmddyyyy.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      if(!m) return null;
+      let mm = parseInt(m[1],10), yy = parseInt(m[3],10);
+      if(yy<100) yy += 2000;
+      return `${MONTHS[mm-1]} ${yy}`;
+    }
+    function daysInMonthLabel(label){
+      const m = label.match(/^([A-Za-z]{3})\s+(\d{4})$/);
+      if(!m) return 30; // fallback
+      const idx = MONTHS.indexOf(m[1]);
+      const year = parseInt(m[2],10);
+      if(idx<0) return 30;
+      return new Date(year, idx+1, 0).getDate();
+    }
+    function labelToYM(label){
+      const m = label.match(/^([A-Za-z]{3})\s+(\d{4})$/);
+      if(!m) return null;
+      const idx = MONTHS.indexOf(m[1]);
+      const year = parseInt(m[2],10);
+      if(idx<0) return null;
+      return {y:year, m:idx}; // 0..11
+    }
+    function ymToLabel(y, mIndex){
+      return `${MONTHS[mIndex]} ${y}`;
+    }
+    function quarterOf(mIndex){ // 0..11
+      if(mIndex<=2) return 1;
+      if(mIndex<=5) return 2;
+      if(mIndex<=8) return 3;
+      return 4;
+    }
+
+    // Notes helpers
+    const noteKey = (hotel, period, path) => `plnote:${hotel}:${period}:${path}`;
+    const getNote = (h,p,path) => localStorage.getItem(noteKey(h,p,path)) || '';
+    const setNote = (h,p,path,val) => localStorage.setItem(noteKey(h,p,path), val||'');
+
+    function isMostlyBlank(arr){
+      const filled = arr.filter(x => String(x||'').trim()!=='');
+      return filled.length <= 1;
+    }
+    function isAllNumeric(arr){
+      return arr.every(v => String(v||'').trim()==='' || /^-?[\d,.()%]+$/.test(String(v).trim()));
+    }
+
+    function findAsOfDate(rows){
+      for(let r=0;r<Math.min(12,rows.length);r++){
+        const row = rows[r]||[];
+        for(let c=0;c<Math.min(6,row.length);c++){
+          const cell = String(row[c]||'').trim();
+          if(/as\s*of\s*date:/i.test(cell)){
+            for(let k=c+1;k<row.length;k++){
+              const v = String(row[k]||'').trim();
+              if(v) return v;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    function findHeaderAndLabelCol(rows){
+      for(let i=0;i<rows.length;i++){
+        const row = rows[i]||[];
+        for(let c=0;c<Math.min(4,row.length);c++){
+          const val = String(row[c]||'').trim().toLowerCase();
+          if(val === 'account name'){
+            return {headerIdx:i, labelCol:c};
+          }
+        }
+      }
+      for(let i=0;i<rows.length;i++){
+        const row = rows[i]||[];
+        const nonEmptyIdx = row.findIndex(x=>String(x||'').trim()!=='');
+        if(nonEmptyIdx>=0){
+          const after = row.slice(nonEmptyIdx+1);
+          const manyActual = after.filter(x=>/actual/i.test(String(x))).length>=3;
+          if(manyActual){
+            return {headerIdx:i, labelCol:nonEmptyIdx};
+          }
+        }
+      }
+      return {headerIdx:0,labelCol:0};
+    }
+
+    // Robust reader
+    async function readWorkbook(file){
+      if(typeof XLSX === 'undefined'){
+        throw new Error('XLSX library not loaded. Ensure the XLSX <script> tag is present.');
+      }
+      const name = (file.name || '').toLowerCase();
+
+      function readAsBinaryString(f){
+        return new Promise((resolve,reject)=>{
+          const fr = new FileReader();
+          fr.onerror = () => reject(fr.error || new Error('FileReader failed'));
+          fr.onload  = () => resolve(fr.result);
+          fr.readAsBinaryString(f);
+        });
+      }
+
+      if (name.endsWith('.csv')) {
+        try {
+          const text = await file.text();
+          return XLSX.read(text, { type:'string', raw:true });
+        } catch(e1){
+          try{
+            const buf = await file.arrayBuffer();
+            return XLSX.read(buf, { type:'array', raw:true });
+          } catch(e2){
+            throw new Error('Failed to read CSV: ' + (e2?.message || e1?.message || 'unknown'));
+          }
+        }
+      }
+
+      try {
+        const buf = await file.arrayBuffer();
+        return XLSX.read(buf, { type:'array' });
+      } catch(e1){
+        try{
+          const bin = await readAsBinaryString(file);
+          return XLSX.read(bin, { type:'binary' });
+        } catch(e2){
+          throw new Error('Failed to read workbook: ' + (e2?.message || e1?.message || 'unknown'));
+        }
+      }
+    }
+
+    // Persist rooms input
+    roomsInput.value = localStorage.getItem(ROOMS_KEY) || roomsInput.value || 134;
+    roomsInput.addEventListener('input', ()=>{
+      const val = Math.max(1, parseInt(roomsInput.value||'134',10));
+      roomsInput.value = val;
+      localStorage.setItem(ROOMS_KEY, String(val));
+      if(extracted) renderAll(extracted); // refresh occupancy
+    });
+
+    // React to view/period changes
+    [periodInp, viewSelect].forEach(el => el.addEventListener('change', ()=> { if(extracted) renderAll(extracted); }));
+
+    // Upload / parse
+    fileInput.addEventListener('change', async (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      try{
+        const wb = await readWorkbook(f);
+        extracted = extractFromWorkbook(wb);
+        renderAll(extracted);
+      }catch(err){
+        console.error('Upload parse error:', err);
+        alert('Upload failed: ' + (err?.message || 'Unknown error — see console for details.'));
+      }
+    });
+
+    function extractFromWorkbook(wb){
+      const sections = {};
+      const paths = [];
+
+      wb.SheetNames.forEach(sheetName=>{
+        const ws = wb.Sheets[sheetName];
+        if(!ws) return;
+        const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        if(!rows.length) return;
+
+        const {headerIdx,labelCol} = findHeaderAndLabelCol(rows);
+        const asOfDate = findAsOfDate(rows);
+
+        const monthsRow = rows[Math.max(0, headerIdx-1)] || [];
+        const rawMonthCells = monthsRow.slice(labelCol+1);
+        let headers = rawMonthCells.map(v => toMonthYear(String(v).trim()) || String(v).trim() || 'Col');
+
+        const headerAbove = rows[Math.max(0, headerIdx-2)] || [];
+        const hasTextTotalTTM = headerAbove.some(x => /total\s*ttm/i.test(String(x)));
+        if(hasTextTotalTTM){
+          headers[headers.length-1] = 'TTM';
+        } else if(asOfDate && rawMonthCells.length){
+          const lastRaw = String(rawMonthCells[rawMonthCells.length-1]).trim();
+          if(lastRaw && asOfDate && lastRaw === asOfDate) headers[headers.length-1] = 'TTM';
+        }
+        headers = headers.map(h => {
+          const m = h.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/) ? toMonthYear(h) : h;
+          return m || h;
+        });
+
+        const sectionName = String(sheetName).replace(/^TTM\s*-\s*/i,'').trim() || sheetName;
+        if(!sections[sectionName]) sections[sectionName] = { _headers: headers.slice(), _hasTTM: headers[headers.length-1]==='TTM' };
+
+        let currentSub = '';
+        for(let i=headerIdx+1; i<rows.length; i++){
+          const r = rows[i]||[];
+          if(r.every(c=>String(c||'').trim()==='')) continue;
+
+          const label = String(r[labelCol]||'').trim();
+          const after = r.slice(labelCol+1, labelCol+1+headers.length);
+
+          const isSubHead = label && isMostlyBlank(after);
+          const isTotalLine = /tota?l/i.test(label) && isAllNumeric(after);
+
+          if(isSubHead){
+            currentSub = label;
+            if(!sections[sectionName][currentSub]) sections[sectionName][currentSub] = {};
+            continue;
+          }
+          if(isTotalLine) continue;
+
+          const cols = {};
+          headers.forEach((h,idx)=>{
+            cols[h] = parseNum(r[labelCol+1+idx]);
+          });
+
+          const subKey = currentSub || '_flat';
+          if(!sections[sectionName][subKey]) sections[sectionName][subKey] = {};
+          const catName = label || '(Unnamed)';
+
+          const total12 = headers.filter(h=>h!=='TTM').reduce((a,h)=>a + (parseNum(cols[h])||0), 0);
+          const rowObj = {
+            Section: sectionName,
+            Subsection: currentSub,
+            Category: catName,
+            Columns: cols,
+            TTM: sections[sectionName]._hasTTM ? parseNum(cols['TTM']) : total12,
+            Total: total12
+          };
+          sections[sectionName][subKey][catName] = rowObj;
+
+          const path = (subKey && subKey!=='_flat') ? `${sectionName} › ${subKey} › ${catName}` : `${sectionName} › ${catName}`;
+          paths.push(path);
+        }
+      });
+
+      return { sections, paths };
+    }
+
+    // ---------- View helpers
+    function getSelectedYM(){
+      const v = periodInp.value || '2025-07';
+      const [yy, mm] = v.split('-').map(x=>parseInt(x,10));
+      return {y:yy, m:(mm-1)};
+    }
+
+    function buildViewHeaders(allHeaders){
+      const view = viewSelect.value || 'rolling12';
+      const {y, m} = getSelectedYM();
+      const monthsOnly = allHeaders.filter(h=>h!=='TTM');
+      const ymMap = monthsOnly
+        .map(h => ({h, ym: labelToYM(h)}))
+        .filter(x => !!x.ym);
+
+      if(view === 'month'){
+        const target = ymToLabel(y, m);
+        const found = ymMap.find(x=> x.h === target);
+        const cols = found ? [found.h] : [];
+        return {cols, includeTTM:false, quarterMap:null};
+      }
+
+      if(view === 'ytd'){
+        const cols = ymMap
+          .filter(x => x.ym.y === y && x.ym.m <= m)
+          .map(x => x.h);
+        return {cols, includeTTM:false, quarterMap:null};
+      }
+
+      if(view === 'quarter'){
+        // quarters for selected year up to selected quarter; include only quarters that have at least one month present
+        const selQ = quarterOf(m);
+        const qDefs = {
+          1: [0,1,2],   // Jan, Feb, Mar
+          2: [3,4,5],   // Apr, May, Jun
+          3: [6,7,8],   // Jul, Aug, Sep
+          4: [9,10,11]  // Oct, Nov, Dec
+        };
+        const quarterMap = {};
+        const cols = [];
+        for(let q=1; q<=selQ; q++){
+          const monthsIdx = qDefs[q];
+          const labels = monthsIdx
+            .map(mi => ymToLabel(y, mi))
+            .filter(lbl => monthsOnly.includes(lbl));
+          if(labels.length){
+            const qLabel = `Q${q} ${y}`;
+            quarterMap[qLabel] = labels; // month labels included in this quarter
+            cols.push(qLabel);
+          }
+        }
+        return {cols, includeTTM:false, quarterMap};
+      }
+
+      // rolling12: last 12 months ending at selected month
+      const cols = [];
+      for(let i=11;i>=0;i--){
+        const date = new Date(y, m, 1);
+        date.setMonth(date.getMonth()-i);
+        const label = ymToLabel(date.getFullYear(), date.getMonth());
+        if(monthsOnly.includes(label)) cols.push(label);
+      }
+      const includeTTM = allHeaders.includes('TTM');
+      return {cols, includeTTM, quarterMap:null};
+    }
+
+    // ---------- Rendering
+    const NUMERIC_ROOM_REGEX = /(available\s*rooms?|occupied\s*rooms?|rooms\s*sold)/i;
+
+    function renderAll(data){
+      if(!data || !data.sections){
+        host.innerHTML = `<div id="plHostEmpty">Nothing parsed.</div>`;
+        return;
+      }
+      host.innerHTML='';
+
+      const roomsCount = Math.max(1, parseInt(roomsInput.value||'134',10));
+
+      Object.keys(data.sections).forEach(sec=>{
+        const secNode = data.sections[sec];
+        const headers = (secNode && secNode._headers) ? secNode._headers.slice() : [];
+
+        const {cols:viewCols, includeTTM, quarterMap} = buildViewHeaders(headers);
+        const viewHeaders = includeTTM ? [...viewCols, 'TTM'] : viewCols;
+
+        const wrap = document.createElement('div');
+        wrap.className='section collapsed';
+        wrap.innerHTML = `
+          <div class="section-header" data-toggle>
+            <div>${escHtml(sec)}</div>
+            <div class="chev">▶</div>
+          </div>
+          <div class="inner"></div>
+        `;
+        const inner = wrap.querySelector('.inner');
+
+        Object.keys(secNode).forEach(subKey=>{
+          if(subKey === '_headers' || subKey === '_hasTTM') return;
+          const cats = secNode[subKey];
+          const subTitle = subKey==='_flat' ? 'General' : subKey;
+
+          const sub = document.createElement('div');
+          sub.innerHTML = `
+            <div class="subhead" data-sub-toggle>
+              <div>${escHtml(subTitle)}</div>
+              <div class="chev">▶</div>
+            </div>
+            <div class="subbody"></div>
+          `;
+          const body = sub.querySelector('.subbody');
+
+          const table = document.createElement('table');
+          table.innerHTML = `
+            <thead>
+              <tr>
+                <th class="left">Category</th>
+                ${viewHeaders.map(h=>`<th>${escHtml(h)}</th>`).join('')}
+                <th>Subtotal</th>
+                <th class="no-print">Notes</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          `;
+          const tb = table.querySelector('tbody');
+
+          // Track for occupancy row
+          let availableRow = null;
+          let occupiedRow = null;
+
+          Object.keys(cats).forEach(cat=>{
+            const row = cats[cat];
+            const path = (subKey && subKey!=='_flat') ? `${sec} › ${subKey} › ${cat}` : `${sec} › ${cat}`;
+            const hotel = hotelSel.value;
+            const period = periodInp.value;
+
+            if(currentFilter && !cat.toLowerCase().includes(currentFilter)) return;
+
+            if(/available\s*rooms?/i.test(cat)) availableRow = row;
+            if(/(occupied\s*rooms?|rooms\s*sold)/i.test(cat)) occupiedRow = row;
+
+            const isNumericRooms = NUMERIC_ROOM_REGEX.test(cat);
+
+            // Value getter per column (month or quarter or TTM)
+            function getColVal(colLabel){
+              if(quarterMap && quarterMap[colLabel]){
+                // Quarter: sum its months
+                return quarterMap[colLabel].reduce((a,mon)=> a + (row.Columns[mon]||0), 0);
+              }
+              // Month/rolling/YTD direct columns or TTM
+              return row.Columns[colLabel]||0;
+            }
+
+            const amountTds = viewHeaders.map(col=>{
+              const val = getColVal(col);
+              const html = isNumericRooms ? fmtN(val) : fmtC(val);
+              return `<td class="amount" data-path="${escHtml(path)}" data-col="${escHtml(col)}">${html}</td>`;
+            }).join('');
+
+            const subtotal = viewHeaders.reduce((a,h)=> a + getColVal(h), 0);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <th class="left">${escHtml(cat)}</th>
+              ${amountTds}
+              <td class="amount" data-path="${escHtml(path)}" data-col="Subtotal">${isNumericRooms?fmtN(subtotal):fmtC(subtotal)}</td>
+              <td class="notes-cell no-print"></td>
+            `;
+            const notesTd = tr.querySelector('.notes-cell');
+            const ta = document.createElement('textarea');
+            ta.placeholder = 'Add note for this line…';
+            ta.value = getNote(hotel,period,path);
+            ta.addEventListener('input',()=> setNote(hotel,period,path,ta.value));
+            notesTd.appendChild(ta);
+
+            tb.appendChild(tr);
+          });
+
+          // Computed Occupancy % based on visible columns
+          if(availableRow && occupiedRow){
+            // For occupancy, we recompute per displayed column (month or quarter; TTM uses combined visible months)
+            function daysForCol(colLabel){
+              if(quarterMap && quarterMap[colLabel]){
+                return quarterMap[colLabel].reduce((a,mon)=> a + daysInMonthLabel(mon), 0);
+              }
+              if(colLabel==='TTM') return 0; // handled via subtotal calc below
+              return daysInMonthLabel(colLabel);
+            }
+            function occupiedForCol(colLabel){
+              if(quarterMap && quarterMap[colLabel]){
+                return quarterMap[colLabel].reduce((a,mon)=> a + (parseNum(occupiedRow.Columns[mon])||0), 0);
+              }
+              return parseNum(occupiedRow.Columns[colLabel])||0;
+            }
+
+            const occVals = {};
+            let sumDays = 0;
+            let sumOcc = 0;
+
+            viewHeaders.forEach(h=>{
+              if(h==='TTM') return; // we'll compute subtotal-based occupancy separately
+              const d = daysForCol(h);
+              const occRooms = occupiedForCol(h);
+              const base = roomsCount * d;
+              const occ = base>0 ? (occRooms / base) : 0;
+              occVals[h] = occ;
+              sumDays += d;
+              sumOcc += occRooms;
+            });
+
+            // Subtotal occupancy over visible months (across all quarters if in quarter mode)
+            const occSubtotal = (sumDays>0 && roomsCount>0) ? (sumOcc / (roomsCount * sumDays)) : 0;
+
+            const occTr = document.createElement('tr');
+            occTr.innerHTML = `
+              <th class="left">Occupancy % (computed)</th>
+              ${viewHeaders.map(h=>{
+                if(h==='TTM'){
+                  // show same subtotal-based occupancy in TTM column for uniformity
+                  return `<td class="">${fmtPct(occSubtotal)}</td>`;
+                }
+                return `<td class="">${fmtPct(occVals[h] ?? 0)}</td>`;
+              }).join('')}
+              <td class="">${fmtPct(occSubtotal)}</td>
+              <td class="no-print"></td>
+            `;
+            tb.appendChild(occTr);
+          }
+
+          body.appendChild(table);
+          inner.appendChild(sub);
+        });
+
+        host.appendChild(wrap);
+      });
+
+      // toggles
+      host.querySelectorAll('[data-toggle]').forEach(el=> el.addEventListener('click',()=> el.parentElement.classList.toggle('collapsed')));
+      host.querySelectorAll('[data-sub-toggle]').forEach(el=> el.addEventListener('click',()=> el.classList.toggle('sub-collapsed')));
+
+      // invoice click
+      host.querySelectorAll('td.amount').forEach(td=>{
+        td.addEventListener('click',()=> openInvoices(td.dataset.path, td.dataset.col, td.textContent));
+      });
+    }
+
+    // Expand/Collapse All
+    btnExpandAll.addEventListener('click',()=>{
+      host.querySelectorAll('.section').forEach(sec => sec.classList.remove('collapsed'));
+      host.querySelectorAll('.subhead').forEach(sh => sh.classList.remove('sub-collapsed'));
+    });
+    btnCollapseAll.addEventListener('click',()=>{
+      host.querySelectorAll('.section').forEach(sec => sec.classList.add('collapsed'));
+      host.querySelectorAll('.subhead').forEach(sh => sh.classList.add('sub-collapsed'));
+    });
+
+    // Filter
+    filterInput.addEventListener('input', ()=>{
+      currentFilter = (filterInput.value||'').trim().toLowerCase();
+      renderAll(extracted);
+    });
+
+    // Demo invoices (no network)
+    function openInvoices(path,col,val){
+      const period = periodInp.value || '2025-07';
+      const code = '6999';
+      invTitle.textContent = `Invoices — ${path} (${col}) · Code ${code}`;
+      invBody.innerHTML = '';
+      const m = (period||'2025-07').slice(5,7);
+      [
+        { id:`INV-${code}-${m}-001`, supplier:'Sysco Foods', date:`${period}-05`, total:1243.55, link:'#' },
+        { id:`INV-${code}-${m}-013`, supplier:'Grainger', date:`${period}-12`, total: 688.00, link:'#' },
+        { id:`INV-${code}-${m}-027`, supplier:'Constellation Energy', date:`${period}-23`, total:4987.90, link:'#' },
+      ].forEach(x=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `
+          <td>${x.id}</td><td>${x.supplier}</td><td>${x.date}</td>
+          <td>${fmtC(x.total)}</td><td><a href="${x.link}" target="_blank" rel="noopener">Open</a></td>`;
+        invBody.appendChild(tr);
+      });
+      invModal.classList.add('show');
+    }
+    invClose.addEventListener('click',()=> invModal.classList.remove('show'));
+    invModal.addEventListener('click',e=>{ if(e.target===invModal) invModal.classList.remove('show'); });
+
+    // Notes → “PDF” (print)
+    btnExportNotes.addEventListener('click',()=>{
+      if(!extracted){ alert('Upload a P&L first.'); return; }
+      const hotel=hotelSel.value, period=periodInp.value;
+      const rows=[];
+      Object.entries(extracted.sections).forEach(([sec,subs])=>{
+        Object.entries(subs).forEach(([sub,cats])=>{
+          if(sub==='_headers'||sub==='_hasTTM') return;
+          Object.keys(cats).forEach(cat=>{
+            const path=(sub && sub!=='_flat') ? `${sec} › ${sub} › ${cat}` : `${sec} › ${cat}`;
+            const note=getNote(hotel,period,path);
+            if(note && note.trim()) rows.push({sec,sub,cat,note});
+          });
+        });
+      });
+
+      const w=window.open('','_blank');
+      w.document.write(`<!DOCTYPE html><html><head><title>Notes — ${hotel} ${period}</title>
+        <style>
+          body{font-family:Segoe UI,Arial,sans-serif;padding:20px}
+          h2{margin:0 0 10px}
+          table{border-collapse:collapse;width:100%}
+          th,td{border:1px solid #ccc;padding:8px;text-align:left;vertical-align:top}
+          th{background:#f5f5f5}
+        </style>
+      </head><body>`);
+      w.document.write(`<h2>P&L Notes — ${hotel} · ${period}</h2>`);
+      if(!rows.length){
+        w.document.write('<p>No notes.</p>');
+      } else {
+        w.document.write('<table><thead><tr><th>Path</th><th>Note</th></tr></thead><tbody>');
+        rows.forEach(r=>{
+          w.document.write(`<tr><td>${escHtml(r.sec)}${(r.sub&&r.sub!=='_flat')? ' › '+escHtml(r.sub):''} › ${escHtml(r.cat)}</td><td>${escHtml(r.note)}</td></tr>`);
+        });
+        w.document.write('</tbody></table>');
+      }
+      w.document.write('</body></html>');
+      w.document.close();
+      w.focus();
+      w.print();
+    });
+
+    // Sample with Room Statistics and Rooms to preview all modes
+    if (btnSample) btnSample.addEventListener('click',()=>{
+      const headers = ['Aug 2024','Sep 2024','Oct 2024','Nov 2024','Dec 2024','Jan 2025','Feb 2025','Mar 2025','Apr 2025','May 2025','Jun 2025','Jul 2025','TTM'];
+      function row(h,vals){
+        const obj={Columns:{},TTM:0,Total:0};
+        h.forEach((k,i)=> obj.Columns[k]=vals[i]||0);
+        obj.TTM = obj.Columns['TTM']||0;
+        obj.Total = h.filter(x=>x!=='TTM').reduce((a,k)=>a+(obj.Columns[k]||0),0);
+        return obj;
+      }
+      const sections={
+        'Room Statistics':{
+          _headers: headers, _hasTTM:true,
+          '_flat':{
+            'Available Rooms': row(headers,[134*31, 134*30, 134*31, 134*30, 134*31, 134*31, 134*28, 134*31, 134*30, 134*31, 134*30, 134*31, 134*365]),
+            'Occupied Rooms':  row(headers,[2410,2200,2250,2100,2000,1900,1800,2000,2100,2200,2300,2400,25710])
+          }
+        },
+        'Rooms':{
+          _headers: headers, _hasTTM:true,
+          'Rooms Revenue':{
+            'Transient - Rack Rate': row(headers,[98096,100120,102330,101220,98000,95000,97000,99000,100500,101800,102200,103400,1317726]),
+            'Group': row(headers,[22000,21000,23000,24000,21000,20000,22000,23000,24000,25000,26000,27000,280000])
+          }
+        }
+      };
+      extracted = { sections, paths:[] };
+      renderAll(extracted);
+    });
+  })();
+  </script>
+</body>
+</html>
