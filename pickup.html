@@ -27,7 +27,6 @@
     margin-bottom:16px; box-shadow:0 6px 16px rgba(0,0,0,.08)
   }
   .header h1{margin:0; font-size:20px; font-weight:800; letter-spacing:.2px}
-
   .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:18px}
   .pill{
     background:var(--panel); border:1px solid var(--edge); border-radius:999px;
@@ -195,6 +194,9 @@
   <div class="toolbar">
     <button class="btn" id="btnHelp" type="button">Instructions to use</button>
 
+    <label class="btn" for="logoInput">Upload Logo (PNG/SVG)</label>
+    <input id="logoInput" type="file" accept="image/*" style="display:none"/>
+
     <label class="btn primary" for="bsInputCur">Upload Current Day Booking Stats (.txt)</label>
     <input id="bsInputCur" type="file" accept=".txt" style="display:none"/>
 
@@ -203,9 +205,6 @@
 
     <label class="btn" for="revInput">Upload Revenue Reports (.txt, multi)</label>
     <input id="revInput" type="file" accept=".txt" multiple style="display:none"/>
-
-    <label class="btn" for="logoInput">Upload Logo</label>
-    <input id="logoInput" type="file" accept="image/*" style="display:none"/>
 
     <div class="pill">
       <span>Hotel:</span>
@@ -278,11 +277,10 @@
       <div class="sub" id="kMPORVar">—</div>
     </div>
 
-    <!-- Total Month Pickup -->
     <div class="card">
-      <h3>Total Month Pickup (vs 1st upload)</h3>
+      <h3>Total Month Pickup</h3>
       <div class="big" id="kMonthPickup">—</div>
-      <div class="sub" id="kMonthPickupLabel">—</div>
+      <div class="sub" id="kMonthPickupNote">vs first upload</div>
     </div>
   </div>
 
@@ -337,7 +335,6 @@
             <li>Click <b>Upload Current Day Booking Stats</b> and select today’s FOSSE Booking Stats export (month-to-date snapshot).</li>
             <li>Click <b>Upload Previous Day Booking Stats</b> and select yesterday’s Booking Stats export to set a pickup baseline (enables the compare toggle automatically).</li>
             <li>Click <b>Upload Revenue Reports</b> and select one or more daily revenue <span class="kbd">.txt</span> files (multi-select OK).</li>
-            <li>(Optional) Click <b>Upload Logo</b> to brand the PDF with your MCR logo.</li>
           </ol>
           <p><em>Note:</em> The app auto-detects file type by content — filenames are optional. For clean ops, we recommend naming:</p>
           <ul>
@@ -350,16 +347,16 @@
           <strong>Manual inputs</strong>
           <ul>
             <li>In the grid, enter <b>Salaried Hours</b> and <b>Straight Hours</b> per day to compute HPOR.</li>
-            <li>Click the ▼ next to a date to open HK inputs and add: <b>HK Hours</b>, <b>Checked-Out Rooms</b>, <b>Stayovers</b>, <b>DNDs</b>. <u>DNDs are subtracted</u> from cleaned rooms (CO + SO − DND) when computing MPOR.</li>
+            <li>Click the ▼ next to a date to open HK inputs and add: <b>HK Hours</b>, <b>Checked-Out Rooms</b>, <b>Stayovers</b>, <b>DNDs</b>. This computes day MPOR and updates the top MPOR card.</li>
           </ul>
         </div>
 
         <div class="section">
           <strong>Metrics explained</strong>
           <ul>
-            <li><b>HPOR</b> = (Salaried + Straight Hours) ÷ <em>Actual Rooms</em>.</li>
-            <li><b>MPOR</b> = (HK Hours × 60) ÷ <em>(CO + SO − DND)</em>. The card compares against the standard <b>25 minutes</b> with ± variance.</li>
-            <li><b>Pickup</b> (Rooms/Rev): OTB vs baseline for the same dates (previous upload/yesterday).</li>
+            <li><b>HPOR</b> = (Salaried + Straight Hours) ÷ <em>Rooms</em> for that day. The <b>HPOR (Range)</b> card aggregates over the selected date range.</li>
+            <li><b>MPOR</b> = (HK Hours × 60) ÷ <em>(CO + SO − DND)</em>, floored at zero. The card compares against the standard <b>25 minutes</b> with ± variance.</li>
+            <li><b>Pickup</b> (Rooms/Rev): OTB vs baseline for the same dates (previous upload/yesterday). <b>Total Month Pickup</b> compares the latest month total vs your first upload this month.</li>
           </ul>
         </div>
 
@@ -383,22 +380,22 @@
 <script>
 (function(){
   // ---------- DOM (core)
-  const bsInputCur = document.getElementById('bsInputCur');
+  const logoInput   = document.getElementById('logoInput');
+  const bsInputCur  = document.getElementById('bsInputCur');
   const bsInputPrev = document.getElementById('bsInputPrev');
-  const revInput = document.getElementById('revInput');
-  const logoInput = document.getElementById('logoInput');
-  const monthInput = document.getElementById('monthInput');
-  const rangeMode = document.getElementById('rangeMode');
-  const rangeStart = document.getElementById('rangeStart');
-  const rangeEnd = document.getElementById('rangeEnd');
-  const hotelSel = document.getElementById('hotelSelect');
-  const host = document.getElementById('host');
-  const grid = document.getElementById('grid');
-  const gridBody = document.getElementById('gridBody');
+  const revInput    = document.getElementById('revInput');
+  const monthInput  = document.getElementById('monthInput');
+  const rangeMode   = document.getElementById('rangeMode');
+  const rangeStart  = document.getElementById('rangeStart');
+  const rangeEnd    = document.getElementById('rangeEnd');
+  const hotelSel    = document.getElementById('hotelSelect');
+  const host        = document.getElementById('host');
+  const grid        = document.getElementById('grid');
+  const gridBody    = document.getElementById('gridBody');
   const filterInput = document.getElementById('filterInput');
   const compareToggle = document.getElementById('compareToggle');
   const btnDownload = document.getElementById('btnDownload');
-  const btnPDF = document.getElementById('btnPDF');
+  const btnPDF      = document.getElementById('btnPDF');
 
   // Help modal
   const btnHelp = document.getElementById('btnHelp');
@@ -425,7 +422,7 @@
   const kMPOR = document.getElementById('kMPOR');
   const kMPORVar = document.getElementById('kMPORVar');
   const kMonthPickup = document.getElementById('kMonthPickup');
-  const kMonthPickupLabel = document.getElementById('kMonthPickupLabel');
+  const kMonthPickupNote = document.getElementById('kMonthPickupNote');
 
   // ---------- State
   let bookingStatsCur = null;  // current upload
@@ -435,22 +432,23 @@
   let laborMap = {};           // { 'YYYY-MM-DD': {sal:number, str:number} }
   let hkMap = {};              // { 'YYYY-MM-DD': {hkHrs:number, co:number, so:number, dnd:number} }
   let baselineInfo = { snap:null, label:null };
+  let logoDataUrl = null;      // Brand logo for PDF header
 
   const DELTA_TH = 7;  // rooms pickup threshold
   const MPOR_STD = 25; // minutes
 
   // ---------- Keys
-  const SNAPKEY = (hotel, ym) => `pickup:bs:${hotel}:${ym}`;               // legacy
-  const SNAPDAY = (hotel, ym, dayISO) => `pickup:bs:${hotel}:${ym}:${dayISO}`;
-  const SNAPINDEX = (hotel, ym) => `pickup:bs:index:${hotel}:${ym}`;
-  const BS_CUR = (hotel, ym) => `pickup:bs:current:${hotel}:${ym}`;
-  const BS_PREV = (hotel, ym) => `pickup:bs:previous:${hotel}:${ym}`;
+  const SNAPKEY  = (hotel, ym) => `pickup:bs:${hotel}:${ym}`;               // legacy
+  const SNAPDAY  = (hotel, ym, dayISO) => `pickup:bs:${hotel}:${ym}:${dayISO}`;
+  const SNAPINDEX= (hotel, ym) => `pickup:bs:index:${hotel}:${ym}`;
+  const BS_CUR   = (hotel, ym) => `pickup:bs:current:${hotel}:${ym}`;
+  const BS_PREV  = (hotel, ym) => `pickup:bs:previous:${hotel}:${ym}`;
   const HOURSKEY = (hotel, ym) => `pickup:hours:${hotel}:${ym}`;
-  const HKKEY = (hotel, ym) => `pickup:hk:${hotel}:${ym}`;
+  const HKKEY    = (hotel, ym) => `pickup:hk:${hotel}:${ym}`;
+  const REVKEY   = (hotel, ym) => `pickup:rev:${hotel}:${ym}`;
   const ALERTKEY = (hotel, ym, dayISO) => `pickup:alert:${hotel}:${ym}:${dayISO}`;
-  const LOGO_KEY = 'pickup:brandLogo';
-  // NEW: revenue persistence
-  const REVKEY = (hotel, ym) => `pickup:rev:${hotel}:${ym}`;
+  const LOGO_KEY = `pickup:brand:logo`;
+  const UIKEY    = `pickup:ui:last`;
 
   // ---------- Utils
   const fmtC = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(n)||0);
@@ -491,7 +489,7 @@
   }
 
   // ---------- Filename tips (optional, non-blocking)
-  const RX_BS = /^(?:\d{8}|\d{6})_BookingStats(?:\.txt)?$/i;
+  const RX_BS = /^(?:\d{8}|\d{6})_BookingStats(?:\.txt)?$/i;   // 20250904_BookingStats.txt or 090425_BookingStats.txt
   const RX_REV = /^(?:\d{8}|\d{6})_RevReport(?:\.txt)?$/i;
 
   function toast(msg){
@@ -571,7 +569,7 @@
     return (!r.start || dateKey>=r.start) && (!r.end || dateKey<=r.end);
   }
 
-  // ---------- Persistence: Labor, HK, Revenue
+  // ---------- Persistence: Labor, HK, Revenue, Logo
   function loadLaborMap(){ laborMap = JSON.parse(localStorage.getItem(HOURSKEY(hotelSel.value, ymFromInput())) || '{}'); }
   function saveLaborMap(){ localStorage.setItem(HOURSKEY(hotelSel.value, ymFromInput()), JSON.stringify(laborMap)); }
   function getHours(dateKey){
@@ -582,6 +580,7 @@
     laborMap[dateKey] = { sal: Math.max(0, Number(sal)||0), str: Math.max(0, Number(str)||0) };
     saveLaborMap();
   }
+
   function loadHKMap(){ hkMap = JSON.parse(localStorage.getItem(HKKEY(hotelSel.value, ymFromInput())) || '{}'); }
   function saveHKMap(){ localStorage.setItem(HKKEY(hotelSel.value, ymFromInput()), JSON.stringify(hkMap)); }
   function getHK(dateKey){
@@ -592,12 +591,42 @@
     hkMap[dateKey] = { hkHrs: Math.max(0, Number(hkHrs)||0), co: Math.max(0, Number(co)||0), so: Math.max(0, Number(so)||0), dnd: Math.max(0, Number(dnd)||0) };
     saveHKMap();
   }
-  // NEW: revenue map persistence
-  function loadRevenueMap(){
-    revenueByDay = JSON.parse(localStorage.getItem(REVKEY(hotelSel.value, ymFromInput())) || '{}');
+
+  function loadRevenueMap(){ revenueByDay = JSON.parse(localStorage.getItem(REVKEY(hotelSel.value, ymFromInput())) || '{}'); }
+  function saveRevenueMap(){ localStorage.setItem(REVKEY(hotelSel.value, ymFromInput()), JSON.stringify(revenueByDay)); }
+
+  function loadLogo(){ logoDataUrl = localStorage.getItem(LOGO_KEY) || null; }
+  function saveLogo(dataUrl){ localStorage.setItem(LOGO_KEY, dataUrl); logoDataUrl = dataUrl; }
+
+  // ---------- UI State
+  function saveUIState(){
+    const state = {
+      hotel: hotelSel.value,
+      month: monthInput.value,
+      rangeMode: rangeMode.value,
+      rangeStart: rangeStart.value,
+      rangeEnd: rangeEnd.value,
+      compare: !!compareToggle.checked,
+      filter: filterInput.value
+    };
+    localStorage.setItem(UIKEY, JSON.stringify(state));
   }
-  function saveRevenueMap(){
-    localStorage.setItem(REVKEY(hotelSel.value, ymFromInput()), JSON.stringify(revenueByDay));
+  function loadUIState(){
+    const saved = JSON.parse(localStorage.getItem(UIKEY) || 'null');
+    if(saved){
+      if(saved.month) monthInput.value = saved.month;
+      if(saved.hotel) hotelSel.value = saved.hotel;
+      if(saved.rangeMode) rangeMode.value = saved.rangeMode;
+      ensureRangeDefaults();
+      if(saved.rangeStart) rangeStart.value = saved.rangeStart;
+      if(saved.rangeEnd)   rangeEnd.value   = saved.rangeEnd;
+      if(typeof saved.compare === 'boolean') compareToggle.checked = saved.compare;
+      if(saved.filter != null) filterInput.value = saved.filter;
+    }else{
+      const nowYM = new Date().toISOString().slice(0,7); // YYYY-MM
+      monthInput.value = nowYM;
+      ensureRangeDefaults();
+    }
   }
 
   // ---------- Baselines / snapshots
@@ -633,6 +662,7 @@
     const idx = JSON.parse(localStorage.getItem(SNAPINDEX(hotel, ym)) || '[]');
     if(!idx.includes(day)){
       idx.push(day);
+      idx.sort(); // keep sorted for first/last logic
       localStorage.setItem(SNAPINDEX(hotel, ym), JSON.stringify(idx));
     }
     localStorage.setItem(SNAPKEY(hotel, ym), JSON.stringify(bs)); // compat
@@ -644,16 +674,16 @@
     bookingStatsCur = JSON.parse(localStorage.getItem(BS_CUR(hotel, ym)) || 'null');
     bookingStatsPrev = JSON.parse(localStorage.getItem(BS_PREV(hotel, ym)) || 'null');
   }
-
-  // FIRST snapshot of the month (for "Total Month Pickup")
-  function getFirstSnapshotOfMonth(){
+  function getFirstMonthSnapshot(){
     const ym = ymFromInput();
     const hotel = hotelSel.value;
     const idx = JSON.parse(localStorage.getItem(SNAPINDEX(hotel, ym)) || '[]');
-    if(!idx.length) return {snap:null, date:null};
-    const firstDate = idx.slice().sort()[0];
-    const snap = JSON.parse(localStorage.getItem(SNAPDAY(hotel, ym, firstDate)) || 'null');
-    return {snap, date:firstDate || null};
+    if(idx && idx.length){
+      const first = [...idx].sort()[0];
+      const snap = JSON.parse(localStorage.getItem(SNAPDAY(hotel, ym, first)) || 'null');
+      return { snap, date:first };
+    }
+    return { snap:null, date:null };
   }
 
   // ---------- Merge + KPIs
@@ -722,7 +752,7 @@
     const hpor = (roomsForHPOR>0) ? (totH/roomsForHPOR) : null;
     kHPORRange.textContent = (hpor!=null) ? fmtN2(hpor) : '—';
 
-    // Pickup vs baseline across range (OTB deltas)
+    // Pickup vs baseline across range (OTB days)
     let pRooms=0, pRev=0;
     const baselineSnap = bookingStatsPrev || baselineInfo.snap;
     if(baselineSnap && compareToggle.checked){
@@ -742,7 +772,7 @@
       kPickupLabel.textContent = 'baseline: —';
     }
 
-    // MPOR (range) — DND subtracts from cleaned rooms
+    // MPOR (range) using cleaned = CO + SO - DND (floored at 0)
     let hkMinutes = 0, cleanedRooms = 0;
     rows.forEach(r=>{
       const hk = getHK(r.date);
@@ -762,19 +792,19 @@
       kMPORVar.textContent = '—';
     }
 
-    // Total Month Pickup (full month, not range)
-    const { snap:firstSnap, date:firstDate } = getFirstSnapshotOfMonth();
+    // Total Month Pickup (vs first upload for the month)
+    const { snap:firstSnap, date:firstDate } = getFirstMonthSnapshot();
     if(firstSnap){
-      let monthTotalNow = 0;
-      merged.forEach(r=>{ if(r.rev!=null){ monthTotalNow += (r.rev||0); } });
-      let monthTotalStart = 0;
-      Object.values(firstSnap.rows || {}).forEach(v => { monthTotalStart += (v.rev||0); });
-      const diff = monthTotalNow - monthTotalStart;
-      kMonthPickup.textContent = (diff>=0?'+':'') + fmtC(diff);
-      kMonthPickupLabel.textContent = `since ${firstDate}`;
+      let baseTotal = 0;
+      Object.values(firstSnap.rows || {}).forEach(v => { baseTotal += (v?.rev||0); });
+      let currentTotal = 0;
+      merged.forEach(r=>{ if(r.rev!=null){ currentTotal += r.rev; } });
+      const monthPickupVal = currentTotal - baseTotal;
+      kMonthPickup.textContent = (monthPickupVal>=0?'+':'') + fmtC(monthPickupVal);
+      kMonthPickupNote.textContent = `vs first upload (${firstDate})`;
     }else{
       kMonthPickup.textContent = '—';
-      kMonthPickupLabel.textContent = '—';
+      kMonthPickupNote.textContent = 'Upload Booking Stats to start baseline';
     }
   }
 
@@ -797,8 +827,8 @@
     tr.className = 'expand-row';
     const colSpan = 11;
     const hk = getHK(dateKey);
-    const dayCleaned = Math.max(0, (hk.co||0) + (hk.so||0) - (hk.dnd||0));
-    const dayMPOR = (hk.hkHrs>0 && dayCleaned>0) ? ((hk.hkHrs*60)/dayCleaned) : null;
+    const cleanedInit = Math.max(0, (hk.co||0)+(hk.so||0)-(hk.dnd||0));
+    const dayMPOR = (hk.hkHrs>0 && cleanedInit>0) ? ((hk.hkHrs*60)/cleanedInit) : null;
 
     tr.innerHTML = `
       <td colspan="${colSpan}">
@@ -826,7 +856,6 @@
             <span class="chip" id="hk-var-${dateKey}">
               ${dayMPOR==null?'—':( (dayMPOR-MPOR_STD)>=0?`<span class="delta neg">+${fmtN2(dayMPOR-MPOR_STD)}</span>`:`<span class="delta pos">${fmtN2(dayMPOR-MPOR_STD)}</span>` )} vs 25m
             </span>
-            <span class="chip">Cleaned: <strong id="hk-cleaned-${dateKey}">${fmtN0(dayCleaned)}</strong> (CO+SO−DND)</span>
           </div>
         </div>
       </td>
@@ -852,8 +881,6 @@
       setHK(dateKey, hours, co, so, dnd);
 
       const cleaned = Math.max(0, co + so - dnd);
-      document.getElementById(`hk-cleaned-${dateKey}`).textContent = `${fmtN0(cleaned)}`;
-
       const dayM = (hours>0 && cleaned>0) ? (hours*60/cleaned) : null;
       const mporEl = document.getElementById(`hk-mpor-${dateKey}`);
       const varEl = document.getElementById(`hk-var-${dateKey}`);
@@ -1011,14 +1038,7 @@
     }
   }
 
-  // ---------- PDF summary (logo + signature; robust export)
-  const DEFAULT_MCR_LOGO = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="220" height="60" viewBox="0 0 220 60"><rect width="220" height="60" fill="white"/><circle cx="30" cy="30" r="27" fill="%231b3355"/><text x="30" y="36" dominant-baseline="middle" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="white">MCR</text></svg>';
-  const SIGNATURE_DATAURI = '';
-
-  function currentLogo(){
-    return localStorage.getItem(LOGO_KEY) || DEFAULT_MCR_LOGO;
-  }
-
+  // ---------- PDF summary
   function computeSummary(){
     const ym = ymFromInput();
     const hotel = hotelSel.value;
@@ -1040,23 +1060,16 @@
     const mtdMPOR = (cleaned>0 && mtdHKHrs>0) ? ((mtdHKHrs*60)/cleaned) : null;
     const mtdMPORVar = (mtdMPOR!=null) ? (mtdMPOR - MPOR_STD) : null;
 
-    // Month totals (Actual + OTB) and first snapshot
-    let monthTotalNow = 0, monthADR=null, mRooms=0, mRev=0, otbRooms=0, otbRev=0;
+    // Month ADR overall (Actual + OTB where both exist), plus month totals
+    let mRooms=0, mRev=0, otbRooms=0, otbRev=0, monthCurrentTotal=0;
     merged.forEach(r=>{
-      if(r.rev!=null){ monthTotalNow += (r.rev||0); }
       if(r.rooms!=null && r.rev!=null){ mRooms += r.rooms; mRev += r.rev; }
       if(r.status==='OTB'){ otbRooms += (r.rooms||0); otbRev += (r.rev||0); }
+      if(r.rev!=null){ monthCurrentTotal += r.rev; } // Actual overrides OTB already in merged
     });
-    monthADR = (mRooms>0)? (mRev/mRooms) : null;
+    const monthADR = (mRooms>0)? (mRev/mRooms) : null;
 
-    const { snap:firstSnap, date:firstDate } = getFirstSnapshotOfMonth();
-    let monthTotalStart = null, monthPickup = null;
-    if(firstSnap){
-      monthTotalStart = Object.values(firstSnap.rows||{}).reduce((acc,v)=> acc + (v.rev||0), 0);
-      monthPickup = monthTotalNow - monthTotalStart;
-    }
-
-    // OTB pickup vs baseline (all OTB days)
+    // Pickup vs baseline (all OTB days in month)
     const baselineSnap = bookingStatsPrev || baselineInfo.snap;
     let pRooms=0, pRev=0, inc=[], dec=[];
     if(bookingStatsCur && baselineSnap){
@@ -1073,34 +1086,37 @@
       dec.sort((a,b)=>a.d-b.d);
     }
 
+    // Total Month Pickup (vs first upload)
+    const { snap:firstSnap, date:firstDate } = getFirstMonthSnapshot();
+    let firstSnapTotal = null, monthPickup = null;
+    if(firstSnap){
+      firstSnapTotal = Object.values(firstSnap.rows||{}).reduce((s,v)=> s + (v?.rev||0), 0);
+      monthPickup = monthCurrentTotal - firstSnapTotal;
+    }
+
     return {
       ym, hotel, genAt,
       mtdActRooms, mtdActRev, mtdSal, mtdStr, mtdHPOR,
       mtdHKHrs, mtdCO, mtdSO, mtdDND, mtdMPOR, mtdMPORVar,
       monthADR, otbRooms, otbRev,
-      monthTotalNow, monthTotalStart, monthPickup, firstDate,
       pRooms, pRev, inc, dec,
-      baselineLabel: bookingStatsPrev ? 'previous upload' : (baselineInfo.label || '—')
+      baselineLabel: bookingStatsPrev ? 'previous upload' : (baselineInfo.label || '—'),
+      firstSnapDate: firstDate, firstSnapTotal, monthCurrentTotal, monthPickup
     };
   }
 
   function buildPDFNode(d){
     const el = document.getElementById('pdfSummary');
     const safe = (v, fmt) => (v==null || Number.isNaN(v)) ? '—' : (fmt?fmt(v):v);
-    const signBlock = SIGNATURE_DATAURI
-      ? `<img src="${SIGNATURE_DATAURI}" alt="Signature" style="height:42px;display:block;margin-bottom:6px"/>`
-      : `<div style="height:42px;border-bottom:1px solid #dfe7f5"></div>`;
-
+    const logoTag = logoDataUrl ? `<img src="${logoDataUrl}" alt="Logo" style="height:36px;display:block">` : '';
     el.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <img alt="MCR" src="${currentLogo()}" style="height:34px;max-width:240px;object-fit:contain"/>
-        <div style="text-align:right">
-          <div class="muted">${d.genAt} (America/New_York)</div>
-          <div class="muted">${d.hotel} — Month ${d.ym}</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        ${logoTag}
+        <div>
+          <h1 style="margin:0">Pickup Summary — ${d.hotel} — ${d.ym}</h1>
+          <div class="muted">Generated ${d.genAt} (America/New_York)</div>
         </div>
       </div>
-
-      <h1>Pickup Summary</h1>
 
       <h2>Pickup vs Previous Day</h2>
       <div class="grid">
@@ -1109,11 +1125,18 @@
         <div class="k"><div class="label">Baseline</div><div class="val">${d.baselineLabel}</div></div>
       </div>
 
+      <h2>Total Month Pickup</h2>
+      <div class="grid">
+        <div class="k"><div class="label">First Upload (${d.firstSnapDate || '—'})</div><div class="val">${safe(d.firstSnapTotal, fmtC)}</div></div>
+        <div class="k"><div class="label">Current Month Total</div><div class="val">${safe(d.monthCurrentTotal, fmtC)}</div></div>
+        <div class="k"><div class="label">Pickup (Month vs First)</div><div class="val">${d.monthPickup==null?'—':((d.monthPickup>=0?'+':'')+fmtC(d.monthPickup))}</div></div>
+      </div>
+
       <h2>MTD Productivity</h2>
       <div class="grid">
         <div class="k"><div class="label">MTD HPOR</div><div class="val">${safe(d.mtdHPOR, fmtN2)}</div></div>
         <div class="k"><div class="label">MTD MPOR</div><div class="val">${safe(d.mtdMPOR, x=>fmtN2(x)+' min')}</div></div>
-        <div class="k"><div class="label">MPOR Variance vs 25m</div><div class="val">${(d.mtdMPORVar==null)?'—':((d.mtdMPORVar>=0?'+':'')+fmtN2(d.mtdMPORVar)+' min')}</div></div>
+        <div class="k"><div class="label">MPOR Var vs 25m</div><div class="val">${(d.mtdMPORVar==null)?'—':((d.mtdMPORVar>=0?'+':'')+fmtN2(d.mtdMPORVar)+' min')}</div></div>
       </div>
       <div class="grid" style="margin-top:6px">
         <div class="k"><div class="label">Actual Rooms (MTD)</div><div class="val">${fmtN0(d.mtdActRooms||0)}</div></div>
@@ -1122,26 +1145,20 @@
         <div class="k"><div class="label">HK & Rooms (MTD)</div><div class="val">${fmtN2(d.mtdHKHrs||0)} hrs — ${fmtN0(Math.max(0,(d.mtdCO||0)+(d.mtdSO||0)-(d.mtdDND||0)))} cleaned <span class="muted">(CO ${fmtN0(d.mtdCO||0)} / SO ${fmtN0(d.mtdSO||0)} / DND ${fmtN0(d.mtdDND||0)})</span></div></div>
       </div>
 
+      <h2>High-demand Pickup Alerts</h2>
+      ${ (d.inc && d.inc.length) ? `<ul>${d.inc.slice(0,10).map(x=>`<li>▲ ${x.date}: +${fmtN0(x.d)} rooms</li>`).join('')}</ul>` : '<div class="muted">No substantial pickup days detected.</div>' }
+      ${ (d.dec && d.dec.length) ? `<h2>Significant Drops</h2><ul>${d.dec.slice(0,10).map(x=>`<li>▼ ${x.date}: ${fmtN0(x.d)} rooms</li>`).join('')}</ul>` : '' }
+
       <h2>Additional KPIs</h2>
       <div class="grid">
         <div class="k"><div class="label">Month ADR (Actual + OTB)</div><div class="val">${safe(d.monthADR, fmtN2)}</div></div>
         <div class="k"><div class="label">Remaining OTB Rooms (Month)</div><div class="val">${fmtN0(d.otbRooms||0)}</div></div>
         <div class="k"><div class="label">Remaining OTB Rev (Month)</div><div class="val">${fmtC(d.otbRev||0)}</div></div>
-        <div class="k"><div class="label">Total Month Pickup</div><div class="val">${d.monthPickup==null?'—':((d.monthPickup>=0?'+':'')+fmtC(d.monthPickup))}</div><div class="muted">${d.firstDate?`vs first upload (${d.firstDate})`:''}</div></div>
       </div>
 
-      <h2>Sign-off</h2>
-      <div class="grid">
-        <div class="k">
-          <div class="label">Prepared by</div>
-          ${signBlock}
-          <div class="muted">Name & Title</div>
-        </div>
-        <div class="k">
-          <div class="label">Approved by</div>
-          ${signBlock}
-          <div class="muted">Signature & Date</div>
-        </div>
+      <div style="margin-top:16px;padding-top:10px;border-top:1px solid #e7edf6;display:flex;justify-content:space-between;align-items:center">
+        <div>Prepared by: ________________________________</div>
+        <div>Date: ____________</div>
       </div>
 
       <div class="muted" style="margin-top:10px">
@@ -1151,64 +1168,50 @@
     return el;
   }
 
-  function libsReady(){ return window.jspdf?.jsPDF && window.html2canvas; }
-  async function ensurePdfLibs(retries=30){
-    for(let i=0;i<retries && !libsReady();i++){ await new Promise(r=>setTimeout(r,150)); }
-    return libsReady();
-  }
-
   async function downloadPDF(){
-    const ready = await ensurePdfLibs();
-    if(!ready){
-      alert('PDF libraries are not loaded yet. Please try again.');
-      return;
-    }
     const d = computeSummary();
     const el = buildPDFNode(d);
 
-    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-
-    const canvas = await window.html2canvas(el, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      windowWidth: el.scrollWidth,
-      useCORS: true
-    });
-
-    const imgData = canvas.toDataURL('image/png');
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
-
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 36;
-    const imgW = pageW - margin*2;
-    const imgH = canvas.height * (imgW / canvas.width);
-
-    let heightLeft = imgH;
-    let position = margin;
-
-    pdf.addImage(imgData, 'PNG', margin, position, imgW, imgH);
-    heightLeft -= (pageH - margin*2);
-
-    while (heightLeft > 0) {
-      pdf.addPage();
-      position = margin - (imgH - heightLeft);
-      pdf.addImage(imgData, 'PNG', margin, position, imgW, imgH);
-      heightLeft -= (pageH - margin*2);
+    const jspdfNS = window.jspdf;
+    if(!jspdfNS || !jspdfNS.jsPDF){
+      alert('PDF libraries are not loaded yet. Please wait a moment and try again.');
+      return;
     }
-
-    pdf.save(`Pickup_Summary_${d.hotel}_${d.ym}.pdf`);
+    const doc = new jspdfNS.jsPDF({ unit:'pt', format:'letter', compress:true });
+    await doc.html(el, {
+      x:36, y:36, width:540, windowWidth:1080, autoPaging:'text',
+      callback: function(docInst){
+        const fname = `Pickup_Summary_${d.hotel}_${d.ym}.pdf`;
+        docInst.save(fname);
+      }
+    });
   }
 
-  // ---------- IO wiring
-  filterInput.addEventListener('input', updateAndRender);
-  compareToggle.addEventListener('change', ()=>{ mergeData(); updateAndRender(); });
-  monthInput.addEventListener('change', ()=>{ ensureRangeDefaults(); loadLaborMap(); loadHKMap(); loadRevenueMap(); loadExplicitSnapshots(); loadBaselineInfo(); mergeData(); updateAndRender(); });
-  hotelSel.addEventListener('change', ()=>{ loadLaborMap(); loadHKMap(); loadRevenueMap(); loadExplicitSnapshots(); loadBaselineInfo(); mergeData(); updateAndRender(); });
-  rangeMode.addEventListener('change', ()=>{ ensureRangeDefaults(); updateAndRender(); });
-  rangeStart.addEventListener('change', ()=>{ rangeStart.value = clampToMonth(rangeStart.value); updateAndRender(); });
-  rangeEnd.addEventListener('change', ()=>{ rangeEnd.value = clampToMonth(rangeEnd.value); updateAndRender(); });
+  // ---------- IO wiring (and UI persistence hooks)
+  filterInput.addEventListener('input', ()=>{ updateAndRender(); saveUIState(); });
+
+  compareToggle.addEventListener('change', ()=>{
+    mergeData(); updateAndRender(); saveUIState();
+  });
+
+  monthInput.addEventListener('change', ()=>{
+    ensureRangeDefaults();
+    loadLaborMap(); loadHKMap(); loadRevenueMap();
+    loadExplicitSnapshots(); loadBaselineInfo();
+    mergeData(); updateAndRender();
+    saveUIState();
+  });
+
+  hotelSel.addEventListener('change', ()=>{
+    loadLaborMap(); loadHKMap(); loadRevenueMap();
+    loadExplicitSnapshots(); loadBaselineInfo();
+    mergeData(); updateAndRender();
+    saveUIState();
+  });
+
+  rangeMode.addEventListener('change', ()=>{ ensureRangeDefaults(); updateAndRender(); saveUIState(); });
+  rangeStart.addEventListener('change', ()=>{ rangeStart.value = clampToMonth(rangeStart.value); updateAndRender(); saveUIState(); });
+  rangeEnd.addEventListener('change', ()=>{ rangeEnd.value = clampToMonth(rangeEnd.value); updateAndRender(); saveUIState(); });
 
   // Help modal events
   function openHelp(){ helpModal.classList.add('show'); helpBackdrop.classList.add('show'); }
@@ -1218,21 +1221,14 @@
   helpBackdrop.addEventListener('click', closeHelp);
   window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeHelp(); });
 
-  // Logo upload (persist as data URL)
+  // Logo upload
   logoInput.addEventListener('change', async (e)=>{
     const f = e.target.files?.[0];
     if(!f) return;
-    try{
-      const fr = new FileReader();
-      fr.onload = () => {
-        localStorage.setItem(LOGO_KEY, fr.result);
-        toast('Logo saved. It will appear in the next PDF export.');
-      };
-      fr.readAsDataURL(f);
-    }catch(err){
-      console.error(err);
-      alert('Could not load logo image.');
-    }
+    const reader = new FileReader();
+    reader.onload = () => { saveLogo(reader.result); toast('Logo saved for PDF.'); };
+    reader.onerror = () => alert('Could not read logo file.');
+    reader.readAsDataURL(f);
   });
 
   // Current Day Booking Stats
@@ -1245,7 +1241,9 @@
       const parsed = parseBookingStats(text);
       if(parsed?.start){
         const ymFile = ymFromDateUTC(parsed.start);
-        if(ymFile !== ymFromInput()){ monthInput.value = ymFile; ensureRangeDefaults(); loadRevenueMap(); }
+        if(ymFile !== ymFromInput()){
+          monthInput.value = ymFile; ensureRangeDefaults(); loadRevenueMap(); saveUIState();
+        }
       }
       loadLaborMap(); loadHKMap();
       bookingStatsCur = parsed;
@@ -1274,6 +1272,7 @@
       bookingStatsPrev = parsed;
       localStorage.setItem(BS_PREV(hotelSel.value, ymFromInput()), JSON.stringify(bookingStatsPrev));
       compareToggle.checked = true;
+      saveUIState();
       loadBaselineInfo(); mergeData(); updateAndRender();
     }catch(err){
       console.error(err);
@@ -1281,7 +1280,7 @@
     }
   });
 
-  // Revenue uploads (persist map)
+  // Revenue uploads (persist locally)
   revInput.addEventListener('change', async (e)=>{
     const files = Array.from(e.target.files || []);
     if(!files.length) return;
@@ -1292,7 +1291,7 @@
         const rec = parseRevenueReport(text);
         if(rec){ revenueByDay[rec.date] = rec; }
       }
-      saveRevenueMap();            // << persist revenue after uploading
+      saveRevenueMap();
       mergeData(); updateAndRender();
     }catch(err){
       console.error(err);
@@ -1311,7 +1310,7 @@
       const tot = hrs.sal + hrs.str;
       const hpor = (r.rooms && tot>0) ? (tot/r.rooms) : '';
       const hk = getHK(r.date);
-      const cleaned = Math.max(0,(hk.co||0)+(hk.so||0)-(hk.dnd||0));
+      const cleaned = Math.max(0, (hk.co||0)+(hk.so||0)-(hk.dnd||0));
       const mpor = (hk.hkHrs>0 && cleaned>0) ? ((hk.hkHrs*60)/cleaned) : '';
       out.push([
         r.date,
@@ -1351,11 +1350,13 @@
   // PDF Export
   btnPDF.addEventListener('click', downloadPDF);
 
-  // Initialize
+  // ---------- Initialize (restore UI first so data loads into correct scope)
+  loadUIState();
   ensureRangeDefaults();
+  loadLogo();
   loadLaborMap();
   loadHKMap();
-  loadRevenueMap();      // << load persisted revenue at startup
+  loadRevenueMap();
   loadExplicitSnapshots();
   loadBaselineInfo();
   updateAndRender();
