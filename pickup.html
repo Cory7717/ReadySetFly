@@ -278,7 +278,7 @@
       <div class="sub" id="kMPORVar">—</div>
     </div>
 
-    <!-- NEW: Total Month Pickup -->
+    <!-- Total Month Pickup -->
     <div class="card">
       <h3>Total Month Pickup (vs 1st upload)</h3>
       <div class="big" id="kMonthPickup">—</div>
@@ -449,6 +449,8 @@
   const HKKEY = (hotel, ym) => `pickup:hk:${hotel}:${ym}`;
   const ALERTKEY = (hotel, ym, dayISO) => `pickup:alert:${hotel}:${ym}:${dayISO}`;
   const LOGO_KEY = 'pickup:brandLogo';
+  // NEW: revenue persistence
+  const REVKEY = (hotel, ym) => `pickup:rev:${hotel}:${ym}`;
 
   // ---------- Utils
   const fmtC = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(n)||0);
@@ -569,7 +571,7 @@
     return (!r.start || dateKey>=r.start) && (!r.end || dateKey<=r.end);
   }
 
-  // ---------- Persistence: Labor & HK
+  // ---------- Persistence: Labor, HK, Revenue
   function loadLaborMap(){ laborMap = JSON.parse(localStorage.getItem(HOURSKEY(hotelSel.value, ymFromInput())) || '{}'); }
   function saveLaborMap(){ localStorage.setItem(HOURSKEY(hotelSel.value, ymFromInput()), JSON.stringify(laborMap)); }
   function getHours(dateKey){
@@ -589,6 +591,13 @@
   function setHK(dateKey, hkHrs, co, so, dnd){
     hkMap[dateKey] = { hkHrs: Math.max(0, Number(hkHrs)||0), co: Math.max(0, Number(co)||0), so: Math.max(0, Number(so)||0), dnd: Math.max(0, Number(dnd)||0) };
     saveHKMap();
+  }
+  // NEW: revenue map persistence
+  function loadRevenueMap(){
+    revenueByDay = JSON.parse(localStorage.getItem(REVKEY(hotelSel.value, ymFromInput())) || '{}');
+  }
+  function saveRevenueMap(){
+    localStorage.setItem(REVKEY(hotelSel.value, ymFromInput()), JSON.stringify(revenueByDay));
   }
 
   // ---------- Baselines / snapshots
@@ -753,13 +762,11 @@
       kMPORVar.textContent = '—';
     }
 
-    // NEW: Total Month Pickup (full month, not range)
+    // Total Month Pickup (full month, not range)
     const { snap:firstSnap, date:firstDate } = getFirstSnapshotOfMonth();
     if(firstSnap){
-      // Sum current month total (Actual + OTB where rev present)
       let monthTotalNow = 0;
       merged.forEach(r=>{ if(r.rev!=null){ monthTotalNow += (r.rev||0); } });
-      // Sum first snapshot OTB total
       let monthTotalStart = 0;
       Object.values(firstSnap.rows || {}).forEach(v => { monthTotalStart += (v.rev||0); });
       const diff = monthTotalNow - monthTotalStart;
@@ -1197,8 +1204,8 @@
   // ---------- IO wiring
   filterInput.addEventListener('input', updateAndRender);
   compareToggle.addEventListener('change', ()=>{ mergeData(); updateAndRender(); });
-  monthInput.addEventListener('change', ()=>{ ensureRangeDefaults(); loadLaborMap(); loadHKMap(); loadExplicitSnapshots(); loadBaselineInfo(); mergeData(); updateAndRender(); });
-  hotelSel.addEventListener('change', ()=>{ loadLaborMap(); loadHKMap(); loadExplicitSnapshots(); loadBaselineInfo(); mergeData(); updateAndRender(); });
+  monthInput.addEventListener('change', ()=>{ ensureRangeDefaults(); loadLaborMap(); loadHKMap(); loadRevenueMap(); loadExplicitSnapshots(); loadBaselineInfo(); mergeData(); updateAndRender(); });
+  hotelSel.addEventListener('change', ()=>{ loadLaborMap(); loadHKMap(); loadRevenueMap(); loadExplicitSnapshots(); loadBaselineInfo(); mergeData(); updateAndRender(); });
   rangeMode.addEventListener('change', ()=>{ ensureRangeDefaults(); updateAndRender(); });
   rangeStart.addEventListener('change', ()=>{ rangeStart.value = clampToMonth(rangeStart.value); updateAndRender(); });
   rangeEnd.addEventListener('change', ()=>{ rangeEnd.value = clampToMonth(rangeEnd.value); updateAndRender(); });
@@ -1238,7 +1245,7 @@
       const parsed = parseBookingStats(text);
       if(parsed?.start){
         const ymFile = ymFromDateUTC(parsed.start);
-        if(ymFile !== ymFromInput()){ monthInput.value = ymFile; ensureRangeDefaults(); }
+        if(ymFile !== ymFromInput()){ monthInput.value = ymFile; ensureRangeDefaults(); loadRevenueMap(); }
       }
       loadLaborMap(); loadHKMap();
       bookingStatsCur = parsed;
@@ -1262,7 +1269,7 @@
       const parsed = parseBookingStats(text);
       if(parsed?.start){
         const ymFile = ymFromDateUTC(parsed.start);
-        if(ymFile !== ymFromInput()){ monthInput.value = ymFile; ensureRangeDefaults(); }
+        if(ymFile !== ymFromInput()){ monthInput.value = ymFile; ensureRangeDefaults(); loadRevenueMap(); }
       }
       bookingStatsPrev = parsed;
       localStorage.setItem(BS_PREV(hotelSel.value, ymFromInput()), JSON.stringify(bookingStatsPrev));
@@ -1274,7 +1281,7 @@
     }
   });
 
-  // Revenue uploads
+  // Revenue uploads (persist map)
   revInput.addEventListener('change', async (e)=>{
     const files = Array.from(e.target.files || []);
     if(!files.length) return;
@@ -1285,6 +1292,7 @@
         const rec = parseRevenueReport(text);
         if(rec){ revenueByDay[rec.date] = rec; }
       }
+      saveRevenueMap();            // << persist revenue after uploading
       mergeData(); updateAndRender();
     }catch(err){
       console.error(err);
@@ -1347,6 +1355,7 @@
   ensureRangeDefaults();
   loadLaborMap();
   loadHKMap();
+  loadRevenueMap();      // << load persisted revenue at startup
   loadExplicitSnapshots();
   loadBaselineInfo();
   updateAndRender();
