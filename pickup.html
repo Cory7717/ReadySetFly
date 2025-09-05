@@ -9,6 +9,8 @@
 <!-- PDF libs (deferred so they’re ready by the time the page is interactive) -->
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+<!-- Small compressor for share links -->
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js" defer></script>
 
 <style>
   :root{
@@ -161,25 +163,25 @@
     font-size:12px; color:#415162; font-weight:600;
   }
 
-  /* Toast (filename tips) */
+  /* Toast (filename tips & share confirmations) */
   .toast-wrap{position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:8px; z-index:1100}
   .toast{
     background:#ffffff; border:1px solid var(--edge-2); border-left:4px solid var(--warn);
-    box-shadow:0 8px 24px rgba(0,0,0,.1); padding:10px 12px; border-radius:10px; max-width:360px; font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,.1); padding:10px 12px; border-radius:10px; max-width:420px; font-size:13px;
   }
+  .toast.ok{border-left-color:var(--ok)}
+  .toast.info{border-left-color:var(--brand)}
 
   /* PDF summary panel (rendered off-screen for capture) */
   #pdfSummary{
-    position:absolute; left:-10000px; top:0; width:800px; /* virtual width for crisp render */
+    position:absolute; left:-10000px; top:0; width:800px;
     background:#fff; color:#263238; padding:24px; border:1px solid #eef2f7; border-radius:12px;
     font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
   }
   #pdfSummary h1{font-size:20px; margin:0 0 6px; font-weight:800}
   #pdfSummary h2{font-size:16px; margin:16px 0 8px; font-weight:800}
   #pdfSummary .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px}
-  #pdfSummary .k{
-    border:1px solid #e7edf6; border-radius:12px; padding:10px; background:#fafcff;
-  }
+  #pdfSummary .k{border:1px solid #e7edf6; border-radius:12px; padding:10px; background:#fafcff;}
   #pdfSummary .k .label{font-size:11px; text-transform:uppercase; color:#64748b; font-weight:700; letter-spacing:.3px}
   #pdfSummary .k .val{font-size:20px; font-weight:800; margin-top:4px}
   #pdfSummary ul{margin:6px 0 0 18px}
@@ -245,6 +247,12 @@
 
     <button class="btn" id="btnDownload">Download CSV</button>
     <button class="btn" id="btnPDF">Download PDF</button>
+
+    <!-- NEW: share/backup -->
+    <button class="btn" id="btnShare">Create Share Link</button>
+    <button class="btn" id="btnExport">Export Snapshot</button>
+    <label class="btn" for="importInput">Import Snapshot</label>
+    <input id="importInput" type="file" accept="application/json" style="display:none"/>
   </div>
 
   <div class="cards">
@@ -318,53 +326,33 @@
             <li>Combines <span class="inline-chip">Booking Stats (OTB)</span> from FOSSE with your <span class="inline-chip">Daily Revenue Reports</span>.</li>
             <li>Lets you add <span class="inline-chip">Labor Hours</span> and <span class="inline-chip">Housekeeping details</span> (HK hours, CO, SO, DND) to compute HPOR &amp; MPOR.</li>
             <li>Shows OTB pickup vs a baseline (yesterday or a file you upload as <em>Previous Day Booking Stats</em>).</li>
+            <li><b>Share data</b>: Use <span class="inline-chip">Create Share Link</span> or <span class="inline-chip">Export/Import Snapshot</span> so others can view your exact data without re-uploading.</li>
           </ul>
         </div>
 
         <div class="section">
           <strong>Files to export from FOSSE</strong>
           <ul>
-            <li><b>Booking Stats</b>: Export to <span class="kbd">.txt</span>. The file should include a header like <em>“Beginning … Through …”</em> and day rows with <em>Sold</em>, <em>Avg Rate</em>, and <em>Room Revenue</em>.</li>
-            <li><b>Daily Revenue Report (Rooms)</b>: Export to <span class="kbd">.txt</span>. The report must include <em>TOTAL ROOM SALES</em>, <em># ROOMS OCCUPIED</em>, and <em>AVG RATE PER ROOM</em> for each day.</li>
+            <li><b>Booking Stats</b>: Export to <span class="kbd">.txt</span> (with “Beginning … Through …” header and Sold / Avg Rate / Room Revenue columns).</li>
+            <li><b>Daily Revenue Report (Rooms)</b>: Export to <span class="kbd">.txt</span> containing <em>TOTAL ROOM SALES</em>, <em># ROOMS OCCUPIED</em>, <em>AVG RATE PER ROOM</em>.</li>
           </ul>
         </div>
 
         <div class="section">
           <strong>Upload flow</strong>
           <ol>
-            <li>Click <b>Upload Current Day Booking Stats</b> and select today’s FOSSE Booking Stats export (month-to-date snapshot).</li>
-            <li>Click <b>Upload Previous Day Booking Stats</b> and select yesterday’s Booking Stats export to set a pickup baseline (enables the compare toggle automatically).</li>
-            <li>Click <b>Upload Revenue Reports</b> and select one or more daily revenue <span class="kbd">.txt</span> files (multi-select OK).</li>
+            <li>Upload <b>Current Day Booking Stats</b> (month snapshot).</li>
+            <li>Optionally upload <b>Previous Day Booking Stats</b> to set baseline.</li>
+            <li>Upload one or more <b>Revenue</b> reports.</li>
           </ol>
-          <p><em>Note:</em> The app auto-detects file type by content — filenames are optional. For clean ops, we recommend naming:</p>
-          <ul>
-            <li><span class="kbd">YYYYMMDD_BookingStats.txt</span> (e.g., <span class="kbd">20250904_BookingStats.txt</span>)</li>
-            <li><span class="kbd">YYYYMMDD_RevReport.txt</span> (e.g., <span class="kbd">20250904_RevReport.txt</span>)</li>
-          </ul>
+          <p><em>Suggested filenames:</em> <span class="kbd">YYYYMMDD_BookingStats.txt</span>, <span class="kbd">YYYYMMDD_RevReport.txt</span></p>
         </div>
 
         <div class="section">
           <strong>Manual inputs</strong>
           <ul>
-            <li>In the grid, enter <b>Salaried Hours</b> and <b>Straight Hours</b> per day to compute HPOR.</li>
-            <li>Click the ▼ next to a date to open HK inputs and add: <b>HK Hours</b>, <b>Checked-Out Rooms</b>, <b>Stayovers</b>, <b>DNDs</b>. This computes day MPOR and updates the top MPOR card.</li>
-          </ul>
-        </div>
-
-        <div class="section">
-          <strong>Metrics explained</strong>
-          <ul>
-            <li><b>HPOR</b> = (Salaried + Straight Hours) ÷ <em>Rooms</em> for that day. The <b>HPOR (Range)</b> card aggregates over the selected date range.</li>
-            <li><b>MPOR</b> = (HK Hours × 60) ÷ <em>(CO + SO − DND)</em>, floored at zero. The card compares against the standard <b>25 minutes</b> with ± variance.</li>
-            <li><b>Pickup</b> (Rooms/Rev): OTB vs baseline for the same dates (previous upload/yesterday). <b>Total Month Pickup</b> compares the latest month total vs your first upload this month.</li>
-          </ul>
-        </div>
-
-        <div class="section">
-          <strong>Troubleshooting</strong>
-          <ul>
-            <li>If a file fails to parse, verify it’s a <span class="kbd">.txt</span> export and includes the fields listed above.</li>
-            <li>Ensure the <b>Month</b> at the top matches the files’ month. The page auto-switches month when possible.</li>
+            <li>Enter <b>Salaried/Straight Hours</b> per day.</li>
+            <li>Open ▼ on a date to add HK inputs (<b>HK Hours</b>, <b>CO</b>, <b>SO</b>, <b>DND</b>). <b>MPOR = (HK Hours × 60) ÷ (CO + SO − DND)</b>.</li>
           </ul>
         </div>
       </div>
@@ -396,6 +384,11 @@
   const compareToggle = document.getElementById('compareToggle');
   const btnDownload = document.getElementById('btnDownload');
   const btnPDF      = document.getElementById('btnPDF');
+
+  // NEW share/import/export buttons
+  const btnShare    = document.getElementById('btnShare');
+  const btnExport   = document.getElementById('btnExport');
+  const importInput = document.getElementById('importInput');
 
   // Help modal
   const btnHelp = document.getElementById('btnHelp');
@@ -488,25 +481,25 @@
     return `${y}-${m}`;
   }
 
-  // ---------- Filename tips (optional, non-blocking)
-  const RX_BS = /^(?:\d{8}|\d{6})_BookingStats(?:\.txt)?$/i;   // 20250904_BookingStats.txt or 090425_BookingStats.txt
+  // ---------- Filename tips
+  const RX_BS = /^(?:\d{8}|\d{6})_BookingStats(?:\.txt)?$/i;
   const RX_REV = /^(?:\d{8}|\d{6})_RevReport(?:\.txt)?$/i;
 
-  function toast(msg){
+  function toast(msg, cls=''){
     const t = document.createElement('div');
-    t.className = 'toast';
+    t.className = `toast ${cls}`;
     t.innerHTML = msg;
     toastWrap.appendChild(t);
-    setTimeout(()=>{ t.remove(); }, 5200);
+    setTimeout(()=>{ t.remove(); }, 6500);
   }
   function softNameCheck(file, type){
     const name = (file?.name || '').trim();
     if(!name) return;
     if(type === 'bs' && !RX_BS.test(name)){
-      toast(`Tip: Consider naming Booking Stats like <span class="kbd">YYYYMMDD_BookingStats.txt</span> (got <b>${name}</b>).`);
+      toast(`Tip: Consider naming Booking Stats like <span class="kbd">YYYYMMDD_BookingStats.txt</span> (got <b>${name}</b>).`, 'info');
     }
     if(type === 'rev' && !RX_REV.test(name)){
-      toast(`Tip: Consider naming Revenue like <span class="kbd">YYYYMMDD_RevReport.txt</span> (got <b>${name}</b>).`);
+      toast(`Tip: Consider naming Revenue like <span class="kbd">YYYYMMDD_RevReport.txt</span> (got <b>${name}</b>).`, 'info');
     }
   }
 
@@ -623,7 +616,7 @@
       if(typeof saved.compare === 'boolean') compareToggle.checked = saved.compare;
       if(saved.filter != null) filterInput.value = saved.filter;
     }else{
-      const nowYM = new Date().toISOString().slice(0,7); // YYYY-MM
+      const nowYM = new Date().toISOString().slice(0,7);
       monthInput.value = nowYM;
       ensureRangeDefaults();
     }
@@ -662,7 +655,7 @@
     const idx = JSON.parse(localStorage.getItem(SNAPINDEX(hotel, ym)) || '[]');
     if(!idx.includes(day)){
       idx.push(day);
-      idx.sort(); // keep sorted for first/last logic
+      idx.sort();
       localStorage.setItem(SNAPINDEX(hotel, ym), JSON.stringify(idx));
     }
     localStorage.setItem(SNAPKEY(hotel, ym), JSON.stringify(bs)); // compat
@@ -1060,16 +1053,16 @@
     const mtdMPOR = (cleaned>0 && mtdHKHrs>0) ? ((mtdHKHrs*60)/cleaned) : null;
     const mtdMPORVar = (mtdMPOR!=null) ? (mtdMPOR - MPOR_STD) : null;
 
-    // Month ADR overall (Actual + OTB where both exist), plus month totals
+    // Month ADR overall + totals
     let mRooms=0, mRev=0, otbRooms=0, otbRev=0, monthCurrentTotal=0;
     merged.forEach(r=>{
       if(r.rooms!=null && r.rev!=null){ mRooms += r.rooms; mRev += r.rev; }
       if(r.status==='OTB'){ otbRooms += (r.rooms||0); otbRev += (r.rev||0); }
-      if(r.rev!=null){ monthCurrentTotal += r.rev; } // Actual overrides OTB already in merged
+      if(r.rev!=null){ monthCurrentTotal += r.rev; }
     });
     const monthADR = (mRooms>0)? (mRev/mRooms) : null;
 
-    // Pickup vs baseline (all OTB days in month)
+    // Pickup vs baseline (all OTB)
     const baselineSnap = bookingStatsPrev || baselineInfo.snap;
     let pRooms=0, pRev=0, inc=[], dec=[];
     if(bookingStatsCur && baselineSnap){
@@ -1187,6 +1180,159 @@
     });
   }
 
+  // ---------- SHARE / EXPORT / IMPORT (no-backend collaboration)
+  function collectBundle(){
+    const hotel = hotelSel.value;
+    const ym = ymFromInput();
+
+    const bsCur = localStorage.getItem(BS_CUR(hotel, ym)) || null;
+    const bsPrev = localStorage.getItem(BS_PREV(hotel, ym)) || null;
+    const rev = localStorage.getItem(REVKEY(hotel, ym)) || null;
+    const hours = localStorage.getItem(HOURSKEY(hotel, ym)) || null;
+    const hk = localStorage.getItem(HKKEY(hotel, ym)) || null;
+    const snapIndex = JSON.parse(localStorage.getItem(SNAPINDEX(hotel, ym)) || '[]');
+    const snapDays = {};
+    snapIndex.forEach(d=>{
+      const k = SNAPDAY(hotel, ym, d);
+      const v = localStorage.getItem(k);
+      if(v) snapDays[d] = v;
+    });
+    const ui = localStorage.getItem(UIKEY) || null;
+    const logo = localStorage.getItem(LOGO_KEY) || null;
+
+    return {
+      version: 1,
+      hotel, ym,
+      bsCur, bsPrev, rev, hours, hk,
+      snapIndex, snapDays,
+      ui, logo
+    };
+  }
+  function writeBundle(bundle){
+    if(!bundle || bundle.version!==1) throw new Error('Invalid or unsupported snapshot.');
+    const {hotel, ym} = bundle;
+
+    if(bundle.bsCur) localStorage.setItem(BS_CUR(hotel, ym), bundle.bsCur); else localStorage.removeItem(BS_CUR(hotel, ym));
+    if(bundle.bsPrev) localStorage.setItem(BS_PREV(hotel, ym), bundle.bsPrev); else localStorage.removeItem(BS_PREV(hotel, ym));
+    if(bundle.rev) localStorage.setItem(REVKEY(hotel, ym), bundle.rev); else localStorage.removeItem(REVKEY(hotel, ym));
+    if(bundle.hours) localStorage.setItem(HOURSKEY(hotel, ym), bundle.hours); else localStorage.removeItem(HOURSKEY(hotel, ym));
+    if(bundle.hk) localStorage.setItem(HKKEY(hotel, ym), bundle.hk); else localStorage.removeItem(HKKEY(hotel, ym));
+
+    if(Array.isArray(bundle.snapIndex)){
+      localStorage.setItem(SNAPINDEX(hotel, ym), JSON.stringify(bundle.snapIndex));
+      bundle.snapIndex.forEach(d=>{
+        const k = SNAPDAY(hotel, ym, d);
+        const v = bundle.snapDays?.[d] || null;
+        if(v) localStorage.setItem(k, v);
+      });
+    }
+
+    if(bundle.ui) localStorage.setItem(UIKEY, bundle.ui);
+    if(bundle.logo) localStorage.setItem(LOGO_KEY, bundle.logo);
+
+    // Also set "compat" key for baseline if present
+    const compat = bundle.bsCur ? JSON.parse(bundle.bsCur) : null;
+    if(compat) localStorage.setItem(SNAPKEY(hotel, ym), JSON.stringify(compat));
+
+    // Switch UI to that hotel/month
+    hotelSel.value = hotel;
+    monthInput.value = ym;
+    ensureRangeDefaults();
+  }
+
+  function shareLinkFromBundle(b){
+    const raw = JSON.stringify(b);
+    const enc = (window.LZString && LZString.compressToEncodedURIComponent) ? LZString.compressToEncodedURIComponent(raw) : encodeURIComponent(raw);
+    return `${location.origin}${location.pathname}#data=${enc}`;
+  }
+  function tryLoadBundleFromHash(){
+    if(!location.hash || !location.hash.startsWith('#data=')) return false;
+    const enc = location.hash.slice(6);
+    try{
+      const raw = (window.LZString && LZString.decompressFromEncodedURIComponent) ? LZString.decompressFromEncodedURIComponent(enc) : decodeURIComponent(enc);
+      const bundle = JSON.parse(raw);
+      writeBundle(bundle);
+
+      // Reload in-memory state & render
+      loadUIState();
+      loadLogo();
+      loadLaborMap();
+      loadHKMap();
+      loadRevenueMap();
+      loadExplicitSnapshots();
+      loadBaselineInfo();
+      mergeData(); updateAndRender();
+
+      history.replaceState(null,'',location.pathname);
+      toast('Imported snapshot from link. Your local storage has been updated.', 'ok');
+      return true;
+    }catch(e){
+      console.error(e);
+      alert('Could not load snapshot from the link.');
+      return false;
+    }
+  }
+
+  // Buttons
+  btnShare.addEventListener('click', ()=>{
+    try{
+      const b = collectBundle();
+      const url = shareLinkFromBundle(b);
+      if(navigator.clipboard?.writeText){
+        navigator.clipboard.writeText(url).then(()=>{
+          toast('Share link copied to clipboard. Send it to your teammate!', 'ok');
+        }, ()=>{
+          prompt('Copy this link:', url);
+        });
+      }else{
+        prompt('Copy this link:', url);
+      }
+    }catch(e){
+      console.error(e);
+      alert('Could not create share link.');
+    }
+  });
+
+  btnExport.addEventListener('click', ()=>{
+    try{
+      const b = collectBundle();
+      const blob = new Blob([JSON.stringify(b)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `pickup_snapshot_${b.hotel}_${b.ym}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('Snapshot exported.', 'ok');
+    }catch(e){
+      console.error(e);
+      alert('Could not export snapshot.');
+    }
+  });
+
+  importInput.addEventListener('change', async (e)=>{
+    const f = e.target.files?.[0];
+    if(!f) return;
+    try{
+      const text = await f.text();
+      const b = JSON.parse(text);
+      writeBundle(b);
+      // reload state after import
+      loadUIState();
+      loadLogo();
+      loadLaborMap();
+      loadHKMap();
+      loadRevenueMap();
+      loadExplicitSnapshots();
+      loadBaselineInfo();
+      mergeData(); updateAndRender();
+      toast('Snapshot imported.', 'ok');
+    }catch(err){
+      console.error(err);
+      alert('Invalid snapshot file.');
+    }finally{
+      e.target.value = '';
+    }
+  });
+
   // ---------- IO wiring (and UI persistence hooks)
   filterInput.addEventListener('input', ()=>{ updateAndRender(); saveUIState(); });
 
@@ -1213,7 +1359,7 @@
   rangeStart.addEventListener('change', ()=>{ rangeStart.value = clampToMonth(rangeStart.value); updateAndRender(); saveUIState(); });
   rangeEnd.addEventListener('change', ()=>{ rangeEnd.value = clampToMonth(rangeEnd.value); updateAndRender(); saveUIState(); });
 
-  // Help modal events
+  // Help modal
   function openHelp(){ helpModal.classList.add('show'); helpBackdrop.classList.add('show'); }
   function closeHelp(){ helpModal.classList.remove('show'); helpBackdrop.classList.remove('show'); }
   btnHelp.addEventListener('click', openHelp);
@@ -1226,7 +1372,7 @@
     const f = e.target.files?.[0];
     if(!f) return;
     const reader = new FileReader();
-    reader.onload = () => { saveLogo(reader.result); toast('Logo saved for PDF.'); };
+    reader.onload = () => { saveLogo(reader.result); toast('Logo saved for PDF.', 'ok'); };
     reader.onerror = () => alert('Could not read logo file.');
     reader.readAsDataURL(f);
   });
@@ -1350,16 +1496,22 @@
   // PDF Export
   btnPDF.addEventListener('click', downloadPDF);
 
-  // ---------- Initialize (restore UI first so data loads into correct scope)
-  loadUIState();
-  ensureRangeDefaults();
-  loadLogo();
-  loadLaborMap();
-  loadHKMap();
-  loadRevenueMap();
-  loadExplicitSnapshots();
-  loadBaselineInfo();
-  updateAndRender();
+  // ---------- Initialize
+  // 1) If a share link hash is present, import it before anything else.
+  window.addEventListener('load', ()=>{
+    const imported = tryLoadBundleFromHash();
+    if(imported) return; // state already loaded & rendered
+    // Otherwise normal boot
+    loadUIState();
+    ensureRangeDefaults();
+    loadLogo();
+    loadLaborMap();
+    loadHKMap();
+    loadRevenueMap();
+    loadExplicitSnapshots();
+    loadBaselineInfo();
+    updateAndRender();
+  });
 })();
 </script>
 </body>
