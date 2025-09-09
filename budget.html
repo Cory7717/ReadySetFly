@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>USALI Budget Builder (Standalone)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg1:#667eea;--bg2:#764ba2;--panelTint:rgba(255,255,255,.95);
+    --ink:#2c3e50;--inkSoft:#7f8c8d;--brand1:#3498db;--brand2:#2980b9;
+    --dark1:#2c3e50;--dark2:#34495e;--goodBg:#e8f5e8;--good:#27ae60;
+    --warnBg:#fff3cd;--warn:#856404;--grid:#e0e0e0
+  }
+  body{
+    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+    background:linear-gradient(135deg,var(--bg1),var(--bg2));
+    min-height:100vh;padding:20px
+  }
+  .container{
+    max-width:1400px;margin:0 auto;background:var(--panelTint);
+    border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.1);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);overflow:hidden
+  }
+  .header{background:linear-gradient(135deg,var(--dark1),var(--brand1));color:#fff;padding:24px;text-align:center}
+  .header h1{font-size:2em;margin-bottom:6px;text-shadow:2px 2px 4px rgba(0,0,0,.25)}
+  .toolbar{position:sticky;top:0;z-index:5;background:#f9fbff;border-bottom:1px solid #e9edf3;padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn{border:1px solid #dbe3ee;background:#fff;color:#1f2d3d;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;transition:.2s transform,.2s box-shadow}
+  .btn.primary{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;border:none}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08)}
+  input[type="file"]{display:none}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#2c3e50;padding:6px 10px;background:#eef4ff;border:1px solid #d7e2ff;border-radius:999px}
+
+  .content{padding:22px}
+  .hidden{display:none}
+
+  .section{margin-bottom:22px;background:#fff;border-radius:12px;box-shadow:0 5px 15px rgba(0,0,0,.08);overflow:hidden}
+  .section-header{background:linear-gradient(135deg,#34495e,#2c3e50);color:#fff;padding:14px 16px;font-weight:800;display:flex;align-items:center;justify-content:space-between}
+  .section-sub{padding:10px 16px;background:#f8fbff;border-bottom:1px solid #eef2f7;color:#34495e;font-weight:600}
+  .table-container{overflow-x:auto;padding:14px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:9px 8px;text-align:center;border:1px solid var(--grid);min-width:120px;white-space:nowrap}
+  th{background:linear-gradient(135deg,#f8f9fa,#e9ecef);font-weight:800;color:var(--ink);text-transform:uppercase;font-size:11px;letter-spacing:.5px}
+  .month-header{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff!important;font-size:12px}
+  .input-cell{background:#f4f7ff}
+  .input-cell input{width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;text-align:center;font-size:13px;background:#fff}
+  .calculated-cell{background:var(--goodBg);font-weight:800;color:var(--good)}
+  .total-row{background:linear-gradient(135deg,var(--dark1),var(--dark2));color:#fff;font-weight:900}
+  .right{text-align:right}
+  .expandable{cursor:pointer;-webkit-user-select:none;user-select:none;text-align:left;padding-left:10px}
+  .expandable .caret{display:inline-block;width:0;height:0;border-left:6px solid #2c3e50;border-top:4px solid transparent;border-bottom:4px solid transparent;margin-right:8px;vertical-align:middle;transform:rotate(0deg);transition:transform .15s}
+  .expandable.open .caret{transform:rotate(90deg)}
+  .child-wrap{background:#fbfdff;border:1px dashed #dfe7f3;border-radius:10px;margin:8px 0;padding:8px}
+  .child-table th,.child-table td{border:1px solid #eef2f7;padding:6px 6px;text-align:center}
+  .chip{display:inline-block;font-size:11px;background:#eef4ff;border:1px solid #d7e2ff;border-radius:999px;padding:2px 8px;margin-left:8px;color:#1f2d3d}
+  .usali-grid{display:grid;grid-template-columns:repeat(1,minmax(320px,1fr));gap:14px;padding:14px}
+  .usali-card{border:1px solid #e6ebf3;border-radius:12px;background:#fff;overflow:hidden}
+  .usali-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:linear-gradient(135deg,#2c3e50,#1f2d3d);color:#fff}
+  .usali-title{font-size:13px;text-transform:uppercase;letter-spacing:.8px}
+
+  .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid #d7e2ff;border-radius:10px;overflow:hidden}
+  .seg button{padding:6px 10px;border:none;background:#fff;cursor:pointer}
+  .seg button.active{background:#eef4ff;font-weight:800}
+
+  .stats-row{display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;color:#394b59}
+  .stat-pill{background:#eef4ff;border:1px solid #d7e2ff;border-radius:999px;padding:6px 10px;font-size:12px}
+  .neg{color:#991b1b}.pos{color:#166534}
+
+  .inline{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .small{font-size:12px}
+  .muted{color:#6b7a90}
+  .pre{font-family:ui-monospace, Menlo, Consolas, monospace; background:#f6f8ff; border:1px solid #e6ecf7; border-radius:8px; padding:8px; overflow:auto; max-height:220px }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🏨 USALI Budget Builder (Standalone)</h1>
+    <p>Upload an actualized P&L, map labels → USALI, edit monthly lines, and export rollups.</p>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn primary" id="saveBtn">Save</button>
+    <button class="btn" id="loadBtn">Load</button>
+    <button class="btn" id="exportBtn">Export State (.json)</button>
+    <label class="btn" for="importFile">Import State (.json)</label><input id="importFile" type="file" accept=".json"/>
+    <button class="btn" id="exportRollupsBtn">Export Rollups (.json)</button>
+    <button class="btn" id="resetBtn">Reset</button>
+    <label class="pill"><input id="autoSaveToggle" type="checkbox" checked/> Auto-save</label>
+  </div>
+
+  <div class="content">
+    <div class="section">
+      <div class="section-header">
+        <span>📘 Budget (USALI Template) — Click a line to expand details</span>
+        <div class="controls">
+          <div class="seg" id="modeSeg">
+            <button data-mode="budget" class="active">Budget</button>
+            <button data-mode="actual">Actuals</button>
+          </div>
+          <label class="pill" title="Base management fee percentage of Total Revenue">
+            Base Fee % of Revenue: <input type="number" id="baseFeePct" value="3" step="0.1" style="width:70px;margin-left:6px"/>%
+          </label>
+          <label class="pill" title="Incentive management fee percentage of GOP (Operating)">
+            Incentive Fee % of GOP: <input type="number" id="incentiveFeePct" value="10" step="0.1" style="width:70px;margin-left:6px"/>%
+          </label>
+        </div>
+      </div>
+
+      <div class="section-sub">
+        <div class="inline">
+          <label class="btn" for="plUploadInput">Upload Actualized P&L (.xlsx / .csv)</label>
+          <input id="plUploadInput" type="file" accept=".xlsx,.xls,.csv"/>
+          <label class="pill small" title="Lightly tweak label mapping if your export uses different wording">
+            Baseline Growth %: <input type="number" id="baselineGrowthPct" value="0" step="0.5" style="width:80px;margin-left:6px"/>%
+          </label>
+          <button class="btn" id="copyLYToBudgetBtn" title="Copies Same-Month Last Year Actuals into Budget, applying optional growth %">Same-Month LY → Budget</button>
+          <button class="btn" id="toggleMapBtn">Show Mapping JSON</button>
+        </div>
+        <div id="mapWrap" class="hidden" style="margin-top:10px">
+          <div class="muted small" style="margin:4px 0 6px">If a row label doesn’t place correctly, add a keyword here. Matches are case-insensitive and use <em>contains</em> logic, first match wins.</div>
+          <textarea id="mappingEditor" class="pre" rows="10" style="width:100%"></textarea>
+          <div class="inline" style="margin-top:8px">
+            <button class="btn" id="applyMappingBtn">Apply Mapping Changes</button>
+            <span class="muted small">Tip: keep a backup of your mapping once it’s dialed in for your property.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="usali-grid" id="usaliGrid"></div>
+
+      <div class="stats-row">
+        <span class="stat-pill">Total Revenue (B): <strong id="usaliTotalRevB">$0</strong></span>
+        <span class="stat-pill">Total Revenue (A): <strong id="usaliTotalRevA">$0</strong></span>
+        <span class="stat-pill">Dept Exp (B): <strong id="usaliDeptExpB">$0</strong></span>
+        <span class="stat-pill">Dept Exp (A): <strong id="usaliDeptExpA">$0</strong></span>
+        <span class="stat-pill">Dept Income (B): <strong id="usaliDeptIncB">$0</strong></span>
+        <span class="stat-pill">Dept Income (A): <strong id="usaliDeptIncA">$0</strong></span>
+        <span class="stat-pill">UOE (B): <strong id="usaliUOEB">$0</strong></span>
+        <span class="stat-pill">UOE (A): <strong id="usaliUOEA">$0</strong></span>
+        <span class="stat-pill">Mgmt Fees (B): <strong id="usaliMgmtB">$0</strong></span>
+        <span class="stat-pill">Mgmt Fees (A): <strong id="usaliMgmtA">$0</strong></span>
+        <span class="stat-pill">Fixed (B): <strong id="usaliFixedB">$0</strong></span>
+        <span class="stat-pill">Fixed (A): <strong id="usaliFixedA">$0</strong></span>
+        <span class="stat-pill">GOP Op (B): <strong id="usaliGOPB">$0</strong></span>
+        <span class="stat-pill">GOP Op (A): <strong id="usaliGOPA">$0</strong></span>
+        <span class="stat-pill">GOP After Fees & Fixed (B): <strong id="usaliGOPAFB">$0</strong></span>
+        <span class="stat-pill">GOP After Fees & Fixed (A): <strong id="usaliGOPAFA">$0</strong></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- XLSX for importing spreadsheets -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+  const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const qs=(s,r=document)=>r.querySelector(s);
+  const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const fmtC=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0}).format(Number(n)||0);
+  const sum=a=>a.reduce((x,y)=>x+(Number(y)||0),0);
+  const toNum=(v)=>{ if(v==null || v==='') return 0; if(typeof v==='number') return v; const s=String(v).trim().replace(/[\$,]/g,''); if(/^\(.+\)$/.test(s)) return -Number(s.slice(1,-1)); const n=Number(s); return Number.isFinite(n)?n:0; };
+
+  /* =========================
+     IMPORTER MAPPING (editable)
+     Each entry: { match: /regex/i OR "substring", path: [secKey, parentName, childName?] }
+     secKey ∈ {'revenue','dept_exp','uoe','mgmt_fees','fixed'}
+     ========================= */
+  const DEFAULT_MAPPING = [
+    {match:/\btransient\b/i, path:['revenue','Rooms Revenue','Transient']},
+    {match:/\bgroup\b/i,     path:['revenue','Rooms Revenue','Group']},
+    {match:/\bcontract\b/i,  path:['revenue','Rooms Revenue','Contract']},
+    {match:/rooms? revenue/i,path:['revenue','Rooms Revenue','Other']},
+    {match:/\bresort fee\b|\bfacility fee\b/i, path:['revenue','Miscellaneous Income','Resort/Facility Fee']},
+    {match:/service charge/i, path:['revenue','Miscellaneous Income','Service Charge']},
+
+    {match:/restaurant/i,      path:['revenue','Food & Beverage Revenue','Restaurant']},
+    {match:/bar|lounge/i,      path:['revenue','Food & Beverage Revenue','Bar/Lounge']},
+    {match:/banquet|cater/i,   path:['revenue','Food & Beverage Revenue','Banquets/Catering']},
+    {match:/in-?room dining|room service/i, path:['revenue','Food & Beverage Revenue','In-Room Dining']},
+
+    {match:/parking/i,         path:['revenue','Other Operated Depts Revenue','Parking']},
+    {match:/spa\b/i,           path:['revenue','Other Operated Depts Revenue','Spa']},
+    {match:/gift shop|market/i,path:['revenue','Other Operated Depts Revenue','Gift Shop']},
+    {match:/telephone|telecom revenue/i, path:['revenue','Other Operated Depts Revenue','Telephone']},
+    {match:/laundry|valet/i,   path:['revenue','Other Operated Depts Revenue','Laundry/Dry Cleaning']},
+    {match:/misc/i,            path:['revenue','Other Operated Depts Revenue','Miscellaneous']},
+
+    {match:/front desk/i,         path:['dept_exp','Rooms Department','Front Desk Wages']},
+    {match:/night audit/i,        path:['dept_exp','Rooms Department','Night Audit Wages']},
+    {match:/bell|door|valet/i,    path:['dept_exp','Rooms Department','Bell/Door/Valet']},
+    {match:/room attendant|housekeep/i, path:['dept_exp','Rooms Department','HK Room Attendants']},
+    {match:/supervisor/i,         path:['dept_exp','Rooms Department','HK Supervisors']},
+    {match:/laundry attendant/i,  path:['dept_exp','Rooms Department','Laundry Attendants']},
+    {match:/payroll taxes?/i,     path:['dept_exp','Rooms Department','Payroll Taxes']},
+    {match:/benefit/i,            path:['dept_exp','Rooms Department','Employee Benefits']},
+    {match:/linen/i,              path:['dept_exp','Rooms Department','Laundry & Linen']},
+    {match:/guest supplies?/i,    path:['dept_exp','Rooms Department','Guest Supplies']},
+    {match:/cleaning supplies?/i, path:['dept_exp','Rooms Department','Cleaning Supplies']},
+    {match:/commission|ota|expedia|booking\.com/i, path:['dept_exp','Rooms Department','Commissions & OTA']},
+    {match:/reservations?|crs/i,  path:['dept_exp','Rooms Department','Reservations/CRS']},
+    {match:/uniform/i,            path:['dept_exp','Rooms Department','Uniforms']},
+    {match:/training/i,           path:['dept_exp','Rooms Department','Training']},
+    {match:/misc(?! income)/i,    path:['dept_exp','Rooms Department','Misc Departmental']},
+
+    {match:/foh labor/i,      path:['dept_exp','Food & Beverage Department','FOH Labor']},
+    {match:/boh labor/i,      path:['dept_exp','Food & Beverage Department','BOH Labor']},
+    {match:/cogs.*food/i,     path:['dept_exp','Food & Beverage Department','COGS – Food']},
+    {match:/cogs.*bev|beverage cost/i, path:['dept_exp','Food & Beverage Department','COGS – Beverage']},
+    {match:/china|glass|silver/i, path:['dept_exp','Food & Beverage Department','China/Glass/Silver']},
+    {match:/kitchen supplies?/i,  path:['dept_exp','Food & Beverage Department','Kitchen Supplies']},
+    {match:/minor operating/i,    path:['dept_exp','Food & Beverage Department','Minor Operating Equip']},
+    {match:/entertainment|music/i,path:['dept_exp','Food & Beverage Department','Entertainment/Music']},
+    {match:/misc(?! income)/i,    path:['dept_exp','Food & Beverage Department','Misc Departmental']},
+    {match:/payroll taxes?/i,     path:['dept_exp','Food & Beverage Department','Payroll Taxes']},
+    {match:/benefit/i,            path:['dept_exp','Food & Beverage Department','Employee Benefits']},
+
+    {match:/other operated.*labor/i,         path:['dept_exp','Other Operated Departments','Labor']},
+    {match:/other operated.*cogs|operating supplies/i, path:['dept_exp','Other Operated Departments','COGS/Operating Supplies']},
+    {match:/other operated.*misc/i,          path:['dept_exp','Other Operated Departments','Misc Departmental']},
+
+    {match:/admin(istrative)?|a\s*&\s*g/i, path:['uoe','Administrative & General','Salaries & Wages']},
+    {match:/credit card fees?/i,        path:['uoe','Administrative & General','Credit Card Fees']},
+    {match:/bad debt/i,                 path:['uoe','Administrative & General','Bad Debt']},
+    {match:/licenses?|permit|fees?\b(?! mgmt)/i, path:['uoe','Administrative & General','Licenses & Fees']},
+    {match:/legal|professional/i,       path:['uoe','Administrative & General','Legal & Professional']},
+    {match:/office supplies?/i,         path:['uoe','Administrative & General','Office Supplies']},
+    {match:/travel|meals?/i,            path:['uoe','Administrative & General','Travel/Meals']},
+    {match:/dues?|subscriptions?/i,     path:['uoe','Administrative & General','Dues & Subscriptions']},
+    {match:/security/i,                 path:['uoe','Administrative & General','Security']},
+    {match:/recruit|training/i,         path:['uoe','Administrative & General','Recruitment/Training']},
+    {match:/payroll taxes?/i,           path:['uoe','Administrative & General','Payroll Taxes']},
+    {match:/benefit/i,                  path:['uoe','Administrative & General','Employee Benefits']},
+    {match:/misc(?! income)/i,          path:['uoe','Administrative & General','Miscellaneous']},
+
+    {match:/sales.*marketing|s&m/i, path:['uoe','Sales & Marketing','Salaries & Wages']},
+    {match:/advertis|campaign/i,   path:['uoe','Sales & Marketing','Advertising']},
+    {match:/digital marketing|seo|sem|social/i, path:['uoe','Sales & Marketing','Digital Marketing']},
+    {match:/loyalty|points/i,      path:['uoe','Sales & Marketing','Loyalty/Points']},
+    {match:/public relations?|pr\b/i, path:['uoe','Sales & Marketing','Public Relations']},
+    {match:/trade show|travel/i,   path:['uoe','Sales & Marketing','Travel & Trade Shows']},
+    {match:/commissions?\b/i,      path:['uoe','Sales & Marketing','Commissions']},
+    {match:/payroll taxes?/i,      path:['uoe','Sales & Marketing','Payroll Taxes']},
+    {match:/benefit/i,             path:['uoe','Sales & Marketing','Employee Benefits']},
+
+    {match:/it|information.*tele/i, path:['uoe','Information & Telecommunications Systems','Licenses & Subscriptions']},
+    {match:/support|maintenance/i,  path:['uoe','Information & Telecommunications Systems','Support & Maintenance']},
+    {match:/hardware|peripherals?/i,path:['uoe','Information & Telecommunications Systems','Hardware/Peripherals']},
+    {match:/telecom|internet/i,     path:['uoe','Information & Telecommunications Systems','Telecom']},
+
+    {match:/poms?|maintenance|engineering/i, path:['uoe','Property Operations & Maintenance','Salaries & Wages']},
+    {match:/r&m contracts?/i,       path:['uoe','Property Operations & Maintenance','R&M Contracts']},
+    {match:/r&m supplies?/i,        path:['uoe','Property Operations & Maintenance','R&M Supplies']},
+    {match:/grounds|landscap/i,     path:['uoe','Property Operations & Maintenance','Groundskeeping']},
+    {match:/waste|trash/i,          path:['uoe','Property Operations & Maintenance','Waste Removal']},
+    {match:/other/i,                path:['uoe','Property Operations & Maintenance','Other']},
+    {match:/payroll taxes?/i,       path:['uoe','Property Operations & Maintenance','Payroll Taxes']},
+    {match:/benefit/i,              path:['uoe','Property Operations & Maintenance','Employee Benefits']},
+
+    {match:/\belectric/i, path:['uoe','Utilities','Electricity']},
+    {match:/\bgas\b/i,     path:['uoe','Utilities','Gas']},
+    {match:/water|sewer/i, path:['uoe','Utilities','Water & Sewer']},
+    {match:/internet|telecom/i, path:['uoe','Utilities','Internet/Telecom']},
+
+    {match:/base management fee/i,      path:['mgmt_fees','Base Management Fee']},
+    {match:/incentive management fee/i, path:['mgmt_fees','Incentive Management Fee']},
+    {match:/rent|lease/i,     path:['fixed','Rent/Lease']},
+    {match:/property tax/i,   path:['fixed','Property Taxes']},
+    {match:/insurance/i,      path:['fixed','Insurance']},
+    {match:/interest/i,       path:['fixed','Interest']},
+    {match:/ff&e|reserve/i,   path:['fixed','FF&E Reserve']}
+  ];
+
+  const USALI_SECTIONS = [
+    { key:'revenue', title:'Operating Revenues', type:'revenue', items:[
+      {name:'Rooms Revenue', children:['Transient','Group','Contract','Other']},
+      {name:'Food & Beverage Revenue', children:['Restaurant','Bar/Lounge','Banquets/Catering','In-Room Dining']},
+      {name:'Other Operated Depts Revenue', children:['Parking','Spa','Gift Shop','Telephone','Laundry/Dry Cleaning','Miscellaneous']},
+      {name:'Miscellaneous Income', children:['Service Charge','Resort/Facility Fee','Other Misc Income']}
+    ]},
+    { key:'dept_exp', title:'Departmental Expenses', type:'expense', items:[
+      {name:'Rooms Department', children:[
+        'Front Desk Wages','Night Audit Wages','Bell/Door/Valet','HK Room Attendants','HK Supervisors','Laundry Attendants',
+        'Payroll Taxes','Employee Benefits','Laundry & Linen','Guest Supplies','Cleaning Supplies','Commissions & OTA',
+        'Reservations/CRS','Uniforms','Training','Misc Departmental'
+      ]},
+      {name:'Food & Beverage Department', children:[
+        'FOH Labor','BOH Labor','Payroll Taxes','Employee Benefits','COGS – Food','COGS – Beverage',
+        'China/Glass/Silver','Kitchen Supplies','Minor Operating Equip','Entertainment/Music','Misc Departmental'
+      ]},
+      {name:'Other Operated Departments', children:[
+        'Labor','COGS/Operating Supplies','Misc Departmental'
+      ]}
+    ]},
+    { key:'uoe', title:'Undistributed Operating Expenses', type:'expense', items:[
+      {name:'Administrative & General', children:[
+        'Salaries & Wages','Payroll Taxes','Employee Benefits','Recruitment/Training',
+        'Credit Card Fees','Bad Debt','Licenses & Fees','Legal & Professional',
+        'Office Supplies','Travel/Meals','Dues & Subscriptions','Security','Miscellaneous'
+      ]},
+      {name:'Sales & Marketing', children:[
+        'Salaries & Wages','Payroll Taxes','Employee Benefits','Advertising','Digital Marketing',
+        'Loyalty/Points','Public Relations','Travel & Trade Shows','Commissions'
+      ]},
+      {name:'Information & Telecommunications Systems', children:[
+        'Licenses & Subscriptions','Support & Maintenance','Hardware/Peripherals','Telecom'
+      ]},
+      {name:'Property Operations & Maintenance', children:[
+        'Salaries & Wages','Payroll Taxes','Employee Benefits','R&M Contracts','R&M Supplies','Groundskeeping','Waste Removal','Other'
+      ]},
+      {name:'Utilities', children:[
+        'Electricity','Gas','Water & Sewer','Internet/Telecom'
+      ]}
+    ]},
+    { key:'mgmt_fees', title:'Management Fees', type:'expense', items:[
+      {name:'Base Management Fee', formula:'baseFeePctRevenue'},
+      {name:'Incentive Management Fee', formula:'incentivePctGOP'}
+    ]},
+    { key:'fixed', title:'Fixed Charges', type:'expense', items:[
+      {name:'Rent/Lease'},{name:'Property Taxes'},{name:'Insurance'},{name:'Interest'},{name:'FF&E Reserve'}
+    ]}
+  ];
+
+  let usaliBudget={}, usaliActual={}, usaliMode='budget';
+  let mapping = DEFAULT_MAPPING.slice();
+
+  function ensureTemplate(obj){
+    USALI_SECTIONS.forEach(sec=>{
+      obj[sec.key]=obj[sec.key]||{};
+      sec.items.forEach(it=>{
+        if (it.children){
+          const cur=obj[sec.key][it.name]||{children:{}};
+          it.children.forEach(ch=>{ if(!Array.isArray(cur.children[ch])) cur.children[ch]=Array(12).fill(0); });
+          obj[sec.key][it.name]=cur;
+        } else if (it.formula){
+          obj[sec.key][it.name]=Array(12).fill(0);
+        } else {
+          obj[sec.key][it.name]=Array(12).fill(0);
+        }
+      });
+    });
+  }
+  function initUsali(){ ensureTemplate(usaliBudget); ensureTemplate(usaliActual); }
+  function activeDS(){ return usaliMode==='budget'?usaliBudget:usaliActual; }
+  function isParent(ds,secKey,itemName){ const entry=ds?.[secKey]?.[itemName]; return entry && typeof entry==='object' && entry.children; }
+  function getItemMonths(ds,secKey,item){
+    const entry=ds?.[secKey]?.[item];
+    if (Array.isArray(entry)) return entry;
+    if (entry && entry.children){
+      const months=Array(12).fill(0);
+      Object.values(entry.children).forEach(arr=>{ for(let m=0;m<12;m++) months[m]+=Number(arr[m])||0; });
+      return months;
+    }
+    return Array(12).fill(0);
+  }
+
+  function renderUsali(){
+    initUsali();
+    const grid=qs('#usaliGrid'); grid.innerHTML='';
+    const tableHeadMonths = MONTHS.map(m=>`<th class="month-header">${m}</th>`).join('');
+
+    USALI_SECTIONS.forEach(sec=>{
+      const card=document.createElement('div'); card.className='usali-card'; card.id='usali-'+sec.key;
+      const ds=activeDS();
+      const rowsHTML = sec.items.map(it=>{
+        const isPar = !!it.children;
+        const isFormula = !!it.formula;
+        const labelExtras = isFormula
+          ? `<span class="chip">${it.formula==='baseFeePctRevenue'? '= % of Revenue' : '= % of GOP (Operating)'}</span>`
+          : '';
+        const rowCells = isPar
+          ? MONTHS.map((_,mi)=>`<td data-usali-parent="${sec.key}" data-item="${it.name}" data-month="${mi}">$0</td>`).join('')
+          : isFormula
+            ? MONTHS.map((_,mi)=>`<td data-usali-formula="${sec.key}|${it.name}" data-month="${mi}">$0</td>`).join('')
+            : MONTHS.map((_,mi)=>`<td class="input-cell"><input type="number" step="1" data-usali-leaf="${sec.key}" data-item="${it.name}" data-month="${mi}" value="${Array.isArray(ds[sec.key][it.name]) ? (ds[sec.key][it.name][mi]||'') : ''}"></td>`).join('');
+        return `
+          <tr>
+            <th class="right ${isPar?'expandable':''}" data-expander="${sec.key}|${it.name}">
+              ${isPar?'<span class="caret"></span>':''}${it.name}${labelExtras}
+            </th>
+            ${rowCells}
+            <td class="calculated-cell" data-usali-total="${sec.key}" data-item="${it.name}">$0</td>
+          </tr>
+          ${isPar?`
+            <tr class="children-row hidden" data-children="${sec.key}|${it.name}">
+              <td colspan="14">
+                <div class="child-wrap">
+                  <table class="child-table" style="width:100%">
+                    <thead>
+                      <tr>
+                        <th style="min-width:220px">• ${it.name} — Details</th>
+                        ${tableHeadMonths}
+                        <th class="total-row">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${it.children.map(ch=>{
+                        const arr=(ds[sec.key][it.name].children[ch]||Array(12).fill(0));
+                        return `
+                          <tr>
+                            <th class="right">${ch}</th>
+                            ${arr.map((v,mi)=>`<td class="input-cell"><input type="number" step="1" data-usali-child="${sec.key}" data-parent="${it.name}" data-child="${ch}" data-month="${mi}" value="${v||''}"></td>`).join('')}
+                            <td class="calculated-cell" data-usali-child-total="${sec.key}" data-parent="${it.name}" data-child="${ch}">$0</td>
+                          </tr>`;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          `:''}`;
+      }).join('');
+
+      card.innerHTML=`
+        <div class="usali-header">
+          <div class="usali-title">${sec.title}</div>
+        </div>
+        <div class="usali-inner">
+          <div class="table-container">
+            <table class="usali-table">
+              <thead>
+                <tr>
+                  <th style="min-width:260px">Line Item</th>
+                  ${tableHeadMonths}
+                  <th class="total-row">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHTML}
+                <tr class="total-row">
+                  <th class="right">Subtotal — ${sec.title}</th>
+                  ${[...Array(12)].map((_,mi)=>`<td data-usali-sub="${sec.key}" data-month="${mi}">$0</td>`).join('')}
+                  <td data-usali-subtotal-total="${sec.key}">$0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      grid.appendChild(card);
+    });
+
+    qsa('[data-expander]').forEach(th=>{
+      th.addEventListener('click',()=>{
+        const [secKey,itemName]=th.dataset.expander.split('|');
+        if (!isParent(activeDS(),secKey,itemName)) return;
+        const row=qs(`[data-children="${secKey}|${itemName}"]`);
+        th.classList.toggle('open');
+        row.classList.toggle('hidden');
+      });
+    });
+
+    qsa('input[data-usali-leaf]').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        const ds=activeDS();
+        const sec=inp.dataset.usaliLeaf, item=inp.dataset.item, m=parseInt(inp.dataset.month);
+        ds[sec][item][m]=parseFloat(inp.value)||0; recalcUsali();
+      });
+    });
+    qsa('input[data-usali-child]').forEach(inp=>{
+      inp.addEventListener('input',()=>{
+        const ds=activeDS();
+        const sec=inp.dataset.usaliChild, parent=inp.dataset.parent, ch=inp.dataset.child, m=parseInt(inp.dataset.month);
+        ds[sec][parent].children[ch][m]=parseFloat(inp.value)||0; recalcUsali();
+      });
+    });
+
+    recalcUsali();
+  }
+
+  function computeUSALI(ds){
+    const revMonths=Array(12).fill(0), deptExpMonths=Array(12).fill(0), uoeMonths=Array(12).fill(0), fixedMonths=Array(12).fill(0), mgmtMonths=Array(12).fill(0);
+    USALI_SECTIONS.forEach(sec=>{
+      if (sec.key==='mgmt_fees') return;
+      for(let m=0;m<12;m++){
+        const subtotal = sec.items.reduce((acc,it)=> acc + (getItemMonths(ds,sec.key,it.name)[m]||0), 0);
+        if (sec.key==='revenue') revMonths[m]+=subtotal;
+        else if (sec.key==='dept_exp') deptExpMonths[m]+=subtotal;
+        else if (sec.key==='uoe') uoeMonths[m]+=subtotal;
+        else if (sec.key==='fixed') fixedMonths[m]+=subtotal;
+      }
+    });
+    const deptIncomeMonths = revMonths.map((r,i)=> r - (deptExpMonths[i]||0));
+    const gopOpMonths      = deptIncomeMonths.map((d,i)=> d - (uoeMonths[i]||0));
+
+    const basePct=parseFloat(qs('#baseFeePct').value)||0;
+    const incPct =parseFloat(qs('#incentiveFeePct').value)||0;
+    const baseFeeMonths = revMonths.map(v=> v*(basePct/100));
+    const incFeeMonths  = gopOpMonths.map(v=> Math.max(0,v)*(incPct/100));
+    ds['mgmt_fees']['Base Management Fee']=baseFeeMonths.slice();
+    ds['mgmt_fees']['Incentive Management Fee']=incFeeMonths.slice();
+
+    for(let m=0;m<12;m++) mgmtMonths[m]=baseFeeMonths[m]+incFeeMonths[m];
+    const gopAfterMonths = gopOpMonths.map((g,i)=> g - mgmtMonths[i] - (fixedMonths[i]||0));
+    return {revMonths, deptExpMonths, deptIncomeMonths, uoeMonths, mgmtMonths, fixedMonths, gopOpMonths, gopAfterMonths};
+  }
+
+  function recalcUsali(){
+    const ds=activeDS();
+    qsa('[data-usali-child-total]').forEach(cell=>{
+      const sec=cell.dataset.usaliChildTotal, parent=cell.dataset.parent, child=cell.dataset.child;
+      const arr = ds[sec][parent].children[child]||[];
+      cell.textContent=fmtC(sum(arr));
+    });
+    qsa('[data-usali-parent]').forEach(cell=>{
+      const sec=cell.dataset.usaliParent, item=cell.dataset.item, m=parseInt(cell.dataset.month);
+      cell.textContent=fmtC(getItemMonths(ds,sec,item)[m]||0);
+    });
+
+    const B=computeUSALI(usaliBudget), A=computeUSALI(usaliActual);
+
+    qsa('[data-usali-formula]').forEach(cell=>{
+      const [sec,key]=cell.dataset.usaliFormula.split('|'); const m=parseInt(cell.dataset.month);
+      const arr = ds[sec][key]||[]; cell.textContent=fmtC(arr[m]||0);
+    });
+
+    qsa('[data-usali-total]').forEach(cell=>{
+      const sec=cell.dataset.usaliTotal, item=cell.dataset.item;
+      cell.textContent=fmtC(sum(getItemMonths(ds,sec,item)));
+    });
+
+    USALI_SECTIONS.forEach(sec=>{
+      for(let m=0;m<12;m++){
+        const subtotal = sec.items.reduce((acc,it)=> acc + (getItemMonths(ds,sec.key,it.name)[m]||0), 0);
+        const c=qs(`[data-usali-sub="${sec.key}"][data-month="${m}"]`); if(c) c.textContent=fmtC(subtotal);
+      }
+      const total = sec.items.reduce((acc,it)=> acc + sum(getItemMonths(ds,sec.key,it.name)), 0);
+      const ct=qs(`[data-usali-subtotal-total="${sec.key}"]`); if(ct) ct.textContent=fmtC(total);
+    });
+
+    // Summary row
+    qs('#usaliTotalRevB').textContent=fmtC(sum(B.revMonths));   qs('#usaliTotalRevA').textContent=fmtC(sum(A.revMonths));
+    qs('#usaliDeptExpB').textContent=fmtC(sum(B.deptExpMonths));qs('#usaliDeptExpA').textContent=fmtC(sum(A.deptExpMonths));
+    qs('#usaliDeptIncB').textContent=fmtC(sum(B.deptIncomeMonths));qs('#usaliDeptIncA').textContent=fmtC(sum(A.deptIncomeMonths));
+    qs('#usaliUOEB').textContent=fmtC(sum(B.uoeMonths));        qs('#usaliUOEA').textContent=fmtC(sum(A.uoeMonths));
+    qs('#usaliMgmtB').textContent=fmtC(sum(B.mgmtMonths));      qs('#usaliMgmtA').textContent=fmtC(sum(A.mgmtMonths));
+    qs('#usaliFixedB').textContent=fmtC(sum(B.fixedMonths));    qs('#usaliFixedA').textContent=fmtC(sum(A.fixedMonths));
+    qs('#usaliGOPB').textContent=fmtC(sum(B.gopOpMonths));      qs('#usaliGOPA').textContent=fmtC(sum(A.gopOpMonths));
+    qs('#usaliGOPAFB').textContent=fmtC(sum(B.gopAfterMonths)); qs('#usaliGOPAFA').textContent=fmtC(sum(A.gopAfterMonths));
+
+    if (qs('#autoSaveToggle').checked) saveToLocal(false);
+  }
+
+  // Mode switch
+  qsa('#modeSeg button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      qsa('#modeSeg button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); usaliMode=b.dataset.mode; renderUsali();
+    });
+  });
+  qs('#baseFeePct').addEventListener('input',recalcUsali);
+  qs('#incentiveFeePct').addEventListener('input',recalcUsali);
+
+  /* =========================
+     IMPORTER: Excel (.xlsx/.csv) → USALI Actuals
+     ========================= */
+  function normalizeLabel(v){
+    const s=(v??'').toString().trim();
+    return s.replace(/\s+/g,' ').replace(/:+$/,'');
+  }
+  function findMonthColumnsByHeader(aoa){
+    const monthAliases = [
+      ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'],
+      ['january','february','march','april','may','june','july','august','september','october','november','december']
+    ];
+    for(let r=0;r<Math.min(10,aoa.length);r++){
+      const row=aoa[r]||[];
+      const cols=[];
+      for(let c=0;c<row.length;c++){
+        const v=row[c];
+        if(v instanceof Date){ cols.push(c); continue; }
+        const s=(v??'').toString().toLowerCase();
+        if (monthAliases.some(list=>list.includes(s.slice(0,3)))) cols.push(c);
+        else if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\-\/ ]?\d{2,4}$/.test(s)) cols.push(c);
+      }
+      if(cols.length>=12){ return cols.slice(-12); }
+    }
+    const maxLen = Math.max(...aoa.map(r=>r.length));
+    return Array.from({length:12},(_,i)=>maxLen-12+i);
+  }
+  function detectLabelCol(aoa){
+    let best = 0, bestScore=0;
+    for(let c=0;c<Math.min(10, (aoa[0]||[]).length); c++){
+      let score=0;
+      for(let r=0;r<Math.min(30,aoa.length); r++){
+        const v=aoa[r]?.[c];
+        if (typeof v==='string' && v.trim().length>0) score++;
+      }
+      if (score>bestScore){ bestScore=score; best=c; }
+    }
+    return best;
+  }
+  function placeToUSALI(ds, path, monthsArr){
+    ensureTemplate(ds);
+    const [sec, parent, child] = path;
+    if (child){
+      const node = ds[sec][parent];
+      if(!node.children[child]) node.children[child]=Array(12).fill(0);
+      for(let m=0;m<12;m++) node.children[child][m] += toNum(monthsArr[m]||0);
+    } else {
+      if(!ds[sec][parent]) ds[sec][parent]=Array(12).fill(0);
+      for(let m=0;m<12;m++) ds[sec][parent][m] += toNum(monthsArr[m]||0);
+    }
+  }
+  function matchPath(label, sheetName=''){
+    const s = (label||'').toString();
+    for(const rule of mapping){
+      const cond = (rule.match instanceof RegExp) ? rule.match.test(s) : s.toLowerCase().includes(String(rule.match).toLowerCase());
+      if (cond) return rule.path;
+    }
+    const sh = sheetName.toLowerCase();
+    if (sh.includes('rooms')) return ['revenue','Rooms Revenue','Other'];
+    if (sh.includes('food') || sh.includes('beverage')) return ['revenue','Food & Beverage Revenue','Restaurant'];
+    if (sh.includes('minor other') || sh.includes('operated')) return ['revenue','Other Operated Depts Revenue','Miscellaneous'];
+    if (sh.includes('admin') || sh.includes('a&g')) return ['uoe','Administrative & General','Miscellaneous'];
+    if (sh.includes('sales') || sh.includes('marketing')) return ['uoe','Sales & Marketing','Advertising'];
+    if (sh.includes('information') || sh.includes('telcom') || sh.includes('telecom')) return ['uoe','Information & Telecommunications Systems','Licenses & Subscriptions'];
+    if (sh.includes('property operations')) return ['uoe','Property Operations & Maintenance','Other'];
+    if (sh.includes('utilities')) return ['uoe','Utilities','Electricity'];
+    if (sh.includes('management fees')) return ['mgmt_fees','Base Management Fee'];
+    if (sh.includes('non operating')) return ['fixed','Property Taxes'];
+    return null;
+  }
+  function importWorkbookToActuals(wb){
+    const ds = {}; ensureTemplate(ds);
+    wb.SheetNames.forEach(name=>{
+      const ws = wb.Sheets[name];
+      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
+      if (!aoa || !aoa.length) return;
+      const labelCol = detectLabelCol(aoa);
+      const monthCols = findMonthColumnsByHeader(aoa);
+      let startRow = 0;
+      for(let r=0;r<Math.min(12,aoa.length);r++){
+        const v = aoa[r]?.[labelCol];
+        if (v && String(v).trim().length>0){ startRow = r; break; }
+      }
+      for(let r=startRow; r<aoa.length; r++){
+        const labelRaw = aoa[r]?.[labelCol];
+        const label = normalizeLabel(labelRaw);
+        if (!label || /^total\b/i.test(label)) continue;
+        const vals = monthCols.map(c=> aoa[r]?.[c]);
+        if (vals.every(v=>!v && v!==0)) continue;
+        const path = matchPath(label, name);
+        if (path) placeToUSALI(ds, path, vals);
+      }
+    });
+    return ds;
+  }
+  function assignActuals(ds){
+    ensureTemplate(usaliActual);
+    ['revenue','dept_exp','uoe','mgmt_fees','fixed'].forEach(sec=>{
+      const node = ds[sec]||{};
+      Object.keys(node).forEach(key=>{
+        const entry = node[key];
+        if (Array.isArray(entry)){
+          if(!Array.isArray(usaliActual[sec][key])) usaliActual[sec][key]=Array(12).fill(0);
+          usaliActual[sec][key] = entry.slice();
+        } else if (entry && entry.children){
+          const tgt = usaliActual[sec][key]||{children:{}};
+          Object.keys(entry.children).forEach(ch=>{
+            tgt.children[ch] = (entry.children[ch]||Array(12).fill(0)).slice();
+          });
+          usaliActual[sec][key]=tgt;
+        }
+      });
+    });
+  }
+
+  // File input → parse
+  qs('#plUploadInput').addEventListener('change', async (e)=>{
+    const file = e.target.files?.[0];
+    if(!file) return;
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const imported = importWorkbookToActuals(wb);
+      assignActuals(imported);
+      usaliMode='actual'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
+      renderUsali();
+      flash(`Imported: ${file.name}`);
+    }catch(err){
+      console.error(err);
+      alert('Import failed. Please double-check the file format.');
+    }
+  });
+
+  // Mapping editor
+  qs('#toggleMapBtn').addEventListener('click', ()=>{
+    const wrap = qs('#mapWrap');
+    wrap.classList.toggle('hidden');
+    if (!wrap.classList.contains('hidden')){
+      qs('#mappingEditor').value = JSON.stringify(mapping, (k,v)=> (v instanceof RegExp ? v.toString() : v), 2);
+    }
+  });
+  qs('#applyMappingBtn').addEventListener('click', ()=>{
+    try{
+      const raw = JSON.parse(qs('#mappingEditor').value);
+      mapping = raw.map(r=>{
+        const clone = {...r};
+        if (typeof clone.match === 'string' && /^\/.*\/[gimsuy]*$/.test(clone.match)){
+          const m = clone.match.match(/^\/(.*)\/([gimsuy]*)$/);
+          clone.match = new RegExp(m[1], m[2]||'i');
+        }
+        return clone;
+      });
+      flash('Mapping updated');
+    }catch(e){
+      alert('Invalid JSON. Please fix and try again.');
+    }
+  });
+
+  // Same-Month LY → Budget (with growth %)
+  qs('#copyLYToBudgetBtn').addEventListener('click', ()=>{
+    const growth = parseFloat(qs('#baselineGrowthPct').value)||0;
+    ensureTemplate(usaliBudget); ensureTemplate(usaliActual);
+    ['revenue','dept_exp','uoe','mgmt_fees','fixed'].forEach(sec=>{
+      const items = USALI_SECTIONS.find(s=>s.key===sec).items;
+      items.forEach(it=>{
+        const srcMonths = getItemMonths(usaliActual, sec, it.name);
+        if (it.children){
+          const tgt = usaliBudget[sec][it.name];
+          it.children.forEach(ch=>{
+            const arrA = (usaliActual[sec][it.name]?.children[ch])||Array(12).fill(0);
+            const arrB = Array(12).fill(0);
+            for(let m=0;m<12;m++) arrB[m] = Math.round(arrA[m]*(1+growth/100));
+            tgt.children[ch] = arrB;
+          });
+        } else {
+          const arrB = Array(12).fill(0);
+          for(let m=0;m<12;m++) arrB[m] = Math.round(srcMonths[m]*(1+growth/100));
+          usaliBudget[sec][it.name] = arrB;
+        }
+      });
+    });
+    usaliMode='budget'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
+    renderUsali();
+    flash('Copied LY Actuals → Budget');
+  });
+
+  /* ---------- Save/Load/Export ---------- */
+  const STORAGE_KEY='usaliBudgetAppV1';
+  function gatherState(){ return {
+    usaliBudget, usaliActual, usaliMode,
+    baseFeePct: parseFloat(qs('#baseFeePct').value)||0,
+    incentiveFeePct: parseFloat(qs('#incentiveFeePct').value)||0,
+    mapping
+  }; }
+  function applyState(s){
+    if(!s) return;
+    if (s.usaliBudget) usaliBudget=s.usaliBudget;
+    if (s.usaliActual) usaliActual=s.usaliActual;
+    if (typeof s.baseFeePct==='number') qs('#baseFeePct').value=String(s.baseFeePct);
+    if (typeof s.incentiveFeePct==='number') qs('#incentiveFeePct').value=String(s.incentiveFeePct);
+    if (s.usaliMode) usaliMode=s.usaliMode;
+    if (Array.isArray(s.mapping)) mapping=s.mapping;
+    qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
+    renderUsali();
+  }
+  function saveToLocal(toast=true){ localStorage.setItem(STORAGE_KEY, JSON.stringify(gatherState())); if(toast) flash('Saved.'); }
+  function loadFromLocal(){
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw){ flash('Nothing saved yet.'); return; }
+    try{ applyState(JSON.parse(raw)); flash('Loaded.'); }catch(e){ console.error(e); flash('Load failed.'); }
+  }
+  function exportJSON(){
+    const blob=new Blob([JSON.stringify(gatherState(),null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`usali-budget-state-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+  }
+  function exportRollups(){
+    const B=computeUSALI(usaliBudget), A=computeUSALI(usaliActual);
+    const payload = { budget:B, actual:A };
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`usali-rollups-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+  }
+  function importJSON(file){
+    const r=new FileReader();
+    r.onload=e=>{ try{ applyState(JSON.parse(e.target.result)); flash('Imported.'); }catch(err){ console.error(err); flash('Import failed.'); } };
+    r.readAsText(file);
+  }
+  function resetAll(){
+    if(!confirm('Reset all inputs and parameters?')) return;
+    usaliBudget={}; usaliActual={}; initUsali();
+    qs('#baseFeePct').value='3'; qs('#incentiveFeePct').value='10'; usaliMode='budget'; mapping=DEFAULT_MAPPING.slice();
+    qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
+    renderUsali(); flash('Reset.');
+  }
+
+  // Toast
+  let toastEl;
+  function flash(msg){
+    if(!toastEl){ toastEl=document.createElement('div'); Object.assign(toastEl.style,{
+      position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',padding:'10px 14px',
+      background:'rgba(44,62,80,.95)',color:'#fff',borderRadius:'10px',boxShadow:'0 8px 20px rgba(0,0,0,.2)',zIndex:'9999',transition:'opacity .3s'
+    }); document.body.appendChild(toastEl); }
+    toastEl.textContent=msg; toastEl.style.opacity='1'; setTimeout(()=>{ toastEl.style.opacity='0'; },1300);
+  }
+
+  // Wire toolbar
+  qs('#saveBtn').addEventListener('click',()=>saveToLocal(true));
+  qs('#loadBtn').addEventListener('click',loadFromLocal);
+  qs('#exportBtn').addEventListener('click',exportJSON);
+  qs('#exportRollupsBtn').addEventListener('click',exportRollups);
+  qs('#importFile').addEventListener('change',e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); });
+  qs('#resetBtn').addEventListener('click',resetAll);
+
+  // Expose a tiny API for integration
+  window.USALIBudget = {
+    getState: ()=>gatherState(),
+    setState: applyState,
+    getRollups: ()=>({ budget: computeUSALI(usaliBudget), actual: computeUSALI(usaliActual) }),
+    setBudgetData: (data)=>{ usaliBudget=data||{}; ensureTemplate(usaliBudget); renderUsali(); },
+    setActualData: (data)=>{ usaliActual=data||{}; ensureTemplate(usaliActual); renderUsali(); },
+    setFees: ({basePct, incentivePct}={})=>{ if(basePct!=null) qs('#baseFeePct').value=String(basePct); if(incentivePct!=null) qs('#incentiveFeePct').value=String(incentivePct); recalcUsali(); },
+    setMapping: (arr)=>{ if(Array.isArray(arr)) mapping = arr; },
+    getMapping: ()=>mapping.slice()
+  };
+
+  // Init
+  initUsali();
+  renderUsali();
+})();
+</script>
+</body>
+</html>
