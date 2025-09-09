@@ -208,6 +208,10 @@
     <label class="btn" for="revInput">Upload Revenue Reports (.txt, multi)</label>
     <input id="revInput" type="file" accept=".txt" multiple style="display:none"/>
 
+    <!-- >>> ADDED: Manual re-run button for mapping Dep->CO and Stay->SO -->
+    <button class="btn" id="btnHKAuto" type="button" title="Fill HK CO/SO from Booking Stats (non-destructive)">Auto-fill HK (CO/SO)</button>
+    <!-- <<< ADDED -->
+
     <div class="pill">
       <span>Hotel:</span>
       <select id="hotelSelect" aria-label="Hotel">
@@ -327,13 +331,16 @@
             <li>Lets you add <span class="inline-chip">Labor Hours</span> and <span class="inline-chip">Housekeeping details</span> (HK hours, CO, SO, DND) to compute HPOR &amp; MPOR.</li>
             <li>Shows OTB pickup vs a baseline (yesterday or a file you upload as <em>Previous Day Booking Stats</em>).</li>
             <li><b>Share data</b>: Use <span class="inline-chip">Create Share Link</span> or <span class="inline-chip">Export/Import Snapshot</span> so others can view your exact data without re-uploading.</li>
+            <!-- >>> ADDED -->
+            <li><b>Auto-fill HK:</b> When available in Booking Stats headers, the tool maps <span class="inline-chip">Departures → Checked-Out Rooms</span> and <span class="inline-chip">Stayovers → Stayover Rooms</span> for each day. It fills blanks only (won’t overwrite your entries) unless you click <em>Auto-fill HK (CO/SO)</em> to re-run.</li>
+            <!-- <<< ADDED -->
           </ul>
         </div>
 
         <div class="section">
           <strong>Files to export from FOSSE</strong>
           <ul>
-            <li><b>Booking Stats</b>: Export to <span class="kbd">.txt</span> (with “Beginning … Through …” header and Sold / Avg Rate / Room Revenue columns).</li>
+            <li><b>Booking Stats</b>: Export to <span class="kbd">.txt</span> (with “Beginning … Through …” header and Sold / Avg Rate / Room Revenue columns; if present, <em>Departures</em> and <em>Stayovers</em> will be read automatically).</li>
             <li><b>Daily Revenue Report (Rooms)</b>: Export to <span class="kbd">.txt</span> containing <em>TOTAL ROOM SALES</em>, <em># ROOMS OCCUPIED</em>, <em>AVG RATE PER ROOM</em>.</li>
           </ul>
         </div>
@@ -390,12 +397,16 @@
   const btnExport   = document.getElementById('btnExport');
   const importInput = document.getElementById('importInput');
 
-  // Help modal
+  // Help modal & toasts
   const btnHelp = document.getElementById('btnHelp');
   const helpModal = document.getElementById('helpModal');
   const helpBackdrop = document.getElementById('helpBackdrop');
   const helpClose = document.getElementById('helpClose');
   const toastWrap = document.getElementById('toastWrap');
+
+  // >>> ADDED: HK Auto-fill button
+  const btnHKAuto  = document.getElementById('btnHKAuto');
+  // <<< ADDED
 
   // KPIs
   const kRooms = document.getElementById('kRooms');
@@ -447,8 +458,8 @@
   const fmtC = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(n)||0);
   const fmtN0 = n => new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(Number(n)||0);
   const fmtN2 = n => new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(Number(n)||0);
-  const parseMoney = s => parseFloat(String(s).replace(/,/g,'')) || 0;
-  const parseADR = s => parseFloat(String(s).replace(/,/g,'')) || 0;
+  const parseMoney = s => parseFloat(String(s).replace(/[^0-9.-]/g,'')) || 0; // more robust
+  const parseADR = s => parseFloat(String(s).replace(/[^0-9.-]/g,'')) || 0;
 
   function todayISO(){ return new Date().toISOString().slice(0,10); }
   function yesterdayISO(){ const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
@@ -480,6 +491,7 @@
     const m = String(dt.getUTCMonth()+1).padStart(2,'0');
     return `${y}-${m}`;
   }
+  const withinCurrentYM = (dateKey) => (dateKey && dateKey.slice(0,7) === ymFromInput());
 
   // ---------- Filename tips
   const RX_BS = /^(?:\d{8}|\d{6})_BookingStats(?:\.txt)?$/i;
@@ -505,27 +517,89 @@
 
   // ---------- Parsers
   async function readText(file){ return await file.text(); }
+
+  // >>> ADDED: Flexible Booking Stats parser that also reads Departures & Stayovers (if present)
   function parseBookingStats(text){
+    // capture report date span
     const hdr = text.match(/Beginning\s+(\d{2}[A-Za-z]{3}\d{2})\s+Through\s+(\d{2}[A-Za-z]{3}\d{2})/);
     let start = null, end = null;
     if(hdr){ start = parseShortDateToken(hdr[1]); end = parseShortDateToken(hdr[2]); }
+
     const lines = text.split(/\r?\n/);
-    const rows = {};
-    for(const line of lines){
-      const m = line.match(/^\s*(\d{2}[A-Za-z]{3}\d{2})\s+(.*)$/);
-      if(!m) continue;
-      const dateTok = m[1];
-      const rest = m[2].trim().split(/\s+/);
-      if(rest.length < 10) continue;
-      const sold = parseInt(rest[6],10) || 0;
-      const roomRev = parseMoney(rest[8]);
-      const adr = parseADR(rest[9]);
-      const dt = parseShortDateToken(dateTok);
-      if(!dt) continue;
-      rows[dToKey(dt)] = { rooms: sold, adr: adr, rev: roomRev };
+
+    // find the header row containing key columns
+    let headerLine = null, headerIdx = -1;
+    for(let i=0;i<Math.min(80,lines.length);i++){
+      const l = lines[i];
+      if(/Sold/i.test(l) && /Room\s+Rev/i.test(l)){ headerLine = l; headerIdx = i; break; }
+      if(/Sold/i.test(l) && /Room\s+Revenue/i.test(l)){ headerLine = l; headerIdx = i; break; }
     }
+
+    // helper to find column starts
+    const findPos = (re) => headerLine ? headerLine.search(re) : -1;
+    const pos = {
+      dep:  findPos(/Dep(?:artures?)?/i),
+      stay: findPos(/Stay(?:overs?)?/i),
+      sold: findPos(/Sold/i),
+      adr:  findPos(/Avg\.?\s*Rate|Average\s*Rate/i),
+      rev:  findPos(/Room\s+Rev(?:enue)?/i),
+    };
+
+    // build ordered columns for fixed-slice parsing
+    const ordered = Object.entries(pos).filter(([,p])=>p>=0).sort((a,b)=>a[1]-b[1]);
+    const cols = ordered.map(([key,start],i) => {
+      const end = (i<ordered.length-1) ? ordered[i+1][1] : 1e9;
+      return {key, start, end};
+    });
+    const grab = (line,key) => {
+      const c = cols.find(x=>x.key===key);
+      if(!c) return null;
+      return line.slice(c.start, Math.min(c.end, line.length)).trim();
+    };
+
+    const rows = {};
+
+    // iterate date rows
+    for(const line of lines){
+      const m = line.match(/^\s*(\d{2}[A-Za-z]{3}\d{2})\s+/);
+      if(!m) continue;
+      const dt = parseShortDateToken(m[1]);
+      if(!dt) continue;
+      const dateKey = dToKey(dt);
+
+      let sold=null, adr=null, rev=null, dep=null, stay=null;
+
+      if(cols.length){ // preferred: fixed-width slices
+        const vsold = grab(line,'sold'); if(vsold!=null) sold = parseInt(vsold.replace(/[^\d-]/g,''),10) || 0;
+        const vadr  = grab(line,'adr');  if(vadr!=null)  adr  = parseADR(vadr);
+        const vrev  = grab(line,'rev');  if(vrev!=null)  rev  = parseMoney(vrev);
+        const vdep  = grab(line,'dep');  if(vdep!=null)  dep  = parseInt(vdep.replace(/[^\d-]/g,''),10) || 0;
+        const vstay = grab(line,'stay'); if(vstay!=null) stay = parseInt(vstay.replace(/[^\d-]/g,''),10) || 0;
+      }else{
+        // fallback: legacy token indexing (keeps your original behavior)
+        const rest = line.slice(m[0].length).trim().split(/\s+/);
+        if(rest.length >= 10){
+          sold = parseInt(rest[6],10) || 0;
+          const roomRev = parseMoney(rest[8]);
+          const adrTok  = parseADR(rest[9]);
+          rev = roomRev; adr = adrTok;
+          // no reliable tokens for dep/stay in fallback
+        }
+      }
+
+      rows[dateKey] = {
+        rooms: (sold!=null ? sold : 0),
+        adr: (adr!=null ? adr : 0),
+        rev: (rev!=null ? rev : 0),
+        dep: (dep!=null ? dep : null),
+        stay: (stay!=null ? stay : null)
+      };
+    }
+
     return { start, end, rows };
   }
+  // <<< ADDED
+
   function parseRevenueReport(text){
     const dateMatch = text.match(/^\s*(\d{2}[A-Za-z]{3}\d{2})\s+Run on/m);
     if(!dateMatch) return null;
@@ -1031,7 +1105,7 @@
     }
   }
 
-  // ---------- PDF summary
+  // ---------- PDF summary (unchanged core)
   function computeSummary(){
     const ym = ymFromInput();
     const hotel = hotelSel.value;
@@ -1273,6 +1347,34 @@
     }
   }
 
+  // ---------- HK Auto-fill logic
+  // Maps Booking Stats dep/stay into HK co/so for the current month — fills blanks only.
+  function autofillHKFromBookingStats(bsSnap, {overwrite=false} = {}){
+    if(!bsSnap || !bsSnap.rows) return {filled:0, foundDep:0, foundStay:0, days:0};
+    let filled = 0, foundDep = 0, foundStay = 0, days = 0;
+
+    Object.entries(bsSnap.rows).forEach(([dateKey, v])=>{
+      if(!withinCurrentYM(dateKey)) return;
+      days++;
+      const dep = (typeof v.dep === 'number') ? v.dep : null;
+      const stay = (typeof v.stay === 'number') ? v.stay : null;
+      if(dep!=null) foundDep++;
+      if(stay!=null) foundStay++;
+
+      if(dep==null && stay==null) return;
+
+      const cur = getHK(dateKey);
+      const nextCO = overwrite ? (dep ?? cur.co) : (cur.co>0 ? cur.co : (dep ?? 0));
+      const nextSO = overwrite ? (stay ?? cur.so) : (cur.so>0 ? cur.so : (stay ?? 0));
+      if(nextCO !== cur.co || nextSO !== cur.so){
+        setHK(dateKey, cur.hkHrs, nextCO, nextSO, cur.dnd);
+        filled++;
+      }
+    });
+
+    return {filled, foundDep, foundStay, days};
+  }
+
   // Buttons
   btnShare.addEventListener('click', ()=>{
     try{
@@ -1377,6 +1479,15 @@
     reader.readAsDataURL(f);
   });
 
+  // >>> ADDED: manual re-run button for HK auto-fill
+  btnHKAuto.addEventListener('click', ()=>{
+    if(!bookingStatsCur){ alert('Upload Current Day Booking Stats first.'); return; }
+    const {filled, foundDep, foundStay} = autofillHKFromBookingStats(bookingStatsCur, {overwrite:false});
+    mergeData(); updateAndRender();
+    toast(`Auto-fill complete: set CO/SO on ${filled} day(s). Found Departures on ${foundDep} and Stayovers on ${foundStay}.`, 'ok');
+  });
+  // <<< ADDED
+
   // Current Day Booking Stats
   bsInputCur.addEventListener('change', async (e)=>{
     const f = e.target.files?.[0];
@@ -1396,6 +1507,16 @@
       localStorage.setItem(BS_CUR(hotelSel.value, ymFromInput()), JSON.stringify(bookingStatsCur));
       saveSnapshotWithHistory(bookingStatsCur);
       loadExplicitSnapshots(); loadBaselineInfo();
+
+      // >>> ADDED: auto-fill HK CO/SO once on upload (non-destructive)
+      const {filled, foundDep, foundStay} = autofillHKFromBookingStats(bookingStatsCur, {overwrite:false});
+      if(foundDep || foundStay){
+        toast(`Mapped Booking Stats → HK: CO from Departures, SO from Stayovers. Filled ${filled} day(s).`, 'ok');
+      }else{
+        toast('No Departures/Stayovers columns detected in Booking Stats header; HK auto-fill skipped.', '');
+      }
+      // <<< ADDED
+
       mergeData(); updateAndRender(); firePickupAlertsIfNeeded();
     }catch(err){
       console.error(err);
@@ -1497,11 +1618,9 @@
   btnPDF.addEventListener('click', downloadPDF);
 
   // ---------- Initialize
-  // 1) If a share link hash is present, import it before anything else.
   window.addEventListener('load', ()=>{
     const imported = tryLoadBundleFromHash();
     if(imported) return; // state already loaded & rendered
-    // Otherwise normal boot
     loadUIState();
     ensureRangeDefaults();
     loadLogo();
