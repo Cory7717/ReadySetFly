@@ -71,6 +71,7 @@
   .small{font-size:12px}
   .muted{color:#6b7a90}
   .pre{font-family:ui-monospace, Menlo, Consolas, monospace; background:#f6f8ff; border:1px solid #e6ecf7; border-radius:8px; padding:8px; overflow:auto; max-height:220px }
+  .log{background:#fefefe;border:1px solid #e6ecf7;border-radius:8px;padding:10px;max-height:260px;overflow:auto}
 </style>
 </head>
 <body>
@@ -117,6 +118,8 @@
           </label>
           <button class="btn" id="copyLYToBudgetBtn" title="Copies Same-Month Last Year Actuals into Budget, applying optional growth %">Same-Month LY → Budget</button>
           <button class="btn" id="toggleMapBtn">Show Mapping JSON</button>
+          <button class="btn" id="toggleLogBtn">Show Import Log</button>
+          <button class="btn" id="downloadLogBtn">Download Log</button>
         </div>
         <div id="mapWrap" class="hidden" style="margin-top:10px">
           <div class="muted small" style="margin:4px 0 6px">If a row label doesn’t place correctly, add a keyword here. Matches are case-insensitive and use <em>contains</em> logic, first match wins.</div>
@@ -125,6 +128,10 @@
             <button class="btn" id="applyMappingBtn">Apply Mapping Changes</button>
             <span class="muted small">Tip: keep a backup of your mapping once it’s dialed in for your property.</span>
           </div>
+        </div>
+        <div id="logWrap" class="hidden" style="margin-top:10px">
+          <div class="muted small" style="margin:4px 0 6px">Rows placed vs. unmatched by sheet (last import).</div>
+          <div id="importLog" class="log small"></div>
         </div>
       </div>
 
@@ -169,108 +176,126 @@
      secKey ∈ {'revenue','dept_exp','uoe','mgmt_fees','fixed'}
      ========================= */
   const DEFAULT_MAPPING = [
-    {match:/\btransient\b/i, path:['revenue','Rooms Revenue','Transient']},
-    {match:/\bgroup\b/i,     path:['revenue','Rooms Revenue','Group']},
-    {match:/\bcontract\b/i,  path:['revenue','Rooms Revenue','Contract']},
-    {match:/rooms? revenue/i,path:['revenue','Rooms Revenue','Other']},
-    {match:/\bresort fee\b|\bfacility fee\b/i, path:['revenue','Miscellaneous Income','Resort/Facility Fee']},
-    {match:/service charge/i, path:['revenue','Miscellaneous Income','Service Charge']},
+    // --- Rooms revenue
+    {match:/\btransient\b/i,            path:['revenue','Rooms Revenue','Transient']},
+    {match:/\brack rate\b/i,            path:['revenue','Rooms Revenue','Transient']},
+    {match:/\bcorporate\b/i,            path:['revenue','Rooms Revenue','Transient']},
+    {match:/\bgroup\b/i,                path:['revenue','Rooms Revenue','Group']},
+    {match:/\bcontract\b/i,             path:['revenue','Rooms Revenue','Contract']},
+    {match:/room(?:s)? revenue/i,       path:['revenue','Rooms Revenue','Other']},
+    {match:/room allowances?/i,         path:['revenue','Rooms Revenue','Other']},
+    {match:/no[-\s]?show|cancell?ation/i, path:['revenue','Miscellaneous Income','Other Misc Income']},
+    {match:/pet .*clean|smoking .*clean|gov.*recovery/i, path:['revenue','Miscellaneous Income','Other Misc Income']},
 
-    {match:/restaurant/i,      path:['revenue','Food & Beverage Revenue','Restaurant']},
-    {match:/bar|lounge/i,      path:['revenue','Food & Beverage Revenue','Bar/Lounge']},
-    {match:/banquet|cater/i,   path:['revenue','Food & Beverage Revenue','Banquets/Catering']},
+    // --- F&B revenue
+    {match:/restaurant/i,               path:['revenue','Food & Beverage Revenue','Restaurant']},
+    {match:/bar|lounge/i,               path:['revenue','Food & Beverage Revenue','Bar/Lounge']},
+    {match:/banquet|cater|event space/i,path:['revenue','Food & Beverage Revenue','Banquets/Catering']},
     {match:/in-?room dining|room service/i, path:['revenue','Food & Beverage Revenue','In-Room Dining']},
 
-    {match:/parking/i,         path:['revenue','Other Operated Depts Revenue','Parking']},
-    {match:/spa\b/i,           path:['revenue','Other Operated Depts Revenue','Spa']},
-    {match:/gift shop|market/i,path:['revenue','Other Operated Depts Revenue','Gift Shop']},
+    // --- Other operated rev
+    {match:/parking/i,                   path:['revenue','Other Operated Depts Revenue','Parking']},
+    {match:/spa\b/i,                     path:['revenue','Other Operated Depts Revenue','Spa']},
+    {match:/gift shop|market|vending/i,  path:['revenue','Other Operated Depts Revenue','Gift Shop']},
     {match:/telephone|telecom revenue/i, path:['revenue','Other Operated Depts Revenue','Telephone']},
-    {match:/laundry|valet/i,   path:['revenue','Other Operated Depts Revenue','Laundry/Dry Cleaning']},
-    {match:/misc/i,            path:['revenue','Other Operated Depts Revenue','Miscellaneous']},
+    {match:/laundry|valet/i,             path:['revenue','Other Operated Depts Revenue','Laundry/Dry Cleaning']},
+    {match:/misc/i,                      path:['revenue','Other Operated Depts Revenue','Miscellaneous']},
 
-    {match:/front desk/i,         path:['dept_exp','Rooms Department','Front Desk Wages']},
-    {match:/night audit/i,        path:['dept_exp','Rooms Department','Night Audit Wages']},
-    {match:/bell|door|valet/i,    path:['dept_exp','Rooms Department','Bell/Door/Valet']},
-    {match:/room attendant|housekeep/i, path:['dept_exp','Rooms Department','HK Room Attendants']},
-    {match:/supervisor/i,         path:['dept_exp','Rooms Department','HK Supervisors']},
-    {match:/laundry attendant/i,  path:['dept_exp','Rooms Department','Laundry Attendants']},
-    {match:/payroll taxes?/i,     path:['dept_exp','Rooms Department','Payroll Taxes']},
-    {match:/benefit/i,            path:['dept_exp','Rooms Department','Employee Benefits']},
-    {match:/linen/i,              path:['dept_exp','Rooms Department','Laundry & Linen']},
-    {match:/guest supplies?/i,    path:['dept_exp','Rooms Department','Guest Supplies']},
-    {match:/cleaning supplies?/i, path:['dept_exp','Rooms Department','Cleaning Supplies']},
+    // --- Rooms dept expenses (labor & ops)
+    {match:/guest service agent|front desk/i, path:['dept_exp','Rooms Department','Front Desk Wages']},
+    {match:/night audit/i,                    path:['dept_exp','Rooms Department','Night Audit Wages']},
+    {match:/bell|door|valet/i,                path:['dept_exp','Rooms Department','Bell/Door/Valet']},
+    {match:/housekeep|room attendant/i,       path:['dept_exp','Rooms Department','HK Room Attendants']},
+    {match:/supervisor|management/i,          path:['dept_exp','Rooms Department','HK Supervisors']},
+    {match:/laundry attendant/i,              path:['dept_exp','Rooms Department','Laundry Attendants']},
+    {match:/payroll taxes?/i,                 path:['dept_exp','Rooms Department','Payroll Taxes']},
+    {match:/group insurance|medical|dental|vision|workers comp|paid time off|pto/i, path:['dept_exp','Rooms Department','Employee Benefits']},
+    {match:/linen/i,                          path:['dept_exp','Rooms Department','Laundry & Linen']},
+    {match:/guest supplies?/i,                path:['dept_exp','Rooms Department','Guest Supplies']},
+    {match:/cleaning supplies?/i,             path:['dept_exp','Rooms Department','Cleaning Supplies']},
     {match:/commission|ota|expedia|booking\.com/i, path:['dept_exp','Rooms Department','Commissions & OTA']},
-    {match:/reservations?|crs/i,  path:['dept_exp','Rooms Department','Reservations/CRS']},
-    {match:/uniform/i,            path:['dept_exp','Rooms Department','Uniforms']},
-    {match:/training/i,           path:['dept_exp','Rooms Department','Training']},
-    {match:/misc(?! income)/i,    path:['dept_exp','Rooms Department','Misc Departmental']},
+    {match:/reservations?|crs/i,              path:['dept_exp','Rooms Department','Reservations/CRS']},
+    {match:/uniform/i,                        path:['dept_exp','Rooms Department','Uniforms']},
+    {match:/training/i,                       path:['dept_exp','Rooms Department','Training']},
+    {match:/misc(?! income)/i,                path:['dept_exp','Rooms Department','Misc Departmental']},
 
-    {match:/foh labor/i,      path:['dept_exp','Food & Beverage Department','FOH Labor']},
-    {match:/boh labor/i,      path:['dept_exp','Food & Beverage Department','BOH Labor']},
-    {match:/cogs.*food/i,     path:['dept_exp','Food & Beverage Department','COGS – Food']},
-    {match:/cogs.*bev|beverage cost/i, path:['dept_exp','Food & Beverage Department','COGS – Beverage']},
-    {match:/china|glass|silver/i, path:['dept_exp','Food & Beverage Department','China/Glass/Silver']},
-    {match:/kitchen supplies?/i,  path:['dept_exp','Food & Beverage Department','Kitchen Supplies']},
-    {match:/minor operating/i,    path:['dept_exp','Food & Beverage Department','Minor Operating Equip']},
-    {match:/entertainment|music/i,path:['dept_exp','Food & Beverage Department','Entertainment/Music']},
-    {match:/misc(?! income)/i,    path:['dept_exp','Food & Beverage Department','Misc Departmental']},
-    {match:/payroll taxes?/i,     path:['dept_exp','Food & Beverage Department','Payroll Taxes']},
-    {match:/benefit/i,            path:['dept_exp','Food & Beverage Department','Employee Benefits']},
+    // --- F&B dept expenses
+    {match:/foh labor|breakfast attendant/i,  path:['dept_exp','Food & Beverage Department','FOH Labor']},
+    {match:/boh labor|cook|kitchen/i,         path:['dept_exp','Food & Beverage Department','BOH Labor']},
+    {match:/cogs.*food|cost of sales.*food/i, path:['dept_exp','Food & Beverage Department','COGS – Food']},
+    {match:/cogs.*bev|beverage cost/i,        path:['dept_exp','Food & Beverage Department','COGS – Beverage']},
+    {match:/china|glass|silver/i,             path:['dept_exp','Food & Beverage Department','China/Glass/Silver']},
+    {match:/kitchen supplies|operating supplies/i, path:['dept_exp','Food & Beverage Department','Kitchen Supplies']},
+    {match:/minor operating/i,                path:['dept_exp','Food & Beverage Department','Minor Operating Equip']},
+    {match:/entertainment|music/i,            path:['dept_exp','Food & Beverage Department','Entertainment/Music']},
+    {match:/payroll taxes?/i,                 path:['dept_exp','Food & Beverage Department','Payroll Taxes']},
+    {match:/benefit|insurance/i,              path:['dept_exp','Food & Beverage Department','Employee Benefits']},
+    {match:/misc(?! income)/i,                path:['dept_exp','Food & Beverage Department','Misc Departmental']},
 
-    {match:/other operated.*labor/i,         path:['dept_exp','Other Operated Departments','Labor']},
+    // --- Other operated departments exp
+    {match:/other operated.*labor/i,          path:['dept_exp','Other Operated Departments','Labor']},
     {match:/other operated.*cogs|operating supplies/i, path:['dept_exp','Other Operated Departments','COGS/Operating Supplies']},
-    {match:/other operated.*misc/i,          path:['dept_exp','Other Operated Departments','Misc Departmental']},
+    {match:/other operated.*misc|rebates paid/i, path:['dept_exp','Other Operated Departments','Misc Departmental']},
 
-    {match:/admin(istrative)?|a\s*&\s*g/i, path:['uoe','Administrative & General','Salaries & Wages']},
-    {match:/credit card fees?/i,        path:['uoe','Administrative & General','Credit Card Fees']},
-    {match:/bad debt/i,                 path:['uoe','Administrative & General','Bad Debt']},
+    // --- UOE: Administrative & General
+    {match:/admin(istrative)?|a\s*&\s*g/i,    path:['uoe','Administrative & General','Salaries & Wages']},
+    {match:/contract labor|task force/i,      path:['uoe','Administrative & General','Salaries & Wages']},
+    {match:/credit card fees?|chargebacks?/i, path:['uoe','Administrative & General','Credit Card Fees']},
+    {match:/bad debt/i,                       path:['uoe','Administrative & General','Bad Debt']},
     {match:/licenses?|permit|fees?\b(?! mgmt)/i, path:['uoe','Administrative & General','Licenses & Fees']},
-    {match:/legal|professional/i,       path:['uoe','Administrative & General','Legal & Professional']},
-    {match:/office supplies?/i,         path:['uoe','Administrative & General','Office Supplies']},
-    {match:/travel|meals?/i,            path:['uoe','Administrative & General','Travel/Meals']},
-    {match:/dues?|subscriptions?/i,     path:['uoe','Administrative & General','Dues & Subscriptions']},
-    {match:/security/i,                 path:['uoe','Administrative & General','Security']},
-    {match:/recruit|training/i,         path:['uoe','Administrative & General','Recruitment/Training']},
-    {match:/payroll taxes?/i,           path:['uoe','Administrative & General','Payroll Taxes']},
-    {match:/benefit/i,                  path:['uoe','Administrative & General','Employee Benefits']},
-    {match:/misc(?! income)/i,          path:['uoe','Administrative & General','Miscellaneous']},
+    {match:/legal|professional|accounting/i,  path:['uoe','Administrative & General','Legal & Professional']},
+    {match:/office supplies?/i,               path:['uoe','Administrative & General','Office Supplies']},
+    {match:/travel|meals?\b/i,                path:['uoe','Administrative & General','Travel/Meals']},
+    {match:/dues?|subscriptions?/i,           path:['uoe','Administrative & General','Dues & Subscriptions']},
+    {match:/security/i,                       path:['uoe','Administrative & General','Security']},
+    {match:/recruit|training/i,               path:['uoe','Administrative & General','Recruitment/Training']},
+    {match:/payroll taxes?/i,                 path:['uoe','Administrative & General','Payroll Taxes']},
+    {match:/benefit|group insurance|workers comp|paid time off|pto/i, path:['uoe','Administrative & General','Employee Benefits']},
+    {match:/bank fees|bank service/i,         path:['uoe','Administrative & General','Credit Card Fees']},
+    {match:/misc(?! income)/i,                path:['uoe','Administrative & General','Miscellaneous']},
 
-    {match:/sales.*marketing|s&m/i, path:['uoe','Sales & Marketing','Salaries & Wages']},
-    {match:/advertis|campaign/i,   path:['uoe','Sales & Marketing','Advertising']},
-    {match:/digital marketing|seo|sem|social/i, path:['uoe','Sales & Marketing','Digital Marketing']},
-    {match:/loyalty|points/i,      path:['uoe','Sales & Marketing','Loyalty/Points']},
-    {match:/public relations?|pr\b/i, path:['uoe','Sales & Marketing','Public Relations']},
-    {match:/trade show|travel/i,   path:['uoe','Sales & Marketing','Travel & Trade Shows']},
-    {match:/commissions?\b/i,      path:['uoe','Sales & Marketing','Commissions']},
-    {match:/payroll taxes?/i,      path:['uoe','Sales & Marketing','Payroll Taxes']},
-    {match:/benefit/i,             path:['uoe','Sales & Marketing','Employee Benefits']},
+    // --- UOE: Sales & Marketing
+    {match:/sales.*marketing|s&m/i,           path:['uoe','Sales & Marketing','Salaries & Wages']},
+    {match:/advertis|campaign|promotions?/i,  path:['uoe','Sales & Marketing','Advertising']},
+    {match:/digital marketing|seo|sem|social|e-?commerce/i, path:['uoe','Sales & Marketing','Digital Marketing']},
+    {match:/loyalty|brand loyalty/i,          path:['uoe','Sales & Marketing','Loyalty/Points']},
+    {match:/public relations?|pr\b/i,         path:['uoe','Sales & Marketing','Public Relations']},
+    {match:/trade show|travel/i,              path:['uoe','Sales & Marketing','Travel & Trade Shows']},
+    {match:/commissions?\b/i,                 path:['uoe','Sales & Marketing','Commissions']},
+    {match:/payroll taxes?/i,                 path:['uoe','Sales & Marketing','Payroll Taxes']},
+    {match:/benefit|insurance/i,              path:['uoe','Sales & Marketing','Employee Benefits']},
 
-    {match:/it|information.*tele/i, path:['uoe','Information & Telecommunications Systems','Licenses & Subscriptions']},
-    {match:/support|maintenance/i,  path:['uoe','Information & Telecommunications Systems','Support & Maintenance']},
-    {match:/hardware|peripherals?/i,path:['uoe','Information & Telecommunications Systems','Hardware/Peripherals']},
-    {match:/telecom|internet/i,     path:['uoe','Information & Telecommunications Systems','Telecom']},
+    // --- UOE: IT & Telecom
+    {match:/it|information.*tele/i,           path:['uoe','Information & Telecommunications Systems','Licenses & Subscriptions']},
+    {match:/software|licens/i,                path:['uoe','Information & Telecommunications Systems','Licenses & Subscriptions']},
+    {match:/support|maintenance/i,            path:['uoe','Information & Telecommunications Systems','Support & Maintenance']},
+    {match:/hardware|peripherals?/i,          path:['uoe','Information & Telecommunications Systems','Hardware/Peripherals']},
+    {match:/telecom|internet|email|hosting/i, path:['uoe','Information & Telecommunications Systems','Telecom']},
 
-    {match:/poms?|maintenance|engineering/i, path:['uoe','Property Operations & Maintenance','Salaries & Wages']},
-    {match:/r&m contracts?/i,       path:['uoe','Property Operations & Maintenance','R&M Contracts']},
-    {match:/r&m supplies?/i,        path:['uoe','Property Operations & Maintenance','R&M Supplies']},
-    {match:/grounds|landscap/i,     path:['uoe','Property Operations & Maintenance','Groundskeeping']},
-    {match:/waste|trash/i,          path:['uoe','Property Operations & Maintenance','Waste Removal']},
-    {match:/other/i,                path:['uoe','Property Operations & Maintenance','Other']},
-    {match:/payroll taxes?/i,       path:['uoe','Property Operations & Maintenance','Payroll Taxes']},
-    {match:/benefit/i,              path:['uoe','Property Operations & Maintenance','Employee Benefits']},
+    // --- UOE: POM
+    {match:/poms?|maintenance|engineering/i,  path:['uoe','Property Operations & Maintenance','Salaries & Wages']},
+    {match:/r&m contracts?|elevator/i,        path:['uoe','Property Operations & Maintenance','R&M Contracts']},
+    {match:/r&m supplies?|janitor|custod/i,   path:['uoe','Property Operations & Maintenance','R&M Supplies']},
+    {match:/grounds|landscap|snow/i,          path:['uoe','Property Operations & Maintenance','Groundskeeping']},
+    {match:/waste|trash/i,                    path:['uoe','Property Operations & Maintenance','Waste Removal']},
+    {match:/other\b/i,                        path:['uoe','Property Operations & Maintenance','Other']},
+    {match:/payroll taxes?/i,                 path:['uoe','Property Operations & Maintenance','Payroll Taxes']},
+    {match:/benefit|insurance/i,              path:['uoe','Property Operations & Maintenance','Employee Benefits']},
 
-    {match:/\belectric/i, path:['uoe','Utilities','Electricity']},
-    {match:/\bgas\b/i,     path:['uoe','Utilities','Gas']},
-    {match:/water|sewer/i, path:['uoe','Utilities','Water & Sewer']},
-    {match:/internet|telecom/i, path:['uoe','Utilities','Internet/Telecom']},
+    // --- Utilities
+    {match:/\belectric/i,                     path:['uoe','Utilities','Electricity']},
+    {match:/\bnatural gas|\bgas\b/i,          path:['uoe','Utilities','Gas']},
+    {match:/water|sewer/i,                    path:['uoe','Utilities','Water & Sewer']},
+    {match:/internet|telecom/i,               path:['uoe','Utilities','Internet/Telecom']},
 
-    {match:/base management fee/i,      path:['mgmt_fees','Base Management Fee']},
-    {match:/incentive management fee/i, path:['mgmt_fees','Incentive Management Fee']},
-    {match:/rent|lease/i,     path:['fixed','Rent/Lease']},
-    {match:/property tax/i,   path:['fixed','Property Taxes']},
-    {match:/insurance/i,      path:['fixed','Insurance']},
-    {match:/interest/i,       path:['fixed','Interest']},
-    {match:/ff&e|reserve/i,   path:['fixed','FF&E Reserve']}
+    // --- Mgmt fees & Fixed
+    {match:/base management fee/i,            path:['mgmt_fees','Base Management Fee']},
+    {match:/incentive management fee/i,       path:['mgmt_fees','Incentive Management Fee']},
+    {match:/rent|lease/i,                     path:['fixed','Rent/Lease']},
+    {match:/property tax/i,                   path:['fixed','Property Taxes']},
+    {match:/insurance/i,                      path:['fixed','Insurance']},
+    {match:/interest/i,                       path:['fixed','Interest']},
+    {match:/ff&e|reserve/i,                   path:['fixed','FF&E Reserve']}
   ];
 
   const USALI_SECTIONS = [
@@ -325,7 +350,9 @@
 
   let usaliBudget={}, usaliActual={}, usaliMode='budget';
   let mapping = DEFAULT_MAPPING.slice();
+  let lastImportLog = { summary: {}, unmatched: {} };
 
+  /* ====== helpers to build/maintain the USALI shape ====== */
   function ensureTemplate(obj){
     USALI_SECTIONS.forEach(sec=>{
       obj[sec.key]=obj[sec.key]||{};
@@ -356,6 +383,7 @@
     return Array(12).fill(0);
   }
 
+  /* ====== UI render ====== */
   function renderUsali(){
     initUsali();
     const grid=qs('#usaliGrid'); grid.innerHTML='';
@@ -469,8 +497,10 @@
     recalcUsali();
   }
 
-  function computeUSALI(ds){
+  /* ====== Calculations ====== */
+  function computeUSALI(ds, {respectManualMgmtFees=true}={}){
     const revMonths=Array(12).fill(0), deptExpMonths=Array(12).fill(0), uoeMonths=Array(12).fill(0), fixedMonths=Array(12).fill(0), mgmtMonths=Array(12).fill(0);
+
     USALI_SECTIONS.forEach(sec=>{
       if (sec.key==='mgmt_fees') return;
       for(let m=0;m<12;m++){
@@ -481,17 +511,29 @@
         else if (sec.key==='fixed') fixedMonths[m]+=subtotal;
       }
     });
+
     const deptIncomeMonths = revMonths.map((r,i)=> r - (deptExpMonths[i]||0));
     const gopOpMonths      = deptIncomeMonths.map((d,i)=> d - (uoeMonths[i]||0));
 
-    const basePct=parseFloat(qs('#baseFeePct').value)||0;
-    const incPct =parseFloat(qs('#incentiveFeePct').value)||0;
-    const baseFeeMonths = revMonths.map(v=> v*(basePct/100));
-    const incFeeMonths  = gopOpMonths.map(v=> Math.max(0,v)*(incPct/100));
-    ds['mgmt_fees']['Base Management Fee']=baseFeeMonths.slice();
-    ds['mgmt_fees']['Incentive Management Fee']=incFeeMonths.slice();
+    // Management fees: if arrays already populated (e.g., from Actuals import), do NOT overwrite.
+    const baseArr = ds['mgmt_fees']['Base Management Fee']||Array(12).fill(0);
+    const incArr  = ds['mgmt_fees']['Incentive Management Fee']||Array(12).fill(0);
+    const baseHas = sum(baseArr) !== 0;
+    const incHas  = sum(incArr) !== 0;
 
-    for(let m=0;m<12;m++) mgmtMonths[m]=baseFeeMonths[m]+incFeeMonths[m];
+    if (!respectManualMgmtFees || (!baseHas && !incHas)){
+      const basePct=parseFloat(qs('#baseFeePct').value)||0;
+      const incPct =parseFloat(qs('#incentiveFeePct').value)||0;
+      const baseFeeMonths = revMonths.map(v=> v*(basePct/100));
+      const incFeeMonths  = gopOpMonths.map(v=> Math.max(0,v)*(incPct/100));
+      ds['mgmt_fees']['Base Management Fee']=baseFeeMonths.slice();
+      ds['mgmt_fees']['Incentive Management Fee']=incFeeMonths.slice();
+    }
+
+    const mmBase = getItemMonths(ds,'mgmt_fees','Base Management Fee');
+    const mmInc  = getItemMonths(ds,'mgmt_fees','Incentive Management Fee');
+    for(let m=0;m<12;m++) mgmtMonths[m]=(mmBase[m]||0)+(mmInc[m]||0);
+
     const gopAfterMonths = gopOpMonths.map((g,i)=> g - mgmtMonths[i] - (fixedMonths[i]||0));
     return {revMonths, deptExpMonths, deptIncomeMonths, uoeMonths, mgmtMonths, fixedMonths, gopOpMonths, gopAfterMonths};
   }
@@ -508,7 +550,8 @@
       cell.textContent=fmtC(getItemMonths(ds,sec,item)[m]||0);
     });
 
-    const B=computeUSALI(usaliBudget), A=computeUSALI(usaliActual);
+    const B=computeUSALI(usaliBudget,{respectManualMgmtFees:false});
+    const A=computeUSALI(usaliActual,{respectManualMgmtFees:true});
 
     qsa('[data-usali-formula]').forEach(cell=>{
       const [sec,key]=cell.dataset.usaliFormula.split('|'); const m=parseInt(cell.dataset.month);
@@ -553,79 +596,79 @@
   qs('#incentiveFeePct').addEventListener('input',recalcUsali);
 
   /* =========================
-     IMPORTER: Excel (.xlsx/.xlsm/.xls/.csv) → USALI Actuals
-     Robust month header detection + clearer errors
+     IMPORTER (rolling-12 aware)
      ========================= */
   function normalizeLabel(v){
     const s=(v??'').toString().trim();
     return s.replace(/\s+/g,' ').replace(/:+$/,'');
   }
 
-  // --- New helpers for date-like headers ---
-  function excelSerialToDate(n){
-    // Excel serial (days since 1899-12-30)
-    return new Date(Math.round((Number(n) - 25569) * 86400 * 1000));
-  }
-  function looksLikeExcelSerial(n){
-    return typeof n === 'number' && n > 20000 && n < 60000; // ~1955–2064
-  }
+  const SHEET_IGNORE = [/summary report/i, /room statistics/i];
+  const SHEET_ALLOW_HINTS = [
+    /rooms/i, /food|beverage/i, /minor other operated/i, /administrative|a\s*&\s*g/i,
+    /sales|marketing/i, /information.*tel/i, /property operations/i, /utilities/i,
+    /management fees?/i, /non operating/i
+  ];
+
+  function looksLikeExcelSerial(n){ return typeof n === 'number' && n > 20000 && n < 60000; }
   function looksLikeDateString(s){
     if (typeof s !== 'string') return false;
     const t = s.trim().toLowerCase();
     return (
-      /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(t) ||     // M/D/YYYY or M-D-YY
+      /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(t) ||     // M/D/YYYY
       /^\d{4}[\/\-]\d{1,2}([\/\-]\d{1,2})?$/.test(t) ||    // YYYY-MM or YYYY-MM-DD
-      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/.test(t) // Jan, Jan-24, January
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/.test(t)
     );
   }
-
-  // --- Replaced with robust version ---
-  function findMonthColumnsByHeader(aoa){
-    const MAX_SCAN_ROWS = Math.min(10, aoa.length || 0);
-    for (let r = 0; r < MAX_SCAN_ROWS; r++){
-      const row = aoa[r] || [];
-      const monthCols = [];
-      for (let c = 0; c < row.length; c++){
-        const v = row[c];
-        if (v instanceof Date){
-          monthCols.push(c);
-        } else if (looksLikeExcelSerial(v)){
-          monthCols.push(c);
-        } else if (looksLikeDateString(String(v ?? ''))){
-          monthCols.push(c);
-        }
-      }
-      if (monthCols.length >= 12){
-        return monthCols.slice(-12);
-      }
-    }
-    // Fallback: choose likely date columns from the widest early row
-    let widestLen = 0, widestRowIdx = -1;
-    for (let i = 0; i < Math.min(20, aoa.length); i++){
-      const len = (aoa[i] || []).length;
-      if (len > widestLen){ widestLen = len; widestRowIdx = i; }
-    }
-    if (widestRowIdx >= 0 && widestLen > 0){
-      const row = aoa[widestRowIdx] || [];
-      const candidates = [];
-      for (let c = 0; c < row.length; c++){
-        const s = String(row[c] ?? '').toLowerCase();
-        if (looksLikeExcelSerial(row[c]) || looksLikeDateString(s)) candidates.push(c);
-      }
-      if (candidates.length >= 12) return candidates.slice(-12);
-      // last resort: last 12 columns
-      return Array.from({length:12}, (_,i)=> Math.max(0, row.length - 12 + i));
-    }
-    // Absolute fallback
-    const maxLen = Math.max(0, ...aoa.map(r => (r || []).length));
-    return Array.from({length:12}, (_,i)=> Math.max(0, maxLen - 12 + i));
+  function serialToJSDate(n){ return new Date(Math.round((Number(n) - 25569) * 86400 * 1000)); }
+  function getMonthIndexFromHeader(v){
+    let d=null;
+    if (v instanceof Date) d=v;
+    else if (looksLikeExcelSerial(v)) d=serialToJSDate(v);
+    else if (looksLikeDateString(String(v))) d=new Date(String(v));
+    if (!d || isNaN(+d)) return null;
+    return d.getMonth(); // 0-11
   }
 
-  function detectLabelCol(aoa){
+  function findMonthColumnsWithIndex(aoa){
+    // Find a header row (top ~15 rows) that contains >=10 date-like values.
+    let headerRow = -1;
+    for(let r=0; r<Math.min(15, aoa.length); r++){
+      const row = aoa[r]||[];
+      let count=0;
+      for(let c=0;c<row.length;c++){
+        const mi = getMonthIndexFromHeader(row[c]);
+        if (mi!=null) count++;
+      }
+      if (count>=10){ headerRow=r; break; }
+    }
+    if (headerRow<0) return null;
+
+    const row=aoa[headerRow]||[];
+    const prev=aoa[headerRow-1]||[];
+    const pairs=[];
+    for(let c=0;c<row.length;c++){
+      const mi=getMonthIndexFromHeader(row[c]);
+      if (mi==null) continue;
+      // Skip "Total TTM" column if the row above says so
+      const above = prev[c];
+      if (typeof above==='string' && above.trim().toLowerCase().startsWith('total ttm')) continue;
+      pairs.push({col:c, mi, dateVal:row[c]});
+    }
+    // We may have >12 months in header; sort by date (left-to-right can be unreliable), then take last 12.
+    pairs.sort((a,b)=> new Date(a.dateVal) - new Date(b.dateVal));
+    const last12 = pairs.slice(-12);
+    // return sorted by month index 0..11 for stable placement
+    last12.sort((a,b)=> a.mi - b.mi);
+    return { headerRow, monthMap:last12 };
+  }
+
+  function detectLabelCol(aoa, startRow){
     let best = 0, bestScore=0;
-    for(let c=0;c<Math.min(10, (aoa[0]||[]).length); c++){
+    const COL_SCAN= Math.min(10, (aoa[0]||[]).length);
+    for(let c=0;c<COL_SCAN;c++){
       let score=0;
-      for(let r=0;r<Math.min(30,aoa.length); r++){
+      for(let r=startRow; r<Math.min(startRow+40,aoa.length); r++){
         const v=aoa[r]?.[c];
         if (typeof v==='string' && v.trim().length>0) score++;
       }
@@ -653,6 +696,7 @@
       const cond = (rule.match instanceof RegExp) ? rule.match.test(s) : s.toLowerCase().includes(String(rule.match).toLowerCase());
       if (cond) return rule.path;
     }
+    // Sheet hints (fallbacks if label didn't match)
     const sh = sheetName.toLowerCase();
     if (sh.includes('rooms')) return ['revenue','Rooms Revenue','Other'];
     if (sh.includes('food') || sh.includes('beverage')) return ['revenue','Food & Beverage Revenue','Restaurant'];
@@ -669,32 +713,55 @@
 
   function importWorkbookToActuals(wb){
     const ds = {}; ensureTemplate(ds);
+    const log = { summary:{}, unmatched:{} };
+
     wb.SheetNames.forEach(name=>{
+      if (SHEET_IGNORE.some(rx=>rx.test(name))) return;
+      if (!SHEET_ALLOW_HINTS.some(rx=>rx.test(name))) return;
+
       const ws = wb.Sheets[name];
       const aoa = XLSX.utils.sheet_to_json(ws, {
-        header: 1,
-        raw: true,       // keep numbers as numbers (including date serials)
-        defval: '',      // no undefined holes
-        blankrows: false
+        header: 1, raw: true, defval: '', blankrows: false
       });
       if (!aoa || !aoa.length) return;
-      const labelCol = detectLabelCol(aoa);
-      const monthCols = findMonthColumnsByHeader(aoa);
-      let startRow = 0;
-      for(let r=0;r<Math.min(12,aoa.length);r++){
-        const v = aoa[r]?.[labelCol];
-        if (v && String(v).trim().length>0){ startRow = r; break; }
+
+      const mm = findMonthColumnsWithIndex(aoa);
+      if (!mm){ (log.unmatched[name] = log.unmatched[name]||[]).push({reason:'No month header found'}); return; }
+      const { headerRow, monthMap } = mm;
+
+      // label column & start row (prefer the row after the "Account name" header if present)
+      let startRow = headerRow + 1;
+      for(let r=headerRow+1; r<headerRow+15 && r<aoa.length; r++){
+        const v = (aoa[r]||[])[0];
+        if (typeof v==='string' && /account\s*name/i.test(v)){ startRow = r+1; break; }
       }
+      const labelCol = detectLabelCol(aoa, startRow);
+
+      let placed=0, skipped=0, unmatched=0;
       for(let r=startRow; r<aoa.length; r++){
-        const labelRaw = aoa[r]?.[labelCol];
+        const labelRaw = (aoa[r]||[])[labelCol];
         const label = normalizeLabel(labelRaw);
-        if (!label || /^total\b/i.test(label)) continue;
-        const vals = monthCols.map(c=> aoa[r]?.[c]);
-        if (vals.every(v=>!v && v!==0)) continue;
+        if (!label || /^total\b/i.test(label) || /^departmental profit/i.test(label)) { skipped++; continue; }
+
+        // Collect into 12-month array via month index
+        const arr = Array(12).fill(0);
+        monthMap.forEach(({col, mi})=>{
+          const v = (aoa[r]||[])[col];
+          arr[mi] += toNum(v);
+        });
+        if (arr.every(v=>v===0)) { skipped++; continue; }
+
         const path = matchPath(label, name);
-        if (path) placeToUSALI(ds, path, vals);
+        if (path) { placeToUSALI(ds, path, arr); placed++; }
+        else {
+          unmatched++;
+          (log.unmatched[name] = log.unmatched[name]||[]).push({label, months:arr});
+        }
       }
+      log.summary[name] = { placed, skipped, unmatched };
     });
+
+    lastImportLog = log;
     return ds;
   }
 
@@ -718,17 +785,18 @@
     });
   }
 
-  // File input → parse (with clearer errors + cellDates)
+  // File input → parse (with clearer errors + rolling-12 month alignment)
   qs('#plUploadInput').addEventListener('change', async (e)=>{
     const file = e.target.files?.[0];
     if(!file) return;
     try{
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type:'array', cellDates:true });
+      const wb = XLSX.read(buf, { type:'array', cellDates:true, WTF:false });
       const imported = importWorkbookToActuals(wb);
       assignActuals(imported);
       usaliMode='actual'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
       renderUsali();
+      renderImportLog();
       flash(`Imported: ${file.name}`);
     }catch(err){
       console.error(err);
@@ -761,6 +829,40 @@
     }
   });
 
+  // Import log panel
+  function renderImportLog(){
+    const el = qs('#importLog');
+    const lines = [];
+    Object.keys(lastImportLog.summary||{}).forEach(name=>{
+      const s = lastImportLog.summary[name];
+      lines.push(`• ${name}: placed ${s.placed}, skipped ${s.skipped}, unmatched ${s.unmatched}`);
+    });
+    const unmatchedSheets = Object.keys(lastImportLog.unmatched||{});
+    if (unmatchedSheets.length){
+      lines.push('');
+      lines.push('Unmatched examples:');
+      unmatchedSheets.forEach(name=>{
+        const arr = lastImportLog.unmatched[name]||[];
+        arr.slice(0,5).forEach(row=>{
+          lines.push(`  - [${name}] ${row.label}`);
+        });
+      });
+      if (unmatchedSheets.some(k=>(lastImportLog.unmatched[k]||[]).length>5)){
+        lines.push('  … (see Download Log for full list)');
+      }
+    }
+    el.textContent = lines.join('\n') || 'No import run yet.';
+  }
+  qs('#toggleLogBtn').addEventListener('click', ()=>{
+    const wrap = qs('#logWrap'); wrap.classList.toggle('hidden');
+    if (!wrap.classList.contains('hidden')) renderImportLog();
+  });
+  qs('#downloadLogBtn').addEventListener('click', ()=>{
+    const blob=new Blob([JSON.stringify(lastImportLog,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`usali-import-log-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+  });
+
   // Same-Month LY → Budget (with growth %)
   qs('#copyLYToBudgetBtn').addEventListener('click', ()=>{
     const growth = parseFloat(qs('#baselineGrowthPct').value)||0;
@@ -790,7 +892,7 @@
   });
 
   /* ---------- Save/Load/Export ---------- */
-  const STORAGE_KEY='usaliBudgetAppV1';
+  const STORAGE_KEY='usaliBudgetAppV2';
   function gatherState(){ return {
     usaliBudget, usaliActual, usaliMode,
     baseFeePct: parseFloat(qs('#baseFeePct').value)||0,
@@ -820,7 +922,7 @@
     a.download=`usali-budget-state-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove();
   }
   function exportRollups(){
-    const B=computeUSALI(usaliBudget), A=computeUSALI(usaliActual);
+    const B=computeUSALI(usaliBudget,{respectManualMgmtFees:false}), A=computeUSALI(usaliActual,{respectManualMgmtFees:true});
     const payload = { budget:B, actual:A };
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -861,12 +963,13 @@
   window.USALIBudget = {
     getState: ()=>gatherState(),
     setState: applyState,
-    getRollups: ()=>({ budget: computeUSALI(usaliBudget), actual: computeUSALI(usaliActual) }),
+    getRollups: ()=>({ budget: computeUSALI(usaliBudget,{respectManualMgmtFees:false}), actual: computeUSALI(usaliActual,{respectManualMgmtFees:true}) }),
     setBudgetData: (data)=>{ usaliBudget=data||{}; ensureTemplate(usaliBudget); renderUsali(); },
     setActualData: (data)=>{ usaliActual=data||{}; ensureTemplate(usaliActual); renderUsali(); },
     setFees: ({basePct, incentivePct}={})=>{ if(basePct!=null) qs('#baseFeePct').value=String(basePct); if(incentivePct!=null) qs('#incentiveFeePct').value=String(incentivePct); recalcUsali(); },
     setMapping: (arr)=>{ if(Array.isArray(arr)) mapping = arr; },
-    getMapping: ()=>mapping.slice()
+    getMapping: ()=>mapping.slice(),
+    getLastImportLog: ()=>JSON.parse(JSON.stringify(lastImportLog))
   };
 
   // Init
