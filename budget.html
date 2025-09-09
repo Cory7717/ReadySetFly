@@ -159,10 +159,12 @@
   </div>
 </div>
 
-<!-- XLSX for importing spreadsheets -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+<!-- Fast-path: try to load SheetJS up front (if CSP allows). If this fails, runtime loader will kick in. -->
+<script id="sheetjs-cdn" src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+
 <script>
 (function(){
+  /* ========= Utilities ========= */
   const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const qs=(s,r=document)=>r.querySelector(s);
   const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
@@ -170,30 +172,51 @@
   const sum=a=>a.reduce((x,y)=>x+(Number(y)||0),0);
   const toNum=(v)=>{ if(v==null || v==='') return 0; if(typeof v==='number') return v; const s=String(v).trim().replace(/[\$,]/g,''); if(/^\(.+\)$/.test(s)) return -Number(s.slice(1,-1)); const n=Number(s); return Number.isFinite(n)?n:0; };
 
+  /* ========= Robust SheetJS loader (prevents "XLSX is not defined") ========= */
+  const XLSX_READY = (function(){
+    let _p;
+    return function ensureXLSX(){
+      if (window.XLSX) return Promise.resolve(window.XLSX);
+      if (_p) return _p;
+      const urls = [
+        "https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js",
+        "https://unpkg.com/xlsx@0.19.3/dist/xlsx.full.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js"
+      ];
+      _p = new Promise((resolve, reject)=>{
+        let i=0;
+        const tryNext = ()=>{
+          if (window.XLSX) return resolve(window.XLSX);
+          if (i>=urls.length) return reject(new Error("Failed to load SheetJS (XLSX) — likely blocked by CSP. Consider self-hosting xlsx.full.min.js."));
+          const s=document.createElement('script');
+          s.src=urls[i++]; s.async=true; s.crossOrigin="anonymous";
+          s.onload=()=> resolve(window.XLSX);
+          s.onerror=()=> setTimeout(tryNext, 0);
+          document.head.appendChild(s);
+        };
+        tryNext();
+      });
+      return _p;
+    };
+  })();
+
   /* =========================
      IMPORTER MAPPING (editable)
-     Each entry: { match: /regex/i OR "substring", path: [secKey, parentName, childName?] }
-     secKey ∈ {'revenue','dept_exp','uoe','mgmt_fees','fixed'}
      ========================= */
   const DEFAULT_MAPPING = [
-    // --- Rooms revenue
     {match:/\btransient\b/i,            path:['revenue','Rooms Revenue','Transient']},
     {match:/\brack rate\b/i,            path:['revenue','Rooms Revenue','Transient']},
     {match:/\bcorporate\b/i,            path:['revenue','Rooms Revenue','Transient']},
     {match:/\bgroup\b/i,                path:['revenue','Rooms Revenue','Group']},
     {match:/\bcontract\b/i,             path:['revenue','Rooms Revenue','Contract']},
-    {match:/room(?:s)? revenue/i,       path:['revenue','Rooms Revenue','Other']},
-    {match:/room allowances?/i,         path:['revenue','Rooms Revenue','Other']},
-    {match:/no[-\s]?show|cancell?ation/i, path:['revenue','Miscellaneous Income','Other Misc Income']},
-    {match:/pet .*clean|smoking .*clean|gov.*recovery/i, path:['revenue','Miscellaneous Income','Other Misc Income']},
+    {match:/room(?:s)? revenue|room allowances?/i, path:['revenue','Rooms Revenue','Other']},
+    {match:/no[-\s]?show|cancell?ation|pet .*clean|smoking .*clean|gov.*recovery/i, path:['revenue','Miscellaneous Income','Other Misc Income']},
 
-    // --- F&B revenue
     {match:/restaurant/i,               path:['revenue','Food & Beverage Revenue','Restaurant']},
     {match:/bar|lounge/i,               path:['revenue','Food & Beverage Revenue','Bar/Lounge']},
     {match:/banquet|cater|event space/i,path:['revenue','Food & Beverage Revenue','Banquets/Catering']},
     {match:/in-?room dining|room service/i, path:['revenue','Food & Beverage Revenue','In-Room Dining']},
 
-    // --- Other operated rev
     {match:/parking/i,                   path:['revenue','Other Operated Depts Revenue','Parking']},
     {match:/spa\b/i,                     path:['revenue','Other Operated Depts Revenue','Spa']},
     {match:/gift shop|market|vending/i,  path:['revenue','Other Operated Depts Revenue','Gift Shop']},
@@ -201,7 +224,6 @@
     {match:/laundry|valet/i,             path:['revenue','Other Operated Depts Revenue','Laundry/Dry Cleaning']},
     {match:/misc/i,                      path:['revenue','Other Operated Depts Revenue','Miscellaneous']},
 
-    // --- Rooms dept expenses (labor & ops)
     {match:/guest service agent|front desk/i, path:['dept_exp','Rooms Department','Front Desk Wages']},
     {match:/night audit/i,                    path:['dept_exp','Rooms Department','Night Audit Wages']},
     {match:/bell|door|valet/i,                path:['dept_exp','Rooms Department','Bell/Door/Valet']},
@@ -219,7 +241,6 @@
     {match:/training/i,                       path:['dept_exp','Rooms Department','Training']},
     {match:/misc(?! income)/i,                path:['dept_exp','Rooms Department','Misc Departmental']},
 
-    // --- F&B dept expenses
     {match:/foh labor|breakfast attendant/i,  path:['dept_exp','Food & Beverage Department','FOH Labor']},
     {match:/boh labor|cook|kitchen/i,         path:['dept_exp','Food & Beverage Department','BOH Labor']},
     {match:/cogs.*food|cost of sales.*food/i, path:['dept_exp','Food & Beverage Department','COGS – Food']},
@@ -232,12 +253,10 @@
     {match:/benefit|insurance/i,              path:['dept_exp','Food & Beverage Department','Employee Benefits']},
     {match:/misc(?! income)/i,                path:['dept_exp','Food & Beverage Department','Misc Departmental']},
 
-    // --- Other operated departments exp
     {match:/other operated.*labor/i,          path:['dept_exp','Other Operated Departments','Labor']},
     {match:/other operated.*cogs|operating supplies/i, path:['dept_exp','Other Operated Departments','COGS/Operating Supplies']},
     {match:/other operated.*misc|rebates paid/i, path:['dept_exp','Other Operated Departments','Misc Departmental']},
 
-    // --- UOE: Administrative & General
     {match:/admin(istrative)?|a\s*&\s*g/i,    path:['uoe','Administrative & General','Salaries & Wages']},
     {match:/contract labor|task force/i,      path:['uoe','Administrative & General','Salaries & Wages']},
     {match:/credit card fees?|chargebacks?/i, path:['uoe','Administrative & General','Credit Card Fees']},
@@ -254,7 +273,6 @@
     {match:/bank fees|bank service/i,         path:['uoe','Administrative & General','Credit Card Fees']},
     {match:/misc(?! income)/i,                path:['uoe','Administrative & General','Miscellaneous']},
 
-    // --- UOE: Sales & Marketing
     {match:/sales.*marketing|s&m/i,           path:['uoe','Sales & Marketing','Salaries & Wages']},
     {match:/advertis|campaign|promotions?/i,  path:['uoe','Sales & Marketing','Advertising']},
     {match:/digital marketing|seo|sem|social|e-?commerce/i, path:['uoe','Sales & Marketing','Digital Marketing']},
@@ -265,14 +283,12 @@
     {match:/payroll taxes?/i,                 path:['uoe','Sales & Marketing','Payroll Taxes']},
     {match:/benefit|insurance/i,              path:['uoe','Sales & Marketing','Employee Benefits']},
 
-    // --- UOE: IT & Telecom
     {match:/it|information.*tele/i,           path:['uoe','Information & Telecommunications Systems','Licenses & Subscriptions']},
     {match:/software|licens/i,                path:['uoe','Information & Telecommunications Systems','Licenses & Subscriptions']},
     {match:/support|maintenance/i,            path:['uoe','Information & Telecommunications Systems','Support & Maintenance']},
     {match:/hardware|peripherals?/i,          path:['uoe','Information & Telecommunications Systems','Hardware/Peripherals']},
     {match:/telecom|internet|email|hosting/i, path:['uoe','Information & Telecommunications Systems','Telecom']},
 
-    // --- UOE: POM
     {match:/poms?|maintenance|engineering/i,  path:['uoe','Property Operations & Maintenance','Salaries & Wages']},
     {match:/r&m contracts?|elevator/i,        path:['uoe','Property Operations & Maintenance','R&M Contracts']},
     {match:/r&m supplies?|janitor|custod/i,   path:['uoe','Property Operations & Maintenance','R&M Supplies']},
@@ -282,13 +298,11 @@
     {match:/payroll taxes?/i,                 path:['uoe','Property Operations & Maintenance','Payroll Taxes']},
     {match:/benefit|insurance/i,              path:['uoe','Property Operations & Maintenance','Employee Benefits']},
 
-    // --- Utilities
     {match:/\belectric/i,                     path:['uoe','Utilities','Electricity']},
     {match:/\bnatural gas|\bgas\b/i,          path:['uoe','Utilities','Gas']},
     {match:/water|sewer/i,                    path:['uoe','Utilities','Water & Sewer']},
     {match:/internet|telecom/i,               path:['uoe','Utilities','Internet/Telecom']},
 
-    // --- Mgmt fees & Fixed
     {match:/base management fee/i,            path:['mgmt_fees','Base Management Fee']},
     {match:/incentive management fee/i,       path:['mgmt_fees','Incentive Management Fee']},
     {match:/rent|lease/i,                     path:['fixed','Rent/Lease']},
@@ -352,7 +366,7 @@
   let mapping = DEFAULT_MAPPING.slice();
   let lastImportLog = { summary: {}, unmatched: {} };
 
-  /* ====== helpers to build/maintain the USALI shape ====== */
+  /* ===== USALI helpers ===== */
   function ensureTemplate(obj){
     USALI_SECTIONS.forEach(sec=>{
       obj[sec.key]=obj[sec.key]||{};
@@ -383,7 +397,7 @@
     return Array(12).fill(0);
   }
 
-  /* ====== UI render ====== */
+  /* ===== Render ===== */
   function renderUsali(){
     initUsali();
     const grid=qs('#usaliGrid'); grid.innerHTML='';
@@ -442,9 +456,7 @@
       }).join('');
 
       card.innerHTML=`
-        <div class="usali-header">
-          <div class="usali-title">${sec.title}</div>
-        </div>
+        <div class="usali-header"><div class="usali-title">${sec.title}</div></div>
         <div class="usali-inner">
           <div class="table-container">
             <table class="usali-table">
@@ -497,7 +509,7 @@
     recalcUsali();
   }
 
-  /* ====== Calculations ====== */
+  /* ===== Calculations ===== */
   function computeUSALI(ds, {respectManualMgmtFees=true}={}){
     const revMonths=Array(12).fill(0), deptExpMonths=Array(12).fill(0), uoeMonths=Array(12).fill(0), fixedMonths=Array(12).fill(0), mgmtMonths=Array(12).fill(0);
 
@@ -515,7 +527,6 @@
     const deptIncomeMonths = revMonths.map((r,i)=> r - (deptExpMonths[i]||0));
     const gopOpMonths      = deptIncomeMonths.map((d,i)=> d - (uoeMonths[i]||0));
 
-    // Management fees: if arrays already populated (e.g., from Actuals import), do NOT overwrite.
     const baseArr = ds['mgmt_fees']['Base Management Fee']||Array(12).fill(0);
     const incArr  = ds['mgmt_fees']['Incentive Management Fee']||Array(12).fill(0);
     const baseHas = sum(baseArr) !== 0;
@@ -572,7 +583,6 @@
       const ct=qs(`[data-usali-subtotal-total="${sec.key}"]`); if(ct) ct.textContent=fmtC(total);
     });
 
-    // Summary row
     qs('#usaliTotalRevB').textContent=fmtC(sum(B.revMonths));   qs('#usaliTotalRevA').textContent=fmtC(sum(A.revMonths));
     qs('#usaliDeptExpB').textContent=fmtC(sum(B.deptExpMonths));qs('#usaliDeptExpA').textContent=fmtC(sum(A.deptExpMonths));
     qs('#usaliDeptIncB').textContent=fmtC(sum(B.deptIncomeMonths));qs('#usaliDeptIncA').textContent=fmtC(sum(A.deptIncomeMonths));
@@ -585,38 +595,16 @@
     if (qs('#autoSaveToggle').checked) saveToLocal(false);
   }
 
-  // Mode switch
-  qsa('#modeSeg button').forEach(b=>{
-    b.addEventListener('click',()=>{
-      qsa('#modeSeg button').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active'); usaliMode=b.dataset.mode; renderUsali();
-    });
-  });
-  qs('#baseFeePct').addEventListener('input',recalcUsali);
-  qs('#incentiveFeePct').addEventListener('input',recalcUsali);
-
-  /* =========================
-     IMPORTER (rolling-12 aware)
-     ========================= */
-  function normalizeLabel(v){
-    const s=(v??'').toString().trim();
-    return s.replace(/\s+/g,' ').replace(/:+$/,'');
-  }
-
+  /* ===== Importer (rolling-12 aware; parses all relevant tabs) ===== */
   const SHEET_IGNORE = [/summary report/i, /room statistics/i];
-  const SHEET_ALLOW_HINTS = [
-    /rooms/i, /food|beverage/i, /minor other operated/i, /administrative|a\s*&\s*g/i,
-    /sales|marketing/i, /information.*tel/i, /property operations/i, /utilities/i,
-    /management fees?/i, /non operating/i
-  ];
 
   function looksLikeExcelSerial(n){ return typeof n === 'number' && n > 20000 && n < 60000; }
   function looksLikeDateString(s){
     if (typeof s !== 'string') return false;
     const t = s.trim().toLowerCase();
     return (
-      /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(t) ||     // M/D/YYYY
-      /^\d{4}[\/\-]\d{1,2}([\/\-]\d{1,2})?$/.test(t) ||    // YYYY-MM or YYYY-MM-DD
+      /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(t) ||
+      /^\d{4}[\/\-]\d{1,2}([\/\-]\d{1,2})?$/.test(t) ||
       /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/.test(t)
     );
   }
@@ -629,9 +617,12 @@
     if (!d || isNaN(+d)) return null;
     return d.getMonth(); // 0-11
   }
+  function normalizeLabel(v){
+    const s=(v??'').toString().trim();
+    return s.replace(/\s+/g,' ').replace(/:+$/,'');
+  }
 
   function findMonthColumnsWithIndex(aoa){
-    // Find a header row (top ~15 rows) that contains >=10 date-like values.
     let headerRow = -1;
     for(let r=0; r<Math.min(15, aoa.length); r++){
       const row = aoa[r]||[];
@@ -650,15 +641,12 @@
     for(let c=0;c<row.length;c++){
       const mi=getMonthIndexFromHeader(row[c]);
       if (mi==null) continue;
-      // Skip "Total TTM" column if the row above says so
       const above = prev[c];
       if (typeof above==='string' && above.trim().toLowerCase().startsWith('total ttm')) continue;
       pairs.push({col:c, mi, dateVal:row[c]});
     }
-    // We may have >12 months in header; sort by date (left-to-right can be unreliable), then take last 12.
     pairs.sort((a,b)=> new Date(a.dateVal) - new Date(b.dateVal));
     const last12 = pairs.slice(-12);
-    // return sorted by month index 0..11 for stable placement
     last12.sort((a,b)=> a.mi - b.mi);
     return { headerRow, monthMap:last12 };
   }
@@ -696,7 +684,6 @@
       const cond = (rule.match instanceof RegExp) ? rule.match.test(s) : s.toLowerCase().includes(String(rule.match).toLowerCase());
       if (cond) return rule.path;
     }
-    // Sheet hints (fallbacks if label didn't match)
     const sh = sheetName.toLowerCase();
     if (sh.includes('rooms')) return ['revenue','Rooms Revenue','Other'];
     if (sh.includes('food') || sh.includes('beverage')) return ['revenue','Food & Beverage Revenue','Restaurant'];
@@ -715,21 +702,20 @@
     const ds = {}; ensureTemplate(ds);
     const log = { summary:{}, unmatched:{} };
 
-    wb.SheetNames.forEach(name=>{
-      if (SHEET_IGNORE.some(rx=>rx.test(name))) return;
-      if (!SHEET_ALLOW_HINTS.some(rx=>rx.test(name))) return;
+    // Choose sheets: parse all except obvious non-ledger sheets.
+    let candidates = wb.SheetNames.filter(name=> !SHEET_IGNORE.some(rx=>rx.test(name)));
+    // If nothing left (edge case), fall back to all
+    if (!candidates.length) candidates = wb.SheetNames.slice();
 
+    candidates.forEach(name=>{
       const ws = wb.Sheets[name];
-      const aoa = XLSX.utils.sheet_to_json(ws, {
-        header: 1, raw: true, defval: '', blankrows: false
-      });
+      const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'', blankrows:false });
       if (!aoa || !aoa.length) return;
 
       const mm = findMonthColumnsWithIndex(aoa);
       if (!mm){ (log.unmatched[name] = log.unmatched[name]||[]).push({reason:'No month header found'}); return; }
       const { headerRow, monthMap } = mm;
 
-      // label column & start row (prefer the row after the "Account name" header if present)
       let startRow = headerRow + 1;
       for(let r=headerRow+1; r<headerRow+15 && r<aoa.length; r++){
         const v = (aoa[r]||[])[0];
@@ -743,7 +729,6 @@
         const label = normalizeLabel(labelRaw);
         if (!label || /^total\b/i.test(label) || /^departmental profit/i.test(label)) { skipped++; continue; }
 
-        // Collect into 12-month array via month index
         const arr = Array(12).fill(0);
         monthMap.forEach(({col, mi})=>{
           const v = (aoa[r]||[])[col];
@@ -785,26 +770,41 @@
     });
   }
 
-  // File input → parse (with clearer errors + rolling-12 month alignment)
-  qs('#plUploadInput').addEventListener('change', async (e)=>{
-    const file = e.target.files?.[0];
-    if(!file) return;
-    try{
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type:'array', cellDates:true, WTF:false });
-      const imported = importWorkbookToActuals(wb);
-      assignActuals(imported);
-      usaliMode='actual'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
-      renderUsali();
-      renderImportLog();
-      flash(`Imported: ${file.name}`);
-    }catch(err){
-      console.error(err);
-      alert(`Import failed: ${err?.message || err}`);
+  /* ===== UI: mapping + logs ===== */
+  function renderImportLog(){
+    const el = qs('#importLog');
+    const lines = [];
+    Object.keys(lastImportLog.summary||{}).forEach(name=>{
+      const s = lastImportLog.summary[name];
+      lines.push(`• ${name}: placed ${s.placed}, skipped ${s.skipped}, unmatched ${s.unmatched}`);
+    });
+    const unmatchedSheets = Object.keys(lastImportLog.unmatched||{});
+    if (unmatchedSheets.length){
+      lines.push('');
+      lines.push('Unmatched examples:');
+      unmatchedSheets.forEach(name=>{
+        const arr = lastImportLog.unmatched[name]||[];
+        arr.slice(0,5).forEach(row=>{
+          lines.push(`  - [${name}] ${row.label}`);
+        });
+      });
+      if (unmatchedSheets.some(k=>(lastImportLog.unmatched[k]||[]).length>5)){
+        lines.push('  … (see Download Log for full list)');
+      }
     }
-  });
+    el.textContent = lines.join('\n') || 'No import run yet.';
+  }
 
-  // Mapping editor
+  /* ===== Events ===== */
+  qsa('#modeSeg button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      qsa('#modeSeg button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); usaliMode=b.dataset.mode; renderUsali();
+    });
+  });
+  qs('#baseFeePct').addEventListener('input',recalcUsali);
+  qs('#incentiveFeePct').addEventListener('input',recalcUsali);
+
   qs('#toggleMapBtn').addEventListener('click', ()=>{
     const wrap = qs('#mapWrap');
     wrap.classList.toggle('hidden');
@@ -829,30 +829,6 @@
     }
   });
 
-  // Import log panel
-  function renderImportLog(){
-    const el = qs('#importLog');
-    const lines = [];
-    Object.keys(lastImportLog.summary||{}).forEach(name=>{
-      const s = lastImportLog.summary[name];
-      lines.push(`• ${name}: placed ${s.placed}, skipped ${s.skipped}, unmatched ${s.unmatched}`);
-    });
-    const unmatchedSheets = Object.keys(lastImportLog.unmatched||{});
-    if (unmatchedSheets.length){
-      lines.push('');
-      lines.push('Unmatched examples:');
-      unmatchedSheets.forEach(name=>{
-        const arr = lastImportLog.unmatched[name]||[];
-        arr.slice(0,5).forEach(row=>{
-          lines.push(`  - [${name}] ${row.label}`);
-        });
-      });
-      if (unmatchedSheets.some(k=>(lastImportLog.unmatched[k]||[]).length>5)){
-        lines.push('  … (see Download Log for full list)');
-      }
-    }
-    el.textContent = lines.join('\n') || 'No import run yet.';
-  }
   qs('#toggleLogBtn').addEventListener('click', ()=>{
     const wrap = qs('#logWrap'); wrap.classList.toggle('hidden');
     if (!wrap.classList.contains('hidden')) renderImportLog();
@@ -863,32 +839,24 @@
     a.download=`usali-import-log-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove();
   });
 
-  // Same-Month LY → Budget (with growth %)
-  qs('#copyLYToBudgetBtn').addEventListener('click', ()=>{
-    const growth = parseFloat(qs('#baselineGrowthPct').value)||0;
-    ensureTemplate(usaliBudget); ensureTemplate(usaliActual);
-    ['revenue','dept_exp','uoe','mgmt_fees','fixed'].forEach(sec=>{
-      const items = USALI_SECTIONS.find(s=>s.key===sec).items;
-      items.forEach(it=>{
-        const srcMonths = getItemMonths(usaliActual, sec, it.name);
-        if (it.children){
-          const tgt = usaliBudget[sec][it.name];
-          it.children.forEach(ch=>{
-            const arrA = (usaliActual[sec][it.name]?.children[ch])||Array(12).fill(0);
-            const arrB = Array(12).fill(0);
-            for(let m=0;m<12;m++) arrB[m] = Math.round(arrA[m]*(1+growth/100));
-            tgt.children[ch] = arrB;
-          });
-        } else {
-          const arrB = Array(12).fill(0);
-          for(let m=0;m<12;m++) arrB[m] = Math.round(srcMonths[m]*(1+growth/100));
-          usaliBudget[sec][it.name] = arrB;
-        }
-      });
-    });
-    usaliMode='budget'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
-    renderUsali();
-    flash('Copied LY Actuals → Budget');
+  // File upload → ensure SheetJS → parse
+  qs('#plUploadInput').addEventListener('change', async (e)=>{
+    const file = e.target.files?.[0];
+    if(!file) return;
+    try{
+      await XLSX_READY(); // <-- guarantees window.XLSX exists
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:'array', cellDates:true, WTF:false });
+      const imported = importWorkbookToActuals(wb);
+      assignActuals(imported);
+      usaliMode='actual'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
+      renderUsali();
+      renderImportLog();
+      flash(`Imported: ${file.name}`);
+    }catch(err){
+      console.error(err);
+      alert(`Import failed: ${err?.message || err}`);
+    }
   });
 
   /* ---------- Save/Load/Export ---------- */
@@ -951,7 +919,7 @@
     toastEl.textContent=msg; toastEl.style.opacity='1'; setTimeout(()=>{ toastEl.style.opacity='0'; },1300);
   }
 
-  // Wire toolbar
+  // Toolbar
   qs('#saveBtn').addEventListener('click',()=>saveToLocal(true));
   qs('#loadBtn').addEventListener('click',loadFromLocal);
   qs('#exportBtn').addEventListener('click',exportJSON);
@@ -959,7 +927,7 @@
   qs('#importFile').addEventListener('change',e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); });
   qs('#resetBtn').addEventListener('click',resetAll);
 
-  // Expose a tiny API for integration
+  // Tiny API
   window.USALIBudget = {
     getState: ()=>gatherState(),
     setState: applyState,
