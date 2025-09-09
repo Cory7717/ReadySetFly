@@ -110,8 +110,8 @@
 
       <div class="section-sub">
         <div class="inline">
-          <label class="btn" for="plUploadInput">Upload Actualized P&L (.xlsx / .csv)</label>
-          <input id="plUploadInput" type="file" accept=".xlsx,.xls,.csv"/>
+          <label class="btn" for="plUploadInput">Upload Actualized P&L (.xlsx / .xlsm / .xls / .csv)</label>
+          <input id="plUploadInput" type="file" accept=".xlsx,.xlsm,.xls,.csv"/>
           <label class="pill small" title="Lightly tweak label mapping if your export uses different wording">
             Baseline Growth %: <input type="number" id="baselineGrowthPct" value="0" step="0.5" style="width:80px;margin-left:6px"/>%
           </label>
@@ -553,32 +553,74 @@
   qs('#incentiveFeePct').addEventListener('input',recalcUsali);
 
   /* =========================
-     IMPORTER: Excel (.xlsx/.csv) → USALI Actuals
+     IMPORTER: Excel (.xlsx/.xlsm/.xls/.csv) → USALI Actuals
+     Robust month header detection + clearer errors
      ========================= */
   function normalizeLabel(v){
     const s=(v??'').toString().trim();
     return s.replace(/\s+/g,' ').replace(/:+$/,'');
   }
-  function findMonthColumnsByHeader(aoa){
-    const monthAliases = [
-      ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'],
-      ['january','february','march','april','may','june','july','august','september','october','november','december']
-    ];
-    for(let r=0;r<Math.min(10,aoa.length);r++){
-      const row=aoa[r]||[];
-      const cols=[];
-      for(let c=0;c<row.length;c++){
-        const v=row[c];
-        if(v instanceof Date){ cols.push(c); continue; }
-        const s=(v??'').toString().toLowerCase();
-        if (monthAliases.some(list=>list.includes(s.slice(0,3)))) cols.push(c);
-        else if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\-\/ ]?\d{2,4}$/.test(s)) cols.push(c);
-      }
-      if(cols.length>=12){ return cols.slice(-12); }
-    }
-    const maxLen = Math.max(...aoa.map(r=>r.length));
-    return Array.from({length:12},(_,i)=>maxLen-12+i);
+
+  // --- New helpers for date-like headers ---
+  function excelSerialToDate(n){
+    // Excel serial (days since 1899-12-30)
+    return new Date(Math.round((Number(n) - 25569) * 86400 * 1000));
   }
+  function looksLikeExcelSerial(n){
+    return typeof n === 'number' && n > 20000 && n < 60000; // ~1955–2064
+  }
+  function looksLikeDateString(s){
+    if (typeof s !== 'string') return false;
+    const t = s.trim().toLowerCase();
+    return (
+      /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(t) ||     // M/D/YYYY or M-D-YY
+      /^\d{4}[\/\-]\d{1,2}([\/\-]\d{1,2})?$/.test(t) ||    // YYYY-MM or YYYY-MM-DD
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/.test(t) // Jan, Jan-24, January
+    );
+  }
+
+  // --- Replaced with robust version ---
+  function findMonthColumnsByHeader(aoa){
+    const MAX_SCAN_ROWS = Math.min(10, aoa.length || 0);
+    for (let r = 0; r < MAX_SCAN_ROWS; r++){
+      const row = aoa[r] || [];
+      const monthCols = [];
+      for (let c = 0; c < row.length; c++){
+        const v = row[c];
+        if (v instanceof Date){
+          monthCols.push(c);
+        } else if (looksLikeExcelSerial(v)){
+          monthCols.push(c);
+        } else if (looksLikeDateString(String(v ?? ''))){
+          monthCols.push(c);
+        }
+      }
+      if (monthCols.length >= 12){
+        return monthCols.slice(-12);
+      }
+    }
+    // Fallback: choose likely date columns from the widest early row
+    let widestLen = 0, widestRowIdx = -1;
+    for (let i = 0; i < Math.min(20, aoa.length); i++){
+      const len = (aoa[i] || []).length;
+      if (len > widestLen){ widestLen = len; widestRowIdx = i; }
+    }
+    if (widestRowIdx >= 0 && widestLen > 0){
+      const row = aoa[widestRowIdx] || [];
+      const candidates = [];
+      for (let c = 0; c < row.length; c++){
+        const s = String(row[c] ?? '').toLowerCase();
+        if (looksLikeExcelSerial(row[c]) || looksLikeDateString(s)) candidates.push(c);
+      }
+      if (candidates.length >= 12) return candidates.slice(-12);
+      // last resort: last 12 columns
+      return Array.from({length:12}, (_,i)=> Math.max(0, row.length - 12 + i));
+    }
+    // Absolute fallback
+    const maxLen = Math.max(0, ...aoa.map(r => (r || []).length));
+    return Array.from({length:12}, (_,i)=> Math.max(0, maxLen - 12 + i));
+  }
+
   function detectLabelCol(aoa){
     let best = 0, bestScore=0;
     for(let c=0;c<Math.min(10, (aoa[0]||[]).length); c++){
@@ -591,6 +633,7 @@
     }
     return best;
   }
+
   function placeToUSALI(ds, path, monthsArr){
     ensureTemplate(ds);
     const [sec, parent, child] = path;
@@ -603,6 +646,7 @@
       for(let m=0;m<12;m++) ds[sec][parent][m] += toNum(monthsArr[m]||0);
     }
   }
+
   function matchPath(label, sheetName=''){
     const s = (label||'').toString();
     for(const rule of mapping){
@@ -622,11 +666,17 @@
     if (sh.includes('non operating')) return ['fixed','Property Taxes'];
     return null;
   }
+
   function importWorkbookToActuals(wb){
     const ds = {}; ensureTemplate(ds);
     wb.SheetNames.forEach(name=>{
       const ws = wb.Sheets[name];
-      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
+      const aoa = XLSX.utils.sheet_to_json(ws, {
+        header: 1,
+        raw: true,       // keep numbers as numbers (including date serials)
+        defval: '',      // no undefined holes
+        blankrows: false
+      });
       if (!aoa || !aoa.length) return;
       const labelCol = detectLabelCol(aoa);
       const monthCols = findMonthColumnsByHeader(aoa);
@@ -647,6 +697,7 @@
     });
     return ds;
   }
+
   function assignActuals(ds){
     ensureTemplate(usaliActual);
     ['revenue','dept_exp','uoe','mgmt_fees','fixed'].forEach(sec=>{
@@ -667,13 +718,13 @@
     });
   }
 
-  // File input → parse
+  // File input → parse (with clearer errors + cellDates)
   qs('#plUploadInput').addEventListener('change', async (e)=>{
     const file = e.target.files?.[0];
     if(!file) return;
     try{
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:'array'});
+      const wb = XLSX.read(buf, { type:'array', cellDates:true });
       const imported = importWorkbookToActuals(wb);
       assignActuals(imported);
       usaliMode='actual'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
@@ -681,7 +732,7 @@
       flash(`Imported: ${file.name}`);
     }catch(err){
       console.error(err);
-      alert('Import failed. Please double-check the file format.');
+      alert(`Import failed: ${err?.message || err}`);
     }
   });
 
