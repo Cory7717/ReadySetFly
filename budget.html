@@ -5,8 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>USALI Budget Builder (Standalone)</title>
 
+<!-- NOTE: We intentionally do NOT hard-require XLSX here.
+     The script will be loaded dynamically from several candidate paths. -->
+
 <!-- Load SheetJS locally to avoid CSP/CDN issues -->
 <script src="./xlsx.full.min.js"></script>
+
+<!-- Load SheetJS from CDN (testing) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.2/dist/xlsx.full.min.js"></script>
 
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
@@ -84,7 +90,7 @@
 <div class="container">
   <div class="header">
     <h1>🏨 USALI Budget Builder (Standalone)</h1>
-    <p>Upload an actualized P&L, map labels → USALI, edit monthly lines, and export rollups.</p>
+    <p>Upload an actualized P&amp;L, map labels → USALI, edit monthly lines, and export rollups.</p>
   </div>
 
   <div class="toolbar">
@@ -95,6 +101,8 @@
     <button class="btn" id="exportRollupsBtn">Export Rollups (.json)</button>
     <button class="btn" id="resetBtn">Reset</button>
     <label class="pill"><input id="autoSaveToggle" type="checkbox" checked/> Auto-save</label>
+    <span class="pill small" id="sheetjsStatus" title="SheetJS load status">XLSX: checking…</span>
+    <button class="btn" id="downloadLastBtn" title="Download the last uploaded file from local storage">Download Last Upload</button>
   </div>
 
   <div class="content">
@@ -117,7 +125,7 @@
 
       <div class="section-sub">
         <div class="inline">
-          <label class="btn" for="plUploadInput">Upload Actualized P&L (.xlsx / .xlsm / .xls / .csv)</label>
+          <label class="btn" for="plUploadInput">Upload Actualized P&amp;L (.xlsx / .xlsm / .xls / .csv)</label>
           <input id="plUploadInput" type="file" accept=".xlsx,.xlsm,.xls,.csv"/>
           <button class="btn" id="reimportBtn" title="Parse the last uploaded file saved locally">Re-import Last Upload</button>
           <label class="pill small" title="Lightly tweak label mapping if your export uses different wording">
@@ -136,7 +144,7 @@
         </div>
       </div>
 
-      <!-- NEW: Rooms KPIs card -->
+      <!-- Rooms KPIs card -->
       <div class="usali-grid" id="kpiGrid"></div>
 
       <div class="usali-grid" id="usaliGrid"></div>
@@ -156,8 +164,8 @@
         <span class="stat-pill">Fixed (A): <strong id="usaliFixedA">$0</strong></span>
         <span class="stat-pill">GOP Op (B): <strong id="usaliGOPB">$0</strong></span>
         <span class="stat-pill">GOP Op (A): <strong id="usaliGOPA">$0</strong></span>
-        <span class="stat-pill">GOP After Fees & Fixed (B): <strong id="usaliGOPAFB">$0</strong></span>
-        <span class="stat-pill">GOP After Fees & Fixed (A): <strong id="usaliGOPAFA">$0</strong></span>
+        <span class="stat-pill">GOP After Fees &amp; Fixed (B): <strong id="usaliGOPAFB">$0</strong></span>
+        <span class="stat-pill">GOP After Fees &amp; Fixed (A): <strong id="usaliGOPAFA">$0</strong></span>
       </div>
     </div>
   </div>
@@ -166,21 +174,47 @@
 <script>
 (function(){
   /* -------------------------------------------------------
-     SheetJS guard + local file store (IndexedDB)
+     SheetJS loader + local file store (IndexedDB)
   ------------------------------------------------------- */
   function loadScript(src){
     return new Promise((resolve,reject)=>{
       const s=document.createElement('script');
       s.src=src; s.async=true;
-      s.onload=()=>resolve();
+      s.onload=()=>resolve(src);
       s.onerror=()=>reject(new Error('Failed to load '+src));
       document.head.appendChild(s);
     });
   }
+
+  const SHEETJS_CANDIDATES = [
+    './xlsx.full.min.js',
+    '/xlsx.full.min.js',
+    '/assets/vendor/xlsx/xlsx.full.min.js',
+    // As a last resort (useful for testing if CSP allows):
+    'https://cdn.jsdelivr.net/npm/xlsx@0.20.2/dist/xlsx.full.min.js'
+  ];
+
+  const statusEl = () => document.getElementById('sheetjsStatus');
+  function setSheetJSStatus(text, ok){
+    const el=statusEl(); if(!el) return;
+    el.textContent = text;
+    el.style.borderColor = ok ? '#9ed2a1' : '#f0c36d';
+    el.style.background = ok ? '#eafaf0' : '#fff7e0';
+  }
+
   async function ensureSheetJS(){
-    if (window.XLSX && XLSX.read) return true;
-    try { await loadScript('./xlsx.full.min.js'); } catch(_) {}
-    return !!(window.XLSX && XLSX.read);
+    if (window.XLSX && typeof XLSX.read === 'function'){ setSheetJSStatus('XLSX: loaded', true); return true; }
+    for (const src of SHEETJS_CANDIDATES){
+      try{
+        await loadScript(src);
+        if (window.XLSX && typeof XLSX.read === 'function'){
+          setSheetJSStatus('XLSX: loaded', true);
+          return true;
+        }
+      }catch(e){ /* try next */ }
+    }
+    setSheetJSStatus('XLSX: missing (local parse skipped)', false);
+    return false;
   }
 
   const IDB_NAME='USALI_LOCAL', IDB_STORE='files';
@@ -330,7 +364,6 @@
     {match:/ff&e|reserve/i,   path:['fixed','FF&E Reserve']}
   ];
 
-  // USALI structure
   const USALI_SECTIONS = [
     { key:'revenue', title:'Operating Revenues', type:'revenue', items:[
       {name:'Rooms Revenue', children:['Transient','Group','Contract','Other']},
@@ -381,7 +414,7 @@
     ]}
   ];
 
-  // NEW: Rooms KPI store
+  // Rooms KPI store
   let roomsKPI = {
     available: Array(12).fill(0),
     sold: Array(12).fill(0),
@@ -469,7 +502,6 @@
       </div>`;
     grid.appendChild(kpiCard);
 
-    // KPI input handlers
     qsa('input[data-kpi]').forEach(inp=>{
       inp.addEventListener('input',()=>{
         const key=inp.dataset.kpi, m=parseInt(inp.dataset.month);
@@ -809,7 +841,6 @@
       for(let m=0;m<12;m++) ds[sec][parent][m] += toNum(monthsArr[m]||0);
     }
   }
-  // NEW: metric matcher
   function matchMetric(label){
     const s = String(label||'').toLowerCase();
     if(/rooms?\s*available|available\s*rooms/i.test(s)) return 'available';
@@ -907,7 +938,7 @@
       // Always store locally
       await idbPut('lastUpload', { name:file.name, type:file.type, buf });
 
-      // Only parse if SheetJS is available
+      // Try to parse if SheetJS is available / loadable
       const ok = await ensureSheetJS();
       if(!ok){
         flash("Saved file locally. SheetJS not available, so parsing was skipped for now.");
@@ -929,13 +960,13 @@
     }
   });
 
-  // Re-import from IndexedDB (useful after dropping xlsx.full.min.js in folder)
+  // Re-import from IndexedDB (useful after adding xlsx.full.min.js locally)
   qs('#reimportBtn').addEventListener('click', async ()=>{
     try{
       const saved = await idbGet('lastUpload');
       if(!saved || !saved.buf){ flash('No saved upload found.'); return; }
       const ok = await ensureSheetJS();
-      if(!ok){ alert("SheetJS (XLSX) not found. Place 'xlsx.full.min.js' next to this HTML."); return; }
+      if(!ok){ alert("SheetJS (XLSX) not found. Place 'xlsx.full.min.js' next to this HTML or allow CDN."); return; }
       const wb = XLSX.read(saved.buf, { type:'array', cellDates:true });
       const imported = importWorkbookToActuals(wb);
       assignActuals(imported.ds);
@@ -947,6 +978,20 @@
       console.error(err);
       alert(`Re-import failed: ${err?.message||err}`);
     }
+  });
+
+  // Download last upload (to verify local save worked)
+  qs('#downloadLastBtn').addEventListener('click', async ()=>{
+    const saved = await idbGet('lastUpload');
+    if(!saved || !saved.buf){ flash('No saved upload to download.'); return; }
+    const blob = new Blob([saved.buf], { type: saved.type || 'application/octet-stream' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = saved.name || 'last-upload.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    flash('Downloaded last upload.');
   });
 
   // Mapping editor
@@ -1073,7 +1118,7 @@
   qs('#importFile').addEventListener('change',e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); e.target.value=''; });
   qs('#resetBtn').addEventListener('click',resetAll);
 
-  // Expose tiny API
+  // Public API
   window.USALIBudget = {
     getState: ()=>gatherState(),
     setState: applyState,
@@ -1087,12 +1132,14 @@
   };
 
   // Init
+  setSheetJSStatus('XLSX: checking…', false);
+  ensureSheetJS();  // kick off async load; status pill will update
   initUsali();
   renderUsali();
 
-  // Friendly alert if library truly missing on page load
+  // Friendly hint in console
   if(!(window.XLSX && window.XLSX.read)){
-    console.log("SheetJS not detected yet. Uploads will be saved locally and can be parsed later after 'xlsx.full.min.js' is present.");
+    console.log("SheetJS not detected yet. Uploads will be saved locally and can be parsed later after 'xlsx.full.min.js' is present (or CDN allowed).");
   }
 })();
 </script>
