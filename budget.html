@@ -119,6 +119,7 @@
         <div class="inline">
           <label class="btn" for="plUploadInput">Upload Actualized P&L (.xlsx / .xlsm / .xls / .csv)</label>
           <input id="plUploadInput" type="file" accept=".xlsx,.xlsm,.xls,.csv"/>
+          <button class="btn" id="reimportBtn" title="Parse the last uploaded file saved locally">Re-import Last Upload</button>
           <label class="pill small" title="Lightly tweak label mapping if your export uses different wording">
             Baseline Growth %: <input type="number" id="baselineGrowthPct" value="0" step="0.5" style="width:80px;margin-left:6px"/>%
           </label>
@@ -135,7 +136,7 @@
         </div>
       </div>
 
-      <!-- Rooms KPIs -->
+      <!-- NEW: Rooms KPIs card -->
       <div class="usali-grid" id="kpiGrid"></div>
 
       <div class="usali-grid" id="usaliGrid"></div>
@@ -164,11 +165,55 @@
 
 <script>
 (function(){
-  // DO NOT place the literal closing script tag anywhere in this file.
-  if(!(window.XLSX && XLSX.read)){
-    alert("SheetJS (XLSX) not found. Place 'xlsx.full.min.js' next to this HTML and ensure the <script src='./xlsx.full.min.js'></scr"+"ipt> tag is present.");
+  /* -------------------------------------------------------
+     SheetJS guard + local file store (IndexedDB)
+  ------------------------------------------------------- */
+  function loadScript(src){
+    return new Promise((resolve,reject)=>{
+      const s=document.createElement('script');
+      s.src=src; s.async=true;
+      s.onload=()=>resolve();
+      s.onerror=()=>reject(new Error('Failed to load '+src));
+      document.head.appendChild(s);
+    });
+  }
+  async function ensureSheetJS(){
+    if (window.XLSX && XLSX.read) return true;
+    try { await loadScript('./xlsx.full.min.js'); } catch(_) {}
+    return !!(window.XLSX && XLSX.read);
   }
 
+  const IDB_NAME='USALI_LOCAL', IDB_STORE='files';
+  function idbOpen(){
+    return new Promise((res,rej)=>{
+      const req=indexedDB.open(IDB_NAME,1);
+      req.onupgradeneeded=()=>{ req.result.createObjectStore(IDB_STORE); };
+      req.onsuccess=()=>res(req.result);
+      req.onerror=()=>rej(req.error);
+    });
+  }
+  async function idbPut(key,value){
+    const db=await idbOpen();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(IDB_STORE,'readwrite');
+      tx.objectStore(IDB_STORE).put(value,key);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>rej(tx.error);
+    });
+  }
+  async function idbGet(key){
+    const db=await idbOpen();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(IDB_STORE,'readonly');
+      const req=tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess=()=>res(req.result);
+      req.onerror=()=>rej(req.error);
+    });
+  }
+
+  /* -------------------------------------------------------
+     Utilities
+  ------------------------------------------------------- */
   const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const qs=(s,r=document)=>r.querySelector(s);
   const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
@@ -336,7 +381,7 @@
     ]}
   ];
 
-  // Rooms KPI store
+  // NEW: Rooms KPI store
   let roomsKPI = {
     available: Array(12).fill(0),
     sold: Array(12).fill(0),
@@ -354,8 +399,6 @@
           const cur=obj[sec.key][it.name]||{children:{}};
           it.children.forEach(ch=>{ if(!Array.isArray(cur.children[ch])) cur.children[ch]=Array(12).fill(0); });
           obj[sec.key][it.name]=cur;
-        } else if (it.formula){
-          obj[sec.key][it.name]=Array(12).fill(0);
         } else {
           obj[sec.key][it.name]=Array(12).fill(0);
         }
@@ -398,12 +441,11 @@
               </tr>
             </thead>
             <tbody>
-              ${
-                [
-                  {label:'Total Rooms Available', key:'available', fmt:(v)=>Number(v)||''},
-                  {label:'Room Nights Sold', key:'sold', fmt:(v)=>Number(v)||''},
-                  {label:'ADR (Avg Daily Rate)', key:'adr', fmt:(v)=>Number(v)||''}
-                ].map(row=>`
+              ${[
+                {label:'Total Rooms Available', key:'available', fmt:(v)=>Number(v)||''},
+                {label:'Room Nights Sold', key:'sold', fmt:(v)=>Number(v)||''},
+                {label:'ADR (Avg Daily Rate)', key:'adr', fmt:(v)=>Number(v)||''}
+              ].map(row=>`
                 <tr>
                   <th class="right">${row.label}</th>
                   ${roomsKPI[row.key].map((v,mi)=>`
@@ -411,10 +453,9 @@
                       <div class="wrap">
                         <input type="number" step="${row.key==='adr'?'0.01':'1'}" data-kpi="${row.key}" data-month="${mi}" value="${row.fmt(v)}" />
                         <div class="micro">
-                          ${
-                            row.key==='adr'
-                              ? `<span data-kpi-extra="adr-computed" data-month="${mi}" title="If ADR blank, we infer: Rooms Rev / Rooms Sold">ADR≈—</span>`
-                              : `<span class="muted"> </span>`
+                          ${row.key==='adr'
+                            ? `<span data-kpi-extra="adr-computed" data-month="${mi}" title="If ADR blank, we infer: Rooms Rev / Rooms Sold">ADR≈—</span>`
+                            : `<span class="muted"> </span>`
                           }
                         </div>
                       </div>
@@ -617,7 +658,7 @@
     });
 
     const B=computeUSALI(usaliBudget), A=computeUSALI(usaliActual);
-    const using = (usaliMode==='budget') ? B : A;
+    const using = (usaliMode==='budget') ? B : A; // for %Rev
 
     // Formula cells
     qsa('[data-usali-formula]').forEach(cell=>{
@@ -652,6 +693,8 @@
     qs('#usaliGOPAFB').textContent=fmtC(sum(B.gopAfterMonths)); qs('#usaliGOPAFA').textContent=fmtC(sum(A.gopAfterMonths));
 
     // KPI totals + inferred ADR
+    const roomsAvailTot = sum(roomsKPI.available);
+    const roomsSoldTot  = sum(roomsKPI.sold);
     for(let m=0;m<12;m++){
       const roomsRevMonth = getItemMonths(ds,'revenue','Rooms Revenue')[m]||0;
       const sold = roomsKPI.sold[m]||0;
@@ -662,11 +705,40 @@
         else tag.textContent = 'ADR≈—';
       }
     }
-    let num=0, den=0;
-    for(let m=0;m<12;m++){ num += (roomsKPI.adr[m]||0) * (roomsKPI.sold[m]||0); den += (roomsKPI.sold[m]||0); }
-    const kAvailTot=qs('[data-kpi-total="available"]'); if(kAvailTot) kAvailTot.textContent = sum(roomsKPI.available).toLocaleString('en-US');
-    const kSoldTot =qs('[data-kpi-total="sold"]');      if(kSoldTot)  kSoldTot.textContent  = sum(roomsKPI.sold).toLocaleString('en-US');
-    const kAdrTot  =qs('[data-kpi-total="adr"]');       if(kAdrTot)   kAdrTot.textContent   = den>0 ? `$${(num/den).toFixed(0)}` : '—';
+    const weightedADR = (()=>{ let num=0, den=0; for(let m=0;m<12;m++){ const sold=roomsKPI.sold[m]||0; const adr=roomsKPI.adr[m]||0; num += adr * sold; den += sold; } return den>0 ? num/den : 0; })();
+    const kAvailTot=qs('[data-kpi-total="available"]'); if(kAvailTot) kAvailTot.textContent = roomsAvailTot.toLocaleString('en-US');
+    const kSoldTot =qs('[data-kpi-total="sold"]');      if(kSoldTot)  kSoldTot.textContent  = roomsSoldTot.toLocaleString('en-US');
+    const kAdrTot  =qs('[data-kpi-total="adr"]');       if(kAdrTot)   kAdrTot.textContent   = weightedADR>0 ? `$${weightedADR.toFixed(0)}` : '—';
+
+    // In-cell CPOR & %Rev
+    function valueForCell(d){
+      if(d.child){
+        const arr = ds[d.sec][d.parent]?.children?.[d.child] || [];
+        return Number(arr[d.month]||0);
+      } else {
+        const arr = ds[d.sec]?.[d.item] || [];
+        return Number(arr[d.month]||0);
+      }
+    }
+    qsa('[data-metric]').forEach(span=>{
+      const metric=span.dataset.metric;
+      const sec=span.dataset.sec;
+      const m=parseInt(span.dataset.month);
+      const isChild = !!span.dataset.child;
+      const payload = { sec, month:m, child:isChild?span.dataset.child:null, parent:isChild?span.dataset.parent:null, item:isChild?null:span.dataset.item };
+      const val = valueForCell(payload);
+      if(metric==='cpor'){
+        if(expenseKeys.has(sec)){
+          const sold = roomsKPI.sold[m]||0;
+          span.textContent = (sold>0 && val!==0) ? `CPOR: ${fmtC(val/sold)}` : 'CPOR: —';
+        }else{
+          span.textContent = 'CPOR: —';
+        }
+      }else if(metric==='pctrev'){
+        const rev = using.revMonths[m]||0;
+        span.textContent = (rev>0 && val!==0) ? `%Rev: ${fmtP(100*val/rev)}` : '%Rev: —';
+      }
+    });
 
     if (qs('#autoSaveToggle').checked) saveToLocal(false);
   }
@@ -737,6 +809,7 @@
       for(let m=0;m<12;m++) ds[sec][parent][m] += toNum(monthsArr[m]||0);
     }
   }
+  // NEW: metric matcher
   function matchMetric(label){
     const s = String(label||'').toLowerCase();
     if(/rooms?\s*available|available\s*rooms/i.test(s)) return 'available';
@@ -824,12 +897,23 @@
     });
   }
 
-  // File input → parse
+  // File input → parse (local-first; no XLSX hard dependency)
   qs('#plUploadInput').addEventListener('change', async (e)=>{
     const file = e.target.files?.[0];
     if(!file) return;
     try{
       const buf = await file.arrayBuffer();
+
+      // Always store locally
+      await idbPut('lastUpload', { name:file.name, type:file.type, buf });
+
+      // Only parse if SheetJS is available
+      const ok = await ensureSheetJS();
+      if(!ok){
+        flash("Saved file locally. SheetJS not available, so parsing was skipped for now.");
+        return;
+      }
+
       const wb = XLSX.read(buf, { type:'array', cellDates:true });
       const imported = importWorkbookToActuals(wb);
       assignActuals(imported.ds);
@@ -842,6 +926,26 @@
       alert(`Import failed: ${err?.message || err}`);
     }finally{
       e.target.value='';
+    }
+  });
+
+  // Re-import from IndexedDB (useful after dropping xlsx.full.min.js in folder)
+  qs('#reimportBtn').addEventListener('click', async ()=>{
+    try{
+      const saved = await idbGet('lastUpload');
+      if(!saved || !saved.buf){ flash('No saved upload found.'); return; }
+      const ok = await ensureSheetJS();
+      if(!ok){ alert("SheetJS (XLSX) not found. Place 'xlsx.full.min.js' next to this HTML."); return; }
+      const wb = XLSX.read(saved.buf, { type:'array', cellDates:true });
+      const imported = importWorkbookToActuals(wb);
+      assignActuals(imported.ds);
+      roomsKPI = imported.metrics || roomsKPI;
+      usaliMode='actual'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
+      renderUsali();
+      flash(`Re-imported: ${saved.name||'lastUpload'}`);
+    }catch(err){
+      console.error(err);
+      alert(`Re-import failed: ${err?.message||err}`);
     }
   });
 
@@ -985,6 +1089,11 @@
   // Init
   initUsali();
   renderUsali();
+
+  // Friendly alert if library truly missing on page load
+  if(!(window.XLSX && window.XLSX.read)){
+    console.log("SheetJS not detected yet. Uploads will be saved locally and can be parsed later after 'xlsx.full.min.js' is present.");
+  }
 })();
 </script>
 </body>
