@@ -3,110 +3,58 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Hotel Revenue · Budget · P&L · Daily (SDOWLY) · USALI</title>
+<title>Hotel Revenue · P&L · Daily (SDOWLY)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  :root{
-    --bg1:#667eea;--bg2:#764ba2;--panelTint:rgba(255,255,255,.95);
-    --ink:#2c3e50;--inkSoft:#7f8c8d;--brand1:#3498db;--brand2:#2980b9;
-    --dark1:#2c3e50;--dark2:#34495e;--goodBg:#e8f5e8;--good:#27ae60;
-    --warnBg:#fff3cd;--warn:#856404;--posBg:#d1edcc;--pos:#155724;
-    --negBg:#f8d7da;--neg:#721c24;--grid:#e0e0e0
-  }
-  body{
-    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
-    background:linear-gradient(135deg,var(--bg1),var(--bg2));
-    min-height:100vh;padding:20px
-  }
-  .container{
-    max-width:1400px;margin:0 auto;background:var(--panelTint);
-    border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.1);
-    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);overflow:hidden
-  }
-  .header{background:linear-gradient(135deg,var(--dark1),var(--brand1));color:#fff;padding:24px;text-align:center}
-  .header h1{font-size:2em;margin-bottom:6px;text-shadow:2px 2px 4px rgba(0,0,0,.25)}
-  .toolbar{position:sticky;top:0;z-index:5;background:#f9fbff;border-bottom:1px solid #e9edf3;padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-  .btn{border:1px solid #dbe3ee;background:#fff;color:#1f2d3d;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;transition:.2s transform,.2s box-shadow}
-  .btn.primary{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;border:none}
-  .btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08)}
-  input[type="file"]{display:none}
-  .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#2c3e50;padding:6px 10px;background:#eef4ff;border:1px solid #d7e2ff;border-radius:999px}
-
-  .tabs{display:flex;gap:8px;justify-content:center;padding:14px;background:#f6f9ff;border-bottom:1px solid #e7eef7;flex-wrap:wrap}
-  .tab{padding:10px 14px;border-radius:10px;border:1px solid #dce6f3;background:#fff;cursor:pointer;font-weight:700}
-  .tab.active{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;border:none}
-
-  .content{padding:22px}
-  .hidden{display:none}
-
-  .section{margin-bottom:22px;background:#fff;border-radius:12px;box-shadow:0 5px 15px rgba(0,0,0,.08);overflow:hidden}
-  .section-header{background:linear-gradient(135deg,#34495e,#2c3e50);color:#fff;padding:14px 16px;font-weight:800;display:flex;align-items:center;justify-content:space-between}
-  .section-sub{padding:10px 16px;background:#f8fbff;border-bottom:1px solid #eef2f7;color:#34495e;font-weight:600}
-  .table-container{overflow-x:auto;padding:14px}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{padding:9px 8px;text-align:center;border:1px solid var(--grid);min-width:120px;white-space:nowrap}
-  th{background:linear-gradient(135deg,#f8f9fa,#e9ecef);font-weight:800;color:var(--ink);text-transform:uppercase;font-size:11px;letter-spacing:.5px}
-  .month-header{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff!important;font-size:12px}
-  .input-cell{background:#f4f7ff}
-  .input-cell input{width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;text-align:center;font-size:13px;background:#fff}
-  .calculated-cell{background:var(--goodBg);font-weight:800;color:var(--good)}
-  .forecast-cell{background:var(--warnBg);font-weight:800;color:var(--warn)}
-  .variance-positive{background:var(--posBg);color:var(--pos);font-weight:800}
-  .variance-negative{background:var(--negBg);color:var(--neg);font-weight:800}
-  .total-row{background:linear-gradient(135deg,var(--dark1),var(--dark2));color:#fff;font-weight:900}
-  canvas{max-width:100%;height:320px}
-
-  /* DAILY single-wide table */
-  .kpi-bar{display:flex;gap:12px;flex-wrap:wrap;padding:14px}
-  .kpi{flex:1;min-width:180px;background:#f9fbff;border:1px solid #e6ecf7;border-radius:12px;padding:10px 12px;text-align:center}
-  .kpi .v{font-size:20px;font-weight:900;color:#1e2a3a}
-  .kpi .l{font-size:12px;color:#6b7a90;text-transform:uppercase;letter-spacing:.6px}
-  .daily-wide th.sticky-col{position:sticky;left:0;background:#f4f6fb;z-index:1}
-  .col-ly{background:#fdecea}
-  .col-bud{background:#e8f2ff}
-  .col-fc{background:#f4e8ff}
-  .col-act{background:#e8fbe8}
-  .revpar{color:#1f7a1f;font-weight:800}
-  .accuracy-good{background:#e7fbef;color:#166534;font-weight:800}
-  .accuracy-bad{background:#fee2e2;color:#991b1b;font-weight:800}
-
-  /* USALI Budget */
-  .usali-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .seg{display:inline-flex;border:1px solid #d7e2ff;border-radius:10px;overflow:hidden}
-  .seg button{padding:6px 10px;border:none;background:#fff;cursor:pointer}
-  .seg button.active{background:#eef4ff;font-weight:800}
-  .usali-grid{display:grid;grid-template-columns:repeat(1,minmax(320px,1fr));gap:14px;padding:14px}
-  .usali-card{border:1px solid #e6ebf3;border-radius:12px;background:#fff;overflow:hidden}
-  .usali-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:linear-gradient(135deg,#2c3e50,#1f2d3d);color:#fff}
-  .usali-title{font-size:13px;text-transform:uppercase;letter-spacing:.8px}
-  .usali-inner{padding:0 12px 12px}
-  .usali-card.collapsed .usali-inner{display:none}
-  .usali-table th,.usali-table td{border:1px solid #eef2f7;padding:8px 6px;text-align:center}
-  .usali-table th{background:#f7fafc;font-size:11px;text-transform:uppercase}
-  .right{text-align:right}
-  .expandable{cursor:pointer;-webkit-user-select:none;user-select:none;text-align:left;padding-left:10px}
-  .expandable .caret{display:inline-block;width:0;height:0;border-left:6px solid #2c3e50;border-top:4px solid transparent;border-bottom:4px solid transparent;margin-right:8px;vertical-align:middle;transform:rotate(0deg);transition:transform .15s}
-  .expandable.open .caret{transform:rotate(90deg)}
-  .child-wrap{background:#fbfdff;border:1px dashed #dfe7f3;border-radius:10px;margin:8px 0;padding:8px}
-  .child-table th,.child-table td{border:1px solid #eef2f7;padding:6px 6px;text-align:center}
-  .chip{display:inline-block;font-size:11px;background:#eef4ff;border:1px solid #d7e2ff;border-radius:999px;padding:2px 8px;margin-left:8px;color:#1f2d3d}
-  .apply-row{display:flex;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid #eef2f7;background:#f8fbff;flex-wrap:wrap}
-  .stats-row{display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;color:#394b59}
-  .stat-pill{background:#eef4ff;border:1px solid #d7e2ff;border-radius:999px;padding:6px 10px;font-size:12px}
-  .neg{color:#991b1b}.pos{color:#166534}
-
-  /* Importer UI bits */
-  .inline{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .small{font-size:12px}
-  .muted{color:#6b7a90}
-  .pre{font-family:ui-monospace, Menlo, Consolas, monospace; background:#f6f8ff; border:1px solid #e6ecf7; border-radius:8px; padding:8px; overflow:auto; max-height:220px }
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg1:#667eea;--bg2:#764ba2;--panelTint:rgba(255,255,255,.95);--ink:#2c3e50;--inkSoft:#7f8c8d;--brand1:#3498db;--brand2:#2980b9;--dark1:#2c3e50;--dark2:#34495e;--goodBg:#e8f5e8;--good:#27ae60;--warnBg:#fff3cd;--warn:#856404;--posBg:#d1edcc;--pos:#155724;--negBg:#f8d7da;--neg:#721c24;--grid:#e0e0e0}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));min-height:100vh;padding:20px}
+.container{max-width:1400px;margin:0 auto;background:var(--panelTint);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.1);backdrop-filter:blur(10px);overflow:hidden}
+.header{background:linear-gradient(135deg,var(--dark1),var(--brand1));color:#fff;padding:24px;text-align:center}
+.header h1{font-size:2em;margin-bottom:6px;text-shadow:2px 2px 4px rgba(0,0,0,.25)}
+.toolbar{position:sticky;top:0;z-index:5;background:#f9fbff;border-bottom:1px solid #e9edf3;padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.btn{border:1px solid #dbe3ee;background:#fff;color:#1f2d3d;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;transition:.2s transform,.2s box-shadow}
+.btn.primary{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;border:none}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08)}
+input[type="file"]{display:none}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#2c3e50;padding:6px 10px;background:#eef4ff;border:1px solid #d7e2ff;border-radius:999px}
+.tabs{display:flex;gap:8px;justify-content:center;padding:14px;background:#f6f9ff;border-bottom:1px solid #e7eef7;flex-wrap:wrap}
+.tab{padding:10px 14px;border-radius:10px;border:1px solid #dce6f3;background:#fff;cursor:pointer;font-weight:700}
+.tab.active{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;border:none}
+.content{padding:22px}
+.hidden{display:none}
+.section{margin-bottom:22px;background:#fff;border-radius:12px;box-shadow:0 5px 15px rgba(0,0,0,.08);overflow:hidden}
+.section-header{background:linear-gradient(135deg,#34495e,#2c3e50);color:#fff;padding:14px 16px;font-weight:800;display:flex;align-items:center;justify-content:space-between}
+.section-actions{display:flex;gap:10px;flex-wrap:wrap}
+.table-container{overflow-x:auto;padding:14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 8px;text-align:center;border:1px solid var(--grid);min-width:120px;white-space:nowrap}
+th{background:linear-gradient(135deg,#f8f9fa,#e9ecef);font-weight:800;color:#2c3e50;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
+.month-header{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff!important;font-size:12px}
+.input-cell{background:#f4f7ff}
+.input-cell input{width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;text-align:center;font-size:13px;background:#fff}
+.calculated-cell{background:var(--goodBg);font-weight:800;color:var(--good)}
+.variance-positive{background:var(--posBg);color:var(--pos);font-weight:800}
+.variance-negative{background:var(--negBg);color:var(--neg);font-weight:800}
+.total-row{background:linear-gradient(135deg,var(--dark1),var(--dark2));color:#fff;font-weight:900}
+canvas{max-width:100%;height:320px}
+details.master-drop summary{cursor:pointer;font-weight:900;color:#1f2d3d;list-style:none;font-size:12px}
+details.master-drop[open] summary{color:#0b5ed7}
+.drop-panel{padding:10px 12px;border-top:1px dashed #e5e7eb;text-align:left}
+.controls{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.cat-list{list-style:none;padding:0;margin:0;font-size:13px}
+.cat-list li{display:flex;align-items:center;justify-content:space-between;border-bottom:1px dashed #e5e7eb;padding:4px 0}
+.kpi-chip{display:inline-flex;gap:6px;background:#f4f7ff;border:1px solid #e6ecf7;border-radius:999px;padding:4px 8px;font-size:12px;color:#1e2a3a;margin-right:6px}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #e5e7eb;background:#f5f7fb}
+.badge.good{background:#e8f5e8;border-color:#bfe6bf;color:#216e39}
+.badge.warn{background:#fff3cd;border-color:#f2df8a;color:#8a6d3b}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>🏨 Hotel Revenue · Budget · P&amp;L · Daily (SDOWLY) · USALI</h1>
-    <p>Daily (with Budget & Accuracy), Monthly, P&amp;L, and full USALI Budget + Actuals.</p>
+    <h1>🏨 Hotel Revenue · P&amp;L · Daily (SDOWLY)</h1>
+    <p>Daily (with Budget & Accuracy), Monthly, and Operating P&amp;L.</p>
   </div>
 
   <div class="toolbar">
@@ -118,12 +66,10 @@
     <label class="pill"><input id="autoSaveToggle" type="checkbox" checked/> Auto-save</label>
   </div>
 
-  <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-tab="dailyTab">Daily</button>
     <button class="tab" data-tab="monthlyTab">Monthly (Rev &amp; Exp)</button>
     <button class="tab" data-tab="plTab">P&amp;L</button>
-    <button class="tab" data-tab="budgetTab">Budget (USALI)</button>
   </div>
 
   <div class="content">
@@ -143,34 +89,20 @@
             </label>
             <label>Year: <input type="number" id="dailyYear" value="2025" style="width:90px"/></label>
             <button class="btn" id="regenDailyBtn">Generate Days</button>
-            <label class="pill" title="Sum of daily Actuals updates Monthly Revenue automatically">
+            <label class="pill" title="Sum of daily Actuals updates Monthly Current Year automatically">
               <input type="checkbox" id="dailyRollupToggle" checked/> Roll up Actuals → Monthly
             </label>
             <label class="pill" title="Sum of daily Budget updates Monthly Budget automatically">
-              <input type="checkbox" id="dailyBudgetRollupToggle" /> Roll up Budget → Monthly Budgets
+              <input type="checkbox" id="dailyBudgetRollupToggle"/> Roll up Budget → Monthly Budgets
             </label>
+            <span class="badge">GM Accuracy (Daily Avg): <b id="gmAccuracyAvg">—</b></span>
           </div>
         </div>
-
-        <div class="kpi-bar">
-          <div class="kpi"><div class="v" id="dailyTarget">$0</div><div class="l">Monthly Target (Budget)</div></div>
-          <div class="kpi"><div class="v" id="dailyProgress">$0</div><div class="l">Daily Progress (Actual)</div></div>
-        </div>
-
         <div class="table-container">
           <table class="daily-wide" id="dailyTable">
             <thead id="dailyHead"></thead>
             <tbody id="dailyBody"></tbody>
           </table>
-        </div>
-
-        <div class="kpi-bar">
-          <div class="kpi"><div class="v" id="avgDailyRev">$0</div><div class="l">Avg Daily Revenue</div></div>
-          <div class="kpi"><div class="v" id="avgADR">$0</div><div class="l">Average ADR</div></div>
-          <div class="kpi"><div class="v" id="avgOCC">0%</div><div class="l">Average Occupancy</div></div>
-          <div class="kpi"><div class="v" id="avgREVPAR">$0</div><div class="l">Average RevPAR</div></div>
-          <div class="kpi"><div class="v" id="fcAccuracy">0%</div><div class="l">Manager Forecast Accuracy</div></div>
-          <div class="kpi"><div class="v" id="varVsLYPct">0%</div><div class="l">Variance vs Prev Year</div></div>
         </div>
       </div>
     </div>
@@ -178,7 +110,16 @@
     <!-- MONTHLY TAB -->
     <div id="monthlyTab" class="hidden">
       <div class="section">
-        <div class="section-header">📊 Monthly Revenue · Actuals · Forecast · Budget</div>
+        <div class="section-header">
+          <span>📊 Monthly Revenue · Actuals · Forecast · Budget</span>
+          <div class="section-actions">
+            <label class="btn" for="prevYearRevUpload">Upload Prev Year RevReports (.txt)</label>
+            <input id="prevYearRevUpload" type="file" accept=".txt" multiple />
+            <label class="btn" for="currYearRevUpload">Upload Current Year RevReports (.txt)</label>
+            <input id="currYearRevUpload" type="file" accept=".txt" multiple />
+            <span class="pill">Header period like <b>31Jan25</b> picks the month (e.g., Jan 2025).</span>
+          </div>
+        </div>
         <div class="table-container">
           <table id="revenueTable">
             <thead>
@@ -242,491 +183,425 @@
         </div>
       </div>
     </div>
-
-    <!-- BUDGET (USALI) TAB -->
-    <div id="budgetTab" class="hidden">
-      <div class="section">
-        <div class="section-header">
-          <span>📘 Budget (USALI Template) — Click a line to expand details</span>
-          <div class="usali-controls">
-            <div class="seg" id="modeSeg">
-              <button data-mode="budget" class="active">Budget</button>
-              <button data-mode="actual">Actuals</button>
-            </div>
-            <label class="pill" title="Base management fee percentage of Total Revenue">
-              Base Fee % of Revenue: <input type="number" id="baseFeePct" value="3" step="0.1" style="width:70px;margin-left:6px"/>%
-            </label>
-            <label class="pill" title="Incentive management fee percentage of GOP (Operating)">
-              Incentive Fee % of GOP: <input type="number" id="incentiveFeePct" value="10" step="0.1" style="width:70px;margin-left:6px"/>%
-            </label>
-          </div>
-        </div>
-
-        <div class="section-sub">
-          <div class="inline">
-            <label class="btn" for="plUploadInput">Upload Actualized P&L (.xlsx / .csv)</label>
-            <input id="plUploadInput" type="file" accept=".xlsx,.xls,.csv"/>
-            <label class="pill small" title="Lightly tweak label mapping if your export uses different wording">
-              Baseline Growth %: <input type="number" id="baselineGrowthPct" value="0" step="0.5" style="width:80px;margin-left:6px"/>%
-            </label>
-            <button class="btn" id="copyLYToBudgetBtn" title="Copies Same-Month Last Year Actuals into Budget, applying optional growth %">Same-Month LY → Budget</button>
-            <button class="btn" id="toggleMapBtn">Show Mapping JSON</button>
-          </div>
-          <div id="mapWrap" class="hidden" style="margin-top:10px">
-            <div class="muted small" style="margin:4px 0 6px">If a row label doesn’t place correctly, add a keyword here. Matches are case-insensitive and use <em>contains</em> logic, first match wins.</div>
-            <textarea id="mappingEditor" class="pre" rows="10" style="width:100%"></textarea>
-            <div class="inline" style="margin-top:8px">
-              <button class="btn" id="applyMappingBtn">Apply Mapping Changes</button>
-              <span class="muted small">Tip: keep a backup of your mapping once it’s dialed in for your property.</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="usali-grid" id="usaliGrid"></div>
-
-        <div class="apply-row">
-          <label class="pill"><input type="checkbox" id="applyBudgetToMonthlyToggle" checked/> Apply Budget → Monthly Budgets</label>
-          <button class="btn" id="applyBudgetToMonthlyBtn">Apply Budget Now</button>
-          <label class="pill"><input type="checkbox" id="applyActualToMonthlyToggle" checked/> Apply Actuals → Monthly Actuals</label>
-          <button class="btn" id="applyActualToMonthlyBtn">Apply Actuals Now</button>
-        </div>
-        <div class="stats-row">
-          <span class="stat-pill">Total Revenue (B): <strong id="usaliTotalRevB">$0</strong></span>
-          <span class="stat-pill">Total Revenue (A): <strong id="usaliTotalRevA">$0</strong></span>
-          <span class="stat-pill">Dept Exp (B): <strong id="usaliDeptExpB">$0</strong></span>
-          <span class="stat-pill">Dept Exp (A): <strong id="usaliDeptExpA">$0</strong></span>
-          <span class="stat-pill">Dept Income (B): <strong id="usaliDeptIncB">$0</strong></span>
-          <span class="stat-pill">Dept Income (A): <strong id="usaliDeptIncA">$0</strong></span>
-          <span class="stat-pill">UOE (B): <strong id="usaliUOEB">$0</strong></span>
-          <span class="stat-pill">UOE (A): <strong id="usaliUOEA">$0</strong></span>
-          <span class="stat-pill">Mgmt Fees (B): <strong id="usaliMgmtB">$0</strong></span>
-          <span class="stat-pill">Mgmt Fees (A): <strong id="usaliMgmtA">$0</strong></span>
-          <span class="stat-pill">Fixed (B): <strong id="usaliFixedB">$0</strong></span>
-          <span class="stat-pill">Fixed (A): <strong id="usaliFixedA">$0</strong></span>
-          <span class="stat-pill">GOP Op (B): <strong id="usaliGOPB">$0</strong></span>
-          <span class="stat-pill">GOP Op (A): <strong id="usaliGOPA">$0</strong></span>
-          <span class="stat-pill">GOP After Fees & Fixed (B): <strong id="usaliGOPAFB">$0</strong></span>
-          <span class="stat-pill">GOP After Fees & Fixed (A): <strong id="usaliGOPAFA">$0</strong></span>
-          <span class="stat-pill">Variance GOP After ($): <strong id="usaliGOPAFVar" class="pos">$0</strong></span>
-          <span class="stat-pill">Variance GOP After (%): <strong id="usaliGOPAFVarPct" class="pos">0%</strong></span>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 
-<!-- Libraries -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
-
 <script>
-(function(){
+(()=>{
+  /* ========= Utilities ========= */
   const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const TODAY=new Date();
   const qs=(s,r=document)=>r.querySelector(s);
   const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const fmtC=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0}).format(Number(n)||0);
+  const fmtC=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n)||0);
   const fmtP=v=>((Number.isFinite(v)?v:0).toFixed(1))+'%';
   const sum=a=>a.reduce((x,y)=>x+(Number(y)||0),0);
-  const avg=a=>a.length?sum(a)/a.length:0;
-  const toNum=(v)=>{ if(v==null || v==='') return 0; if(typeof v==='number') return v; const s=String(v).trim().replace(/[\$,]/g,''); if(/^\(.+\)$/.test(s)) return -Number(s.slice(1,-1)); const n=Number(s); return Number.isFinite(n)?n:0; };
-  function addVarClass(el,val,invert=false){ if(!el) return; el.className='calculated-cell'; const v=invert?-val:val; if(v>0) el.classList.add('variance-positive'); else if(v<0) el.classList.add('variance-negative'); }
+  function addVarClass(el,val,invert=false){ if(!el)return; el.className='calculated-cell'; const v=invert?-val:val; if(v>0)el.classList.add('variance-positive'); else if(v<0)el.classList.add('variance-negative'); }
 
-  /* =========================
-     IMPORTER MAPPING (editable)
-     Each entry: { match: /regex/i OR "substring", path: [secKey, parentName, childName?] }
-     secKey ∈ {'revenue','dept_exp','uoe','mgmt_fees','fixed'}
-     ========================= */
-  const DEFAULT_MAPPING = [
-    // Rooms revenue split
-    {match:/\btransient\b/i, path:['revenue','Rooms Revenue','Transient']},
-    {match:/\bgroup\b/i,     path:['revenue','Rooms Revenue','Group']},
-    {match:/\bcontract\b/i,  path:['revenue','Rooms Revenue','Contract']},
-    {match:/rooms? revenue/i,path:['revenue','Rooms Revenue','Other']},
-    {match:/\bresort fee\b|\bfacility fee\b/i, path:['revenue','Miscellaneous Income','Resort/Facility Fee']},
-    {match:/service charge/i, path:['revenue','Miscellaneous Income','Service Charge']},
-
-    // F&B revenue
-    {match:/restaurant/i,      path:['revenue','Food & Beverage Revenue','Restaurant']},
-    {match:/bar|lounge/i,      path:['revenue','Food & Beverage Revenue','Bar/Lounge']},
-    {match:/banquet|cater/i,   path:['revenue','Food & Beverage Revenue','Banquets/Catering']},
-    {match:/in-?room dining|room service/i, path:['revenue','Food & Beverage Revenue','In-Room Dining']},
-
-    // Other Operated revenue
-    {match:/parking/i,         path:['revenue','Other Operated Depts Revenue','Parking']},
-    {match:/spa\b/i,           path:['revenue','Other Operated Depts Revenue','Spa']},
-    {match:/gift shop|market/i,path:['revenue','Other Operated Depts Revenue','Gift Shop']},
-    {match:/telephone|telecom revenue/i, path:['revenue','Other Operated Depts Revenue','Telephone']},
-    {match:/laundry|valet/i,   path:['revenue','Other Operated Depts Revenue','Laundry/Dry Cleaning']},
-    {match:/misc/i,            path:['revenue','Other Operated Depts Revenue','Miscellaneous']},
-
-    // Rooms departmental expenses
-    {match:/front desk/i,         path:['dept_exp','Rooms Department','Front Desk Wages']},
-    {match:/night audit/i,        path:['dept_exp','Rooms Department','Night Audit Wages']},
-    {match:/bell|door|valet/i,    path:['dept_exp','Rooms Department','Bell/Door/Valet']},
-    {match:/room attendant|housekeep/i, path:['dept_exp','Rooms Department','HK Room Attendants']},
-    {match:/supervisor/i,         path:['dept_exp','Rooms Department','HK Supervisors']},
-    {match:/laundry attendant/i,  path:['dept_exp','Rooms Department','Laundry Attendants']},
-    {match:/payroll taxes?/i,     path:['dept_exp','Rooms Department','Payroll Taxes']},
-    {match:/benefit/i,            path:['dept_exp','Rooms Department','Employee Benefits']},
-    {match:/linen/i,              path:['dept_exp','Rooms Department','Laundry & Linen']},
-    {match:/guest supplies?/i,    path:['dept_exp','Rooms Department','Guest Supplies']},
-    {match:/cleaning supplies?/i, path:['dept_exp','Rooms Department','Cleaning Supplies']},
-    {match:/commission|ota|expedia|booking\.com/i, path:['dept_exp','Rooms Department','Commissions & OTA']},
-    {match:/reservations?|crs/i,  path:['dept_exp','Rooms Department','Reservations/CRS']},
-    {match:/uniform/i,            path:['dept_exp','Rooms Department','Uniforms']},
-    {match:/training/i,           path:['dept_exp','Rooms Department','Training']},
-    {match:/misc(?! income)/i,    path:['dept_exp','Rooms Department','Misc Departmental']},
-
-    // F&B departmental expenses
-    {match:/foh labor/i,      path:['dept_exp','Food & Beverage Department','FOH Labor']},
-    {match:/boh labor/i,      path:['dept_exp','Food & Beverage Department','BOH Labor']},
-    {match:/cogs.*food/i,     path:['dept_exp','Food & Beverage Department','COGS – Food']},
-    {match:/cogs.*bev|beverage cost/i, path:['dept_exp','Food & Beverage Department','COGS – Beverage']},
-    {match:/china|glass|silver/i, path:['dept_exp','Food & Beverage Department','China/Glass/Silver']},
-    {match:/kitchen supplies?/i,  path:['dept_exp','Food & Beverage Department','Kitchen Supplies']},
-    {match:/minor operating/i,    path:['dept_exp','Food & Beverage Department','Minor Operating Equip']},
-    {match:/entertainment|music/i,path:['dept_exp','Food & Beverage Department','Entertainment/Music']},
-    {match:/misc(?! income)/i,    path:['dept_exp','Food & Beverage Department','Misc Departmental']},
-    {match:/payroll taxes?/i,     path:['dept_exp','Food & Beverage Department','Payroll Taxes']},
-    {match:/benefit/i,            path:['dept_exp','Food & Beverage Department','Employee Benefits']},
-
-    // Other Operated departments expenses
-    {match:/other operated.*labor/i,         path:['dept_exp','Other Operated Departments','Labor']},
-    {match:/other operated.*cogs|operating supplies/i, path:['dept_exp','Other Operated Departments','COGS/Operating Supplies']},
-    {match:/other operated.*misc/i,          path:['dept_exp','Other Operated Departments','Misc Departmental']},
-
-    // UOE: A&G
-    {match:/admin(istrative)?|a\s*&\s*g/i, path:['uoe','Administrative & General','Salaries & Wages']}, // fallback
-    {match:/credit card fees?/i,        path:['uoe','Administrative & General','Credit Card Fees']},
-    {match:/bad debt/i,                 path:['uoe','Administrative & General','Bad Debt']},
-    {match:/licenses?|permit|fees?\b(?! mgmt)/i, path:['uoe','Administrative & General','Licenses & Fees']},
-    {match:/legal|professional/i,       path:['uoe','Administrative & General','Legal & Professional']},
-    {match:/office supplies?/i,         path:['uoe','Administrative & General','Office Supplies']},
-    {match:/travel|meals?/i,            path:['uoe','Administrative & General','Travel/Meals']},
-    {match:/dues?|subscriptions?/i,     path:['uoe','Administrative & General','Dues & Subscriptions']},
-    {match:/security/i,                 path:['uoe','Administrative & General','Security']},
-    {match:/recruit|training/i,         path:['uoe','Administrative & General','Recruitment/Training']},
-    {match:/payroll taxes?/i,           path:['uoe','Administrative & General','Payroll Taxes']},
-    {match:/benefit/i,                  path:['uoe','Administrative & General','Employee Benefits']},
-    {match:/misc(?! income)/i,          path:['uoe','Administrative & General','Miscellaneous']},
-
-    // UOE: Sales & Marketing
-    {match:/sales.*marketing|s&m/i, path:['uoe','Sales & Marketing','Salaries & Wages']},
-    {match:/advertis|campaign/i,   path:['uoe','Sales & Marketing','Advertising']},
-    {match:/digital marketing|seo|sem|social/i, path:['uoe','Sales & Marketing','Digital Marketing']},
-    {match:/loyalty|points/i,      path:['uoe','Sales & Marketing','Loyalty/Points']},
-    {match:/public relations?|pr\b/i, path:['uoe','Sales & Marketing','Public Relations']},
-    {match:/trade show|travel/i,   path:['uoe','Sales & Marketing','Travel & Trade Shows']},
-    {match:/commissions?\b/i,      path:['uoe','Sales & Marketing','Commissions']},
-    {match:/payroll taxes?/i,      path:['uoe','Sales & Marketing','Payroll Taxes']},
-    {match:/benefit/i,             path:['uoe','Sales & Marketing','Employee Benefits']},
-
-    // UOE: IT/Telecom
-    {match:/it|information.*tele/i, path:['uoe','Information & Telecommunications Systems','Licenses & Subscriptions']},
-    {match:/support|maintenance/i,  path:['uoe','Information & Telecommunications Systems','Support & Maintenance']},
-    {match:/hardware|peripherals?/i,path:['uoe','Information & Telecommunications Systems','Hardware/Peripherals']},
-    {match:/telecom|internet/i,     path:['uoe','Information & Telecommunications Systems','Telecom']},
-
-    // UOE: Property Operations & Maintenance
-    {match:/poms?|maintenance|engineering/i, path:['uoe','Property Operations & Maintenance','Salaries & Wages']},
-    {match:/r&m contracts?/i,       path:['uoe','Property Operations & Maintenance','R&M Contracts']},
-    {match:/r&m supplies?/i,        path:['uoe','Property Operations & Maintenance','R&M Supplies']},
-    {match:/grounds|landscap/i,     path:['uoe','Property Operations & Maintenance','Groundskeeping']},
-    {match:/waste|trash/i,          path:['uoe','Property Operations & Maintenance','Waste Removal']},
-    {match:/other/i,                path:['uoe','Property Operations & Maintenance','Other']},
-    {match:/payroll taxes?/i,       path:['uoe','Property Operations & Maintenance','Payroll Taxes']},
-    {match:/benefit/i,              path:['uoe','Property Operations & Maintenance','Employee Benefits']},
-
-    // UOE: Utilities
-    {match:/\belectric/i, path:['uoe','Utilities','Electricity']},
-    {match:/\bgas\b/i,     path:['uoe','Utilities','Gas']},
-    {match:/water|sewer/i, path:['uoe','Utilities','Water & Sewer']},
-    {match:/internet|telecom/i, path:['uoe','Utilities','Internet/Telecom']},
-
-    // Mgmt & Fixed
-    {match:/base management fee/i,      path:['mgmt_fees','Base Management Fee']},
-    {match:/incentive management fee/i, path:['mgmt_fees','Incentive Management Fee']},
-    {match:/rent|lease/i,     path:['fixed','Rent/Lease']},
-    {match:/property tax/i,   path:['fixed','Property Taxes']},
-    {match:/insurance/i,      path:['fixed','Insurance']},
-    {match:/interest/i,       path:['fixed','Interest']},
-    {match:/ff&e|reserve/i,   path:['fixed','FF&E Reserve']}
-  ];
-
-  /* ---------- Tabs ---------- */
+  /* ========= Tabs ========= */
   qsa('.tab').forEach(btn=>{
     btn.addEventListener('click',()=>{
       qsa('.tab').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
-      ['dailyTab','monthlyTab','plTab','budgetTab'].forEach(x=>qs('#'+x).classList.add('hidden'));
+      ['dailyTab','monthlyTab','plTab'].forEach(id=>qs('#'+id).classList.add('hidden'));
       qs('#'+btn.dataset.tab).classList.remove('hidden');
     });
   });
 
-  /* ---------- DAILY ---------- */
-  const daily = {}; // key "YYYY-MM": {ly:[], bud:[], fc:[], act:[]}
-  function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
-  function weekday(y,m,d){ return new Date(y,m,d).toLocaleDateString('en-US',{weekday:'short'}); }
-  function keyFor(y,m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
-  function revpar(adr,occPct){ return (Number(adr)||0) * ((Number(occPct)||0)/100); }
-
-  // SDOWLY mapping
-  function sdowMap(y,m){
-    const n=daysInMonth(y,m), nLY=daysInMonth(y-1,m);
-    const curDays=[...Array(n)].map((_,i)=>i+1), lyDays=[...Array(nLY)].map((_,i)=>i+1);
-    const curW=curDays.map(d=>new Date(y,m,d).getDay()), lyW=lyDays.map(d=>new Date(y-1,m,d).getDay());
-    const occ=(days,year)=>{ let idx=[], c=Array(7).fill(0); days.forEach((d,i)=>{ const w=new Date(year,m,d).getDay(); c[w]++; idx[i]=c[w]; }); return idx; };
-    const curOcc=occ(curDays,y), lyOcc=occ(lyDays,y-1);
-    const lyByWOcc={}; lyDays.forEach((d,i)=>{ const k=`${lyW[i]}-${lyOcc[i]}`; (lyByWOcc[k]??=[]).push(d); });
-    return curDays.map((d,i)=>{
-      const k=`${curW[i]}-${curOcc[i]}`; if (lyByWOcc[k]?.length) return lyByWOcc[k][0]-1;
-      const lyList=lyDays.filter((dd,li)=>lyW[li]===curW[i]);
-      return lyList.length ? lyList[Math.min(curOcc[i]-1, lyList.length-1)]-1 : Math.max(0,Math.min(nLY-1,i-7));
-    });
-  }
-
-  function ensureDailyKey(y,m){
-    const k=keyFor(y,m), n=daysInMonth(y,m), nLY=daysInMonth(y-1,m);
-    if(!daily[k]){
-      const blank=len=>Array.from({length:len},()=>({rev:'',adr:'',occ:''}));
-      daily[k]={ ly:blank(nLY), bud:blank(n), fc:blank(n), act:blank(n) };
-    }else{
-      const adj=(arr,len)=>Array.from({length:len},(_,i)=>arr[i]??({rev:'',adr:'',occ:''}));
-      daily[k].ly = adj(daily[k].ly, nLY);
-      daily[k].bud = adj(daily[k].bud, n);
-      daily[k].fc = adj(daily[k].fc, n);
-      daily[k].act = adj(daily[k].act, n);
-    }
-    return k;
-  }
-
+  /* ========= DAILY (restored + GM Accuracy) ========= */
+  const dailyHead=qs('#dailyHead'), dailyBody=qs('#dailyBody');
   function buildDailyHeader(){
-    const head=qs('#dailyHead');
-    head.innerHTML = `
+    dailyHead.innerHTML=`
       <tr>
-        <th class="sticky-col">Day</th>
-        <th colspan="4" class="col-ly">Previous Year Actual</th>
-        <th colspan="4" class="col-bud">Budget</th>
-        <th colspan="4" class="col-fc">Manager Forecast</th>
-        <th colspan="4" class="col-act">Current Year Actual</th>
-        <th colspan="5">Forecast Accuracy</th>
+        <th>Day</th>
+        <th colspan="4">Prev Year Actual</th>
+        <th colspan="4">Budget</th>
+        <th colspan="4">Manager Forecast</th>
+        <th colspan="4">Current Year Actual</th>
+        <th>GM Accuracy %</th>
       </tr>
       <tr>
-        <th class="sticky-col"># / DOW</th>
-        <th class="col-ly">Revenue</th><th class="col-ly">ADR</th><th class="col-ly">OCC %</th><th class="col-ly">RevPAR</th>
-        <th class="col-bud">Revenue</th><th class="col-bud">ADR</th><th class="col-bud">OCC %</th><th class="col-bud">RevPAR</th>
-        <th class="col-fc">Revenue</th><th class="col-fc">ADR</th><th class="col-fc">OCC %</th><th class="col-fc">RevPAR</th>
-        <th class="col-act">Revenue</th><th class="col-act">ADR</th><th class="col-act">OCC %</th><th class="col-act">RevPAR</th>
-        <th>Rev</th><th>ADR</th><th>OCC</th><th>RevPAR</th><th>Avg</th>
+        <th># / DOW</th>
+        <th>Revenue</th><th>ADR</th><th>OCC%</th><th>RevPAR</th>
+        <th>Revenue</th><th>ADR</th><th>OCC%</th><th>RevPAR</th>
+        <th>Revenue</th><th>ADR</th><th>OCC%</th><th>RevPAR</th>
+        <th>Revenue</th><th>ADR</th><th>OCC%</th><th>RevPAR</th>
+        <th>%</th>
       </tr>`;
   }
+  function daysInMonth(y,m){return new Date(y,m+1,0).getDate();}
+  function weekday(y,m,d){return new Date(y,m,d).toLocaleDateString('en-US',{weekday:'short'});}
 
-  function renderDaily(){
-    const m=parseInt(qs('#dailyMonth').value), y=parseInt(qs('#dailyYear').value);
-    const k=ensureDailyKey(y,m); buildDailyHeader();
-    const n=daysInMonth(y,m), body=qs('#dailyBody'); body.innerHTML='';
-    for(let d=1; d<=n; d++){
-      const dow=weekday(y,m,d);
-      const ly=daily[k].ly[d-1]||{}, bud=daily[k].bud[d-1]||{}, fc=daily[k].fc[d-1]||{}, act=daily[k].act[d-1]||{};
-      const row=document.createElement('tr');
-      row.innerHTML = `
-        <td class="sticky-col">${d} · ${dow}</td>
-        <td class="col-ly"><input class="d-in" data-g="ly" data-f="rev" data-i="${d-1}" type="number" value="${ly.rev||''}"></td>
-        <td class="col-ly"><input class="d-in" data-g="ly" data-f="adr" data-i="${d-1}" type="number" step="0.01" value="${ly.adr||''}"></td>
-        <td class="col-ly"><input class="d-in" data-g="ly" data-f="occ" data-i="${d-1}" type="number" step="0.01" value="${ly.occ||''}"></td>
-        <td class="col-ly revpar" data-rp="ly" data-i="${d-1}">$0</td>
+  // persisted daily data
+  let dailyData = {}; // { "YYYY-M": [ {prev:{...}, bud:{...}, fcst:{...}, curr:{...}}, ... ] }
 
-        <td class="col-bud"><input class="d-in" data-g="bud" data-f="rev" data-i="${d-1}" type="number" value="${bud.rev||''}"></td>
-        <td class="col-bud"><input class="d-in" data-g="bud" data-f="adr" data-i="${d-1}" type="number" step="0.01" value="${bud.adr||''}"></td>
-        <td class="col-bud"><input class="d-in" data-g="bud" data-f="occ" data-i="${d-1}" type="number" step="0.01" value="${bud.occ||''}"></td>
-        <td class="col-bud revpar" data-rp="bud" data-i="${d-1}">$0</td>
-
-        <td class="col-fc"><input class="d-in" data-g="fc" data-f="rev" data-i="${d-1}" type="number" value="${fc.rev||''}"></td>
-        <td class="col-fc"><input class="d-in" data-g="fc" data-f="adr" data-i="${d-1}" type="number" step="0.01" value="${fc.adr||''}"></td>
-        <td class="col-fc"><input class="d-in" data-g="fc" data-f="occ" data-i="${d-1}" type="number" step="0.01" value="${fc.occ||''}"></td>
-        <td class="col-fc revpar" data-rp="fc" data-i="${d-1}">$0</td>
-
-        <td class="col-act"><input class="d-in" data-g="act" data-f="rev" data-i="${d-1}" type="number" value="${act.rev||''}"></td>
-        <td class="col-act"><input class="d-in" data-g="act" data-f="adr" data-i="${d-1}" type="number" step="0.01" value="${act.adr||''}"></td>
-        <td class="col-act"><input class="d-in" data-g="act" data-f="occ" data-i="${d-1}" type="number" step="0.01" value="${act.occ||''}"></td>
-        <td class="col-act revpar" data-rp="act" data-i="${d-1}">$0</td>
-
-        <td data-acc="rev" data-i="${d-1}">0%</td>
-        <td data-acc="adr" data-i="${d-1}">0%</td>
-        <td data-acc="occ" data-i="${d-1}">0%</td>
-        <td data-acc="revpar" data-i="${d-1}">0%</td>
-        <td data-acc="avg" data-i="${d-1}">0%</td>
-      `;
-      body.appendChild(row);
-    }
-    qsa('.d-in',body).forEach(inp=>{
-      inp.addEventListener('input',()=>{
-        const g=inp.dataset.g, f=inp.dataset.f, i=parseInt(inp.dataset.i);
-        daily[k][g][i][f]=inp.value;
-        recalcDaily();
-      });
-    });
-    recalcDaily();
+  function keyForDaily(){
+    const y=Number(qs('#dailyYear').value)||new Date().getFullYear();
+    const m=Number(qs('#dailyMonth').value)||new Date().getMonth();
+    return `${y}-${m}`;
   }
-
-  let lastUSALI_B=null; // for daily target
-  function recalcDaily(){
-    const m=parseInt(qs('#dailyMonth').value), y=parseInt(qs('#dailyYear').value);
-    const k=ensureDailyKey(y,m);
-    const n=daysInMonth(y,m);
-
-    const sums={ly:0,bud:0,fc:0,act:0}, adrSum={ly:[],bud:[],fc:[],act:[]}, occSum={ly:[],bud:[],fc:[],act:[]}, rpSum={ly:[],bud:[],fc:[],act:[]};
-    for(let i=0;i<n;i++){
-      ['ly','bud','fc','act'].forEach(g=>{
-        const e=daily[k][g][i]||{}, adr=Number(e.adr)||0, occ=Number(e.occ)||0, rp=revpar(adr,occ);
-        const rpCell=qs(`[data-rp="${g}"][data-i="${i}"]`); if(rpCell) rpCell.textContent=fmtC(rp);
-        sums[g]+=Number(e.rev)||0; adrSum[g].push(adr); occSum[g].push(occ); rpSum[g].push(rp);
-      });
-    }
-
-    qs('#avgDailyRev').textContent=fmtC((sums.act||0)/Math.max(1,n));
-    qs('#avgADR').textContent=fmtC(avg(adrSum.act));
-    qs('#avgOCC').textContent=fmtP(avg(occSum.act));
-    qs('#avgREVPAR').textContent=fmtC(avg(rpSum.act));
-
-    const map=sdowMap(y,m);
-    let accRevArr=[], accAdrArr=[], accOccArr=[], accRpArr=[];
-    for(let i=0;i<n;i++){
-      const li=map[i];
-      const ly = daily[k].ly[li]||{};
-      const f  = daily[k].fc[i]||{};
-      const a  = daily[k].act[i]||{};
-
-      const lyR=Number(ly.rev)||0, lyA=Number(ly.adr)||0, lyO=Number(ly.occ)||0, lyP=revpar(lyA,lyO);
-      const fR =Number(f.rev)||0,  fA =Number(f.adr)||0,  fO =Number(f.occ)||0,  fP =revpar(fA,fO);
-      const aR =Number(a.rev)||0,  aA =Number(a.adr)||0,  aO =Number(a.occ)||0,  aP =revpar(aA,aO);
-
-      function accMetric(fv,av,lyv){
-        if (av===0 && fv===0) return 100;
-        if (lyv>0 && av>0){ const idxF=fv/lyv, idxA=av/lyv; const ape=Math.abs(idxF-idxA)/(idxA||1)*100; return Math.max(0,100-ape); }
-        if (av>0){ const ape=Math.abs(fv-av)/(av||1)*100; return Math.max(0,100-ape); }
-        return fv===0?100:0;
+  function ensureDailyArray(len){
+    const k=keyForDaily();
+    if(!dailyData[k]) dailyData[k]=Array(len).fill(0).map(()=>({
+      prev:{rev:'',adr:'',occ:'',revpar:''},
+      bud :{rev:'',adr:'',occ:'',revpar:''},
+      fcst:{rev:'',adr:'',occ:'',revpar:''},
+      curr:{rev:'',adr:'',occ:'',revpar:''},
+    }));
+    if(dailyData[k].length!==len){
+      dailyData[k].length=len;
+      for(let i=0;i<len;i++){
+        if(!dailyData[k][i]) dailyData[k][i]={prev:{rev:'',adr:'',occ:'',revpar:''},bud:{rev:'',adr:'',occ:'',revpar:''},fcst:{rev:'',adr:'',occ:'',revpar:''},curr:{rev:'',adr:'',occ:'',revpar:''}};
       }
-      const ar=accMetric(fR,aR,lyR), aa=accMetric(fA,aA,lyA), ao=accMetric(fO,aO,lyO), ap=accMetric(fP,aP,lyP);
-      accRevArr.push(ar); accAdrArr.push(aa); accOccArr.push(ao); accRpArr.push(ap);
-
-      const put=(k,v)=>{ const c=qs(`[data-acc="${k}"][data-i="${i}"]`); if(c){ c.textContent=fmtP(v); c.className = (v>=90?'accuracy-good':(v<70?'accuracy-bad':'')); } };
-      put('rev',ar); put('adr',aa); put('occ',ao); put('revpar',ap); put('avg',avg([ar,aa,ao,ap]));
     }
-    const oAvg=avg([avg(accRevArr)||0, avg(accAdrArr)||0, avg(accOccArr)||0, avg(accRpArr)||0])||0;
-    qs('#fcAccuracy').textContent=fmtP(oAvg);
-
-    const lyTotal = sums.ly, varPct = lyTotal>0 ? ((sums.act-lyTotal)/lyTotal)*100 : 0;
-    qs('#varVsLYPct').textContent=fmtP(varPct);
-
-    if (qs('#dailyRollupToggle').checked){
-      const i=m;
-      if (els.revCurrInputs && els.revCurrInputs[i]) els.revCurrInputs[i].value = Math.round(sums.act);
-      revCurr[i]=sums.act;
-      calculateMonthly();
-    }
-    if (qs('#dailyBudgetRollupToggle').checked){
-      const i=m;
-      if (els.revBudgetInputs && els.revBudgetInputs[i]) els.revBudgetInputs[i].value = Math.round(sums.bud);
-      revBudget[i]=sums.bud;
-      calculateMonthly();
-    }
-
-    const target = lastUSALI_B ? (lastUSALI_B.revMonths[m]||0) : sums.bud || 0;
-    qs('#dailyTarget').textContent=fmtC(target);
-    qs('#dailyProgress').textContent=fmtC(sums.act||0);
-
-    if (qs('#autoSaveToggle').checked) saveToLocal(false);
+    return dailyData[k];
   }
 
-  /* ---------- MONTHLY + P&L + Chart ---------- */
-  let revPrev=Array(12).fill(0), revCurr=Array(12).fill(0), revBudget=Array(12).fill(0);
-  let expPrev=Array(12).fill(0), expCurr=Array(12).fill(0), expBudget=Array(12).fill(0);
+  function gmAccForDay(fcst, actual){
+    const a = Number(actual)||0;
+    const f = Number(fcst)||0;
+    if(a<=0) return null; // undefined when no actual
+    const err = Math.abs(f-a)/Math.max(a,1);
+    return Math.max(0, 100*(1-err));
+  }
+
+  function renderDailyTable(){
+    buildDailyHeader();
+    const y=Number(qs('#dailyYear').value)||new Date().getFullYear();
+    const m=Number(qs('#dailyMonth').value)||new Date().getMonth();
+    const n=daysInMonth(y,m);
+    const arr=ensureDailyArray(n);
+    dailyBody.innerHTML='';
+    let accSum=0, accN=0;
+
+    for(let d=1; d<=n; d++){
+      const row=document.createElement('tr');
+      const day=arr[d-1];
+      const cell = (g,f,ro=false)=>{
+        const step=(f==='occ'||f==='adr'||f==='revpar')?'0.01':'1';
+        const placeholder=(f==='occ'||f==='revpar')?'0.0':'0';
+        const val=day[g][f]??'';
+        const roAttr = ro ? 'readonly' : '';
+        return `<td class="input-cell"><input ${roAttr} type="number" step="${step}" value="${val}" placeholder="${placeholder}" data-day="${d-1}" data-group="${g}" data-field="${f}"/></td>`;
+      };
+      const acc = gmAccForDay(day.fcst.rev, day.curr.rev);
+      if(acc!=null){accSum+=acc;accN++;}
+
+      row.innerHTML=`
+        <td>${d} · ${weekday(y,m,d)}</td>
+        ${cell('prev','rev',true)}${cell('prev','adr',true)}${cell('prev','occ',true)}${cell('prev','revpar',true)}
+        ${cell('bud','rev')}${cell('bud','adr')}${cell('bud','occ')}${cell('bud','revpar')}
+        ${cell('fcst','rev')}${cell('fcst','adr')}${cell('fcst','occ')}${cell('fcst','revpar')}
+        ${cell('curr','rev')}${cell('curr','adr')}${cell('curr','occ')}${cell('curr','revpar')}
+        <td><span data-acc="${d-1}">${acc!=null?fmtP(acc):'—'}</span></td>
+      `;
+      dailyBody.appendChild(row);
+    }
+    qsa('#dailyBody input').forEach(inp=>inp.addEventListener('input',onDailyInput));
+
+    qs('#gmAccuracyAvg').textContent = accN? fmtP(accSum/accN) : '—';
+  }
+
+  function onDailyInput(e){
+    const el=e.target;
+    const idx=parseInt(el.dataset.day,10);
+    const g=el.dataset.group,f=el.dataset.field;
+    const y=Number(qs('#dailyYear').value)||new Date().getFullYear();
+    const m=Number(qs('#dailyMonth').value)||new Date().getMonth();
+    const n=daysInMonth(y,m);
+    const arr=ensureDailyArray(n);
+    arr[idx][g][f]=el.value;
+
+    // update GM accuracy for that row
+    const acc = gmAccForDay(arr[idx].fcst.rev, arr[idx].curr.rev);
+    const sp = qs(`[data-acc="${idx}"]`);
+    if(sp) sp.textContent = acc!=null ? fmtP(acc) : '—';
+
+    // refresh average
+    let accSum=0,accN=0;
+    for(let i=0;i<arr.length;i++){
+      const a=gmAccForDay(arr[i].fcst.rev, arr[i].curr.rev);
+      if(a!=null){accSum+=a;accN++;}
+    }
+    qs('#gmAccuracyAvg').textContent = accN? fmtP(accSum/accN) : '—';
+
+    recalcDailyRollups();
+    if(qs('#autoSaveToggle').checked) saveToLocal(false);
+  }
+
+  function recalcDailyRollups(){
+    const k=keyForDaily();
+    const arr=dailyData[k]||[];
+    const budRev = arr.reduce((t,day)=>t+(parseFloat(day.bud.rev)||0),0);
+    const actRev = arr.reduce((t,day)=>t+(parseFloat(day.curr.rev)||0),0);
+
+    if(qs('#dailyBudgetRollupToggle').checked){
+      const m=Number(qs('#dailyMonth').value)||0;
+      const budInputs=qsa('input[data-rev="budget"]');
+      if(budInputs[m]) budInputs[m].value = String(Math.round(budRev));
+    }
+    if(qs('#dailyRollupToggle').checked){
+      const m=Number(qs('#dailyMonth').value)||0;
+      revCurrBreakdowns[m] = revCurrBreakdowns[m] || blankBreakdown();
+      revCurrBreakdowns[m].total = actRev;
+      revCurrBreakdowns[m].hasTotal = true;
+    }
+    calculateMonthly();
+  }
+
+  qs('#regenDailyBtn').addEventListener('click',renderDailyTable);
+  renderDailyTable();
+
+  /* ========= Monthly tables ========= */
+  const els={};
+  function mkCells(n,cls,attr){return Array.from({length:n},()=>`<td class="${cls}"><input type="number" ${attr} placeholder="0"/></td>`).join('');}
+  function mkCalc(n,attr,txt='$0'){return Array.from({length:n},(_,i)=>`<td class="calculated-cell" ${attr?attr:''} data-month="${i}">${txt}</td>`).join('');}
 
   function buildMonthlyTables(){
-    const revBody=qs('#revenueBody');
-    const expBody=qs('#expenseBody');
-    const mkCells=(n,cls,attr)=>Array.from({length:n},()=>`<td class="${cls}"><input type="number" ${attr} placeholder="0"/></td>`).join('');
-    const mkCalc=(n,attr,txt='$0')=>Array.from({length:n},(_,i)=>`<td class="calculated-cell" ${attr?`${attr} data-month="${i}"`:''}>${txt}</td>`).join('');
-
-    revBody.innerHTML = `
-      <tr><th>Prev Year Revenue</th>${mkCells(12,'input-cell','data-rev="prev"')}<td class="calculated-cell" data-rev="prev-total">$0</td></tr>
-      <tr><th>Current Year Actual</th>${mkCells(7,'input-cell','data-rev="curr"')}<td class="forecast-cell" data-rev="forecast" data-month="7">Forecast</td><td class="forecast-cell" data-rev="forecast" data-month="8">Forecast</td><td class="forecast-cell" data-rev="forecast" data-month="9">Forecast</td><td class="forecast-cell" data-rev="forecast" data-month="10">Forecast</td><td class="forecast-cell" data-rev="forecast" data-month="11">Forecast</td><td class="calculated-cell" data-rev="curr-total">$0</td></tr>
+    const revBody=qs('#revenueBody'), expBody=qs('#expenseBody');
+    revBody.innerHTML=`
+      <tr>
+        <th>
+          <details class="master-drop" id="prevMaster">
+            <summary>Prev Year Actual (PTD)</summary>
+            <div class="drop-panel">
+              <div class="controls">
+                <label>Month: <select id="prevMonthSelect">${MONTHS.map((m,i)=>`<option value="${i}">${m}</option>`).join('')}</select></label>
+              </div>
+              <div class="controls">
+                <span class="kpi-chip">Rooms: <b id="prevKpiRooms">0</b></span>
+                <span class="kpi-chip">ADR: <b id="prevKpiADR">$0</b></span>
+                <span class="kpi-chip">OCC%: <b id="prevKpiOCC">0%</b></span>
+              </div>
+              <ul class="cat-list" id="prevCatList"><li><em>No categories yet.</em></li></ul>
+            </div>
+          </details>
+        </th>
+        ${Array.from({length:12},(_,i)=>`<td><span data-rev="prev-total-month" data-month="${i}">$0</span></td>`).join('')}
+        <td class="calculated-cell"><span id="prevTotalAll">$0</span></td>
+      </tr>
+      <tr>
+        <th>PTD KPIs (Prev Year)</th>
+        ${Array.from({length:12},(_,i)=>`
+          <td>
+            <span class="kpi-chip">Rooms: <b data-rev="prev-kpi-rooms" data-month="${i}">0</b></span>
+            <span class="kpi-chip">ADR: <b data-rev="prev-kpi-adr" data-month="${i}">$0</b></span>
+            <span class="kpi-chip">OCC%: <b data-rev="prev-kpi-occ" data-month="${i}">0%</b></span>
+          </td>`).join('')}
+        <td class="calculated-cell">—</td>
+      </tr>
+      <tr>
+        <th>
+          <details class="master-drop" id="currMaster">
+            <summary>Current Year Actual (PTD)</summary>
+            <div class="drop-panel">
+              <div class="controls">
+                <label>Month: <select id="currMonthSelect">${MONTHS.map((m,i)=>`<option value="${i}">${m}</option>`).join('')}</select></label>
+              </div>
+              <div class="controls">
+                <span class="kpi-chip">Rooms: <b id="currKpiRooms">0</b></span>
+                <span class="kpi-chip">ADR: <b id="currKpiADR">$0</b></span>
+                <span class="kpi-chip">OCC%: <b id="currKpiOCC">0%</b></span>
+              </div>
+              <ul class="cat-list" id="currCatList"><li><em>No categories yet.</em></li></ul>
+            </div>
+          </details>
+        </th>
+        ${Array.from({length:12},(_,i)=>`<td><span data-rev="curr-total-month" data-month="${i}">$0</span></td>`).join('')}
+        <td class="calculated-cell"><span id="currTotalAll">$0</span></td>
+      </tr>
+      <tr>
+        <th>PTD KPIs (Current Year)</th>
+        ${Array.from({length:12},(_,i)=>`
+          <td>
+            <span class="kpi-chip">Rooms: <b data-rev="curr-kpi-rooms" data-month="${i}">0</b></span>
+            <span class="kpi-chip">ADR: <b data-rev="curr-kpi-adr" data-month="${i}">$0</b></span>
+            <span class="kpi-chip">OCC%: <b data-rev="curr-kpi-occ" data-month="${i}">0%</b></span>
+          </td>`).join('')}
+        <td class="calculated-cell">—</td>
+      </tr>
       <tr><th>Budget (Revenue)</th>${mkCells(12,'input-cell','data-rev="budget"')}<td class="calculated-cell" data-rev="budget-total">$0</td></tr>
-      <tr><th>Variance vs LY ($)</th>${mkCalc(12,'data-rev="var-ly") }<td class="calculated-cell" data-rev="var-ly-total">$0</td></tr>
+      <tr><th>Variance vs LY ($)</th>${mkCalc(12,'data-rev="var-ly"','$0')}<td class="calculated-cell" data-rev="var-ly-total">$0</td></tr>
       <tr><th>Variance vs LY (%)</th>${mkCalc(12,'data-rev="varpct-ly"','0%')}<td class="calculated-cell" data-rev="varpct-ly-total">0%</td></tr>
-      <tr><th>Variance vs Budget ($)</th>${mkCalc(12,'data-rev="var-bud") }<td class="calculated-cell" data-rev="var-bud-total">$0</td></tr>
+      <tr><th>Variance vs Budget ($)</th>${mkCalc(12,'data-rev="var-bud"','$0')}<td class="calculated-cell" data-rev="var-bud-total">$0</td></tr>
       <tr><th>Variance vs Budget (%)</th>${mkCalc(12,'data-rev="varpct-bud"','0%')}<td class="calculated-cell" data-rev="varpct-bud-total">0%</td></tr>
     `;
-
-    expBody.innerHTML = `
+    expBody.innerHTML=`
       <tr><th>Prev Year Expenses</th>${mkCells(12,'input-cell','data-exp="prev"')}<td class="calculated-cell" data-exp="prev-total">$0</td></tr>
-      <tr><th>Current Year Actual</th>${mkCells(7,'input-cell','data-exp="curr"')}<td class="forecast-cell" data-exp="forecast" data-month="7">Forecast</td><td class="forecast-cell" data-exp="forecast" data-month="8">Forecast</td><td class="forecast-cell" data-exp="forecast" data-month="9">Forecast</td><td class="forecast-cell" data-exp="forecast" data-month="10">Forecast</td><td class="forecast-cell" data-exp="forecast" data-month="11">Forecast</td><td class="calculated-cell" data-exp="curr-total">$0</td></tr>
+      <tr><th>Current Year Actual</th>${mkCells(12,'input-cell','data-exp="curr"')}<td class="calculated-cell" data-exp="curr-total">$0</td></tr>
       <tr><th>Budget (Expenses)</th>${mkCells(12,'input-cell','data-exp="budget"')}<td class="calculated-cell" data-exp="budget-total">$0</td></tr>
-      <tr><th>Variance vs LY ($)</th>${mkCalc(12,'data-exp="var-ly") }<td class="calculated-cell" data-exp="var-ly-total">$0</td></tr>
+      <tr><th>Variance vs LY ($)</th>${mkCalc(12,'data-exp="var-ly"','$0')}<td class="calculated-cell" data-exp="var-ly-total">$0</td></tr>
       <tr><th>Variance vs LY (%)</th>${mkCalc(12,'data-exp="varpct-ly"','0%')}<td class="calculated-cell" data-exp="varpct-ly-total">0%</td></tr>
-      <tr><th>Variance vs Budget ($)</th>${mkCalc(12,'data-exp="var-bud") }<td class="calculated-cell" data-exp="var-bud-total">$0</td></tr>
+      <tr><th>Variance vs Budget ($)</th>${mkCalc(12,'data-exp="var-bud"','$0')}<td class="calculated-cell" data-exp="var-bud-total">$0</td></tr>
       <tr><th>Variance vs Budget (%)</th>${mkCalc(12,'data-exp="varpct-bud"','0%')}<td class="calculated-cell" data-exp="varpct-bud-total">0%</td></tr>
     `;
-
-    qs('#plBody').innerHTML = `
-      <tr><th>Prev Year Operating Profit</th>${mkCalc(12,'data-pl="prev") }<td class="calculated-cell" data-pl="prev-total">$0</td></tr>
-      <tr><th>Current Year Operating Profit</th>${mkCalc(12,'data-pl="curr") }<td class="calculated-cell" data-pl="curr-total">$0</td></tr>
-      <tr><th>Budget Operating Profit</th>${mkCalc(12,'data-pl="budget") }<td class="calculated-cell" data-pl="budget-total">$0</td></tr>
-      <tr><th>Variance vs LY ($)</th>${mkCalc(12,'data-pl="var-ly") }<td class="calculated-cell" data-pl="var-ly-total">$0</td></tr>
-      <tr><th>Variance vs Budget ($)</th>${mkCalc(12,'data-pl="var-bud") }<td class="calculated-cell" data-pl="var-bud-total">$0</td></tr>
+    qs('#plBody').innerHTML=`
+      <tr><th>Prev Year Operating Profit</th>${mkCalc(12,'data-pl="prev"','$0')}<td class="calculated-cell" data-pl="prev-total">$0</td></tr>
+      <tr><th>Current Year Operating Profit</th>${mkCalc(12,'data-pl="curr"','$0')}<td class="calculated-cell" data-pl="curr-total">$0</td></tr>
+      <tr><th>Budget Operating Profit</th>${mkCalc(12,'data-pl="budget"','$0')}<td class="calculated-cell" data-pl="budget-total">$0</td></tr>
+      <tr><th>Variance vs LY ($)</th>${mkCalc(12,'data-pl="var-ly"','$0')}<td class="calculated-cell" data-pl="var-ly-total">$0</td></tr>
+      <tr><th>Variance vs Budget ($)</th>${mkCalc(12,'data-pl="var-bud"','$0')}<td class="calculated-cell" data-pl="var-bud-total">$0</td></tr>
     `;
-
-    els.revPrevInputs=qsa('input[data-rev="prev"]');
-    els.revCurrInputs=qsa('input[data-rev="curr"]');
     els.revBudgetInputs=qsa('input[data-rev="budget"]');
-    els.revForecastCells=qsa('[data-rev="forecast"]');
-    els.revPrevTotal=qs('[data-rev="prev-total"]');
-    els.revCurrTotal=qs('[data-rev="curr-total"]');
-    els.revBudgetTotal=qs('[data-rev="budget-total"]');
-    els.revVarLyCells=qsa('[data-rev="var-ly"]');
-    els.revVarPctLyCells=qsa('[data-rev="varpct-ly"]');
-    els.revVarBudCells=qsa('[data-rev="var-bud"]');
-    els.revVarPctBudCells=qsa('[data-rev="varpct-bud"]');
-    els.revVarLyTotal=qs('[data-rev="var-ly-total"]');
-    els.revVarPctLyTotal=qs('[data-rev="varpct-ly-total"]');
-    els.revVarBudTotal=qs('[data-rev="var-bud-total"]');
-    els.revVarPctBudTotal=qs('[data-rev="varpct-bud-total"]');
-
     els.expPrevInputs=qsa('input[data-exp="prev"]');
     els.expCurrInputs=qsa('input[data-exp="curr"]');
     els.expBudgetInputs=qsa('input[data-exp="budget"]');
-    els.expForecastCells=qsa('[data-exp="forecast"]');
-    els.expPrevTotal=qs('[data-exp="prev-total"]');
-    els.expCurrTotal=qs('[data-exp="curr-total"]');
-    els.expBudgetTotal=qs('[data-exp="budget-total"]');
-    els.expVarLyCells=qsa('[data-exp="var-ly"]');
-    els.expVarPctLyCells=qsa('[data-exp="varpct-ly"]');
-    els.expVarBudCells=qsa('[data-exp="var-bud"]');
-    els.expVarPctBudCells=qsa('[data-exp="varpct-bud"]');
-    els.expVarLyTotal=qs('[data-exp="var-ly-total"]');
-    els.expVarPctLyTotal=qs('[data-exp="varpct-ly-total"]');
-    els.expVarBudTotal=qs('[data-exp="var-bud-total"]');
-    els.expVarPctBudTotal=qs('[data-exp="varpct-bud-total"]');
+    els.revPrevMonthTotals=qsa('[data-rev="prev-total-month"]');
+    els.revCurrMonthTotals=qsa('[data-rev="curr-total-month"]');
+    els.revPrevTotalAll=qs('#prevTotalAll');
+    els.revCurrTotalAll=qs('#currTotalAll');
+    els.prevMonthSelect=qs('#prevMonthSelect');
+    els.prevCatList=qs('#prevCatList');
+    els.prevKpiRooms=qs('#prevKpiRooms');
+    els.prevKpiADR=qs('#prevKpiADR');
+    els.prevKpiOCC=qs('#prevKpiOCC');
+    els.currMonthSelect=qs('#currMonthSelect');
+    els.currCatList=qs('#currCatList');
+    els.currKpiRooms=qs('#currKpiRooms');
+    els.currKpiADR=qs('#currKpiADR');
+    els.currKpiOCC=qs('#currKpiOCC');
+    els.prevMonthSelect.addEventListener('change',()=>renderMasterPanel('prev', parseInt(els.prevMonthSelect.value,10)));
+    els.currMonthSelect.addEventListener('change',()=>renderMasterPanel('curr', parseInt(els.currMonthSelect.value,10)));
+  }
+  buildMonthlyTables();
 
-    els.plPrevCells=qsa('[data-pl="prev"]');
-    els.plCurrCells=qsa('[data-pl="curr"]');
-    els.plBudgetCells=qsa('[data-pl="budget"]');
-    els.plVarLyCells=qsa('[data-pl="var-ly"]');
-    els.plVarBudCells=qsa('[data-pl="var-bud"]');
-    els.plPrevTotal=qs('[data-pl="prev-total"]');
-    els.plCurrTotal=qs('[data-pl="curr-total"]');
-    els.plBudgetTotal=qs('[data-pl="budget-total"]');
+  /* ========= State ========= */
+  let revBudget=Array(12).fill(0);
+  let expPrev=Array(12).fill(0), expCurr=Array(12).fill(0), expBudget=Array(12).fill(0);
+  function blankBreakdown(){ return { total:0, hasTotal:false, categories:{}, kpis:{rooms:0,adr:0,occ:0} }; }
+  const revPrevBreakdowns=Array(12).fill(null).map(()=>blankBreakdown());
+  const revCurrBreakdowns=Array(12).fill(null).map(()=>blankBreakdown());
+
+  /* ========= Parsing (header period like 31Jan25) ========= */
+  const RX_DATE_TOKEN=/\b(\d{2})([A-Za-z]{3})(\d{2})\b/;
+  const MONTHS3=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  function cleanNumber(v){
+    if(typeof v==='number') return v;
+    const s=String(v||'').trim(); if(!s) return NaN;
+    const neg=/\(.*\)/.test(s)||/^-/.test(s);
+    const t=s.replace(/[^0-9.]/g,''); if(!t) return NaN;
+    const n=Number(t); return Number.isFinite(n)?(neg?-Math.abs(n):n):NaN;
+  }
+  function numbersInLine(line){
+    const re=/-?\(?\$?\d[\d,]*(?:\.\d+)?\)?/g; const out=[]; let m;
+    while((m=re.exec(line))!==null) out.push(cleanNumber(m[0]));
+    return out;
+  }
+  function getPTD(line){ const nums=numbersInLine(line); return Number.isFinite(nums[2])?nums[2]:NaN; }
+
+  function parseShortDateToken(tok){
+    const m=String(tok||'').match(RX_DATE_TOKEN); if(!m) return null;
+    const d=parseInt(m[1],10); const mon=MONTHS3.indexOf(m[2]); const y=2000+parseInt(m[3],10);
+    if(mon<0) return null; return new Date(Date.UTC(y,mon,d));
   }
 
-  const els={};
+  function getHeaderPeriod(text){
+    // Look only at top ~25 lines for the “top-left” header area
+    const lines=text.split(/\r?\n/).slice(0,25);
+    for(const ln of lines){
+      const m=ln.match(RX_DATE_TOKEN);
+      if(m){ const dt=parseShortDateToken(m[0]); if(dt) return {year:dt.getUTCFullYear(), month:dt.getUTCMonth()}; }
+    }
+    return null;
+  }
 
+  function inferMonthIndexFromText(text, filename){
+    const header=getHeaderPeriod(text);
+    if(header) return header.month;
+    // fallback: filename like 20250131_RevReport.txt
+    const m=(filename||'').match(/(\d{4})(\d{2})(\d{2})_RevReport/i);
+    if(m) return Math.max(0, Math.min(11, Number(m[2])-1));
+    return 0;
+  }
+  function inferYearFromText(text, filename){
+    const header=getHeaderPeriod(text);
+    if(header) return header.year;
+    const m=(filename||'').match(/(\d{4})(\d{2})(\d{2})_RevReport/i);
+    if(m) return Number(m[1]);
+    // fallback to current input year
+    return Number(qs('#dailyYear')?.value)||new Date().getFullYear();
+  }
+
+  const TOTAL_ROOM_SALES=/\bTOTAL\s+ROOM\s+SALES\b/i;
+  const ROOMS_OCC=/\b#\s*ROOM(?:S|)\s*(?:NIGHTS\s*)?OCCUPIED|\b#\s*ROOMS\s*SOLD\b/i;
+  const AVG_RATE=/\bAVG\s+RATE\s+PER\s+ROOM\b/i;
+  const OCC_PCT=/\bOCC(?:UPANCY)?\s*(?:%|PCT)\b/i;
+  const EXCLUDE_TOTALS=/\b(GROSS\s+HOTEL\s+SALES|TOTAL\s+HOTEL\s+REVENUE|GRAND\s+TOTAL)\b/i;
+  const CAT_LINE=/^ROOMS?\s*-\s*([A-Za-z0-9 /&().-]+?)\s+[-,$()0-9.\s]+$/i;
+
+  function parseRevReportText(text, filename){
+    const monthIdx=inferMonthIndexFromText(text, filename);
+    const year=inferYearFromText(text, filename);
+    const bd={ total:0, hasTotal:false, categories:{}, kpis:{rooms:0,adr:0,occ:0}, year };
+
+    const lines=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    for(const lineRaw of lines){
+      const line=lineRaw.replace(/\s+/g,' ').trim();
+      if(!line) continue;
+      if(EXCLUDE_TOTALS.test(line)) continue;
+
+      if(TOTAL_ROOM_SALES.test(line)){
+        const v=getPTD(line);
+        if(Number.isFinite(v)){ bd.total=v; bd.hasTotal=true; }
+        continue;
+      }
+      if(ROOMS_OCC.test(line)){
+        const v=getPTD(line); if(Number.isFinite(v)) bd.kpis.rooms=v; continue;
+      }
+      if(AVG_RATE.test(line)){
+        const v=getPTD(line); if(Number.isFinite(v)) bd.kpis.adr=v; continue;
+      }
+      if(OCC_PCT.test(line)){
+        const v=getPTD(line);
+        if(Number.isFinite(v)) bd.kpis.occ=(v>0&&v<=1)? v*100 : v;
+        continue;
+      }
+      const cm=line.match(CAT_LINE);
+      if(cm){
+        const cat='Rooms - '+cm[1].replace(/\s+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim();
+        const v=getPTD(line);
+        if(Number.isFinite(v)) bd.categories[cat]=(bd.categories[cat]||0)+v;
+      }
+    }
+    return {monthIdx, year, breakdown:bd};
+  }
+
+  /* ========= Upload wiring (multi-file) ========= */
+  async function handleRevFiles(fileList, targetArray, selectEl){
+    for(const f of fileList){
+      try{
+        const txt=await f.text();
+        const {monthIdx, breakdown}=parseRevReportText(txt, f.name);
+        targetArray[monthIdx]=breakdown; // assign by month
+        flash(`Loaded: ${f.name} → ${MONTHS[monthIdx]} ${breakdown.year}`);
+      }catch(err){
+        console.error('Parse error', f.name, err);
+        flash(`Failed: ${f.name}`);
+      }
+    }
+    if(selectEl && fileList.length){
+      const last = fileList[fileList.length-1];
+      const {monthIdx}=parseRevReportText(last.name, last.name); // filename fallback just for dropdown
+      selectEl.value=String(monthIdx ?? 0);
+    }
+    calculateMonthly();
+    if(qs('#autoSaveToggle').checked) saveToLocal(false);
+  }
+  qs('#prevYearRevUpload').addEventListener('change', e=>{
+    if(!e.target.files?.length) return;
+    handleRevFiles(e.target.files, revPrevBreakdowns, qs('#prevMonthSelect'));
+  });
+  qs('#currYearRevUpload').addEventListener('change', e=>{
+    if(!e.target.files?.length) return;
+    handleRevFiles(e.target.files, revCurrBreakdowns, qs('#currMonthSelect'));
+  });
+
+  /* ========= Chart ========= */
   let chart;
   function ensureChart(){
-    if (chart) return chart;
-    chart=new Chart(qs('#revExpChart').getContext('2d'),{
+    if(chart) return chart;
+    const ctx=qs('#revExpChart')?.getContext('2d'); if(!ctx) return null;
+    chart=new Chart(ctx,{
       type:'bar',
       data:{labels:MONTHS,datasets:[
         {label:'Revenue (Current Year)',data:Array(12).fill(0),type:'bar'},
@@ -740,651 +615,178 @@
     });
     return chart;
   }
-  function updateChart(revArr,expArr){
-    const ch=ensureChart();
-    ch.data.datasets[0].data=revArr.map(v=>Math.round(v));
-    ch.data.datasets[1].data=expArr.map(v=>Math.round(v));
-    ch.data.datasets[2].data=revArr.map((v,i)=>Math.round(v-(expArr[i]||0)));
-    ch.update();
+  ensureChart();
+
+  /* ========= Monthly calcs + painting ========= */
+  function renderMasterPanel(series, monthIdx){
+    const bd=(series==='prev'?revPrevBreakdowns[monthIdx]:revCurrBreakdowns[monthIdx])||blankBreakdown();
+    const catList=series==='prev'?qs('#prevCatList'):qs('#currCatList');
+    const kRooms =series==='prev'?qs('#prevKpiRooms'):qs('#currKpiRooms');
+    const kADR   =series==='prev'?qs('#prevKpiADR'):qs('#currKpiADR');
+    const kOCC   =series==='prev'?qs('#prevKpiOCC'):qs('#currKpiOCC');
+
+    if(catList){
+      const entries=Object.entries(bd.categories).sort((a,b)=>b[1]-a[1]);
+      catList.innerHTML = entries.length
+        ? entries.map(([k,v])=>`<li><span>${k}</span><b>${fmtC(v)}</b></li>`).join('')
+        : `<li><em>No categories for ${MONTHS[monthIdx]}.</em></li>`;
+    }
+    if(kRooms) kRooms.textContent = Math.round(bd.kpis.rooms||0);
+    if(kADR)   kADR.textContent   = fmtC(bd.kpis.adr||0);
+    if(kOCC)   kOCC.textContent   = fmtP(bd.kpis.occ||0);
   }
-  function collectInputs(list){ return list.map(i=>parseFloat(i.value)||0); }
 
   function calculateMonthly(){
-    revPrev=collectInputs(els.revPrevInputs);
-    revBudget=collectInputs(els.revBudgetInputs);
-    expPrev=collectInputs(els.expPrevInputs);
-    expBudget=collectInputs(els.expBudgetInputs);
-    for(let i=0;i<7;i++){
-      const rv=parseFloat(els.revCurrInputs[i].value); if(!isNaN(rv)) revCurr[i]=rv;
-      const ex=parseFloat(els.expCurrInputs[i].value); if(!isNaN(ex)) expCurr[i]=ex;
-    }
-    function forecastSeries(prev,lastActualIdx,growth=5,seas=1.1){ const out=Array(12).fill(0); for(let i=lastActualIdx+1;i<12;i++){ if(prev[i]>0) out[i]=prev[i]*(1+growth/100)*seas; } return out; }
-    const revProj=forecastSeries(revPrev,6,5,1.1), expProj=forecastSeries(expPrev,6,3,1.00);
-    const revAvg=avg(revCurr.slice(0,7).filter(v=>v>0)), expAvg=avg(expCurr.slice(0,7).filter(v=>v>0));
-    for(let i=7;i<12;i++){
-      if (!revCurr[i] || revCurr[i]===0) revCurr[i]=revProj[i]||revAvg||0;
-      if (!expCurr[i] || expCurr[i]===0) expCurr[i]=expProj[i]||expAvg||0;
-      const rCell=els.revForecastCells.find(c=>parseInt(c.dataset.month)===i);
-      if (rCell && !rCell.textContent.includes('(daily)')) rCell.textContent=fmtC(revCurr[i]);
-      const eCell=els.expForecastCells.find(c=>parseInt(c.dataset.month)===i);
-      if (eCell) eCell.textContent=fmtC(expCurr[i]);
+    // read numeric inputs
+    revBudget = qsa('input[data-rev="budget"]').map(i=>parseFloat(i.value)||0);
+    expPrev   = qsa('input[data-exp="prev"]').map(i=>parseFloat(i.value)||0);
+    expCurr   = qsa('input[data-exp="curr"]').map(i=>parseFloat(i.value)||0);
+    expBudget = qsa('input[data-exp="budget"]').map(i=>parseFloat(i.value)||0);
+
+    const revPrev=Array(12).fill(0), revCurr=Array(12).fill(0);
+    for(let i=0;i<12;i++){
+      const bp=revPrevBreakdowns[i]||blankBreakdown();
+      const bc=revCurrBreakdowns[i]||blankBreakdown();
+      revPrev[i]=bp.hasTotal?bp.total:sum(Object.values(bp.categories||{}));
+      revCurr[i]=bc.hasTotal?bc.total:sum(Object.values(bc.categories||{}));
+      const p=qs(`[data-rev="prev-total-month"][data-month="${i}"]`);
+      const c=qs(`[data-rev="curr-total-month"][data-month="${i}"]`);
+      if(p) p.textContent=fmtC(revPrev[i]||0);
+      if(c) c.textContent=fmtC(revCurr[i]||0);
+
+      const kpr=qs(`b[data-rev="prev-kpi-rooms"][data-month="${i}"]`);
+      const kpa=qs(`b[data-rev="prev-kpi-adr"][data-month="${i}"]`);
+      const kpo=qs(`b[data-rev="prev-kpi-occ"][data-month="${i}"]`);
+      if(kpr) kpr.textContent=Math.round(bp.kpis.rooms||0);
+      if(kpa) kpa.textContent=fmtC(bp.kpis.adr||0);
+      if(kpo) kpo.textContent=fmtP(bp.kpis.occ||0);
+
+      const kcr=qs(`b[data-rev="curr-kpi-rooms"][data-month="${i}"]`);
+      const kca=qs(`b[data-rev="curr-kpi-adr"][data-month="${i}"]`);
+      const kco=qs(`b[data-rev="curr-kpi-occ"][data-month="${i}"]`);
+      if(kcr) kcr.textContent=Math.round(bc.kpis.rooms||0);
+      if(kca) kca.textContent=fmtC(bc.kpis.adr||0);
+      if(kco) kco.textContent=fmtP(bc.kpis.occ||0);
     }
 
+    // totals
     const rp=sum(revPrev), rc=sum(revCurr), rb=sum(revBudget);
-    qs('[data-rev="prev-total"]').textContent=fmtC(rp);
-    qs('[data-rev="curr-total"]').textContent=fmtC(rc);
-    qs('[data-rev="budget-total"]').textContent=fmtC(rb);
     const ep=sum(expPrev), ec=sum(expCurr), eb=sum(expBudget);
+    if(qs('#prevTotalAll')) qs('#prevTotalAll').textContent=fmtC(rp);
+    if(qs('#currTotalAll')) qs('#currTotalAll').textContent=fmtC(rc);
     qs('[data-exp="prev-total"]').textContent=fmtC(ep);
     qs('[data-exp="curr-total"]').textContent=fmtC(ec);
+    qs('[data-rev="budget-total"]').textContent=fmtC(rb);
     qs('[data-exp="budget-total"]').textContent=fmtC(eb);
 
-    // Revenue variances
-    let rVarLY=0,rVarB=0;
+    // revenue variances
+    const rVarLyCells=qsa('[data-rev="var-ly"]');
+    const rVarPctLyCells=qsa('[data-rev="varpct-ly"]');
+    const rVarBudCells=qsa('[data-rev="var-bud"]');
+    const rVarPctBudCells=qsa('[data-rev="varpct-bud"]');
+    let rVarLYTot=0, rVarBudTot=0;
     for(let i=0;i<12;i++){
-      const vLY=revCurr[i]-revPrev[i], pLY=revPrev[i]>0?(vLY/revPrev[i])*100:0;
-      const vB =revCurr[i]-revBudget[i], pB =revBudget[i]>0?(vB/revBudget[i])*100:0;
-      const lyc=els.revVarLyCells[i], lyp=els.revVarPctLyCells[i], bc=els.revVarBudCells[i], bp=els.revVarPctBudCells[i];
-      if(lyc){ lyc.textContent=fmtC(vLY); addVarClass(lyc,vLY); }
-      if(lyp){ lyp.textContent=fmtP(pLY); addVarClass(lyp,pLY); }
-      if(bc ){ bc .textContent=fmtC(vB ); addVarClass(bc ,vB ); }
-      if(bp ){ bp .textContent=fmtP(pB ); addVarClass(bp ,pB ); }
-      rVarLY+=vLY; rVarB+=vB;
+      const dLY=(revCurr[i]||0)-(revPrev[i]||0);
+      const dB =(revCurr[i]||0)-(revBudget[i]||0);
+      rVarLYTot+=dLY; rVarBudTot+=dB;
+      if(rVarLyCells[i]){ rVarLyCells[i].textContent=fmtC(dLY); addVarClass(rVarLyCells[i],dLY); }
+      if(rVarPctLyCells[i]){ const p=(revPrev[i]>0)?(dLY/revPrev[i])*100:0; rVarPctLyCells[i].textContent=fmtP(p); addVarClass(rVarPctLyCells[i],p); }
+      if(rVarBudCells[i]){ rVarBudCells[i].textContent=fmtC(dB); addVarClass(rVarBudCells[i],dB); }
+      if(rVarPctBudCells[i]){ const p=(revBudget[i]>0)?(dB/revBudget[i])*100:0; rVarPctBudCells[i].textContent=fmtP(p); addVarClass(rVarPctBudCells[i],p); }
     }
-    els.revVarLyTotal.textContent=fmtC(rVarLY); addVarClass(els.revVarLyTotal,rVarLY);
-    els.revVarPctLyTotal.textContent=fmtP(rp>0?(rVarLY/rp)*100:0);
-    els.revVarBudTotal.textContent=fmtC(rVarB); addVarClass(els.revVarBudTotal,rVarB);
-    els.revVarPctBudTotal.textContent=fmtP(rb>0?(rVarB/rb)*100:0);
+    qs('[data-rev="var-ly-total"]').textContent=fmtC(rVarLYTot);
+    qs('[data-rev="var-bud-total"]').textContent=fmtC(rVarBudTot);
 
-    // Expense variances (invert colors)
-    let eVarLY=0,eVarB=0;
+    // expense variances (inverse)
+    const eVarLyCells=qsa('[data-exp="var-ly"]');
+    const eVarPctLyCells=qsa('[data-exp="varpct-ly"]');
+    const eVarBudCells=qsa('[data-exp="var-bud"]');
+    const eVarPctBudCells=qsa('[data-exp="varpct-bud"]');
+    let eVarLYTot=0, eVarBudTot=0;
     for(let i=0;i<12;i++){
-      const vLY=expCurr[i]-expPrev[i], pLY=expPrev[i]>0?(vLY/expPrev[i])*100:0;
-      const vB =expCurr[i]-expBudget[i], pB =expBudget[i]>0?(vB/expBudget[i])*100:0;
-      const lyc=els.expVarLyCells[i], lyp=els.expVarPctLyCells[i], bc=els.expVarBudCells[i], bp=els.expVarPctBudCells[i];
-      if(lyc){ lyc.textContent=fmtC(vLY); addVarClass(lyc,vLY,true); }
-      if(lyp){ lyp.textContent=fmtP(pLY); addVarClass(lyp,pLY,true); }
-      if(bc ){ bc .textContent=fmtC(vB ); addVarClass(bc ,vB ,true); }
-      if(bp ){ bp .textContent=fmtP(pB ); addVarClass(bp ,pB ,true); }
-      eVarLY+=vLY; eVarB+=vB;
+      const dLY=(expCurr[i]||0)-(expPrev[i]||0);
+      const dB =(expCurr[i]||0)-(expBudget[i]||0);
+      eVarLYTot+=dLY; eVarBudTot+=dB;
+      if(eVarLyCells[i]){ eVarLyCells[i].textContent=fmtC(dLY); addVarClass(eVarLyCells[i],dLY,true); }
+      if(eVarPctLyCells[i]){ const p=(expPrev[i]>0)?(dLY/expPrev[i])*100:0; eVarPctLyCells[i].textContent=fmtP(p); addVarClass(eVarPctLyCells[i],p,true); }
+      if(eVarBudCells[i]){ eVarBudCells[i].textContent=fmtC(dB); addVarClass(eVarBudCells[i],dB,true); }
+      if(eVarPctBudCells[i]){ const p=(expBudget[i]>0)?(dB/expBudget[i])*100:0; eVarPctBudCells[i].textContent=fmtP(p); addVarClass(eVarPctBudCells[i],p,true); }
     }
-    els.expVarLyTotal.textContent=fmtC(eVarLY); addVarClass(els.expVarLyTotal,eVarLY,true);
-    els.expVarPctLyTotal.textContent=fmtP(ep>0?(eVarLY/ep)*100:0);
-    els.expVarBudTotal.textContent=fmtC(eVarB); addVarClass(els.expVarBudTotal,eVarB,true);
-    els.expVarPctBudTotal.textContent=fmtP(eb>0?(eVarB/eb)*100:0);
+    qs('[data-exp="var-ly-total"]').textContent=fmtC(eVarLYTot);
+    qs('[data-exp="var-bud-total"]').textContent=fmtC(eVarBudTot);
 
-    const plPrev=revPrev.map((v,i)=>v-(expPrev[i]||0));
-    const plCurr=revCurr.map((v,i)=>v-(expCurr[i]||0));
-    const plBud =revBudget.map((v,i)=>v-(expBudget[i]||0));
+    // P&L
+    const plPrev=MONTHS.map((_,i)=>(revPrev[i]||0)-(expPrev[i]||0));
+    const plCurr=MONTHS.map((_,i)=>(revCurr[i]||0)-(expCurr[i]||0));
+    const plBud =MONTHS.map((_,i)=>(revBudget[i]||0)-(expBudget[i]||0));
+    const plPrevCells=qsa('[data-pl="prev"]');
+    const plCurrCells=qsa('[data-pl="curr"]');
+    const plBudgetCells=qsa('[data-pl="budget"]');
+    const plVarLyCells=qsa('[data-pl="var-ly"]');
+    const plVarBudCells=qsa('[data-pl="var-bud"]');
     for(let i=0;i<12;i++){
-      if(els.plPrevCells[i]){ els.plPrevCells[i].textContent=fmtC(plPrev[i]); addVarClass(els.plPrevCells[i],plPrev[i]); }
-      if(els.plCurrCells[i]){ els.plCurrCells[i].textContent=fmtC(plCurr[i]); addVarClass(els.plCurrCells[i],plCurr[i]); }
-      if(els.plBudgetCells[i]){ els.plBudgetCells[i].textContent=fmtC(plBud[i]); addVarClass(els.plBudgetCells[i],plBud[i]); }
-      if(els.plVarLyCells[i]){ const d=plCurr[i]-plPrev[i]; els.plVarLyCells[i].textContent=fmtC(d); addVarClass(els.plVarLyCells[i],d); }
-      if(els.plVarBudCells[i]){ const d=plCurr[i]-plBud[i]; els.plVarBudCells[i].textContent=fmtC(d); addVarClass(els.plVarBudCells[i],d); }
+      if(plPrevCells[i]){ plPrevCells[i].textContent=fmtC(plPrev[i]); addVarClass(plPrevCells[i],plPrev[i]); }
+      if(plCurrCells[i]){ plCurrCells[i].textContent=fmtC(plCurr[i]); addVarClass(plCurrCells[i],plCurr[i]); }
+      if(plBudgetCells[i]){ plBudgetCells[i].textContent=fmtC(plBud[i]); addVarClass(plBudgetCells[i],plBud[i]); }
+      if(plVarLyCells[i]){ const d=plCurr[i]-plPrev[i]; plVarLyCells[i].textContent=fmtC(d); addVarClass(plVarLyCells[i],d); }
+      if(plVarBudCells[i]){ const d=plCurr[i]-plBud[i];  plVarBudCells[i].textContent=fmtC(d); addVarClass(plVarBudCells[i],d); }
     }
-    els.plPrevTotal.textContent=fmtC(sum(plPrev));
-    els.plCurrTotal.textContent=fmtC(sum(plCurr));
-    els.plBudgetTotal.textContent=fmtC(sum(plBud));
+    qs('[data-pl="prev-total"]').textContent=fmtC(sum(plPrev));
+    qs('[data-pl="curr-total"]').textContent=fmtC(sum(plCurr));
+    qs('[data-pl="budget-total"]').textContent=fmtC(sum(plBud));
 
-    updateChart(revCurr,expCurr);
-    if (qs('#autoSaveToggle').checked) saveToLocal(false);
-  }
-
-  /* ---------- USALI Budget + Actuals (expandable) ---------- */
-  const USALI_SECTIONS = [
-    { key:'revenue', title:'Operating Revenues', type:'revenue', items:[
-      {name:'Rooms Revenue', children:['Transient','Group','Contract','Other']},
-      {name:'Food & Beverage Revenue', children:['Restaurant','Bar/Lounge','Banquets/Catering','In-Room Dining']},
-      {name:'Other Operated Depts Revenue', children:['Parking','Spa','Gift Shop','Telephone','Laundry/Dry Cleaning','Miscellaneous']},
-      {name:'Miscellaneous Income', children:['Service Charge','Resort/Facility Fee','Other Misc Income']}
-    ]},
-    { key:'dept_exp', title:'Departmental Expenses', type:'expense', items:[
-      {name:'Rooms Department', children:[
-        'Front Desk Wages','Night Audit Wages','Bell/Door/Valet','HK Room Attendants','HK Supervisors','Laundry Attendants',
-        'Payroll Taxes','Employee Benefits','Laundry & Linen','Guest Supplies','Cleaning Supplies','Commissions & OTA',
-        'Reservations/CRS','Uniforms','Training','Misc Departmental'
-      ]},
-      {name:'Food & Beverage Department', children:[
-        'FOH Labor','BOH Labor','Payroll Taxes','Employee Benefits','COGS – Food','COGS – Beverage',
-        'China/Glass/Silver','Kitchen Supplies','Minor Operating Equip','Entertainment/Music','Misc Departmental'
-      ]},
-      {name:'Other Operated Departments', children:[
-        'Labor','COGS/Operating Supplies','Misc Departmental'
-      ]}
-    ]},
-    { key:'uoe', title:'Undistributed Operating Expenses', type:'expense', items:[
-      {name:'Administrative & General', children:[
-        'Salaries & Wages','Payroll Taxes','Employee Benefits','Recruitment/Training',
-        'Credit Card Fees','Bad Debt','Licenses & Fees','Legal & Professional',
-        'Office Supplies','Travel/Meals','Dues & Subscriptions','Security','Miscellaneous'
-      ]},
-      {name:'Sales & Marketing', children:[
-        'Salaries & Wages','Payroll Taxes','Employee Benefits','Advertising','Digital Marketing',
-        'Loyalty/Points','Public Relations','Travel & Trade Shows','Commissions'
-      ]},
-      {name:'Information & Telecommunications Systems', children:[
-        'Licenses & Subscriptions','Support & Maintenance','Hardware/Peripherals','Telecom'
-      ]},
-      {name:'Property Operations & Maintenance', children:[
-        'Salaries & Wages','Payroll Taxes','Employee Benefits','R&M Contracts','R&M Supplies','Groundskeeping','Waste Removal','Other'
-      ]},
-      {name:'Utilities', children:[
-        'Electricity','Gas','Water & Sewer','Internet/Telecom'
-      ]}
-    ]},
-    { key:'mgmt_fees', title:'Management Fees', type:'expense', items:[
-      {name:'Base Management Fee', formula:'baseFeePctRevenue'},
-      {name:'Incentive Management Fee', formula:'incentivePctGOP'}
-    ]},
-    { key:'fixed', title:'Fixed Charges', type:'expense', items:[
-      {name:'Rent/Lease'},{name:'Property Taxes'},{name:'Insurance'},{name:'Interest'},{name:'FF&E Reserve'}
-    ]}
-  ];
-
-  let usaliBudget={}, usaliActual={}, usaliMode='budget';
-  function ensureTemplate(obj){
-    USALI_SECTIONS.forEach(sec=>{
-      obj[sec.key]=obj[sec.key]||{};
-      sec.items.forEach(it=>{
-        if (it.children){
-          const cur=obj[sec.key][it.name]||{children:{}};
-          it.children.forEach(ch=>{ if(!Array.isArray(cur.children[ch])) cur.children[ch]=Array(12).fill(0); });
-          obj[sec.key][it.name]=cur;
-        } else if (it.formula){
-          obj[sec.key][it.name]=Array(12).fill(0);
-        } else {
-          obj[sec.key][it.name]=Array(12).fill(0);
-        }
-      });
-    });
-  }
-  function initUsali(){ ensureTemplate(usaliBudget); ensureTemplate(usaliActual); }
-  function activeDS(){ return usaliMode==='budget'?usaliBudget:usaliActual; }
-  function getItemMonths(ds,secKey,item){
-    const entry=ds?.[secKey]?.[item];
-    if (Array.isArray(entry)) return entry;
-    if (entry && entry.children){
-      const months=Array(12).fill(0);
-      Object.values(entry.children).forEach(arr=>{ for(let m=0;m<12;m++) months[m]+=Number(arr[m])||0; });
-      return months;
+    const ch=ensureChart();
+    if(ch){
+      ch.data.datasets[0].data=MONTHS.map((_,i)=>(revCurr[i]||0));
+      ch.data.datasets[1].data=MONTHS.map((_,i)=>(expCurr[i]||0));
+      ch.data.datasets[2].data=MONTHS.map((_,i)=>((revCurr[i]||0)-(expCurr[i]||0)));
+      ch.update();
     }
-    return Array(12).fill(0);
+
+    if(qs('#prevMonthSelect')) renderMasterPanel('prev', parseInt(qs('#prevMonthSelect').value||'0',10));
+    if(qs('#currMonthSelect')) renderMasterPanel('curr', parseInt(qs('#currMonthSelect').value||'0',10));
+    if(qs('#autoSaveToggle').checked) saveToLocal(false);
   }
 
-  function renderUsali(){
-    initUsali();
-    const grid=qs('#usaliGrid'); grid.innerHTML='';
-    const tableHeadMonths = MONTHS.map(m=>`<th class="month-header">${m}</th>`).join('');
+  qsa('#monthlyTab input[type="number"]').forEach(el=>el.addEventListener('input',calculateMonthly));
 
-    USALI_SECTIONS.forEach(sec=>{
-      const card=document.createElement('div'); card.className='usali-card'; card.id='usali-'+sec.key;
-      const ds=activeDS();
-      const rowsHTML = sec.items.map(it=>{
-        const isPar = !!it.children;
-        const isFormula = !!it.formula;
-        const labelExtras = isFormula
-          ? `<span class="chip">${it.formula==='baseFeePctRevenue'?'= % of Revenue':'= % of GOP (Operating)'}</span>`
-          : '';
-        const rowCells = isPar
-          ? MONTHS.map((_,mi)=>`<td data-usali-parent="${sec.key}" data-item="${it.name}" data-month="${mi}">$0</td>`).join('')
-          : isFormula
-            ? MONTHS.map((_,mi)=>`<td data-usali-formula="${sec.key}|${it.name}" data-month="${mi}">$0</td>`).join('')
-            : MONTHS.map((_,mi)=>`<td class="input-cell"><input type="number" step="1" data-usali-leaf="${sec.key}" data-item="${it.name}" data-month="${mi}" value="${Array.isArray(ds[sec.key][it.name]) ? (ds[sec.key][it.name][mi]||'') : ''}"></td>`).join('');
-        return `
-          <tr>
-            <th class="right ${isPar?'expandable':''}" data-expander="${sec.key}|${it.name}">
-              ${isPar?'<span class="caret"></span>':''}${it.name}${labelExtras}
-            </th>
-            ${rowCells}
-            <td class="calculated-cell" data-usali-total="${sec.key}" data-item="${it.name}">$0</td>
-          </tr>
-          ${isPar?`
-            <tr class="children-row hidden" data-children="${sec.key}|${it.name}">
-              <td colspan="14">
-                <div class="child-wrap">
-                  <table class="child-table" style="width:100%">
-                    <thead>
-                      <tr>
-                        <th style="min-width:220px">• ${it.name} — Details</th>
-                        ${tableHeadMonths}
-                        <th class="total-row">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${it.children.map(ch=>{
-                        const arr=(ds[sec.key][it.name].children[ch]||Array(12).fill(0));
-                        return `
-                          <tr>
-                            <th class="right">${ch}</th>
-                            ${arr.map((v,mi)=>`<td class="input-cell"><input type="number" step="1" data-usali-child="${sec.key}" data-parent="${it.name}" data-child="${ch}" data-month="${mi}" value="${v||''}"></td>`).join('')}
-                            <td class="calculated-cell" data-usali-child-total="${sec.key}" data-parent="${it.name}" data-child="${ch}">$0</td>
-                          </tr>`;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>
-              </td>
-            </tr>
-          `:''}`;
-      }).join('');
-
-      card.innerHTML=`
-        <div class="usali-header">
-          <div class="usali-title">${sec.title}</div>
-        </div>
-        <div class="usali-inner">
-          <div class="table-container">
-            <table class="usali-table">
-              <thead>
-                <tr>
-                  <th style="min-width:260px">Line Item</th>
-                  ${tableHeadMonths}
-                  <th class="total-row">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHTML}
-                <tr class="total-row">
-                  <th class="right">Subtotal — ${sec.title}</th>
-                  ${[...Array(12)].map((_,mi)=>`<td data-usali-sub="${sec.key}" data-month="${mi}">$0</td>`).join('')}
-                  <td data-usali-subtotal-total="${sec.key}">$0</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>`;
-      grid.appendChild(card);
-    });
-
-    qsa('[data-expander]').forEach(th=>{
-      th.addEventListener('click',()=>{
-        const [secKey,itemName]=th.dataset.expander.split('|');
-        const row=qs(`[data-children="${secKey}|${itemName}"]`);
-        th.classList.toggle('open');
-        row.classList.toggle('hidden');
-      });
-    });
-
-    qsa('input[data-usali-leaf]').forEach(inp=>{
-      inp.addEventListener('input',()=>{
-        const ds=activeDS();
-        const sec=inp.dataset.usaliLeaf, item=inp.dataset.item, m=parseInt(inp.dataset.month);
-        ds[sec][item][m]=parseFloat(inp.value)||0; recalcUsali();
-      });
-    });
-    qsa('input[data-usali-child]').forEach(inp=>{
-      inp.addEventListener('input',()=>{
-        const ds=activeDS();
-        const sec=inp.dataset.usaliChild, parent=inp.dataset.parent, ch=inp.dataset.child, m=parseInt(inp.dataset.month);
-        ds[sec][parent].children[ch][m]=parseFloat(inp.value)||0; recalcUsali();
-      });
-    });
-
-    recalcUsali();
+  /* ========= Save / Load ========= */
+  const STORAGE_KEY='hotelTrackerV14';
+  function gatherState(){
+    return {
+      revBudget,expPrev,expCurr,expBudget,
+      revPrevBreakdowns,revCurrBreakdowns,
+      prevSel:qs('#prevMonthSelect')?.value??'0',
+      currSel:qs('#currMonthSelect')?.value??'0',
+      dailyData
+    };
   }
-
-  function computeUSALI(ds){
-    const revMonths=Array(12).fill(0), deptExpMonths=Array(12).fill(0), uoeMonths=Array(12).fill(0), fixedMonths=Array(12).fill(0), mgmtMonths=Array(12).fill(0);
-    USALI_SECTIONS.forEach(sec=>{
-      if (sec.key==='mgmt_fees') return;
-      for(let m=0;m<12;m++){
-        const subtotal = sec.items.reduce((acc,it)=> acc + (getItemMonths(ds,sec.key,it.name)[m]||0), 0);
-        if (sec.key==='revenue') revMonths[m]+=subtotal;
-        else if (sec.key==='dept_exp') deptExpMonths[m]+=subtotal;
-        else if (sec.key==='uoe') uoeMonths[m]+=subtotal;
-        else if (sec.key==='fixed') fixedMonths[m]+=subtotal;
-      }
-    });
-    const deptIncomeMonths = revMonths.map((r,i)=> r - (deptExpMonths[i]||0));
-    const gopOpMonths      = deptIncomeMonths.map((d,i)=> d - (uoeMonths[i]||0));
-
-    const basePct=parseFloat(qs('#baseFeePct').value)||0;
-    const incPct =parseFloat(qs('#incentiveFeePct').value)||0;
-    const baseFeeMonths = revMonths.map(v=> v*(basePct/100));
-    const incFeeMonths  = gopOpMonths.map(v=> Math.max(0,v)*(incPct/100));
-    ds['mgmt_fees']['Base Management Fee']=baseFeeMonths.slice();
-    ds['mgmt_fees']['Incentive Management Fee']=incFeeMonths.slice();
-
-    for(let m=0;m<12;m++) mgmtMonths[m]=baseFeeMonths[m]+incFeeMonths[m];
-    const gopAfterMonths = gopOpMonths.map((g,i)=> g - mgmtMonths[i] - (fixedMonths[i]||0));
-    return {revMonths, deptExpMonths, deptIncomeMonths, uoeMonths, mgmtMonths, fixedMonths, gopOpMonths, gopAfterMonths};
-  }
-
-  function recalcUsali(){
-    const ds=activeDS();
-    qsa('[data-usali-child-total]').forEach(cell=>{
-      const sec=cell.dataset.usaliChildTotal, parent=cell.dataset.parent, child=cell.dataset.child;
-      const arr = ds[sec][parent].children[child]||[];
-      cell.textContent=fmtC(sum(arr));
-    });
-    qsa('[data-usali-parent]').forEach(cell=>{
-      const sec=cell.dataset.usaliParent, item=cell.dataset.item, m=parseInt(cell.dataset.month);
-      cell.textContent=fmtC(getItemMonths(ds,sec,item)[m]||0);
-    });
-
-    const B=computeUSALI(usaliBudget), A=computeUSALI(usaliActual);
-    lastUSALI_B=B;
-
-    qsa('[data-usali-formula]').forEach(cell=>{
-      const [sec,key]=cell.dataset.usaliFormula.split('|'); const m=parseInt(cell.dataset.month);
-      const arr = ds[sec][key]||[]; cell.textContent=fmtC(arr[m]||0);
-    });
-
-    qsa('[data-usali-total]').forEach(cell=>{
-      const sec=cell.dataset.usaliTotal, item=cell.dataset.item;
-      cell.textContent=fmtC(sum(getItemMonths(ds,sec,item)));
-    });
-
-    USALI_SECTIONS.forEach(sec=>{
-      for(let m=0;m<12;m++){
-        const subtotal = sec.items.reduce((acc,it)=> acc + (getItemMonths(ds,sec.key,it.name)[m]||0), 0);
-        const c=qs(`[data-usali-sub="${sec.key}"][data-month="${m}"]`); if(c) c.textContent=fmtC(subtotal);
-      }
-      const total = sec.items.reduce((acc,it)=> acc + sum(getItemMonths(ds,sec.key,it.name)), 0);
-      const ct=qs(`[data-usali-subtotal-total="${sec.key}"]`); if(ct) ct.textContent=fmtC(total);
-    });
-
-    qs('#usaliTotalRevB').textContent=fmtC(sum(B.revMonths));   qs('#usaliTotalRevA').textContent=fmtC(sum(A.revMonths));
-    qs('#usaliDeptExpB').textContent=fmtC(sum(B.deptExpMonths));qs('#usaliDeptExpA').textContent=fmtC(sum(A.deptExpMonths));
-    qs('#usaliDeptIncB').textContent=fmtC(sum(B.deptIncomeMonths));qs('#usaliDeptIncA').textContent=fmtC(sum(A.deptIncomeMonths));
-    qs('#usaliUOEB').textContent=fmtC(sum(B.uoeMonths));        qs('#usaliUOEA').textContent=fmtC(sum(A.uoeMonths));
-    qs('#usaliMgmtB').textContent=fmtC(sum(B.mgmtMonths));      qs('#usaliMgmtA').textContent=fmtC(sum(A.mgmtMonths));
-    qs('#usaliFixedB').textContent=fmtC(sum(B.fixedMonths));    qs('#usaliFixedA').textContent=fmtC(sum(A.fixedMonths));
-    qs('#usaliGOPB').textContent=fmtC(sum(B.gopOpMonths));      qs('#usaliGOPA').textContent=fmtC(sum(A.gopOpMonths));
-    qs('#usaliGOPAFB').textContent=fmtC(sum(B.gopAfterMonths)); qs('#usaliGOPAFA').textContent=fmtC(sum(A.gopAfterMonths));
-
-    const varAfter = sum(A.gopAfterMonths) - sum(B.gopAfterMonths);
-    const varAfterPct = sum(B.gopAfterMonths)>0 ? (varAfter/sum(B.gopAfterMonths))*100 : 0;
-
-    const vDollar = qs('#usaliGOPAFVar');
-    const vPct    = qs('#usaliGOPAFVarPct');
-
-    vDollar.textContent = fmtC(varAfter);
-    vDollar.className   = 'stat-pill ' + (varAfter >= 0 ? 'pos' : 'neg');
-    vPct.textContent    = fmtP(varAfterPct);
-    vPct.className      = 'stat-pill ' + (varAfterPct >= 0 ? 'pos' : 'neg');
-
-    recalcDaily(); // refresh daily target
-
-    if (qs('#autoSaveToggle').checked) saveToLocal(false);
-  }
-
-  // Mode switch
-  qsa('#modeSeg button').forEach(b=>{
-    b.addEventListener('click',()=>{
-      qsa('#modeSeg button').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active'); usaliMode=b.dataset.mode; renderUsali();
-    });
-  });
-  qs('#baseFeePct').addEventListener('input',recalcUsali);
-  qs('#incentiveFeePct').addEventListener('input',recalcUsali);
-
-  // Apply Budget/Actuals to Monthly
-  qs('#applyBudgetToMonthlyBtn').addEventListener('click',()=>{
-    if (!qs('#applyBudgetToMonthlyToggle').checked) return;
-    const B=computeUSALI(usaliBudget);
-    qsa('input[data-rev="budget"]').forEach((inp,i)=> inp.value = Math.round(B.revMonths[i]||0));
-    qsa('input[data-exp="budget"]').forEach((inp,i)=> inp.value = Math.round((B.deptExpMonths[i]+B.uoeMonths[i]+B.mgmtMonths[i]+B.fixedMonths[i])||0));
-    calculateMonthly();
-  });
-  qs('#applyActualToMonthlyBtn').addEventListener('click', ()=>{
-    if (!qs('#applyActualToMonthlyToggle').checked) return;
-    const A = computeUSALI(usaliActual);
-    qsa('input[data-rev="curr"]').forEach((inp,i)=> { if(i < 12) inp.value = Math.round(A.revMonths[i] || 0); });
-    qsa('input[data-exp="curr"]').forEach((inp,i)=> { if(i < 12) inp.value = Math.round((A.deptExpMonths[i] + A.uoeMonths[i] + A.mgmtMonths[i] + A.fixedMonths[i]) || 0); });
-    calculateMonthly();
-  });
-
-  /* =========================
-     IMPORTER: Excel (.xlsx/.csv) → USALI Actuals
-     ========================= */
-  let mapping = DEFAULT_MAPPING.slice();
-
-  function normalizeLabel(v){
-    const s=(v??'').toString().trim();
-    return s.replace(/\s+/g,' ').replace(/:+$/,'');
-  }
-  function findMonthColumnsByHeader(aoa){
-    // Try to find a header row with 12 month-like cells
-    const monthAliases = [
-      ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'],
-      ['january','february','march','april','may','june','july','august','september','october','november','december']
-    ];
-    for(let r=0;r<Math.min(10,aoa.length);r++){
-      const row=aoa[r]||[];
-      const cols=[];
-      for(let c=0;c<row.length;c++){
-        const v=row[c];
-        if(v instanceof Date){ cols.push(c); continue; }
-        const s=(v??'').toString().toLowerCase();
-        if (monthAliases.some(list=>list.includes(s.slice(0,3)))) cols.push(c);
-        else if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\-\/ ]?\d{2,4}$/.test(s)) cols.push(c);
-      }
-      // If we found >=12, take the last 12
-      if(cols.length>=12){
-        const last12 = cols.slice(-12);
-        // Map to 0..11 (assume Jan..Dec order if possible)
-        return last12;
-      }
-    }
-    // Fallback: last 12 columns
-    const maxLen = Math.max(...aoa.map(r=>r.length));
-    return Array.from({length:12},(_,i)=>maxLen-12+i);
-  }
-  function detectLabelCol(aoa){
-    // Heuristic: first column that has > 6 stringy entries in first 30 rows
-    let best = 0, bestScore=0;
-    for(let c=0;c<Math.min(10, (aoa[0]||[]).length); c++){
-      let score=0;
-      for(let r=0;r<Math.min(30,aoa.length); r++){
-        const v=aoa[r]?.[c];
-        if (typeof v==='string' && v.trim().length>0) score++;
-      }
-      if (score>bestScore){ bestScore=score; best=c; }
-    }
-    return best;
-  }
-  function monthIndexFromHeader(value){
-    const s=(value??'').toString().toLowerCase();
-    const idx = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].findIndex(m=>s.startsWith(m));
-    return idx>=0?idx:null;
-  }
-
-  function placeToUSALI(ds, path, monthsArr){
-    ensureTemplate(ds);
-    const [sec, parent, child] = path;
-    if (child){ // place into child
-      const node = ds[sec][parent];
-      if(!node.children[child]) node.children[child]=Array(12).fill(0);
-      for(let m=0;m<12;m++) node.children[child][m] += toNum(monthsArr[m]||0);
-    } else {
-      if(!ds[sec][parent]) ds[sec][parent]=Array(12).fill(0);
-      for(let m=0;m<12;m++) ds[sec][parent][m] += toNum(monthsArr[m]||0);
-    }
-  }
-
-  function matchPath(label, sheetName=''){
-    const s = (label||'').toString();
-    for(const rule of mapping){
-      const cond = (rule.match instanceof RegExp) ? rule.match.test(s) : s.toLowerCase().includes(String(rule.match).toLowerCase());
-      if (cond) return rule.path;
-    }
-    // Sheet-level fallbacks
-    const sh = sheetName.toLowerCase();
-    if (sh.includes('rooms')) return ['revenue','Rooms Revenue','Other'];
-    if (sh.includes('food') || sh.includes('beverage')) return ['revenue','Food & Beverage Revenue','Restaurant'];
-    if (sh.includes('minor other') || sh.includes('operated')) return ['revenue','Other Operated Depts Revenue','Miscellaneous'];
-    if (sh.includes('admin') || sh.includes('a&g')) return ['uoe','Administrative & General','Miscellaneous'];
-    if (sh.includes('sales') || sh.includes('marketing')) return ['uoe','Sales & Marketing','Advertising'];
-    if (sh.includes('information') || sh.includes('telcom') || sh.includes('telecom')) return ['uoe','Information & Telecommunications Systems','Licenses & Subscriptions'];
-    if (sh.includes('property operations')) return ['uoe','Property Operations & Maintenance','Other'];
-    if (sh.includes('utilities')) return ['uoe','Utilities','Electricity'];
-    if (sh.includes('management fees')) return ['mgmt_fees','Base Management Fee'];
-    if (sh.includes('non operating')) return ['fixed','Property Taxes'];
-    return null;
-  }
-
-  function importWorkbookToActuals(wb){
-    const ds = {}; ensureTemplate(ds);
-    wb.SheetNames.forEach(name=>{
-      const ws = wb.Sheets[name];
-      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
-      if (!aoa || !aoa.length) return;
-      const labelCol = detectLabelCol(aoa);
-      const monthCols = findMonthColumnsByHeader(aoa);
-      // Find first data row (skip top header noise)
-      let startRow = 0;
-      for(let r=0;r<Math.min(12,aoa.length);r++){
-        const v = aoa[r]?.[labelCol];
-        if (v && String(v).trim().length>0){ startRow = r; break; }
-      }
-      for(let r=startRow; r<aoa.length; r++){
-        const labelRaw = aoa[r]?.[labelCol];
-        const label = normalizeLabel(labelRaw);
-        if (!label || /^total\b/i.test(label)) continue; // skip totals: parents are auto-summed in UI
-        // pull 12 months
-        const vals = monthCols.map(c=> aoa[r]?.[c]);
-        if (vals.every(v=>!v && v!==0)) continue;
-        const path = matchPath(label, name);
-        if (path) {
-          // If the row looks like an expense in a revenue sheet (negative numbers), keep sign
-          placeToUSALI(ds, path, vals);
-        }
-      }
-    });
-    return ds;
-  }
-
-  function assignActuals(ds){
-    // Merge into usaliActual (additive)
-    ensureTemplate(usaliActual);
-    ['revenue','dept_exp','uoe','mgmt_fees','fixed'].forEach(sec=>{
-      const node = ds[sec]||{};
-      Object.keys(node).forEach(key=>{
-        const entry = node[key];
-        if (Array.isArray(entry)){
-          if(!Array.isArray(usaliActual[sec][key])) usaliActual[sec][key]=Array(12).fill(0);
-          usaliActual[sec][key] = entry.slice();
-        } else if (entry && entry.children){
-          const tgt = usaliActual[sec][key]||{children:{}};
-          Object.keys(entry.children).forEach(ch=>{
-            tgt.children[ch] = (entry.children[ch]||Array(12).fill(0)).slice();
-          });
-          usaliActual[sec][key]=tgt;
-        }
-      });
-    });
-  }
-
-  // Hook up file input
-  qs('#plUploadInput').addEventListener('change', async (e)=>{
-    const file = e.target.files?.[0];
-    if(!file) return;
-    try{
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:'array'});
-      const imported = importWorkbookToActuals(wb);
-      assignActuals(imported);
-      usaliMode='actual'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
-      renderUsali();
-      flash(`Imported: ${file.name}`);
-    }catch(err){
-      console.error(err);
-      alert('Import failed. Please double-check the file format.');
-    }
-  });
-
-  // Mapping editor
-  qs('#toggleMapBtn').addEventListener('click', ()=>{
-    const wrap = qs('#mapWrap');
-    wrap.classList.toggle('hidden');
-    if (!wrap.classList.contains('hidden')){
-      qs('#mappingEditor').value = JSON.stringify(mapping, (k,v)=> (v instanceof RegExp ? v.toString() : v), 2);
-    }
-  });
-  qs('#applyMappingBtn').addEventListener('click', ()=>{
-    try{
-      // Revive regex literals from strings like "/pattern/i"
-      const raw = JSON.parse(qs('#mappingEditor').value);
-      mapping = raw.map(r=>{
-        const clone = {...r};
-        if (typeof clone.match === 'string' && /^\/.*\/[gimsuy]*$/.test(clone.match)){
-          const m = clone.match.match(/^\/(.*)\/([gimsuy]*)$/);
-          clone.match = new RegExp(m[1], m[2]||'i');
-        }
-        return clone;
-      });
-      flash('Mapping updated');
-    }catch(e){
-      alert('Invalid JSON. Please fix and try again.');
-    }
-  });
-
-  // Same-Month LY → Budget (with growth %)
-  qs('#copyLYToBudgetBtn').addEventListener('click', ()=>{
-    const growth = parseFloat(qs('#baselineGrowthPct').value)||0;
-    // Copy usaliActual months into usaliBudget months, applying growth
-    ensureTemplate(usaliBudget); ensureTemplate(usaliActual);
-    ['revenue','dept_exp','uoe','mgmt_fees','fixed'].forEach(sec=>{
-      const items = USALI_SECTIONS.find(s=>s.key===sec).items;
-      items.forEach(it=>{
-        const srcMonths = getItemMonths(usaliActual, sec, it.name);
-        if (it.children){
-          const tgt = usaliBudget[sec][it.name];
-          it.children.forEach(ch=>{
-            const arrA = (usaliActual[sec][it.name]?.children[ch])||Array(12).fill(0);
-            const arrB = Array(12).fill(0);
-            for(let m=0;m<12;m++) arrB[m] = Math.round(arrA[m]*(1+growth/100));
-            tgt.children[ch] = arrB;
-          });
-        } else {
-          const arrB = Array(12).fill(0);
-          for(let m=0;m<12;m++) arrB[m] = Math.round(srcMonths[m]*(1+growth/100));
-          usaliBudget[sec][it.name] = arrB;
-        }
-      });
-    });
-    usaliMode='budget'; qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
-    renderUsali();
-    flash('Copied LY Actuals → Budget');
-  });
-
-  /* ---------- Save/Load/Import/Export ---------- */
-  const STORAGE_KEY='hotelTrackerV9_withImporter';
-  function gatherState(){ return {
-    revPrev,revCurr,revBudget,expPrev,expCurr,expBudget,daily,usaliBudget,usaliActual,
-    baseFeePct: parseFloat(qs('#baseFeePct').value)||0,
-    incentiveFeePct: parseFloat(qs('#incentiveFeePct').value)||0,
-    usaliMode, mapping
-  }; }
   function applyState(s){
     if(!s) return;
-    ['revPrev','revCurr','revBudget','expPrev','expCurr','expBudget'].forEach(k=>{
-      if(Array.isArray(s[k])) ({revPrev,revCurr,revBudget,expPrev,expCurr,expBudget})[k]=s[k];
-    });
-    if (s.daily) Object.assign(daily,s.daily);
-    if (s.usaliBudget) usaliBudget=s.usaliBudget;
-    if (s.usaliActual) usaliActual=s.usaliActual;
-    if (typeof s.baseFeePct==='number') qs('#baseFeePct').value=String(s.baseFeePct);
-    if (typeof s.incentiveFeePct==='number') qs('#incentiveFeePct').value=String(s.incentiveFeePct);
-    if (s.usaliMode) usaliMode=s.usaliMode;
-    if (Array.isArray(s.mapping)) mapping=s.mapping;
+    if(Array.isArray(s.revBudget)) revBudget=s.revBudget.map(Number);
+    if(Array.isArray(s.expPrev))   expPrev=s.expPrev.map(Number);
+    if(Array.isArray(s.expCurr))   expCurr=s.expCurr.map(Number);
+    if(Array.isArray(s.expBudget)) expBudget=s.expBudget.map(Number);
+    if(Array.isArray(s.revPrevBreakdowns)) s.revPrevBreakdowns.forEach((bd,i)=>{ if(bd) revPrevBreakdowns[i]=bd; });
+    if(Array.isArray(s.revCurrBreakdowns)) s.revCurrBreakdowns.forEach((bd,i)=>{ if(bd) revCurrBreakdowns[i]=bd; });
+    if(s.dailyData) dailyData=s.dailyData;
 
-    qsa('input[data-rev="prev"]').forEach((inp,i)=> inp.value=Number.isFinite(revPrev[i])?revPrev[i]:'');
-    qsa('input[data-rev="curr"]').forEach((inp,i)=> { if(i<7) inp.value=Number.isFinite(revCurr[i])?revCurr[i]:''; });
-    qsa('input[data-rev="budget"]').forEach((inp,i)=> inp.value=Number.isFinite(revBudget[i])?revBudget[i]:'');
-    qsa('input[data-exp="prev"]').forEach((inp,i)=> inp.value=Number.isFinite(expPrev[i])?expPrev[i]:'');
-    qsa('input[data-exp="curr"]').forEach((inp,i)=> { if(i<7) inp.value=Number.isFinite(expCurr[i])?expCurr[i]:''; });
-    qsa('input[data-exp="budget"]').forEach((inp,i)=> inp.value=Number.isFinite(expBudget[i])?expBudget[i]:'');
-    qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
-    renderUsali(); renderDaily(); calculateMonthly();
+    qsa('input[data-rev="budget"]').forEach((el,i)=>{ el.value=revBudget[i]||''; });
+    qsa('input[data-exp="prev"]').forEach((el,i)=>{ el.value=expPrev[i]||''; });
+    qsa('input[data-exp="curr"]').forEach((el,i)=>{ el.value=expCurr[i]||''; });
+    qsa('input[data-exp="budget"]').forEach((el,i)=>{ el.value=expBudget[i]||''; });
+
+    if(qs('#prevMonthSelect') && s.prevSel!=null) qs('#prevMonthSelect').value=String(s.prevSel);
+    if(qs('#currMonthSelect') && s.currSel!=null) qs('#currMonthSelect').value=String(s.currSel);
+
+    renderDailyTable();
+    recalcDailyRollups(); // triggers monthly
   }
   function saveToLocal(toast=true){ localStorage.setItem(STORAGE_KEY, JSON.stringify(gatherState())); if(toast) flash('Saved.'); }
   function loadFromLocal(){
     const raw=localStorage.getItem(STORAGE_KEY);
-    if(!raw){ flash('Nothing saved yet.'); return; }
-    try{ applyState(JSON.parse(raw)); flash('Loaded.'); }catch(e){ console.error(e); flash('Load failed.'); }
+    if(!raw){ flash('Nothing saved yet.'); calculateMonthly(); return; }
+    try{ applyState(JSON.parse(raw)); flash('Loaded.'); }catch(e){ console.error(e); flash('Load failed.'); calculateMonthly(); }
   }
   function exportJSON(){
     const blob=new Blob([JSON.stringify(gatherState(),null,2)],{type:'application/json'});
@@ -1397,49 +799,33 @@
     r.readAsText(file);
   }
   function resetAll(){
-    if(!confirm('Reset all inputs and parameters?')) return;
-    revPrev=Array(12).fill(0); revCurr=Array(12).fill(0); revBudget=Array(12).fill(0);
-    expPrev=Array(12).fill(0); expCurr=Array(12).fill(0); expBudget=Array(12).fill(0);
-    for (const k in daily) delete daily[k];
-    usaliBudget={}; usaliActual={}; initUsali();
-    qsa('#monthlyTab input[type="number"]').forEach(i=>i.value='');
-    qs('#baseFeePct').value='3'; qs('#incentiveFeePct').value='10'; usaliMode='budget'; mapping=DEFAULT_MAPPING.slice();
-    qsa('#modeSeg button').forEach(b=>b.classList.toggle('active', b.dataset.mode===usaliMode));
-    renderUsali(); renderDaily(); calculateMonthly(); flash('Reset.');
+    if(!confirm('Reset all inputs and parsed data?')) return;
+    revBudget=Array(12).fill(0); expPrev=Array(12).fill(0); expCurr=Array(12).fill(0); expBudget=Array(12).fill(0);
+    for (let i=0;i<12;i++){ revPrevBreakdowns[i]=blankBreakdown(); revCurrBreakdowns[i]=blankBreakdown(); }
+    dailyData={};
+    qsa('input[data-rev="budget"],input[data-exp="prev"],input[data-exp="curr"],input[data-exp="budget"]').forEach(el=>el.value='');
+    renderDailyTable(); calculateMonthly(); flash('Reset.');
   }
 
-  // Toast
-  let toastEl;
-  function flash(msg){
-    if(!toastEl){ toastEl=document.createElement('div'); Object.assign(toastEl.style,{
-      position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',padding:'10px 14px',
-      background:'rgba(44,62,80,.95)',color:'#fff',borderRadius:'10px',boxShadow:'0 8px 20px rgba(0,0,0,.2)',zIndex:'9999',transition:'opacity .3s'
-    }); document.body.appendChild(toastEl); }
-    toastEl.textContent=msg; toastEl.style.opacity='1'; setTimeout(()=>{ toastEl.style.opacity='0'; },1300);
-  }
-
-  // Wire toolbar
   qs('#saveBtn').addEventListener('click',()=>saveToLocal(true));
   qs('#loadBtn').addEventListener('click',loadFromLocal);
   qs('#exportBtn').addEventListener('click',exportJSON);
   qs('#importFile').addEventListener('change',e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); });
   qs('#resetBtn').addEventListener('click',resetAll);
 
-  // Daily events
-  qs('#regenDailyBtn').addEventListener('click',renderDaily);
-  qs('#dailyMonth').addEventListener('change',renderDaily);
-  qs('#dailyYear').addEventListener('change',renderDaily);
-  qs('#dailyRollupToggle').addEventListener('change',recalcDaily);
-  qs('#dailyBudgetRollupToggle').addEventListener('change',recalcDaily);
+  // Toast
+  let toastEl;
+  function flash(msg){
+    if(!toastEl){
+      toastEl=document.createElement('div');
+      Object.assign(toastEl.style,{position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',padding:'10px 14px',background:'rgba(44,62,80,.95)',color:'#fff',borderRadius:'10px',boxShadow:'0 8px 20px rgba(0,0,0,.2)',zIndex:'9999',transition:'opacity .25s ease'});
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent=msg; toastEl.style.opacity='1'; setTimeout(()=>{ toastEl.style.opacity='0'; },1400);
+  }
 
-  /* ---------- Build + init ---------- */
-  buildMonthlyTables();
-  qsa('#monthlyTab input[type="number"]').forEach(el=>el.addEventListener('input',calculateMonthly));
-
-  qs('#dailyMonth').value=String(TODAY.getMonth());
-  qs('#dailyYear').value=String(TODAY.getFullYear());
-
-  renderUsali(); renderDaily(); calculateMonthly();
+  // Boot
+  calculateMonthly();
 })();
 </script>
 </body>
