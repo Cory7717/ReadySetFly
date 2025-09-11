@@ -4,7 +4,12 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Hotel Revenue · P&L · Daily (SDOWLY)</title>
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<!-- jsPDF + AutoTable for PDF export -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg1:#667eea;--bg2:#764ba2;--panelTint:rgba(255,255,255,.95);--ink:#2c3e50;--inkSoft:#7f8c8d;--brand1:#3498db;--brand2:#2980b9;--dark1:#2c3e50;--dark2:#34495e;--goodBg:#e8f5e8;--good:#27ae60;--warnBg:#fff3cd;--warn:#856404;--posBg:#d1edcc;--pos:#155724;--negBg:#f8d7da;--neg:#721c24;--grid:#e0e0e0}
@@ -64,6 +69,8 @@ details.master-drop[open] summary{color:#0b5ed7}
     <label class="btn" for="importFile">Import (.json)</label><input id="importFile" type="file" accept=".json"/>
     <button class="btn" id="resetBtn">Reset</button>
     <label class="pill"><input id="autoSaveToggle" type="checkbox" checked/> Auto-save</label>
+    <!-- Download PDF -->
+    <button class="btn" id="pdfBtn" title="Download a clean, professional PDF report">Download PDF</button>
   </div>
 
   <div class="tabs">
@@ -822,6 +829,189 @@ details.master-drop[open] summary{color:#0b5ed7}
       document.body.appendChild(toastEl);
     }
     toastEl.textContent=msg; toastEl.style.opacity='1'; setTimeout(()=>{ toastEl.style.opacity='0'; },1400);
+  }
+
+  // ========= PDF EXPORT (Landscape + Variance) =========
+  qs('#pdfBtn').addEventListener('click', downloadPDF);
+
+  async function downloadPDF(){
+    try{
+      // Ensure chart and data are up to date
+      calculateMonthly();
+
+      const { jsPDF } = window.jspdf;
+      // LANDSCAPE for wide tables (Letter 792x612)
+      const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
+
+      const margin = 40;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const usable = pageWidth - margin*2;
+      const now = new Date();
+      const ySel = Number(qs('#dailyYear').value)||now.getFullYear();
+      const gmAvg = qs('#gmAccuracyAvg')?.textContent || '—';
+
+      // Assemble arrays for PDF data
+      const revPrev=Array(12).fill(0), revCurr=Array(12).fill(0);
+      for(let i=0;i<12;i++){
+        const bp=revPrevBreakdowns[i]||blankBreakdown();
+        const bc=revCurrBreakdowns[i]||blankBreakdown();
+        revPrev[i]=bp.hasTotal?bp.total:sum(Object.values(bp.categories||{}));
+        revCurr[i]=bc.hasTotal?bc.total:sum(Object.values(bc.categories||{}));
+      }
+      const rb = qsa('input[data-rev="budget"]').map(i=>parseFloat(i.value)||0);
+      const ep = qsa('input[data-exp="prev"]').map(i=>parseFloat(i.value)||0);
+      const ec = qsa('input[data-exp="curr"]').map(i=>parseFloat(i.value)||0);
+      const eb = qsa('input[data-exp="budget"]').map(i=>parseFloat(i.value)||0);
+
+      const plCurr = MONTHS.map((_,i)=>(revCurr[i]||0)-(ec[i]||0));
+
+      // Revenue variance vs LY
+      const rv$ = MONTHS.map((_,i)=>(revCurr[i]||0)-(revPrev[i]||0));
+      const rvPct = MONTHS.map((_,i)=>{
+        const prev = revPrev[i]||0;
+        return prev>0 ? (rv$[i]/prev)*100 : 0;
+      });
+      const totalRv$ = sum(rv$);
+      const totalRvPct = (sum(revPrev)>0) ? (totalRv$/sum(revPrev))*100 : 0;
+
+      // ---------- COVER HEADER ----------
+      doc.setFillColor(52,73,94); // dark header band
+      doc.rect(0,0,pageWidth,70,'F');
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(18);
+      doc.setTextColor(255,255,255);
+      doc.text('Hotel Revenue · P&L · Daily (SDOWLY)', margin, 45);
+
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(10);
+      doc.text(`Generated: ${now.toLocaleString()}`, pageWidth - margin, 45, { align:'right' });
+
+      // Title block
+      let y = 95;
+      doc.setTextColor(44,62,80);
+      doc.setFontSize(16);
+      doc.text(`Summary Report — ${ySel}`, margin, y);
+      y += 10;
+      doc.setDrawColor(220);
+      doc.line(margin, y, pageWidth-margin, y);
+      y += 18;
+
+      // KPI row (3 cards)
+      const boxW = (usable - 20) / 3;
+      const kpis = [
+        { label: 'CY Revenue (Sum)', value: fmtC(sum(revCurr)) },
+        { label: 'CY Expenses (Sum)', value: fmtC(sum(ec)) },
+        { label: 'Operating Profit (Sum)', value: fmtC(sum(plCurr)) }
+      ];
+      doc.setFontSize(11);
+      kpis.forEach((k,i)=>{
+        const x = margin + i*(boxW+10);
+        doc.setDrawColor(230);
+        doc.setFillColor(247,249,252);
+        doc.roundedRect(x, y, boxW, 44, 6, 6, 'FD');
+        doc.setTextColor(127,140,141);
+        doc.text(k.label, x+12, y+18);
+        doc.setTextColor(33,45,61);
+        doc.setFont('helvetica','bold');
+        doc.setFontSize(12);
+        doc.text(k.value, x+12, y+34);
+        doc.setFont('helvetica','normal');
+        doc.setFontSize(11);
+      });
+      y += 64;
+
+      // GM Accuracy chip
+      doc.setFontSize(11);
+      doc.setTextColor(127,140,141);
+      doc.text('GM Accuracy (Daily Avg):', margin, y);
+      doc.setTextColor(33,45,61);
+      doc.setFont('helvetica','bold');
+      doc.text(String(gmAvg||'—'), margin+175, y);
+      doc.setFont('helvetica','normal');
+
+      y += 12;
+
+      // ---------- CHART ----------
+      const ch = ensureChart();
+      if(ch && ch.toBase64Image){
+        const img = ch.toBase64Image();
+        const imgW = usable;
+        const imgH = imgW * 0.45; // aspect hint
+        y += 10;
+        doc.addImage(img, 'PNG', margin, y, imgW, imgH, undefined, 'FAST');
+        y += imgH + 20;
+      }
+
+      // ---------- TABLES ----------
+      function table(title, head, rows){
+        doc.setFontSize(13);
+        doc.setTextColor(44,62,80);
+        doc.setFont('helvetica','bold');
+        doc.text(title, margin, y);
+        doc.setFont('helvetica','normal');
+        y += 6;
+
+        doc.autoTable({
+          head: [head],
+          body: rows,
+          theme: 'grid',
+          startY: y,
+          styles: { fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: [52,152,219], textColor: 255, halign:'center' },
+          columnStyles: { 0: { cellWidth: 120 }},
+          margin: { left: margin, right: margin },
+          didDrawPage: ({ pageNumber })=>{
+            // footer
+            doc.setFontSize(9);
+            doc.setTextColor(150);
+            doc.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 15, { align:'right' });
+          }
+        });
+        y = doc.lastAutoTable.finalY + 18;
+      }
+
+      const headMonths = ['Metric', ...MONTHS, 'Total'];
+
+      // Revenue table
+      const revRows = [
+        ['Prev Year (PTD)', ...MONTHS.map((_,i)=>fmtC(revPrev[i]||0)), fmtC(sum(revPrev))],
+        ['Current Year (PTD)', ...MONTHS.map((_,i)=>fmtC(revCurr[i]||0)), fmtC(sum(revCurr))],
+        ['Budget (Revenue)', ...MONTHS.map((_,i)=>fmtC(rb[i]||0)), fmtC(sum(rb))]
+      ];
+      table('Revenue', headMonths, revRows);
+
+      // NEW: Revenue Variance vs LY
+      const varianceRows = [
+        ['Var vs LY ($)', ...rv$.map(v=>fmtC(v)), fmtC(totalRv$)],
+        ['Var vs LY (%)', ...rvPct.map(p=>fmtP(p)), fmtP(totalRvPct)]
+      ];
+      table('Revenue Variance vs LY', headMonths, varianceRows);
+
+      // Expenses table
+      const expRows = [
+        ['Prev Year Expenses', ...MONTHS.map((_,i)=>fmtC(ep[i]||0)), fmtC(sum(ep))],
+        ['Current Year Expenses', ...MONTHS.map((_,i)=>fmtC(ec[i]||0)), fmtC(sum(ec))],
+        ['Budget (Expenses)', ...MONTHS.map((_,i)=>fmtC(eb[i]||0)), fmtC(sum(eb))]
+      ];
+      table('Expenses', headMonths, expRows);
+
+      // P&L table
+      const plPrev = MONTHS.map((_,i)=>(revPrev[i]||0)-(ep[i]||0));
+      const plBud  = MONTHS.map((_,i)=>(rb[i]||0)-(eb[i]||0));
+      const plRows = [
+        ['Prev Year Operating Profit', ...plPrev.map(v=>fmtC(v)), fmtC(sum(plPrev))],
+        ['Current Year Operating Profit', ...plCurr.map(v=>fmtC(v)), fmtC(sum(plCurr))],
+        ['Budget Operating Profit', ...plBud.map(v=>fmtC(v)), fmtC(sum(plBud))]
+      ];
+      table('Operating P&L', headMonths, plRows);
+
+      doc.save(`Hotel_Report_${ySel}_landscape.pdf`);
+      flash('PDF downloaded.');
+    }catch(err){
+      console.error(err);
+      flash('PDF export failed.');
+    }
   }
 
   // Boot
