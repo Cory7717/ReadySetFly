@@ -983,8 +983,12 @@ details.master-drop[open] summary{color:#0b5ed7}
 
       // NEW: Revenue Variance vs LY
       const varianceRows = [
-        ['Var vs LY ($)', ...rv$.map(v=>fmtC(v)), fmtC(totalRv$)],
-        ['Var vs LY (%)', ...rvPct.map(p=>fmtP(p)), fmtP(totalRvPct)]
+        ['Var vs LY ($)', ...MONTHS.map((_,i)=>fmtC((revCurr[i]||0)-(revPrev[i]||0))), fmtC((sum(revCurr)-sum(revPrev)))],
+        ['Var vs LY (%)', ...MONTHS.map((_,i)=>{
+          const prev = revPrev[i]||0;
+          const d = (revCurr[i]||0)-(prev);
+          return prev>0 ? fmtP((d/prev)*100) : '0.0%';
+        }), (()=>{ const prevT=sum(revPrev)||0; const d=sum(revCurr)-prevT; return prevT>0?fmtP((d/prevT)*100):'0.0%'; })()]
       ];
       table('Revenue Variance vs LY', headMonths, varianceRows);
 
@@ -1001,7 +1005,7 @@ details.master-drop[open] summary{color:#0b5ed7}
       const plBud  = MONTHS.map((_,i)=>(rb[i]||0)-(eb[i]||0));
       const plRows = [
         ['Prev Year Operating Profit', ...plPrev.map(v=>fmtC(v)), fmtC(sum(plPrev))],
-        ['Current Year Operating Profit', ...plCurr.map(v=>fmtC(v)), fmtC(sum(plCurr))],
+        ['Current Year Operating Profit', ...MONTHS.map((_,i)=>fmtC((revCurr[i]||0)-(ec[i]||0))), fmtC(sum(MONTHS.map((_,i)=>(revCurr[i]||0)-(ec[i]||0))))],
         ['Budget Operating Profit', ...plBud.map(v=>fmtC(v)), fmtC(sum(plBud))]
       ];
       table('Operating P&L', headMonths, plRows);
