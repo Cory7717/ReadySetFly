@@ -47,6 +47,13 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 .row-missing-photos{box-shadow:inset 0 0 0 2px #f3b0b0;background:#fff6f6}
 .req-chip{display:inline-block;margin-top:6px;font-size:12px;color:#861b1b;background:#ffe1e1;border:1px solid #f3b0b0;border-radius:999px;padding:2px 8px}
 
+/* "Add Item Below" spacer row */
+.add-row td{background:#f9fbff;border-top:none;border-bottom:1px solid var(--grid)}
+.add-row .btn{width:100%}
+
+/* Footer under table */
+.table-footer{display:flex;justify-content:flex-end;gap:10px;padding:10px 14px;border-top:1px solid #edf2f7;background:#fafcff}
+
 /* ------ Mobile-friendly tweaks ------ */
 @media (max-width: 900px){
   .field{min-width:100%}
@@ -62,9 +69,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     <p>Photo-verified inventory with models/serials, maintenance dates, and exportable PDF.</p>
   </div>
 
+  <!-- Top toolbar: removed Add Item + Save here -->
   <div class="toolbar">
-    <button class="btn primary" id="addItemBtn">+ Add Item</button>
-    <button class="btn" id="saveBtn">Save</button>
     <button class="btn" id="loadBtn">Load</button>
     <button class="btn" id="exportJsonBtn">Export (.json)</button>
     <label class="btn" for="importJson">Import (.json)</label><input id="importJson" type="file" accept=".json"/>
@@ -175,6 +181,11 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
           </thead>
           <tbody id="invBody"></tbody>
         </table>
+      </div>
+
+      <!-- Footer under the table: Save button on the right -->
+      <div class="table-footer">
+        <button class="btn" id="saveBtn">Save</button>
       </div>
     </div>
   </div>
@@ -302,6 +313,21 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     if(qs('#autoSave').checked) saveLocal(false);
   }
 
+  function addItemAfterId(id){
+    const idx = items.findIndex(x=>x.id===id);
+    if(idx<0) return;
+    const it = defaultItem();
+    items.splice(idx+1, 0, it);
+    render();
+    // Focus the new row's name field and bring it into view
+    setTimeout(()=>{
+      const el = qs(`[data-bind="${it.id}:name"]`);
+      el?.scrollIntoView({behavior:'smooth', block:'center'});
+      el?.focus();
+    },0);
+    if(qs('#autoSave').checked) saveLocal(false);
+  }
+
   function removeItem(id){
     if(!confirm('Remove this item?')) return;
     items = items.filter(x=>x.id!==id);
@@ -421,6 +447,12 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       `;
       tb.appendChild(tr);
 
+      // Add-row directly below the current row
+      const addRow = document.createElement('tr');
+      addRow.className = 'add-row';
+      addRow.innerHTML = `<td colspan="14"><button class="btn primary" data-add-after="${it.id}">+ Add Item Below</button></td>`;
+      tb.appendChild(addRow);
+
       // wire photo input
       const fileEl = tr.querySelector(`#photo_${it.id}`);
       fileEl.addEventListener('change', e=>onPhotoUpload(e, it.id));
@@ -440,14 +472,19 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       el.addEventListener('change', onBind);
     });
 
-    // Re-render safely when user leaves the field (no bounce while typing)
+    // safe re-render when leaving a field
     qsa('[data-bind]').forEach(el=>{
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
         el.addEventListener('blur', ()=>render(), {passive:true});
       }
     });
 
-    // bind row actions
+    // add-after handlers
+    qsa('[data-add-after]').forEach(btn=>{
+      btn.addEventListener('click', ()=> addItemAfterId(btn.dataset.addAfter));
+    });
+
+    // row actions
     qsa('[data-del]').forEach(b=>b.addEventListener('click',()=>removeItem(b.dataset.del)));
     qsa('[data-dup]').forEach(b=>b.addEventListener('click',()=>{
       const base = items.find(x=>x.id===b.dataset.dup);
@@ -455,42 +492,46 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       const clone = JSON.parse(JSON.stringify(base));
       clone.id = crypto.randomUUID();
       clone.name = base.name + ' (Copy)';
-      items.push(clone); render(); if(qs('#autoSave').checked) saveLocal(false);
+      const idx = items.findIndex(x=>x.id===base.id);
+      items.splice(idx+1,0,clone);
+      render(); if(qs('#autoSave').checked) saveLocal(false);
       updateChangeNotice();
     }));
 
-    // update totals chip (no full re-render needed elsewhere)
+    // update totals chip
     updateTotalValueChip();
-
     updateChangeNotice();
   }
 
-  // --- focus-safe onBind ---
+  // focus-safe onBind
   function onBind(e){
     const [id, field] = e.target.dataset.bind.split(':');
     const it = items.find(x=>x.id===id);
     if(!it) return;
 
-    // normalize value
     let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
     if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
     it[field] = val;
 
-    // Live update total chip without re-render
     if(field==='qty' || field==='estimatedValue'){
       updateTotalValueChip();
     }
 
-    // Only re-render immediately for non-typing controls
     if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox' || e.target.type === 'date') {
       render();
     }
 
-    // Save, but do not render
     if(qs('#autoSave').checked) saveLocal(false);
   }
 
   /* ======== Change detection vs Last Submitted ======== */
+  const itemKey = it => [
+    (it.name||'').trim().toLowerCase(),
+    (it.location||'').trim().toLowerCase(),
+    (it.model||'').trim().toLowerCase(),
+    (it.serial||'').trim().toLowerCase()
+  ].join('|'); // re-declared for clarity
+
   function diffVsLast(currentItems){
     const last = getLastSubmitted();
     if(!last || !Array.isArray(last.items)) return {added:[], missing:[]};
@@ -507,7 +548,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     const {added, missing, lastMeta, submittedAt} = diffVsLast(items);
     const box = qs('#changeNotice');
     if(!added.length && !missing.length){
-      if(!getLastSubmitted()){ // first-time no baseline
+      if(!getLastSubmitted()){
         box.style.display='block';
         box.classList.remove('critical');
         box.innerHTML = `No previous submitted inventory found. Submitting will set a baseline.`;
@@ -533,20 +574,17 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   qs('#submitBtn').addEventListener('click', onSubmitInventory);
 
   function onSubmitInventory(){
-    // Validate photos for each item
     const noPhoto = items.filter(it=>!it.photos || it.photos.length===0);
     const notice = qs('#submitNotice');
     if(noPhoto.length){
       notice.style.display='block';
       notice.textContent = `Cannot submit: ${noPhoto.length} item${noPhoto.length!==1?'s':''} missing required photo(s). Add at least one photo per item.`;
-      // highlight rows visually (render already marks them)
       render();
       flash('Add photos to all items before submitting.');
       return;
     }
     notice.style.display='none';
 
-    // Save working and archive as "last submitted"
     const payload = workingPayload();
     saveLocal(false);
     setLastSubmitted(payload);
@@ -580,7 +618,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     const by = qs('#conductedBy').value || '—';
     const prop = qs('#property').value || '—';
     const notes = qs('#overallNotes').value || '';
-    // compute total estimated value
     const totalVal = (items||[]).reduce((t,it)=>t+((Number(it.estimatedValue)||0)*(Number(it.qty)||0)),0);
 
     doc.text(`Date: ${invDate}`, margin, y);
@@ -634,7 +671,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y = doc.lastAutoTable.finalY + 16;
     }
 
-    // Validate photo requirement, add prominent banner if violated
+    // Validate photo requirement banner
     const noPhoto = items.filter(it=>!it.photos || it.photos.length===0);
     if(noPhoto.length){
       doc.setFillColor(255,225,225);
@@ -645,7 +682,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y += 40;
     }
 
-    // Inventory table (wrap long cells)
+    // Inventory table
     const head = [[
       'Verified','Name','Location','Model','Serial','Qty',
       'Est. Value','Line Total','Condition','Status','Last Service','Next Due','Notes'
@@ -685,18 +722,18 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       headStyles:{ fillColor:[52,152,219], textColor:255 },
       columnStyles:{
         0:{cellWidth:58, halign:'center'},
-        1:{cellWidth:140, overflow:'linebreak'}, // Name
-        2:{cellWidth:130, overflow:'linebreak'}, // Location
-        3:{cellWidth:95},                        // Model
-        4:{cellWidth:110},                       // Serial
-        5:{cellWidth:38, halign:'center'},       // Qty
-        6:{cellWidth:78, halign:'right'},        // Est. Value
-        7:{cellWidth:88, halign:'right'},        // Line Total
-        8:{cellWidth:88},                        // Condition
-        9:{cellWidth:70},                        // Status
-        10:{cellWidth:70},                       // Last Service
-        11:{cellWidth:70},                       // Next Due
-        12:{cellWidth:190, overflow:'linebreak'} // Notes
+        1:{cellWidth:140, overflow:'linebreak'},
+        2:{cellWidth:130, overflow:'linebreak'},
+        3:{cellWidth:95},
+        4:{cellWidth:110},
+        5:{cellWidth:38, halign:'center'},
+        6:{cellWidth:78, halign:'right'},
+        7:{cellWidth:88, halign:'right'},
+        8:{cellWidth:88},
+        9:{cellWidth:70},
+        10:{cellWidth:70},
+        11:{cellWidth:70},
+        12:{cellWidth:190, overflow:'linebreak'}
       },
       didParseCell: function(data){
         if(data.section==='body'){
@@ -763,8 +800,12 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   }
 
   /* ================== Events & Boot =================== */
-  // Add item
-  qs('#addItemBtn').addEventListener('click', ()=>addItem());
+  // (Top Add button removed; keep guard if re-introduced later)
+  const addTopBtn = qs('#addItemBtn');
+  if(addTopBtn){ addTopBtn.addEventListener('click', ()=>addItem()); }
+
+  // Save buttons (bottom-right)
+  qs('#saveBtn').addEventListener('click', ()=>saveLocal(true));
 
   // Bulk verify
   qs('#bulkVerifyBtn').addEventListener('click', ()=>{
@@ -789,8 +830,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     qs(sel).addEventListener('input', ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
   });
 
-  // Save/Load/Import/Export/Reset
-  qs('#saveBtn').addEventListener('click', ()=>saveLocal(true));
+  // Load/Export/Import/Reset
   qs('#loadBtn').addEventListener('click', loadLocal);
   qs('#exportJsonBtn').addEventListener('click', exportJSON);
   qs('#importJson').addEventListener('change', e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); });
