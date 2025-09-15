@@ -193,7 +193,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   const defaultItem = () => ({
     id: crypto.randomUUID(),
     name:'', location:'', model:'', serial:'', qty:1,
-    estimatedValue: 0,                            // <-- NEW
+    estimatedValue: 0,
     condition:'Good', status:'Active',
     lastService:'', nextDue:'', notes:'',
     verified:false, photos:[]
@@ -284,6 +284,16 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     r.readAsText(file);
   }
 
+  /* ================== Currency & Total Chip =================== */
+  function currency(n){ const v=Number(n)||0; return v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}); }
+
+  function updateTotalValueChip(){
+    const chip = qs('#totalValueChip');
+    if(!chip) return;
+    const total = (items||[]).reduce((t,it)=> t + ((Number(it.estimatedValue)||0) * (Number(it.qty)||0)), 0);
+    chip.textContent = `Total Estimated Value: ${currency(total)}`;
+  }
+
   /* ================== UI Build =================== */
   function addItem(prefill){
     const it = Object.assign(defaultItem(), prefill||{});
@@ -332,8 +342,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     return 'badge status-bad';
   }
 
-  function currency(n){ const v=Number(n)||0; return v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}); }
-
   function render(){
     // Filters
     const q = qs('#searchTxt').value.trim().toLowerCase();
@@ -357,9 +365,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     const tb = qs('#invBody');
     tb.innerHTML = '';
 
-    // running total
-    let totalValue = 0;
-
     for(const it of filtered){
       const needsPhotos = !it.photos || it.photos.length===0;
       const tr = document.createElement('tr');
@@ -382,7 +387,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 
       const estVal = Number(it.estimatedValue)||0;
       const qty = Number(it.qty)||0;
-      totalValue += estVal * qty;
 
       tr.innerHTML = `
         <td><input type="checkbox" ${it.verified?'checked':''} data-bind="${it.id}:verified"/></td>
@@ -430,15 +434,19 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       });
     }
 
-    // update total chip
-    const chip = qs('#totalValueChip');
-    if(chip) chip.textContent = `Total Estimated Value: ${currency(totalValue)}`;
-
     // bind changes
     qsa('[data-bind]').forEach(el=>{
       el.addEventListener('input', onBind);
       el.addEventListener('change', onBind);
     });
+
+    // Re-render safely when user leaves the field (no bounce while typing)
+    qsa('[data-bind]').forEach(el=>{
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.addEventListener('blur', ()=>render(), {passive:true});
+      }
+    });
+
     // bind row actions
     qsa('[data-del]').forEach(b=>b.addEventListener('click',()=>removeItem(b.dataset.del)));
     qsa('[data-dup]').forEach(b=>b.addEventListener('click',()=>{
@@ -451,30 +459,36 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       updateChangeNotice();
     }));
 
+    // update totals chip (no full re-render needed elsewhere)
+    updateTotalValueChip();
+
     updateChangeNotice();
   }
 
-  let bindTimer;
-function onBind(e){
-  const [id, field] = e.target.dataset.bind.split(':');
-  const it = items.find(x=>x.id===id); 
-  if(!it) return;
+  // --- focus-safe onBind ---
+  function onBind(e){
+    const [id, field] = e.target.dataset.bind.split(':');
+    const it = items.find(x=>x.id===id);
+    if(!it) return;
 
-  let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
-  if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
-  it[field] = val;
+    // normalize value
+    let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
+    if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
+    it[field] = val;
 
-  // Only re-render immediately if field affects visual badge/row state
-  if(field === 'condition' || field === 'verified') {
-    render();
-  } else {
-    // Debounce rendering so typing won't constantly destroy the input
-    clearTimeout(bindTimer);
-    bindTimer = setTimeout(render, 500);
+    // Live update total chip without re-render
+    if(field==='qty' || field==='estimatedValue'){
+      updateTotalValueChip();
+    }
+
+    // Only re-render immediately for non-typing controls
+    if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox' || e.target.type === 'date') {
+      render();
+    }
+
+    // Save, but do not render
+    if(qs('#autoSave').checked) saveLocal(false);
   }
-
-  if(qs('#autoSave').checked) saveLocal(false);
-}
 
   /* ======== Change detection vs Last Submitted ======== */
   function diffVsLast(currentItems){
@@ -570,10 +584,12 @@ function onBind(e){
     const totalVal = (items||[]).reduce((t,it)=>t+((Number(it.estimatedValue)||0)*(Number(it.qty)||0)),0);
 
     doc.text(`Date: ${invDate}`, margin, y);
-    doc.text(`Conducted By: ${by}`, margin+200, y);
-    doc.text(`Location/Property: ${prop}`, margin+420, y);
-    doc.text(`Total Estimated Value: ${totalVal.toLocaleString('en-US',{style:'currency',currency:'USD'})}`, margin+720-720+pageWidth-(margin*2+520), y); // right-ish placement
+    doc.text(`Conducted By: ${by}`, margin+220, y);
+    doc.text(`Location/Property: ${prop}`, margin+460, y);
     y += 16;
+    doc.text(`Total Estimated Value: ${totalVal.toLocaleString('en-US',{style:'currency',currency:'USD'})}`, margin, y);
+    y += 14;
+
     if(notes){
       doc.setFontSize(11); doc.setTextColor(127,140,141);
       const wrapped = doc.splitTextToSize(`Notes: ${notes}`, pageWidth - margin*2);
@@ -604,7 +620,7 @@ function onBind(e){
         head: changeHead,
         body: rows,
         startY: y,
-        styles:{ fontSize:9, cellPadding:4 },
+        styles:{ fontSize:9, cellPadding:4, overflow:'linebreak' },
         headStyles:{ fillColor:[52,152,219], textColor:255 },
         columnStyles:{0:{cellWidth:70},1:{cellWidth:160},2:{cellWidth:130},3:{cellWidth:110},4:{cellWidth:120},5:{cellWidth:40,halign:'center'}},
         didParseCell: function(data){
@@ -629,9 +645,12 @@ function onBind(e){
       y += 40;
     }
 
-    // Inventory table (now includes Est. Value + Line Total)
-    const head = [['Verified','Name','Location','Model','Serial','Qty','Est. Value','Line Total','Condition','Status','Last Service','Next Due','Notes']];
-    const all = items; // export all
+    // Inventory table (wrap long cells)
+    const head = [[
+      'Verified','Name','Location','Model','Serial','Qty',
+      'Est. Value','Line Total','Condition','Status','Last Service','Next Due','Notes'
+    ]];
+    const all = items;
     const body = all.map(it=>{
       const ev = Number(it.estimatedValue)||0;
       const q = Number(it.qty)||0;
@@ -643,13 +662,13 @@ function onBind(e){
         it.model||'',
         it.serial||'',
         String(q),
-        (ev).toLocaleString('en-US',{style:'currency',currency:'USD'}),
-        (line).toLocaleString('en-US',{style:'currency',currency:'USD'}),
+        ev.toLocaleString('en-US',{style:'currency',currency:'USD'}),
+        line.toLocaleString('en-US',{style:'currency',currency:'USD'}),
         it.condition||'',
         it.status||'',
         it.lastService||'',
         it.nextDue||'',
-        (it.notes||'').slice(0,120)
+        it.notes||''
       ];
     });
 
@@ -662,15 +681,22 @@ function onBind(e){
     doc.autoTable({
       head, body,
       startY: y,
-      styles:{ fontSize:9, cellPadding:4, halign:'left', valign:'top' },
+      styles:{ fontSize:9, cellPadding:4, halign:'left', valign:'top', overflow:'linebreak' },
       headStyles:{ fillColor:[52,152,219], textColor:255 },
       columnStyles:{
-        0:{cellWidth:60, halign:'center'},
-        1:{cellWidth:120}, 2:{cellWidth:110}, 3:{cellWidth:90}, 4:{cellWidth:100},
-        5:{cellWidth:40, halign:'center'},
-        6:{cellWidth:80, halign:'right'}, 7:{cellWidth:90, halign:'right'},
-        8:{cellWidth:90}, 9:{cellWidth:70}, 10:{cellWidth:75}, 11:{cellWidth:75},
-        12:{cellWidth:160}
+        0:{cellWidth:58, halign:'center'},
+        1:{cellWidth:140, overflow:'linebreak'}, // Name
+        2:{cellWidth:130, overflow:'linebreak'}, // Location
+        3:{cellWidth:95},                        // Model
+        4:{cellWidth:110},                       // Serial
+        5:{cellWidth:38, halign:'center'},       // Qty
+        6:{cellWidth:78, halign:'right'},        // Est. Value
+        7:{cellWidth:88, halign:'right'},        // Line Total
+        8:{cellWidth:88},                        // Condition
+        9:{cellWidth:70},                        // Status
+        10:{cellWidth:70},                       // Last Service
+        11:{cellWidth:70},                       // Next Due
+        12:{cellWidth:190, overflow:'linebreak'} // Notes
       },
       didParseCell: function(data){
         if(data.section==='body'){
