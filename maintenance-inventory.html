@@ -454,16 +454,27 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     updateChangeNotice();
   }
 
-  function onBind(e){
-    const [id, field] = e.target.dataset.bind.split(':');
-    const it = items.find(x=>x.id===id); if(!it) return;
-    let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
-    if(field==='qty' || field==='estimatedValue') val = Number(val)||0;   // <-- ensure numeric
-    it[field] = val;
-    // Re-render for condition badge, photo warnings, totals
+  let bindTimer;
+function onBind(e){
+  const [id, field] = e.target.dataset.bind.split(':');
+  const it = items.find(x=>x.id===id); 
+  if(!it) return;
+
+  let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
+  if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
+  it[field] = val;
+
+  // Only re-render immediately if field affects visual badge/row state
+  if(field === 'condition' || field === 'verified') {
     render();
-    if(qs('#autoSave').checked) saveLocal(false);
+  } else {
+    // Debounce rendering so typing won't constantly destroy the input
+    clearTimeout(bindTimer);
+    bindTimer = setTimeout(render, 500);
   }
+
+  if(qs('#autoSave').checked) saveLocal(false);
+}
 
   /* ======== Change detection vs Last Submitted ======== */
   function diffVsLast(currentItems){
