@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Maintenance & Inventory Checklist</title>
+<!-- jsPDF + AutoTable for PDF export -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg1:#667eea;--bg2:#764ba2;--panelTint:rgba(255,255,255,.95);--ink:#2c3e50;--inkSoft:#7f8c8d;--brand1:#3498db;--brand2:#2980b9;--dark1:#2c3e50;--dark2:#34495e;--goodBg:#e8f5e8;--good:#27ae60;--warnBg:#fff3cd;--warn:#856404;--posBg:#d1edcc;--pos:#155724;--negBg:#f8d7da;--neg:#721c24;--grid:#e0e0e0}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));min-height:100vh;padding:20px}
+.container{max-width:1300px;margin:0 auto;background:var(--panelTint);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.1);backdrop-filter:blur(10px);overflow:hidden}
+.header{background:linear-gradient(135deg,var(--dark1),var(--brand1));color:#fff;padding:24px;text-align:center}
+.header h1{font-size:2em;margin-bottom:6px;text-shadow:2px 2px 4px rgba(0,0,0,.25)}
+.toolbar{position:sticky;top:0;z-index:5;background:#f9fbff;border-bottom:1px solid #e9edf3;padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.btn{border:1px solid #dbe3ee;background:#fff;color:#1f2d3d;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;transition:.2s transform,.2s box-shadow}
+.btn.primary{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;border:none}
+.btn.danger{background:#fff;border-color:#f1c1c1;color:#b10d0d}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08)}
+input[type="file"]{display:none}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#2c3e50;padding:6px 10px;background:#eef4ff;border:1px solid #d7e2ff;border-radius:999px}
+.content{padding:22px}
+.section{margin-bottom:22px;background:#fff;border-radius:12px;box-shadow:0 5px 15px rgba(0,0,0,.08);overflow:hidden}
+.section-header{background:linear-gradient(135deg,#34495e,#2c3e50);color:#fff;padding:14px 16px;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.notice{padding:10px 14px;background:#fff9e6;border-top:1px solid #f2e2b8;color:#7a5b00}
+.notice.critical{background:#ffe9e9;border-top-color:#f3b0b0;color:#861b1b}
+.field-row{display:flex;flex-wrap:wrap;gap:12px;padding:14px 16px;background:#f7faff;border-bottom:1px solid #edf2f7}
+.field-row label{font-size:13px;color:#34495e}
+.field-row input,.field-row select,.field-row textarea{padding:8px;border:1px solid #dbe3ee;border-radius:8px;background:#fff}
+.field{display:flex;flex-direction:column;gap:6px;min-width:200px}
+.table-container{overflow:auto;padding:14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 8px;text-align:left;border:1px solid var(--grid);white-space:nowrap;vertical-align:top}
+th{background:linear-gradient(135deg,#f8f9fa,#e9ecef);font-weight:800;color:#2c3e50;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #e5e7eb;background:#f5f7fb}
+.status-ok{background:var(--posBg);color:var(--pos);border-color:#b8e0b2}
+.status-attn{background:var(--warnBg);color:var(--warn);border-color:#f2df8a}
+.status-bad{background:var(--negBg);color:var(--neg);border-color:#f4b6bc}
+.thumb{width:58px;height:58px;object-fit:cover;border-radius:8px;border:1px solid #e3e8f0}
+.photo-stack{display:flex;gap:6px;flex-wrap:wrap}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+textarea.notes{min-width:220px;min-height:44px}
+.small{font-size:12px;color:#7f8c8d}
+hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
+.row-missing-photos{box-shadow:inset 0 0 0 2px #f3b0b0;background:#fff6f6}
+.req-chip{display:inline-block;margin-top:6px;font-size:12px;color:#861b1b;background:#ffe1e1;border:1px solid #f3b0b0;border-radius:999px;padding:2px 8px}
+
+/* ------ Mobile-friendly tweaks ------ */
+@media (max-width: 900px){
+  .field{min-width:100%}
+  .btn{padding:10px 14px}
+  th,td{min-width:100px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🧰 Maintenance & Equipment Inventory</h1>
+    <p>Photo-verified inventory with models/serials, maintenance dates, and exportable PDF.</p>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn primary" id="addItemBtn">+ Add Item</button>
+    <button class="btn" id="saveBtn">Save</button>
+    <button class="btn" id="loadBtn">Load</button>
+    <button class="btn" id="exportJsonBtn">Export (.json)</button>
+    <label class="btn" for="importJson">Import (.json)</label><input id="importJson" type="file" accept=".json"/>
+    <label class="pill"><input id="autoSave" type="checkbox" checked/> Auto-save</label>
+    <button class="btn" id="submitBtn" title="Validate & archive this inventory">Submit Inventory</button>
+    <button class="btn" id="pdfBtn">Download Inventory (PDF)</button>
+  </div>
+
+  <div class="content">
+    <!-- Header info -->
+    <div class="section">
+      <div class="section-header">
+        <span>🧾 Inventory Session Details</span>
+        <div class="actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="badge" id="totalValueChip">Total Estimated Value: $0</span>
+          <button class="btn" id="bulkVerifyBtn" title="Mark all items Verified">Mark All Verified</button>
+          <button class="btn danger" id="clearAllBtn" title="Remove everything">Reset All</button>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Inventory Date</label>
+          <input type="date" id="invDate"/>
+        </div>
+        <div class="field">
+          <label>Conducted By</label>
+          <input type="text" id="conductedBy" placeholder="Full name"/>
+        </div>
+        <div class="field">
+          <label>Location / Property</label>
+          <input type="text" id="property" placeholder="e.g., Main Hotel – North Wing"/>
+        </div>
+        <div class="field" style="min-width:320px">
+          <label>Notes (overall)</label>
+          <textarea id="overallNotes" rows="2" placeholder="General comments for this inventory..."></textarea>
+        </div>
+      </div>
+      <div id="submitNotice" class="notice critical" style="display:none"></div>
+      <div id="changeNotice" class="notice" style="display:none"></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="section">
+      <div class="section-header">
+        <span>🔎 Filter & Summary</span>
+        <span class="small" id="summaryChip">0 items</span>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Search</label>
+          <input type="text" id="searchTxt" placeholder="Search name/model/serial/location..." />
+        </div>
+        <div class="field">
+          <label>Condition</label>
+          <select id="fCondition">
+            <option value="">All</option>
+            <option>Excellent</option>
+            <option>Good</option>
+            <option>Fair</option>
+            <option>Needs Repair</option>
+            <option>Out of Service</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="fStatus">
+            <option value="">All</option>
+            <option>Active</option>
+            <option>Spare</option>
+            <option>Retired</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Location</label>
+          <input type="text" id="fLocation" placeholder="Filter by location"/>
+        </div>
+        <div class="field" style="align-self:end">
+          <button class="btn" id="clearFiltersBtn">Clear Filters</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory table -->
+    <div class="section">
+      <div class="section-header">
+        <span>📋 Inventory Items</span>
+        <span class="small">Photos are required to submit. Data persists on this device.</span>
+      </div>
+      <div class="table-container">
+        <table id="invTable">
+          <thead>
+            <tr>
+              <th>Verified</th>
+              <th>Photos</th>
+              <th>Item Name</th>
+              <th>Location</th>
+              <th>Model</th>
+              <th>Serial</th>
+              <th>Qty</th>
+              <th>Est. Value</th>
+              <th>Condition</th>
+              <th>Status</th>
+              <th>Last Service</th>
+              <th>Next Due</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+  /* ================== Helpers & State =================== */
+  const qs=(s,r=document)=>r.querySelector(s);
+  const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const STORAGE_KEY='maintInv_v2_working';
+  const STORAGE_LAST='maintInv_v2_lastSubmitted';
+
+  let items = []; // array of item objects
+
+  const defaultItem = () => ({
+    id: crypto.randomUUID(),
+    name:'', location:'', model:'', serial:'', qty:1,
+    estimatedValue: 0,                            // <-- NEW
+    condition:'Good', status:'Active',
+    lastService:'', nextDue:'', notes:'',
+    verified:false, photos:[]
+  });
+
+  // a “natural key” to compare inventories across submissions
+  const itemKey = it => [
+    (it.name||'').trim().toLowerCase(),
+    (it.location||'').trim().toLowerCase(),
+    (it.model||'').trim().toLowerCase(),
+    (it.serial||'').trim().toLowerCase()
+  ].join('|');
+
+  // Toast
+  let toastEl;
+  function flash(msg){
+    if(!toastEl){
+      toastEl=document.createElement('div');
+      Object.assign(toastEl.style,{position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',padding:'10px 14px',background:'rgba(44,62,80,.95)',color:'#fff',borderRadius:'10px',boxShadow:'0 8px 20px rgba(0,0,0,.2)',zIndex:'9999',transition:'opacity .25s ease'});
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent=msg; toastEl.style.opacity='1'; setTimeout(()=>toastEl.style.opacity='0',1400);
+  }
+
+  function workingPayload(){
+    return {
+      meta:{
+        invDate: qs('#invDate').value || '',
+        conductedBy: qs('#conductedBy').value || '',
+        property: qs('#property').value || '',
+        overallNotes: qs('#overallNotes').value || ''
+      },
+      items
+    };
+  }
+
+  function saveLocal(show=true){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(workingPayload()));
+    if(show) flash('Saved.');
+  }
+
+  function loadLocal(){
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){ flash('Nothing saved on this device yet.'); render(); updateChangeNotice(); return; }
+    try{
+      const data = JSON.parse(raw);
+      qs('#invDate').value = data?.meta?.invDate || '';
+      qs('#conductedBy').value = data?.meta?.conductedBy || '';
+      qs('#property').value = data?.meta?.property || '';
+      qs('#overallNotes').value = data?.meta?.overallNotes || '';
+      // ensure estimatedValue exists on legacy items
+      items = Array.isArray(data?.items) ? data.items.map(it=>({ estimatedValue:0, ...it })) : [];
+      render();
+      updateChangeNotice();
+      flash('Loaded.');
+    }catch(e){ console.error(e); flash('Load failed.'); }
+  }
+
+  function getLastSubmitted(){
+    const raw = localStorage.getItem(STORAGE_LAST);
+    if(!raw) return null;
+    try{ return JSON.parse(raw); }catch{ return null; }
+  }
+
+  function setLastSubmitted(payload){
+    localStorage.setItem(STORAGE_LAST, JSON.stringify({
+      submittedAt: new Date().toISOString(),
+      meta: payload.meta,
+      items: payload.items
+    }));
+  }
+
+  function exportJSON(){
+    saveLocal(false);
+    const blob=new Blob([localStorage.getItem(STORAGE_KEY)||'{}'],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    const dateStr = (qs('#invDate').value||new Date().toISOString().slice(0,10));
+    a.download=`inventory_${dateStr}.json`; document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  function importJSON(file){
+    const r=new FileReader();
+    r.onload=e=>{ try{
+      localStorage.setItem(STORAGE_KEY, e.target.result);
+      loadLocal();
+      flash('Imported.');
+    }catch(err){ console.error(err); flash('Import failed.'); } };
+    r.readAsText(file);
+  }
+
+  /* ================== UI Build =================== */
+  function addItem(prefill){
+    const it = Object.assign(defaultItem(), prefill||{});
+    items.push(it);
+    render();
+    if(qs('#autoSave').checked) saveLocal(false);
+  }
+
+  function removeItem(id){
+    if(!confirm('Remove this item?')) return;
+    items = items.filter(x=>x.id!==id);
+    render();
+    if(qs('#autoSave').checked) saveLocal(false);
+  }
+
+  function onPhotoUpload(e, id){
+    const files = e.target.files;
+    if(!files?.length) return;
+    const it = items.find(x=>x.id===id);
+    if(!it) return;
+    const readers = [];
+    for(const f of files){
+      const rd = new FileReader();
+      readers.push(new Promise(res=>{
+        rd.onload = ev => res(ev.target.result);
+        rd.readAsDataURL(f);
+      }));
+    }
+    Promise.all(readers).then(urls=>{
+      it.photos.push(...urls);
+      render();
+      if(qs('#autoSave').checked) saveLocal(false);
+    });
+  }
+
+  function removePhoto(id, idx){
+    const it = items.find(x=>x.id===id); if(!it) return;
+    it.photos.splice(idx,1);
+    render();
+    if(qs('#autoSave').checked) saveLocal(false);
+  }
+
+  function conditionBadge(cond){
+    if(['Excellent','Good'].includes(cond)) return 'badge status-ok';
+    if(['Fair'].includes(cond)) return 'badge status-attn';
+    return 'badge status-bad';
+  }
+
+  function currency(n){ const v=Number(n)||0; return v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}); }
+
+  function render(){
+    // Filters
+    const q = qs('#searchTxt').value.trim().toLowerCase();
+    const fc = qs('#fCondition').value;
+    const fs = qs('#fStatus').value;
+    const fl = qs('#fLocation').value.trim().toLowerCase();
+
+    const filtered = items.filter(it=>{
+      if(fc && it.condition!==fc) return false;
+      if(fs && it.status!==fs) return false;
+      if(fl && !String(it.location||'').toLowerCase().includes(fl)) return false;
+      if(q){
+        const blob = [it.name,it.model,it.serial,it.location,it.notes].join(' ').toLowerCase();
+        if(!blob.includes(q)) return false;
+      }
+      return true;
+    });
+
+    qs('#summaryChip').textContent = `${filtered.length} item${filtered.length!==1?'s':''}`;
+
+    const tb = qs('#invBody');
+    tb.innerHTML = '';
+
+    // running total
+    let totalValue = 0;
+
+    for(const it of filtered){
+      const needsPhotos = !it.photos || it.photos.length===0;
+      const tr = document.createElement('tr');
+      if(needsPhotos) tr.classList.add('row-missing-photos');
+
+      const photosHtml = `
+        <div class="photo-stack">
+          ${it.photos.map((p,idx)=>`
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <img src="${p}" class="thumb" alt="photo"/>
+              <button class="btn danger small" data-remove-photo="${it.id}:${idx}">Remove</button>
+            </div>
+          `).join('')}
+        </div>
+        <hr class="sep"/>
+        <label class="btn" for="photo_${it.id}">+ Add Photos</label>
+        <input id="photo_${it.id}" type="file" accept="image/*" capture="environment" multiple />
+        ${needsPhotos ? '<div class="req-chip">Photos required</div>' : ''}
+      `;
+
+      const estVal = Number(it.estimatedValue)||0;
+      const qty = Number(it.qty)||0;
+      totalValue += estVal * qty;
+
+      tr.innerHTML = `
+        <td><input type="checkbox" ${it.verified?'checked':''} data-bind="${it.id}:verified"/></td>
+        <td style="min-width:220px">${photosHtml}</td>
+        <td><input type="text" value="${it.name||''}" placeholder="Item name" data-bind="${it.id}:name"/></td>
+        <td><input type="text" value="${it.location||''}" placeholder="e.g., Boiler Room" data-bind="${it.id}:location"/></td>
+        <td><input type="text" value="${it.model||''}" placeholder="Model #" data-bind="${it.id}:model"/></td>
+        <td><input type="text" value="${it.serial||''}" placeholder="Serial #" data-bind="${it.id}:serial"/></td>
+        <td><input type="number" min="0" value="${it.qty||1}" style="width:90px" data-bind="${it.id}:qty"/></td>
+        <td>
+          <input type="number" min="0" step="0.01" value="${it.estimatedValue??0}" style="width:120px" data-bind="${it.id}:estimatedValue"/>
+          <div class="small" style="margin-top:4px">${currency(estVal)} × ${qty||0} = <b>${currency(estVal*qty)}</b></div>
+        </td>
+        <td>
+          <select data-bind="${it.id}:condition">
+            ${['Excellent','Good','Fair','Needs Repair','Out of Service'].map(c=>`<option ${c===it.condition?'selected':''}>${c}</option>`).join('')}
+          </select>
+          <div class="${conditionBadge(it.condition)}" style="margin-top:6px">${it.condition}</div>
+        </td>
+        <td>
+          <select data-bind="${it.id}:status">
+            ${['Active','Spare','Retired'].map(s=>`<option ${s===it.status?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="date" value="${it.lastService||''}" data-bind="${it.id}:lastService"/></td>
+        <td><input type="date" value="${it.nextDue||''}" data-bind="${it.id}:nextDue"/></td>
+        <td><textarea class="notes" data-bind="${it.id}:notes" placeholder="Notes...">${it.notes||''}</textarea></td>
+        <td class="actions">
+          <button class="btn" data-dup="${it.id}">Duplicate</button>
+          <button class="btn danger" data-del="${it.id}">Remove</button>
+        </td>
+      `;
+      tb.appendChild(tr);
+
+      // wire photo input
+      const fileEl = tr.querySelector(`#photo_${it.id}`);
+      fileEl.addEventListener('change', e=>onPhotoUpload(e, it.id));
+
+      // wire photo deletes
+      tr.querySelectorAll('[data-remove-photo]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const [id, idx] = btn.dataset.removePhoto.split(':');
+          removePhoto(id, Number(idx));
+        });
+      });
+    }
+
+    // update total chip
+    const chip = qs('#totalValueChip');
+    if(chip) chip.textContent = `Total Estimated Value: ${currency(totalValue)}`;
+
+    // bind changes
+    qsa('[data-bind]').forEach(el=>{
+      el.addEventListener('input', onBind);
+      el.addEventListener('change', onBind);
+    });
+    // bind row actions
+    qsa('[data-del]').forEach(b=>b.addEventListener('click',()=>removeItem(b.dataset.del)));
+    qsa('[data-dup]').forEach(b=>b.addEventListener('click',()=>{
+      const base = items.find(x=>x.id===b.dataset.dup);
+      if(!base) return;
+      const clone = JSON.parse(JSON.stringify(base));
+      clone.id = crypto.randomUUID();
+      clone.name = base.name + ' (Copy)';
+      items.push(clone); render(); if(qs('#autoSave').checked) saveLocal(false);
+      updateChangeNotice();
+    }));
+
+    updateChangeNotice();
+  }
+
+  function onBind(e){
+    const [id, field] = e.target.dataset.bind.split(':');
+    const it = items.find(x=>x.id===id); if(!it) return;
+    let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
+    if(field==='qty' || field==='estimatedValue') val = Number(val)||0;   // <-- ensure numeric
+    it[field] = val;
+    // Re-render for condition badge, photo warnings, totals
+    render();
+    if(qs('#autoSave').checked) saveLocal(false);
+  }
+
+  /* ======== Change detection vs Last Submitted ======== */
+  function diffVsLast(currentItems){
+    const last = getLastSubmitted();
+    if(!last || !Array.isArray(last.items)) return {added:[], missing:[]};
+    const mapPrev = new Map(last.items.map(it=>[itemKey(it), it]));
+    const mapCurr = new Map(currentItems.map(it=>[itemKey(it), it]));
+    const missing = [];
+    const added = [];
+    for(const [k,v] of mapPrev){ if(!mapCurr.has(k)) missing.push(v); }
+    for(const [k,v] of mapCurr){ if(!mapPrev.has(k)) added.push(v); }
+    return {added, missing, lastMeta:last.meta, submittedAt:last.submittedAt};
+  }
+
+  function updateChangeNotice(){
+    const {added, missing, lastMeta, submittedAt} = diffVsLast(items);
+    const box = qs('#changeNotice');
+    if(!added.length && !missing.length){
+      if(!getLastSubmitted()){ // first-time no baseline
+        box.style.display='block';
+        box.classList.remove('critical');
+        box.innerHTML = `No previous submitted inventory found. Submitting will set a baseline.`;
+      }else{
+        box.style.display='none';
+      }
+      return;
+    }
+    box.style.display='block';
+    box.classList.remove('critical');
+    const lastLine = submittedAt ? `Last submitted: ${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}` : '';
+    box.innerHTML = `
+      <b>Changes since last submission:</b>
+      <ul style="margin:6px 0 0 18px;line-height:1.4">
+        <li><b>Added:</b> ${added.length || 0}</li>
+        <li><b>Missing:</b> ${missing.length || 0}</li>
+      </ul>
+      <div class="small" style="margin-top:6px">${lastLine}</div>
+    `;
+  }
+
+  /* ================== Submit (Photos required) =================== */
+  qs('#submitBtn').addEventListener('click', onSubmitInventory);
+
+  function onSubmitInventory(){
+    // Validate photos for each item
+    const noPhoto = items.filter(it=>!it.photos || it.photos.length===0);
+    const notice = qs('#submitNotice');
+    if(noPhoto.length){
+      notice.style.display='block';
+      notice.textContent = `Cannot submit: ${noPhoto.length} item${noPhoto.length!==1?'s':''} missing required photo(s). Add at least one photo per item.`;
+      // highlight rows visually (render already marks them)
+      render();
+      flash('Add photos to all items before submitting.');
+      return;
+    }
+    notice.style.display='none';
+
+    // Save working and archive as "last submitted"
+    const payload = workingPayload();
+    saveLocal(false);
+    setLastSubmitted(payload);
+    updateChangeNotice();
+    flash('Inventory submitted & archived as baseline.');
+  }
+
+  /* ================== PDF Export =================== */
+  qs('#pdfBtn').addEventListener('click', downloadPDF);
+
+  async function downloadPDF(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
+
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Header band
+    doc.setFillColor(52,73,94);
+    doc.rect(0,0,pageWidth,70,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(255,255,255);
+    doc.text('Maintenance & Equipment Inventory', margin, 45);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - margin, 45, {align:'right'});
+
+    // Session meta
+    let y = 90;
+    doc.setTextColor(44,62,80); doc.setFontSize(12);
+    const invDate = qs('#invDate').value || '—';
+    const by = qs('#conductedBy').value || '—';
+    const prop = qs('#property').value || '—';
+    const notes = qs('#overallNotes').value || '';
+    // compute total estimated value
+    const totalVal = (items||[]).reduce((t,it)=>t+((Number(it.estimatedValue)||0)*(Number(it.qty)||0)),0);
+
+    doc.text(`Date: ${invDate}`, margin, y);
+    doc.text(`Conducted By: ${by}`, margin+200, y);
+    doc.text(`Location/Property: ${prop}`, margin+420, y);
+    doc.text(`Total Estimated Value: ${totalVal.toLocaleString('en-US',{style:'currency',currency:'USD'})}`, margin+720-720+pageWidth-(margin*2+520), y); // right-ish placement
+    y += 16;
+    if(notes){
+      doc.setFontSize(11); doc.setTextColor(127,140,141);
+      const wrapped = doc.splitTextToSize(`Notes: ${notes}`, pageWidth - margin*2);
+      doc.text(wrapped, margin, y);
+      y += wrapped.length*12 + 6;
+    }
+
+    // Change log vs last submitted
+    const {added, missing, submittedAt, lastMeta} = diffVsLast(items);
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
+    doc.text('Changes vs Previous Submission', margin, y); y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(90);
+    if(!getLastSubmitted()){
+      doc.text('No previous submitted inventory found. This report will become the baseline once submitted.', margin, y);
+      y += 14;
+    }else if(!added.length && !missing.length){
+      doc.text(`No changes since last submission (${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}).`, margin, y);
+      y += 14;
+    }else{
+      doc.text(`Last submitted: ${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}`, margin, y); y+=14;
+      const changeHead = [['Type','Name','Location','Model','Serial','Qty']];
+      const toRow = it => [ '', it.name||'', it.location||'', it.model||'', it.serial||'', String(it.qty||0) ];
+      const rows = [
+        ...missing.map(it=>{const r=toRow(it); r[0]='Missing'; return r;}),
+        ...added.map(it=>{const r=toRow(it); r[0]='Added'; return r;})
+      ];
+      doc.autoTable({
+        head: changeHead,
+        body: rows,
+        startY: y,
+        styles:{ fontSize:9, cellPadding:4 },
+        headStyles:{ fillColor:[52,152,219], textColor:255 },
+        columnStyles:{0:{cellWidth:70},1:{cellWidth:160},2:{cellWidth:130},3:{cellWidth:110},4:{cellWidth:120},5:{cellWidth:40,halign:'center'}},
+        didParseCell: function(data){
+          if(data.section==='body' && data.column.index===0){
+            const isMissing = data.cell.text[0]==='Missing';
+            data.cell.styles.fillColor = isMissing ? [248,215,218] : [226,242,228];
+          }
+        },
+        margin:{left:margin,right:margin}
+      });
+      y = doc.lastAutoTable.finalY + 16;
+    }
+
+    // Validate photo requirement, add prominent banner if violated
+    const noPhoto = items.filter(it=>!it.photos || it.photos.length===0);
+    if(noPhoto.length){
+      doc.setFillColor(255,225,225);
+      doc.roundedRect(margin, y, pageWidth-2*margin, 30, 6, 6, 'F');
+      doc.setTextColor(134,27,27);
+      doc.setFont('helvetica','bold'); doc.setFontSize(12);
+      doc.text(`Attention: ${noPhoto.length} item${noPhoto.length!==1?'s':''} missing required photo(s).`, margin+10, y+20);
+      y += 40;
+    }
+
+    // Inventory table (now includes Est. Value + Line Total)
+    const head = [['Verified','Name','Location','Model','Serial','Qty','Est. Value','Line Total','Condition','Status','Last Service','Next Due','Notes']];
+    const all = items; // export all
+    const body = all.map(it=>{
+      const ev = Number(it.estimatedValue)||0;
+      const q = Number(it.qty)||0;
+      const line = ev*q;
+      return [
+        it.verified ? 'Yes':'No',
+        it.name||'',
+        it.location||'',
+        it.model||'',
+        it.serial||'',
+        String(q),
+        (ev).toLocaleString('en-US',{style:'currency',currency:'USD'}),
+        (line).toLocaleString('en-US',{style:'currency',currency:'USD'}),
+        it.condition||'',
+        it.status||'',
+        it.lastService||'',
+        it.nextDue||'',
+        (it.notes||'').slice(0,120)
+      ];
+    });
+
+    function rowFillFor(cond){
+      if(['Excellent','Good'].includes(cond)) return [226,242,228];
+      if(cond==='Fair') return [255,243,205];
+      return [248,215,218];
+    }
+
+    doc.autoTable({
+      head, body,
+      startY: y,
+      styles:{ fontSize:9, cellPadding:4, halign:'left', valign:'top' },
+      headStyles:{ fillColor:[52,152,219], textColor:255 },
+      columnStyles:{
+        0:{cellWidth:60, halign:'center'},
+        1:{cellWidth:120}, 2:{cellWidth:110}, 3:{cellWidth:90}, 4:{cellWidth:100},
+        5:{cellWidth:40, halign:'center'},
+        6:{cellWidth:80, halign:'right'}, 7:{cellWidth:90, halign:'right'},
+        8:{cellWidth:90}, 9:{cellWidth:70}, 10:{cellWidth:75}, 11:{cellWidth:75},
+        12:{cellWidth:160}
+      },
+      didParseCell: function(data){
+        if(data.section==='body'){
+          const it = all[data.row.index];
+          const fill = rowFillFor(it.condition||'');
+          data.cell.styles.fillColor = fill;
+        }
+      },
+      margin:{left:margin,right:margin},
+      didDrawPage: ({ pageNumber })=>{
+        doc.setFontSize(9); doc.setTextColor(150);
+        doc.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 15, {align:'right'});
+      }
+    });
+
+    // Photos section
+    let py = doc.lastAutoTable.finalY + 20;
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
+    doc.text('Photo Verification', margin, py);
+    py += 10;
+
+    const thumbW = 120, thumbH = 90, gap = 10, perRow = Math.floor((pageWidth - margin*2 + gap)/ (thumbW + gap));
+
+    for(const it of all){
+      if(py + 14 > pageHeight - 60){ doc.addPage('letter','landscape'); py = 50; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(52,73,94);
+      doc.text(`${it.name || 'Unnamed Item'} — ${it.location || '—'}`, margin, py);
+      py += 6;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
+      doc.text(`Model: ${it.model||'—'}   Serial: ${it.serial||'—'}   Qty: ${it.qty||0}   Verified: ${it.verified?'Yes':'No'}`, margin, py);
+      py += 10;
+
+      if(!it.photos?.length){
+        doc.setFontSize(10); doc.setTextColor(150);
+        doc.text('No photos attached.', margin, py);
+        py += 16;
+        continue;
+      }
+
+      let col = 0;
+      for(const p of it.photos){
+        if(py + thumbH + 20 > pageHeight - 50){ doc.addPage('letter','landscape'); py = 50; col = 0; }
+        const x = margin + col*(thumbW+gap);
+        try{
+          doc.addImage(p, 'JPEG', x, py, thumbW, thumbH, undefined, 'FAST');
+        }catch{
+          try{ doc.addImage(p, 'PNG', x, py, thumbW, thumbH, undefined, 'FAST'); }catch(e){}
+        }
+        col++;
+        if(col>=perRow){ col=0; py += thumbH + 10; }
+      }
+      if(col>0) py += thumbH + 10;
+    }
+
+    // Signature line
+    if(py + 40 > pageHeight - 50){ doc.addPage('letter','landscape'); py = 60; }
+    doc.setDrawColor(180);
+    doc.line(margin, pageHeight-90, margin+260, pageHeight-90);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(100);
+    doc.text('Signature (Conducted By)', margin, pageHeight-75);
+
+    doc.save(`Inventory_${qs('#invDate').value || new Date().toISOString().slice(0,10)}.pdf`);
+    flash('PDF downloaded.');
+  }
+
+  /* ================== Events & Boot =================== */
+  // Add item
+  qs('#addItemBtn').addEventListener('click', ()=>addItem());
+
+  // Bulk verify
+  qs('#bulkVerifyBtn').addEventListener('click', ()=>{
+    if(!items.length) return;
+    items.forEach(it=>it.verified=true);
+    render(); if(qs('#autoSave').checked) saveLocal(false);
+  });
+
+  // Filters
+  ['#searchTxt','#fCondition','#fStatus','#fLocation'].forEach(sel=>{
+    qs(sel).addEventListener('input', render);
+    qs(sel).addEventListener('change', render);
+  });
+  qs('#clearFiltersBtn').addEventListener('click', ()=>{
+    qs('#searchTxt').value=''; qs('#fCondition').value=''; qs('#fStatus').value=''; qs('#fLocation').value='';
+    render();
+  });
+
+  // Session meta save-on-change
+  ['#invDate','#conductedBy','#property','#overallNotes','#autoSave'].forEach(sel=>{
+    qs(sel).addEventListener('change', ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
+    qs(sel).addEventListener('input', ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
+  });
+
+  // Save/Load/Import/Export/Reset
+  qs('#saveBtn').addEventListener('click', ()=>saveLocal(true));
+  qs('#loadBtn').addEventListener('click', loadLocal);
+  qs('#exportJsonBtn').addEventListener('click', exportJSON);
+  qs('#importJson').addEventListener('change', e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); });
+  qs('#clearAllBtn').addEventListener('click', ()=>{
+    if(!confirm('This will remove all items and session info on this device. Proceed?')) return;
+    localStorage.removeItem(STORAGE_KEY); items=[]; qs('#invDate').value=''; qs('#conductedBy').value=''; qs('#property').value=''; qs('#overallNotes').value='';
+    render(); updateChangeNotice(); flash('Reset.');
+  });
+
+  // Initial state
+  loadLocal();
+  if(items.length===0){ addItem({name:'Boiler Pump', location:'Boiler Room'}); }
+})();
+</script>
+</body>
+</html>
