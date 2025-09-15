@@ -36,8 +36,8 @@ th,td{padding:9px 8px;text-align:left;border:1px solid var(--grid);white-space:n
 th{background:linear-gradient(135deg,#f8f9fa,#e9ecef);font-weight:800;color:#2c3e50;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #e5e7eb;background:#f5f7fb}
 .status-ok{background:var(--posBg);color:var(--pos);border-color:#b8e0b2}
-.status-attn{background:var(--warnBg);color:var(--warn);border-color:#f2df8a}
-.status-bad{background:var(--negBg);color:var(--neg);border-color:#f4b6bc}
+.status-attn{background:var(--warnBg);color:#856404;border-color:#f2df8a}
+.status-bad{background:var(--negBg);color:#721c24;border-color:#f4b6bc}
 .thumb{width:58px;height:58px;object-fit:cover;border-radius:8px;border:1px solid #e3e8f0}
 .photo-stack{display:flex;gap:6px;flex-wrap:wrap}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
@@ -46,6 +46,13 @@ textarea.notes{min-width:220px;min-height:44px}
 hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 .row-missing-photos{box-shadow:inset 0 0 0 2px #f3b0b0;background:#fff6f6}
 .req-chip{display:inline-block;margin-top:6px;font-size:12px;color:#861b1b;background:#ffe1e1;border:1px solid #f3b0b0;border-radius:999px;padding:2px 8px}
+
+/* Row-level Add button spacer */
+.add-row td{background:#f9fbff;border-top:none;border-bottom:1px solid var(--grid)}
+.add-row .btn{width:100%}
+
+/* Footer under table */
+.table-footer{display:flex;justify-content:flex-end;gap:10px;padding:10px 14px;border-top:1px solid #edf2f7;background:#fafcff}
 
 /* ------ Mobile-friendly tweaks ------ */
 @media (max-width: 900px){
@@ -62,9 +69,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     <p>Photo-verified inventory with models/serials, maintenance dates, and exportable PDF.</p>
   </div>
 
+  <!-- Top toolbar (Add + Save removed from here) -->
   <div class="toolbar">
-    <button class="btn primary" id="addItemBtn">+ Add Item</button>
-    <button class="btn" id="saveBtn">Save</button>
     <button class="btn" id="loadBtn">Load</button>
     <button class="btn" id="exportJsonBtn">Export (.json)</button>
     <label class="btn" for="importJson">Import (.json)</label><input id="importJson" type="file" accept=".json"/>
@@ -176,6 +182,11 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
           <tbody id="invBody"></tbody>
         </table>
       </div>
+
+      <!-- Footer under the table: Save button on the right -->
+      <div class="table-footer">
+        <button class="btn" id="saveBtn">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -199,7 +210,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     verified:false, photos:[]
   });
 
-  // a “natural key” to compare inventories across submissions
   const itemKey = it => [
     (it.name||'').trim().toLowerCase(),
     (it.location||'').trim().toLowerCase(),
@@ -244,7 +254,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       qs('#conductedBy').value = data?.meta?.conductedBy || '';
       qs('#property').value = data?.meta?.property || '';
       qs('#overallNotes').value = data?.meta?.overallNotes || '';
-      // ensure estimatedValue exists on legacy items
       items = Array.isArray(data?.items) ? data.items.map(it=>({ estimatedValue:0, ...it })) : [];
       render();
       updateChangeNotice();
@@ -286,7 +295,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 
   /* ================== Currency & Total Chip =================== */
   function currency(n){ const v=Number(n)||0; return v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}); }
-
   function updateTotalValueChip(){
     const chip = qs('#totalValueChip');
     if(!chip) return;
@@ -299,6 +307,20 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     const it = Object.assign(defaultItem(), prefill||{});
     items.push(it);
     render();
+    if(qs('#autoSave').checked) saveLocal(false);
+  }
+
+  function addItemAfterId(id){
+    const idx = items.findIndex(x=>x.id===id);
+    if(idx<0) return;
+    const it = defaultItem();
+    items.splice(idx+1, 0, it);
+    render();
+    setTimeout(()=>{
+      const el = qs(`[data-bind="${it.id}:name"]`);
+      el?.scrollIntoView({behavior:'smooth', block:'center'});
+      el?.focus();
+    },0);
     if(qs('#autoSave').checked) saveLocal(false);
   }
 
@@ -421,11 +443,14 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       `;
       tb.appendChild(tr);
 
-      // wire photo input
-      const fileEl = tr.querySelector(`#photo_${it.id}`);
-      fileEl.addEventListener('change', e=>onPhotoUpload(e, it.id));
+      // Add-row directly below this row
+      const addRow = document.createElement('tr');
+      addRow.className = 'add-row';
+      addRow.innerHTML = `<td colspan="14"><button class="btn primary" data-add-after="${it.id}">+ Add Item Below</button></td>`;
+      tb.appendChild(addRow);
 
-      // wire photo deletes
+      // wire photo input & deletes
+      tr.querySelector(`#photo_${it.id}`).addEventListener('change', e=>onPhotoUpload(e, it.id));
       tr.querySelectorAll('[data-remove-photo]').forEach(btn=>{
         btn.addEventListener('click', ()=>{
           const [id, idx] = btn.dataset.removePhoto.split(':');
@@ -434,59 +459,54 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       });
     }
 
-    // bind changes
+    // bind changes (focus-safe)
     qsa('[data-bind]').forEach(el=>{
       el.addEventListener('input', onBind);
       el.addEventListener('change', onBind);
-    });
-
-    // Re-render safely when user leaves the field (no bounce while typing)
-    qsa('[data-bind]').forEach(el=>{
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
         el.addEventListener('blur', ()=>render(), {passive:true});
       }
     });
 
-    // bind row actions
+    // add-after handlers
+    qsa('[data-add-after]').forEach(btn=>{
+      btn.addEventListener('click', ()=> addItemAfterId(btn.dataset.addAfter));
+    });
+
+    // row actions
     qsa('[data-del]').forEach(b=>b.addEventListener('click',()=>removeItem(b.dataset.del)));
     qsa('[data-dup]').forEach(b=>b.addEventListener('click',()=>{
       const base = items.find(x=>x.id===b.dataset.dup);
       if(!base) return;
       const clone = JSON.parse(JSON.stringify(base));
       clone.id = crypto.randomUUID();
-      clone.name = base.name + ' (Copy)';
-      items.push(clone); render(); if(qs('#autoSave').checked) saveLocal(false);
+      clone.name = (base.name||'') + ' (Copy)';
+      const idx = items.findIndex(x=>x.id===base.id);
+      items.splice(idx+1,0,clone);
+      render(); if(qs('#autoSave').checked) saveLocal(false);
       updateChangeNotice();
     }));
 
-    // update totals chip (no full re-render needed elsewhere)
     updateTotalValueChip();
-
     updateChangeNotice();
   }
 
-  // --- focus-safe onBind ---
+  // focus-safe onBind
   function onBind(e){
     const [id, field] = e.target.dataset.bind.split(':');
     const it = items.find(x=>x.id===id);
     if(!it) return;
 
-    // normalize value
     let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
     if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
     it[field] = val;
 
-    // Live update total chip without re-render
-    if(field==='qty' || field==='estimatedValue'){
-      updateTotalValueChip();
-    }
+    if(field==='qty' || field==='estimatedValue'){ updateTotalValueChip(); }
 
-    // Only re-render immediately for non-typing controls
     if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox' || e.target.type === 'date') {
       render();
     }
 
-    // Save, but do not render
     if(qs('#autoSave').checked) saveLocal(false);
   }
 
@@ -507,7 +527,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     const {added, missing, lastMeta, submittedAt} = diffVsLast(items);
     const box = qs('#changeNotice');
     if(!added.length && !missing.length){
-      if(!getLastSubmitted()){ // first-time no baseline
+      if(!getLastSubmitted()){
         box.style.display='block';
         box.classList.remove('critical');
         box.innerHTML = `No previous submitted inventory found. Submitting will set a baseline.`;
@@ -533,20 +553,17 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   qs('#submitBtn').addEventListener('click', onSubmitInventory);
 
   function onSubmitInventory(){
-    // Validate photos for each item
     const noPhoto = items.filter(it=>!it.photos || it.photos.length===0);
     const notice = qs('#submitNotice');
     if(noPhoto.length){
       notice.style.display='block';
       notice.textContent = `Cannot submit: ${noPhoto.length} item${noPhoto.length!==1?'s':''} missing required photo(s). Add at least one photo per item.`;
-      // highlight rows visually (render already marks them)
       render();
       flash('Add photos to all items before submitting.');
       return;
     }
     notice.style.display='none';
 
-    // Save working and archive as "last submitted"
     const payload = workingPayload();
     saveLocal(false);
     setLastSubmitted(payload);
@@ -554,14 +571,16 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     flash('Inventory submitted & archived as baseline.');
   }
 
-  /* ================== PDF Export =================== */
+  /* ================== PDF Export (Landscape + spacing) =================== */
   qs('#pdfBtn').addEventListener('click', downloadPDF);
 
   async function downloadPDF(){
     const { jsPDF } = window.jspdf;
+    // Force LANDSCAPE
     const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
 
     const margin = 40;
+    const gapSm = 8;
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
@@ -576,17 +595,18 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     // Session meta
     let y = 90;
     doc.setTextColor(44,62,80); doc.setFontSize(12);
+
     const invDate = qs('#invDate').value || '—';
     const by = qs('#conductedBy').value || '—';
     const prop = qs('#property').value || '—';
     const notes = qs('#overallNotes').value || '';
-    // compute total estimated value
     const totalVal = (items||[]).reduce((t,it)=>t+((Number(it.estimatedValue)||0)*(Number(it.qty)||0)),0);
 
+    // Split meta across two lines for spacing on Android
     doc.text(`Date: ${invDate}`, margin, y);
     doc.text(`Conducted By: ${by}`, margin+220, y);
     doc.text(`Location/Property: ${prop}`, margin+460, y);
-    y += 16;
+    y += 18;
     doc.text(`Total Estimated Value: ${totalVal.toLocaleString('en-US',{style:'currency',currency:'USD'})}`, margin, y);
     y += 14;
 
@@ -594,22 +614,24 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       doc.setFontSize(11); doc.setTextColor(127,140,141);
       const wrapped = doc.splitTextToSize(`Notes: ${notes}`, pageWidth - margin*2);
       doc.text(wrapped, margin, y);
-      y += wrapped.length*12 + 6;
+      y += wrapped.length*12 + gapSm;
     }
 
     // Change log vs last submitted
     const {added, missing, submittedAt, lastMeta} = diffVsLast(items);
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
-    doc.text('Changes vs Previous Submission', margin, y); y += 6;
+    doc.text('Changes vs Previous Submission', margin, y);
+    y += 8;
     doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(90);
     if(!getLastSubmitted()){
       doc.text('No previous submitted inventory found. This report will become the baseline once submitted.', margin, y);
-      y += 14;
+      y += 16;
     }else if(!added.length && !missing.length){
       doc.text(`No changes since last submission (${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}).`, margin, y);
-      y += 14;
+      y += 16;
     }else{
-      doc.text(`Last submitted: ${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}`, margin, y); y+=14;
+      doc.text(`Last submitted: ${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}`, margin, y);
+      y += 14;
       const changeHead = [['Type','Name','Location','Model','Serial','Qty']];
       const toRow = it => [ '', it.name||'', it.location||'', it.model||'', it.serial||'', String(it.qty||0) ];
       const rows = [
@@ -620,8 +642,11 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         head: changeHead,
         body: rows,
         startY: y,
-        styles:{ fontSize:9, cellPadding:4, overflow:'linebreak' },
+        theme: 'grid',
+        styles:{ fontSize:9, cellPadding:5, overflow:'linebreak' },
         headStyles:{ fillColor:[52,152,219], textColor:255 },
+        tableLineColor: [220,225,230],
+        tableLineWidth: 0.75,
         columnStyles:{0:{cellWidth:70},1:{cellWidth:160},2:{cellWidth:130},3:{cellWidth:110},4:{cellWidth:120},5:{cellWidth:40,halign:'center'}},
         didParseCell: function(data){
           if(data.section==='body' && data.column.index===0){
@@ -631,10 +656,10 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         },
         margin:{left:margin,right:margin}
       });
-      y = doc.lastAutoTable.finalY + 16;
+      y = doc.lastAutoTable.finalY + 18;
     }
 
-    // Validate photo requirement, add prominent banner if violated
+    // Photo requirement banner (if any)
     const noPhoto = items.filter(it=>!it.photos || it.photos.length===0);
     if(noPhoto.length){
       doc.setFillColor(255,225,225);
@@ -645,7 +670,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y += 40;
     }
 
-    // Inventory table (wrap long cells)
+    // Inventory table (landscape-friendly widths + wrapping)
     const head = [[
       'Verified','Name','Location','Model','Serial','Qty',
       'Est. Value','Line Total','Condition','Status','Last Service','Next Due','Notes'
@@ -681,22 +706,26 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     doc.autoTable({
       head, body,
       startY: y,
-      styles:{ fontSize:9, cellPadding:4, halign:'left', valign:'top', overflow:'linebreak' },
+      theme: 'grid',
+      styles:{ fontSize:9, cellPadding:5, halign:'left', valign:'top', overflow:'linebreak' },
       headStyles:{ fillColor:[52,152,219], textColor:255 },
+      tableLineColor: [220,225,230],
+      tableLineWidth: 0.75,
+      rowPageBreak: 'auto',
       columnStyles:{
-        0:{cellWidth:58, halign:'center'},
-        1:{cellWidth:140, overflow:'linebreak'}, // Name
-        2:{cellWidth:130, overflow:'linebreak'}, // Location
-        3:{cellWidth:95},                        // Model
-        4:{cellWidth:110},                       // Serial
-        5:{cellWidth:38, halign:'center'},       // Qty
-        6:{cellWidth:78, halign:'right'},        // Est. Value
-        7:{cellWidth:88, halign:'right'},        // Line Total
-        8:{cellWidth:88},                        // Condition
-        9:{cellWidth:70},                        // Status
-        10:{cellWidth:70},                       // Last Service
-        11:{cellWidth:70},                       // Next Due
-        12:{cellWidth:190, overflow:'linebreak'} // Notes
+        0:{cellWidth:55, halign:'center'},
+        1:{cellWidth:140, overflow:'linebreak'},
+        2:{cellWidth:120, overflow:'linebreak'},
+        3:{cellWidth:95},
+        4:{cellWidth:110},
+        5:{cellWidth:40, halign:'center'},
+        6:{cellWidth:80, halign:'right'},
+        7:{cellWidth:90, halign:'right'},
+        8:{cellWidth:85},
+        9:{cellWidth:70},
+        10:{cellWidth:75},
+        11:{cellWidth:75},
+        12:{cellWidth:190, overflow:'linebreak'}
       },
       didParseCell: function(data){
         if(data.section==='body'){
@@ -713,10 +742,11 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     });
 
     // Photos section
-    let py = doc.lastAutoTable.finalY + 20;
+    let py = doc.lastAutoTable.finalY + 22;
+    if(py + 60 > pageHeight){ doc.addPage('letter','landscape'); py = 60; }
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
     doc.text('Photo Verification', margin, py);
-    py += 10;
+    py += 12;
 
     const thumbW = 120, thumbH = 90, gap = 10, perRow = Math.floor((pageWidth - margin*2 + gap)/ (thumbW + gap));
 
@@ -763,14 +793,21 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   }
 
   /* ================== Events & Boot =================== */
-  // Add item
-  qs('#addItemBtn').addEventListener('click', ()=>addItem());
+  qs('#saveBtn').addEventListener('click', ()=>saveLocal(true));
+  qs('#loadBtn').addEventListener('click', loadLocal);
+  qs('#exportJsonBtn').addEventListener('click', exportJSON);
+  qs('#importJson').addEventListener('change', e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); });
 
-  // Bulk verify
   qs('#bulkVerifyBtn').addEventListener('click', ()=>{
     if(!items.length) return;
     items.forEach(it=>it.verified=true);
     render(); if(qs('#autoSave').checked) saveLocal(false);
+  });
+
+  qs('#clearAllBtn').addEventListener('click', ()=>{
+    if(!confirm('This will remove all items and session info on this device. Proceed?')) return;
+    localStorage.removeItem(STORAGE_KEY); items=[]; qs('#invDate').value=''; qs('#conductedBy').value=''; qs('#property').value=''; qs('#overallNotes').value='';
+    render(); updateChangeNotice(); flash('Reset.');
   });
 
   // Filters
@@ -787,17 +824,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   ['#invDate','#conductedBy','#property','#overallNotes','#autoSave'].forEach(sel=>{
     qs(sel).addEventListener('change', ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
     qs(sel).addEventListener('input', ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
-  });
-
-  // Save/Load/Import/Export/Reset
-  qs('#saveBtn').addEventListener('click', ()=>saveLocal(true));
-  qs('#loadBtn').addEventListener('click', loadLocal);
-  qs('#exportJsonBtn').addEventListener('click', exportJSON);
-  qs('#importJson').addEventListener('change', e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); });
-  qs('#clearAllBtn').addEventListener('click', ()=>{
-    if(!confirm('This will remove all items and session info on this device. Proceed?')) return;
-    localStorage.removeItem(STORAGE_KEY); items=[]; qs('#invDate').value=''; qs('#conductedBy').value=''; qs('#property').value=''; qs('#overallNotes').value='';
-    render(); updateChangeNotice(); flash('Reset.');
   });
 
   // Initial state
