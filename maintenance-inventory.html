@@ -686,70 +686,72 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     y += 42;
   }
 
-  /* ---------- Inventory table ---------- */
-  const all = items;
-  const body = all.map(it=>{
-    const ev = Number(it.estimatedValue)||0;
-    const q  = Number(it.qty)||0;
-    const line = ev*q;
-    return [
-      it.verified ? 'Yes':'No',
-      it.name||'',
-      it.location||'',
-      it.model||'',
-      it.serial||'',
-      String(q),
-      ev.toLocaleString('en-US',{style:'currency',currency:'USD'}),
-      line.toLocaleString('en-US',{style:'currency',currency:'USD'}),
-      it.condition||'',
-      it.status||'',
-      it.lastService||'',
-      it.nextDue||'',
-      it.notes||''
-    ];
-  });
+  /* ---------- Inventory table (wrap + horizontal page breaks) ---------- */
+const all = items;
+const body = all.map(it=>{
+  const ev = Number(it.estimatedValue)||0;
+  const q  = Number(it.qty)||0;
+  const line = ev*q;
+  return [
+    it.verified ? 'Yes':'No',
+    it.name||'',
+    it.location||'',
+    it.model||'',
+    it.serial||'',
+    String(q),
+    ev.toLocaleString('en-US',{style:'currency',currency:'USD'}),
+    line.toLocaleString('en-US',{style:'currency',currency:'USD'}),
+    it.condition||'',
+    it.status||'',
+    `${it.lastService||'—'} → ${it.nextDue||'—'}`, // combined
+    it.notes||''
+  ];
+});
 
-  doc.autoTable({
-    head: [[
-      'Verified','Name','Location','Model','Serial','Qty',
-      'Est. Value','Line Total','Condition','Status','Last Service','Next Due','Notes'
-    ]],
-    body,
-    startY: y,
-    theme: 'grid',
-    styles: {
-      fontSize: 10,                // bump
-      cellPadding: 6,              // bump
-      halign: 'left',
-      valign: 'top',
-      overflow: 'linebreak',
-      minCellHeight: 16,           // prevents overlap when lines wrap
-      lineColor: [220,225,230],
-      lineWidth: 0.75
-    },
-    headStyles: { fillColor:[52,152,219], textColor:255, fontStyle:'bold', fontSize:10 },
-    columnStyles:{
-      0:{cellWidth:55, halign:'center'},
-      1:{cellWidth:160, overflow:'linebreak'},
-      2:{cellWidth:140, overflow:'linebreak'},
-      3:{cellWidth:105, overflow:'linebreak'},
-      4:{cellWidth:125, overflow:'linebreak'},
-      5:{cellWidth:44, halign:'center'},
-      6:{cellWidth:90, halign:'right'},
-      7:{cellWidth:95, halign:'right'},
-      8:{cellWidth:90, overflow:'linebreak'},
-      9:{cellWidth:80, overflow:'linebreak'},
-      10:{cellWidth:80},
-      11:{cellWidth:80},
-      12:{cellWidth:220, overflow:'linebreak'}
-    },
-    rowPageBreak: 'avoid',         // prefer keeping rows together
-    margin: { left: margin, right: margin },
-    didDrawPage: ({ pageNumber })=>{
-      doc.setFontSize(9); doc.setTextColor(150);
-      doc.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 16, {align:'right'});
-    }
-  });
+doc.autoTable({
+  head: [[
+    'Verified','Name','Location','Model','Serial','Qty',
+    'Est. Value','Line Total','Condition','Status','Service (Last → Next)','Notes'
+  ]],
+  body,
+  startY: y,
+  theme: 'grid',
+  tableWidth: 'wrap',               // fit within margins; allow horizontal paging
+  styles: {
+    fontSize: 10,
+    cellPadding: 6,
+    halign: 'left',
+    valign: 'top',
+    overflow: 'linebreak',
+    cellWidth: 'wrap',              // wrap long text rather than extend table width
+    minCellHeight: 16,
+    lineColor: [220,225,230],
+    lineWidth: 0.75
+  },
+  headStyles: { fillColor:[52,152,219], textColor:255, fontStyle:'bold', fontSize:10 },
+  columnStyles:{
+    0:{cellWidth:40, halign:'center'},  // Verified
+    1:{cellWidth:130},                  // Name
+    2:{cellWidth:110},                  // Location
+    3:{cellWidth:90},                   // Model
+    4:{cellWidth:110},                  // Serial
+    5:{cellWidth:32, halign:'center'},  // Qty
+    6:{cellWidth:70, halign:'right'},   // Est. Value
+    7:{cellWidth:80, halign:'right'},   // Line Total
+    8:{cellWidth:70},                   // Condition
+    9:{cellWidth:62},                   // Status
+    10:{cellWidth:90},                  // Service (Last → Next)
+    11:{cellWidth:140}                  // Notes
+  },
+  horizontalPageBreak: 'auto',      // spill extra columns to new pages (no cutoff)
+  showHead: 'everyPage',
+  rowPageBreak: 'avoid',
+  margin: { left: margin, right: margin },
+  didDrawPage: ({ pageNumber })=>{
+    doc.setFontSize(9); doc.setTextColor(150);
+    doc.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 16, {align:'right'});
+  }
+});
 
   /* ---------- Photos section ---------- */
   let py = doc.lastAutoTable.finalY + 24;
