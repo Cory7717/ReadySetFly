@@ -84,6 +84,10 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       </div>
       <div class="field-row">
         <div class="field">
+          <label>Property Identifier</label>
+          <input type="text" id="propertyId" placeholder="e.g., Fairfield Austin Domain"/>
+        </div>
+        <div class="field">
           <label>Inventory Date</label>
           <input type="date" id="invDate"/>
         </div>
@@ -216,6 +220,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   function workingPayload(){
     return {
       meta:{
+        propertyId: qs('#propertyId').value || '',
         invDate: qs('#invDate').value || '',
         conductedBy: qs('#conductedBy').value || '',
         property: qs('#property').value || '',
@@ -235,6 +240,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     if(!raw){ flash('Nothing saved on this device yet.'); render(); updateChangeNotice(); return; }
     try{
       const data = JSON.parse(raw);
+      qs('#propertyId').value = data?.meta?.propertyId || '';
       qs('#invDate').value = data?.meta?.invDate || '';
       qs('#conductedBy').value = data?.meta?.conductedBy || '';
       qs('#property').value = data?.meta?.property || '';
@@ -463,16 +469,17 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   }
 
   function onBind(e){
-    const [id, field] = e.target.dataset.bind.split(':');
-    const it = items.find(x=>x.id===id);
-    if(!it) return;
-
-    let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
-    if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
-    it[field] = val;
-
-    if(field==='qty' || field==='estimatedValue'){ updateTotalValueChip(); }
-    if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox' || e.target.type === 'date') { render(); }
+    const [id, field] = e.target.dataset.bind?.split(':')||[];
+    if(id){
+      const it = items.find(x=>x.id===id);
+      if(it){
+        let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
+        if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
+        it[field] = val;
+        if(field==='qty' || field==='estimatedValue'){ updateTotalValueChip(); }
+        if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox' || e.target.type === 'date') { render(); }
+      }
+    }
     if(qs('#autoSave').checked) saveLocal(false);
   }
 
@@ -549,7 +556,18 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 
     // Meta
     let y = 96;
-    doc.setTextColor(44,62,80); doc.setFontSize(12);
+    const propId = qs('#propertyId').value || '';
+    doc.setTextColor(44,62,80);
+
+    if(propId){
+      // Prominent Property Identifier line
+      doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      const propIdWrapped = doc.splitTextToSize(`Property: ${propId}`, pageWidth - margin*2);
+      doc.text(propIdWrapped, margin, y);
+      y += propIdWrapped.length*14; // line height estimate
+    }
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(12);
     const invDate = qs('#invDate').value || '—';
     const by = qs('#conductedBy').value || '—';
     const prop = qs('#property').value || '—';
@@ -569,6 +587,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       const wrapped = doc.splitTextToSize(`Notes: ${notes}`, pageWidth - margin*2);
       doc.text(wrapped, margin, y);
       y += wrapped.length*13 + 6;
+      doc.setTextColor(44,62,80); doc.setFontSize(12);
     }
 
     // Change log
@@ -624,7 +643,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y += 42;
     }
 
-    /* ---------- Inventory table: photo-left, 2-row cards ---------- */
+    /* Inventory table: photo-left, 2-row cards */
     const all = items;
     const head = [['Photo','Name','Location','Model','Serial','Qty','Est. Value','Line Total']];
     const body = [];
@@ -705,7 +724,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       }
     });
 
-    // Optional photo gallery (kept for parity with your previous layout)
+    // Optional photo gallery
     let py = doc.lastAutoTable.finalY + 24;
     if(py + 60 > pageHeight){ doc.addPage('letter','landscape'); py = 56; }
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
@@ -751,7 +770,12 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(100);
     doc.text('Signature (Conducted By)', margin, pageHeight-76);
 
-    doc.save(`Inventory_${qs('#invDate').value || new Date().toISOString().slice(0,10)}.pdf`);
+    // Save name includes propertyId if present
+    const dateSlug = qs('#invDate').value || new Date().toISOString().slice(0,10);
+    const idSlug = (propId||'').replace(/[^\w\-]+/g,'_').slice(0,40);
+    const fname = `Inventory_${idSlug ? idSlug + '_' : ''}${dateSlug}.pdf`;
+
+    doc.save(fname);
     flash('PDF downloaded.');
   }
 
@@ -768,7 +792,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 
   qs('#clearAllBtn').addEventListener('click', ()=>{
     if(!confirm('This will remove all items and session info on this device. Proceed?')) return;
-    localStorage.removeItem(STORAGE_KEY); items=[]; qs('#invDate').value=''; qs('#conductedBy').value=''; qs('#property').value=''; qs('#overallNotes').value='';
+    localStorage.removeItem(STORAGE_KEY); items=[];
+    qs('#propertyId').value=''; qs('#invDate').value=''; qs('#conductedBy').value=''; qs('#property').value=''; qs('#overallNotes').value='';
     render(); updateChangeNotice(); flash('Reset.');
   });
 
@@ -781,7 +806,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     render();
   });
 
-  ['#invDate','#conductedBy','#property','#overallNotes','#autoSave'].forEach(sel=>{
+  ['#propertyId','#invDate','#conductedBy','#property','#overallNotes','#autoSave'].forEach(sel=>{
     qs(sel).addEventListener('change', ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
     qs(sel).addEventListener('input',  ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
   });
@@ -792,4 +817,3 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 </script>
 </body>
 </html>
-                                                                         
