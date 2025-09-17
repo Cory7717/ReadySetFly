@@ -7,11 +7,9 @@
 
 <style>
   :root{
-    /* Softer, readable light theme */
     --ink:#111827; --ink-soft:#6b7280; --bg:#ffffff;
     --card:#ffffff; --border:#e5e7eb; --ring:#93c5fd;
     --thead:#f5f7fb; --row-alt:#fafcff; --row-hover:#f0f6ff;
-
     --brand:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
   }
 
@@ -28,7 +26,6 @@
   h1{font-size:clamp(20px,5vw,26px); color:var(--ink); margin:8px 0; text-align:center}
   .sub{text-align:center; color:var(--ink-soft); font-size:12px; margin-bottom:12px}
 
-  /* Controls */
   .bar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px}
   .btn{
     appearance:none; border:1px solid var(--border); background:#f8fafc; color:#0f172a;
@@ -46,24 +43,19 @@
     background:#fff; color:#111827; font-size:14px
   }
   .inp:focus{outline:none; border-color:var(--ring); box-shadow:0 0 0 3px rgba(147,197,253,.35)}
-
-  /* Numeric fields: monospace + pixel autosize */
   .inp.num{
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
     text-align:right; font-variant-numeric:tabular-nums;
-    width:auto; min-width:8ch; max-width:none; display:inline-block; white-space:nowrap;
+    width:auto; min-width:8ch; display:inline-block; white-space:nowrap;
   }
 
-  /* Layout */
   .grid{display:grid; gap:12px}
   .grid.cols-2{grid-template-columns:1fr 1fr}
 
-  /* Cards */
   .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.06)}
   .section-title{font-weight:600; margin-bottom:6px}
   .note{color:var(--ink-soft); font-size:12px}
 
-  /* Tables — softened for readability */
   .tbl{width:100%; border-collapse:separate; border-spacing:0; font-size:14px; table-layout:auto}
   .tbl th,.tbl td{padding:10px; color:#111827; vertical-align:middle}
   .tbl th{
@@ -76,29 +68,36 @@
   .tbl td.right{white-space:nowrap}
   .right{text-align:right}
   .center{text-align:center}
-
-  /* Horizontal scroll for mobile */
   .scroll-x{overflow-x:auto; -webkit-overflow-scrolling:touch}
 
-  /* KPI cards */
   .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px}
   .kpi{background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:10px; text-align:center}
   .kpi .label{color:#6b7280; font-size:12px}
   .kpi .val{color:#0f172a; font-size:clamp(16px,5vw,20px); font-weight:700}
 
-  /* Mobile-first */
+  /* Mobile-specific cards for expenses */
+  #expenseMobile{display:none}
+  .exp-card{
+    border:1px solid var(--border); border-radius:14px; padding:10px; background:#fff;
+    display:flex; flex-direction:column; gap:8px
+  }
+  .exp-head{display:flex; justify-content:space-between; gap:8px; align-items:center}
+  .exp-name{flex:1}
+  .exp-row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  .exp-row .label{color:var(--ink-soft); font-size:12px}
+  .exp-actions{display:flex; gap:6px; flex-wrap:wrap}
+
   @media (max-width:900px){
     .grid.cols-2{grid-template-columns:1fr}
     .bar{justify-content:center}
     .wrap{padding:0 10px}
   }
-  @media (max-width:600px){
+  @media (max-width:640px){
+    /* Hide table on phones; show card list */
+    #expenseTableWrap{display:none}
+    #expenseMobile{display:block}
     .btn{font-size:15px; padding:12px 14px}
     .inp{font-size:16px; padding:12px 14px}
-    .tbl{font-size:15px}
-    .tbl th,.tbl td{padding:12px}
-    input[type=checkbox]{width:22px; height:22px}
-    .pill{padding:8px 12px}
   }
 </style>
 </head>
@@ -133,7 +132,7 @@
         <div class="note">Tip: Click a month chip or use the Month dropdown to set the active month.</div>
       </div>
 
-      <!-- Settings card removed per request -->
+      <!-- (Settings removed) -->
     </div>
 
     <div class="grid cols-2" style="margin-top:14px">
@@ -167,10 +166,16 @@
           <input id="filterTxt" class="inp" placeholder="Type to filter by name…" style="width:220px">
         </label>
       </div>
-      <div class="squeeze scroll-x">
+
+      <!-- Desktop/tablet view -->
+      <div id="expenseTableWrap" class="squeeze scroll-x">
         <table class="tbl" id="expenseTbl"></table>
       </div>
-      <div class="note" style="margin-top:8px">Overdue and unpaid items for the active month are highlighted.</div>
+
+      <!-- Mobile view -->
+      <div id="expenseMobile"></div>
+
+      <div class="note" style="margin-top:8px">On phones you edit the active month only; switch months above to edit others.</div>
     </div>
 
   </div>
@@ -189,7 +194,7 @@
   const pad2 = n => String(n).padStart(2,'0');
   const ymOf = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
   const ymFrom = (y,m) => `${y}-${pad2(m)}`;
-  const moneyFmt = (n,curr='USD') => new Intl.NumberFormat(undefined,{style:'currency',currency:curr}).format(+n||0);
+  const moneyFmt = (n) => new Intl.NumberFormat(undefined,{style:'currency',currency:'USD'}).format(+n||0);
   const uid = () => Math.random().toString(36).slice(2,9);
   const now = new Date();
 
@@ -236,6 +241,7 @@
   const filterTxt = $('#filterTxt');
   const incomeTbl = $('#incomeTbl');
   const expenseTbl = $('#expenseTbl');
+  const expenseMobile = $('#expenseMobile');
   const exportBtn = $('#exportBtn');
   const importInput = $('#importInput');
   const resetBtn = $('#resetBtn');
@@ -246,7 +252,7 @@
 
   todayLbl.textContent = new Date().toLocaleDateString();
 
-  // ---------- Month/Year helpers ----------
+  // ---------- Helpers ----------
   function ensureActiveMonth(){
     if(!state.activeMonth){
       const y = state.year || now.getFullYear();
@@ -254,51 +260,64 @@
       state.activeMonth = state.months.includes(guess) ? guess : (state.months[0] || guess);
     }
   }
-
-  function populateYear(y){
-    state.year = +y;
-    state.months = [];
-    for(let m=1; m<=12; m++) state.months.push(ymFrom(+y,m));
-    // backfill structures
-    state.incomes.forEach(i=>{
-      if(!i.amounts) i.amounts={};
-      state.months.forEach(m=>{ if(i.amounts[m]==null) i.amounts[m]=0; });
-    });
-    state.expenses.forEach(x=>{
-      if(!x.amounts) x.amounts={};
-      if(!x.paid) x.paid={};
-      state.months.forEach(m=>{
-        if(x.amounts[m]==null) x.amounts[m]=0;
-        if(x.paid[m]==null) x.paid[m]=false;
-      });
-    });
-    state.activeMonth = ymFrom(+y,1);
-    save();
+  function copyExpenseFromActive(ex, mode){
+    const src = state.activeMonth; if(!src) return;
+    const srcVal = +ex.amounts[src]||0;
+    if(mode==='next'){
+      const idx = state.months.indexOf(src);
+      if(idx>-1 && idx+1<state.months.length) ex.amounts[state.months[idx+1]] = srcVal;
+    }else if(mode==='rest'){
+      let seen=false;
+      state.months.forEach(m=>{ if(m===src){ seen=true; return; } if(seen){ ex.amounts[m]=srcVal; }});
+    }else if(mode==='all'){
+      state.months.forEach(m=> ex.amounts[m]=srcVal);
+    }
   }
 
-  function addRestOfYear(){
-    const y = +yearSelect.value || state.year || now.getFullYear();
+  // ---------- Year/Month controls ----------
+  function renderYearMonthControls(){
+    const yNow = now.getFullYear();
+    const years = [yNow-1, yNow, yNow+1, yNow+2];
+    yearSelect.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    if(!state.year) state.year = yNow;
+    yearSelect.value = state.year;
+
     ensureActiveMonth();
-    const startM = state.activeMonth.startsWith(String(y)) ? +state.activeMonth.split('-')[1] : (y===now.getFullYear()? now.getMonth()+1 : 1);
-    for(let m=startM; m<=12; m++){
-      const key = ymFrom(y,m);
-      if(!state.months.includes(key)) state.months.push(key);
-    }
-    state.months.sort();
-    // backfill
-    state.incomes.forEach(i=>{
-      if(!i.amounts) i.amounts={};
-      state.months.forEach(m=>{ if(i.amounts[m]==null) i.amounts[m]=0; });
-    });
-    state.expenses.forEach(x=>{
-      if(!x.amounts) x.amounts={};
-      if(!x.paid) x.paid={};
-      state.months.forEach(m=>{
-        if(x.amounts[m]==null) x.amounts[m]=0;
-        if(x.paid[m]==null) x.paid[m]=false;
+    monthSelect.innerHTML = state.months.map(m=>`<option value="${m}">${fmtMonth(m)}</option>`).join('');
+    if(state.activeMonth) monthSelect.value = state.activeMonth;
+
+    yearSelect.onchange = () => { state.year = +yearSelect.value; save(false); };
+    monthSelect.onchange = () => { state.activeMonth = monthSelect.value; save(); };
+    populateYearBtn.onclick = () => {
+      const y = +yearSelect.value;
+      state.year = y;
+      state.months = [];
+      for(let m=1; m<=12; m++) state.months.push(ymFrom(y,m));
+      // backfill amounts/paid
+      state.incomes.forEach(i=>{ if(!i.amounts) i.amounts={}; state.months.forEach(mm=> i.amounts[mm] ??= 0); });
+      state.expenses.forEach(x=>{
+        x.amounts ||= {}; x.paid ||= {};
+        state.months.forEach(mm=> { x.amounts[mm] ??= 0; x.paid[mm] ??= false; });
       });
-    });
-    save();
+      state.activeMonth = ymFrom(y,1);
+      save();
+    };
+    addRestBtn.onclick = () => {
+      const y = +yearSelect.value || state.year || now.getFullYear();
+      ensureActiveMonth();
+      const startM = state.activeMonth.startsWith(String(y)) ? +state.activeMonth.split('-')[1] : (y===now.getFullYear()? now.getMonth()+1 : 1);
+      for(let m=startM; m<=12; m++){
+        const key = ymFrom(y,m);
+        if(!state.months.includes(key)) state.months.push(key);
+      }
+      state.months.sort();
+      state.incomes.forEach(i=> state.months.forEach(mm=> i.amounts[mm] ??= 0));
+      state.expenses.forEach(x=>{
+        x.amounts ||= {}; x.paid ||= {};
+        state.months.forEach(mm=> { x.amounts[mm] ??= 0; x.paid[mm] ??= false; });
+      });
+      save();
+    };
   }
 
   // ---------- Month mgmt ----------
@@ -308,12 +327,8 @@
     if(!/^\d{4}-\d{2}$/.test(d)) return alert('Format must be YYYY-MM');
     if(state.months.includes(d)) return alert('Month already exists.');
     state.months.push(d);
-    // initialize values for new month
-    state.incomes.forEach(i=> i.amounts[d] = i.amounts[d] ?? 0);
-    state.expenses.forEach(x=> {
-      x.amounts[d] = x.amounts[d] ?? 0;
-      x.paid[d] = x.paid[d] ?? false;
-    });
+    state.incomes.forEach(i=> i.amounts[d] ??= 0);
+    state.expenses.forEach(x=> { x.amounts[d] ??= 0; x.paid[d] ??= false; });
     save();
   });
   removeMonthBtn.addEventListener('click', ()=>{
@@ -324,40 +339,14 @@
     if(state.activeMonth===last) state.activeMonth = state.months[state.months.length-1]||'';
     save();
   });
-
   function setActiveMonth(m){ state.activeMonth=m; save(); }
-
-  // ---------- Pixel-accurate autosize for inputs ----------
-  const meas = document.createElement('span');
-  meas.style.cssText = `
-    position:absolute; visibility:hidden; white-space:pre; top:-9999px; left:-9999px;
-    font:inherit; padding:0; border:0; letter-spacing:normal;
-  `;
-  document.body.appendChild(meas);
-
-  function copyComputedFont(el, target){
-    const cs = getComputedStyle(el);
-    const props = ['font-family','font-size','font-weight','font-style','font-variant','letter-spacing'];
-    props.forEach(p=> target.style.setProperty(p, cs.getPropertyValue(p)));
-  }
-
-  function autoSizeInputPx(el){
-    // Use value or placeholder for minimum width
-    const text = el.value || el.getAttribute('placeholder') || '';
-    copyComputedFont(el, meas);
-    meas.textContent = text;
-    const extra = 22; // padding for input's left+right + caret space
-    const w = Math.max(8, meas.getBoundingClientRect().width + extra);
-    el.style.width = w + 'px';
-  }
 
   // ---------- Income ----------
   const numberFrom = (s) => {
     if (s == null) return 0;
-    const n = parseFloat(String(s).replace(/,/g,'')); // tolerate commas
+    const n = parseFloat(String(s).replace(/,/g,'')); 
     return Number.isFinite(n) ? n : 0;
   };
-
   addIncomeBtn.addEventListener('click', ()=>{
     state.incomes.push({id:uid(), name:'New Income', amounts:{}});
     state.months.forEach(m=>{ state.incomes[state.incomes.length-1].amounts[m]=0; });
@@ -374,24 +363,7 @@
   function deleteExpense(id){ state.expenses = state.expenses.filter(x=>x.id!==id); save(); }
   function markAllPaidActive(){ state.expenses.forEach(x=> x.paid[state.activeMonth]=true); save(); }
   markAllPaidBtn.addEventListener('click', ()=>{ if(confirm('Mark all expenses paid for the active month?')) markAllPaidActive(); });
-  filterTxt.addEventListener('input', renderExpenses);
-
-  // ---------- Expense copy helpers ----------
-  function copyExpenseFromActive(ex, mode){
-    const src = state.activeMonth; if(!src) return;
-    const srcVal = +ex.amounts[src]||0;
-    if(mode==='next'){
-      const idx = state.months.indexOf(src);
-      if(idx>-1 && idx+1<state.months.length){
-        ex.amounts[state.months[idx+1]] = srcVal;
-      }
-    }else if(mode==='rest'){
-      let seen=false;
-      state.months.forEach(m=>{ if(m===src){ seen=true; return; } if(seen){ ex.amounts[m]=srcVal; }});
-    }else if(mode==='all'){
-      state.months.forEach(m=> ex.amounts[m]=srcVal);
-    }
-  }
+  filterTxt.addEventListener('input', ()=>{ renderExpenses(); renderExpensesMobile(); });
 
   // ---------- Export / Import / Reset ----------
   exportBtn.addEventListener('click', ()=>{
@@ -413,24 +385,7 @@
   });
   resetBtn.addEventListener('click', ()=>{ if(confirm('Clear all local data and reset?')) reset(); });
 
-  // ---------- Rendering ----------
-  function renderYearMonthControls(){
-    const yNow = now.getFullYear();
-    const years = [yNow-1, yNow, yNow+1, yNow+2];
-    yearSelect.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
-    if(!state.year) state.year = yNow;
-    yearSelect.value = state.year;
-
-    ensureActiveMonth();
-    monthSelect.innerHTML = state.months.map(m=>`<option value="${m}">${fmtMonth(m)}</option>`).join('');
-    if(state.activeMonth) monthSelect.value = state.activeMonth;
-
-    yearSelect.onchange = () => { state.year = +yearSelect.value; save(false); };
-    monthSelect.onchange = () => { state.activeMonth = monthSelect.value; save(); };
-    populateYearBtn.onclick = () => populateYear(+yearSelect.value);
-    addRestBtn.onclick = addRestOfYear;
-  }
-
+  // ---------- Render: Months & Income ----------
   function renderMonths(){
     monthsBar.innerHTML='';
     state.months.forEach(m=>{
@@ -478,10 +433,8 @@
     html += '<tfoot><tr><td class="right">Monthly Total</td>'+
             months.map(m=>`<td class="right">${moneyFmt(state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0),0))}</td>`).join('')+
             `<td class="right">${moneyFmt(sumAllIncome())}</td><td></td></tr></tfoot>`;
-
     incomeTbl.innerHTML = html;
 
-    // Name fields: save quietly
     incomeTbl.querySelectorAll('input[data-act="income-name"]').forEach(el=>{
       el.addEventListener('input', ()=>{
         const i = state.incomes.find(x=>x.id===el.dataset.id);
@@ -489,26 +442,21 @@
       });
       el.addEventListener('blur', ()=> save(true));
     });
-
-    // Amount fields: autosize on input, commit on blur
     incomeTbl.querySelectorAll('input[data-act="income-amt"]').forEach(el=>{
       autoSizeInputPx(el);
       el.addEventListener('input', ()=> autoSizeInputPx(el));
       el.addEventListener('blur', ()=>{
         const i = state.incomes.find(x=>x.id===el.dataset.id);
-        if(i){
-          i.amounts[el.dataset.month] = numberFrom(el.value);
-          el.value = i.amounts[el.dataset.month]; // normalize
-        }
+        if(i){ i.amounts[el.dataset.month] = numberFrom(el.value); el.value = i.amounts[el.dataset.month]; }
         save(true);
       });
     });
-
     incomeTbl.querySelectorAll('button[data-act="income-del"]').forEach(el=>{
       el.addEventListener('click', ()=> deleteIncome(el.dataset.id));
     });
   }
 
+  // ---------- Render: Expenses (desktop) ----------
   function renderExpenses(){
     const months = state.months;
     const f = (filterTxt.value||'').toLowerCase();
@@ -566,66 +514,129 @@
 
     expenseTbl.innerHTML = html;
 
-    // Name fields
     expenseTbl.querySelectorAll('input[data-act="exp-name"]').forEach(el=>{
-      el.addEventListener('input', ()=>{
-        const x = findExp(el.dataset.id);
-        if(x){ x.name = el.value; save(false); }
-      });
+      el.addEventListener('input', ()=>{ const x = findExp(el.dataset.id); if(x){ x.name = el.value; save(false);} });
       el.addEventListener('blur', ()=> save(true));
     });
-
-    // Due day: autosize on input, clamp & save on blur
     expenseTbl.querySelectorAll('input[data-act="exp-due"]').forEach(el=>{
       autoSizeInputPx(el);
       el.addEventListener('input', ()=> autoSizeInputPx(el));
       el.addEventListener('blur', ()=>{
         const x = findExp(el.dataset.id);
-        if(x){
-          let v = Math.max(1, Math.min(31, parseInt(el.value,10)||1));
-          x.dueDay = v; el.value = v;
-        }
+        if(x){ let v = Math.max(1, Math.min(31, parseInt(el.value,10)||1)); x.dueDay = v; el.value = v; }
         save(true);
       });
     });
-
-    // Amounts: autosize on input, commit on blur
     expenseTbl.querySelectorAll('input[data-act="exp-amt"]').forEach(el=>{
       autoSizeInputPx(el);
       el.addEventListener('input', ()=> autoSizeInputPx(el));
       el.addEventListener('blur', ()=>{
         const x = findExp(el.dataset.id);
-        if(x){
-          const val = numberFrom(el.value);
-          x.amounts[el.dataset.month] = val;
-          el.value = val; // normalize
-        }
+        if(x){ const val = numberFrom(el.value); x.amounts[el.dataset.month] = val; el.value = val; }
         save(true);
       });
     });
-
     expenseTbl.querySelectorAll('input[data-act="exp-paid"]').forEach(el=>{
-      el.addEventListener('change', ()=>{
-        const x = findExp(el.dataset.id);
-        if(x){ x.paid[el.dataset.month] = el.checked; save(); }
-      });
+      el.addEventListener('change', ()=>{ const x = findExp(el.dataset.id); if(x){ x.paid[el.dataset.month] = el.checked; save(); }});
     });
-
-    // Copy buttons
     expenseTbl.querySelectorAll('button[data-copy]').forEach(b=>{
-      b.addEventListener('click', ()=>{
-        const e = findExp(b.dataset.id); if(!e) return;
-        copyExpenseFromActive(e, b.dataset.copy);
-        save();
-      });
+      b.addEventListener('click', ()=>{ const e = findExp(b.dataset.id); if(!e) return; copyExpenseFromActive(e, b.dataset.copy); save(); });
     });
-
-    // delete row
     expenseTbl.querySelectorAll('button[data-act="exp-del"]').forEach(el=>{
       el.addEventListener('click', ()=> deleteExpense(el.dataset.id));
     });
   }
 
+  // ---------- Render: Expenses (mobile cards) ----------
+  function renderExpensesMobile(){
+    const f = (filterTxt.value||'').toLowerCase();
+    const m = state.activeMonth;
+    expenseMobile.innerHTML = ''; // clear
+    const frag = document.createDocumentFragment();
+
+    state.expenses.forEach(ex=>{
+      if(f && !ex.name.toLowerCase().includes(f)) return;
+      const card = document.createElement('div');
+      card.className = 'exp-card';
+
+      const head = document.createElement('div');
+      head.className = 'exp-head';
+
+      const name = document.createElement('input');
+      name.className = 'inp exp-name';
+      name.value = ex.name;
+      name.addEventListener('input', ()=>{ ex.name = name.value; save(false); });
+
+      const dueWrap = document.createElement('div');
+      dueWrap.className = 'exp-row';
+      dueWrap.innerHTML = `<span class="label">Due</span>`;
+      const due = document.createElement('input');
+      due.type = 'text'; due.inputMode = 'numeric';
+      due.className = 'inp num';
+      due.placeholder = '1-31';
+      due.value = ex.dueDay||1;
+      due.addEventListener('blur', ()=>{
+        let v = Math.max(1, Math.min(31, parseInt(due.value,10)||1));
+        ex.dueDay = v; due.value = v; save(true);
+      });
+      dueWrap.appendChild(due);
+
+      head.appendChild(name);
+      head.appendChild(dueWrap);
+
+      const row = document.createElement('div');
+      row.className = 'exp-row';
+      row.innerHTML = `<span class="label">Amount (${fmtMonth(m)})</span>`;
+      const amt = document.createElement('input');
+      amt.type = 'text'; amt.inputMode = 'decimal';
+      amt.className = 'inp num';
+      amt.placeholder = '0.00';
+      amt.value = +ex.amounts[m]||0;
+      amt.addEventListener('blur', ()=>{
+        ex.amounts[m] = numberFrom(amt.value); amt.value = ex.amounts[m]; save(true);
+      });
+      row.appendChild(amt);
+
+      const paidRow = document.createElement('div');
+      paidRow.className = 'exp-row';
+      const paidLabel = document.createElement('span');
+      paidLabel.className = 'label';
+      paidLabel.textContent = 'Paid';
+      const paid = document.createElement('input');
+      paid.type = 'checkbox';
+      paid.checked = !!ex.paid[m];
+      paid.addEventListener('change', ()=>{ ex.paid[m] = paid.checked; save(); });
+      paidRow.appendChild(paidLabel);
+      paidRow.appendChild(paid);
+
+      const actions = document.createElement('div');
+      actions.className = 'exp-actions';
+      ['next','rest','all'].forEach(mode=>{
+        const b = document.createElement('button');
+        b.className = 'btn small';
+        b.textContent = mode==='next'?'Active → Next': mode==='rest'?'Active → Rest':'Active → All';
+        b.addEventListener('click', ()=>{ copyExpenseFromActive(ex, mode); save(); });
+        actions.appendChild(b);
+      });
+
+      const del = document.createElement('button');
+      del.className = 'btn ghost';
+      del.textContent = 'Delete';
+      del.addEventListener('click', ()=> deleteExpense(ex.id));
+
+      card.appendChild(head);
+      card.appendChild(row);
+      card.appendChild(paidRow);
+      card.appendChild(actions);
+      card.appendChild(del);
+
+      frag.appendChild(card);
+    });
+
+    expenseMobile.appendChild(frag);
+  }
+
+  // ---------- Common helpers ----------
   function isOverdue(exp, ym){
     if(!ym) return false;
     const [y,m] = ym.split('-').map(Number);
@@ -633,10 +644,8 @@
     if(nowD < new Date(y, m-1, 1) || nowD > new Date(y, m-1, 31)) return false;
     return (nowD.getDate() > (exp.dueDay||1)) && !exp.paid[ym];
   }
-
   function sumAllIncome(){ return state.months.reduce((s,m)=> s + state.incomes.reduce((t,i)=> t+(+i.amounts[m]||0),0), 0); }
   function sumAllExpenses(){ return state.months.reduce((s,m)=> s + state.expenses.reduce((t,x)=> t+(+x.amounts[m]||0),0), 0); }
-
   function findExp(id){ return state.expenses.find(x=>x.id===id); }
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
 
@@ -651,18 +660,35 @@
     $('#kpiUnpaid').textContent = unpaid;
   }
 
+  // Pixel autosizer
+  const meas = document.createElement('span');
+  meas.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;top:-9999px;left:-9999px;font:inherit;padding:0;border:0;';
+  document.body.appendChild(meas);
+  function copyFont(el){ const cs=getComputedStyle(el); ['font-family','font-size','font-weight','font-style','letter-spacing'].forEach(p=> meas.style[p]=cs[p]); }
+  function autoSizeInputPx(el){ copyFont(el); meas.textContent = el.value || el.placeholder || ''; el.style.width = Math.max(8, meas.getBoundingClientRect().width + 22) + 'px'; }
+
   function renderAll(){
     renderMonths();
     renderIncome();
     renderExpenses();
+    renderExpensesMobile();
     renderKPIs();
-
-    // Ensure all numeric inputs are sized correctly after first render
+    // size numeric inputs initially
     $$('#incomeTbl .inp.num, #expenseTbl .inp.num').forEach(autoSizeInputPx);
   }
 
   // initial
   renderAll();
+
+  // re-render mobile/desktop on resize breakpoint changes
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', ()=>{
+    const w = window.innerWidth;
+    if((lastWidth>640 && w<=640) || (lastWidth<=640 && w>640)){
+      renderExpenses(); renderExpensesMobile();
+    }
+    lastWidth = w;
+  });
 })();
 </script>
 </body>
