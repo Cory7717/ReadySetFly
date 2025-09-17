@@ -227,6 +227,12 @@
       <input id="monthInput" type="month" value="2025-09" aria-label="Month"/>
     </div>
 
+    <!-- NEW: Hotel Total Rooms (used for Occupancy %) -->
+    <div class="pill" title="Total physical rooms at the hotel">
+      <span>Total Rooms:</span>
+      <input id="hotelRooms" type="number" min="1" step="1" placeholder="e.g., 134" aria-label="Total rooms in hotel"/>
+    </div>
+
     <div class="pill">
       <span>Range:</span>
       <select id="rangeMode" aria-label="Range mode">
@@ -266,7 +272,14 @@
     <div class="card"><h3>Rem. OTB Rev (Range)</h3><div class="big" id="kOTB">—</div></div>
     <div class="card"><h3>Month (Actual + OTB)</h3><div class="big" id="kTotal">—</div></div>
     <div class="card"><h3>Rem. OTB Rooms (Range)</h3><div class="big" id="kOTBRooms">—</div></div>
-    <div class="card"><h3>Month Rooms (Actual + OTB)</h3><div class="big" id="kTotalRooms">—</div></div>
+
+    <!-- UPDATED: Month Rooms card now includes Occupancy % -->
+    <div class="card">
+      <h3>Month Rooms (Actual + OTB)</h3>
+      <div class="big" id="kTotalRooms">—</div>
+      <div class="sub" id="kOccPct">—</div>
+    </div>
+
     <div class="card"><h3>Month ADR (Actual + OTB)</h3><div class="big" id="kMonthADR">—</div></div>
     <div class="card"><h3>Salaried Hours (Range)</h3><div class="big" id="kHoursSal">—</div></div>
     <div class="card"><h3>Straight Hours (Range)</h3><div class="big" id="kHoursStr">—</div></div>
@@ -369,7 +382,6 @@
 
   <!-- Off-screen PDF summary node (kept invisible but measurable) -->
   <div id="pdfSummary" aria-hidden="true"></div>
-
 <script>
 (function(){
   // ---------- DOM (core)
@@ -422,6 +434,10 @@
   const kMonthPickup = document.getElementById('kMonthPickup');
   const kMonthPickupNote = document.getElementById('kMonthPickupNote');
 
+  // NEW: Hotel total rooms input + Occupancy % node
+  const hotelRooms = document.getElementById('hotelRooms');
+  const kOccPct    = document.getElementById('kOccPct');
+
   // ---------- State
   let bookingStatsCur = null;  // current upload
   let bookingStatsPrev = null; // previous-day (baseline) upload
@@ -436,7 +452,7 @@
   const MPOR_STD = 25; // minutes
 
   // ---------- Keys
-  const SNAPKEY  = (hotel, ym) => `pickup:bs:${hotel}:${ym}`;               // legacy
+  const SNAPKEY  = (hotel, ym) => `pickup:bs:${hotel}:${ym}`;
   const SNAPDAY  = (hotel, ym, dayISO) => `pickup:bs:${hotel}:${ym}:${dayISO}`;
   const SNAPINDEX= (hotel, ym) => `pickup:bs:index:${hotel}:${ym}`;
   const BS_CUR   = (hotel, ym) => `pickup:bs:current:${hotel}:${ym}`;
@@ -447,6 +463,8 @@
   const ALERTKEY = (hotel, ym, dayISO) => `pickup:alert:${hotel}:${ym}:${dayISO}`;
   const LOGO_KEY = `pickup:brand:logo`;
   const UIKEY    = `pickup:ui:last`;
+  // NEW: persisted hotel total rooms
+  const ROOMSKEY = (hotel) => `pickup:hotel:totalrooms:${hotel}`;
 
   // ---------- Utils
   const fmtC = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(n)||0);
@@ -471,7 +489,7 @@
     if(iso > endKey) return endKey;
     return iso;
   }
-  function parseShortDateToken(tok){ // "04Sep25" -> Date
+  function parseShortDateToken(tok){
     const m = String(tok).match(/^(\d{2})([A-Za-z]{3})(\d{2})$/);
     if(!m) return null;
     const day = parseInt(m[1],10);
@@ -484,6 +502,25 @@
     const y = dt.getUTCFullYear();
     const m = String(dt.getUTCMonth()+1).padStart(2,'0');
     return `${y}-${m}`;
+  }
+
+  // NEW: month days + hotel rooms persistence
+  function daysInActiveMonth(){
+    const [yy, mm] = ymFromInput().split('-').map(n=>parseInt(n,10));
+    return new Date(yy, mm, 0).getDate();
+  }
+  function loadHotelRooms(){
+    const val = localStorage.getItem(ROOMSKEY(hotelSel.value));
+    hotelRooms.value = (val!=null) ? String(val) : '';
+  }
+  function saveHotelRooms(){
+    const n = Math.max(0, parseInt(hotelRooms.value, 10) || 0);
+    if(n>0) localStorage.setItem(ROOMSKEY(hotelSel.value), String(n));
+    else localStorage.removeItem(ROOMSKEY(hotelSel.value));
+  }
+  function getHotelRooms(){
+    const n = parseInt(hotelRooms.value, 10);
+    return (isFinite(n) && n>0) ? n : 0;
   }
 
   // ---------- Filename tips
@@ -729,12 +766,23 @@
     kOTB.textContent = fmtC(otbRev);
     kTotal.textContent = fmtC(actRev + otbRev);
     kOTBRooms.textContent = fmtN0(otbRooms);
-    kTotalRooms.textContent = fmtN0(actRooms + otbRooms);
+    const totalMonthRooms = actRooms + otbRooms;
+    kTotalRooms.textContent = fmtN0(totalMonthRooms);
 
     // Month ADR across full month (Actual+OTB where both exist)
     let mRooms=0, mRev=0;
     merged.forEach(r=>{ if(r.rooms!=null && r.rev!=null){ mRooms += r.rooms; mRev += r.rev; } });
     kMonthADR.textContent = (mRooms>0) ? fmtN2(mRev/mRooms) : '—';
+
+    // NEW: Occupancy % for the month vs (hotel rooms * days in month)
+    const roomsPhys = getHotelRooms();
+    const dim = daysInActiveMonth();
+    if(roomsPhys > 0 && dim > 0 && totalMonthRooms > 0){
+      const occ = (totalMonthRooms / (roomsPhys * dim)) * 100;
+      kOccPct.textContent = `${fmtN2(occ)}% OCC (vs ${fmtN0(roomsPhys)} rooms × ${dim} days)`;
+    }else{
+      kOccPct.textContent = '—';
+    }
 
     // Labor/HPOR for range
     let sal=0, str=0, totH=0, roomsForHPOR=0;
@@ -770,7 +818,7 @@
       kPickupLabel.textContent = 'baseline: —';
     }
 
-    // MPOR (range) using cleaned = CO + SO - DND (floored at 0)
+    // MPOR (range)
     let hkMinutes = 0, cleanedRooms = 0;
     rows.forEach(r=>{
       const hk = getHK(r.date);
@@ -851,9 +899,7 @@
           </div>
           <div class="group">
             <span class="chip">Day MPOR: <strong id="hk-mpor-${dateKey}">${dayMPOR==null?'—':fmtN2(dayMPOR)+' min'}</strong></span>
-            <span class="chip" id="hk-var-${dateKey}">
-              ${dayMPOR==null?'—':( (dayMPOR-MPOR_STD)>=0?`<span class="delta neg">+${fmtN2(dayMPOR-MPOR_STD)}</span>`:`<span class="delta pos">${fmtN2(dayMPOR-MPOR_STD)}</span>` )} vs 25m
-            </span>
+            <span class="chip" id="hk-var-${dateKey}">${dayMPOR==null?'—':( (dayMPOR-MPOR_STD)>=0?`<span class="delta neg">+${fmtN2(dayMPOR-MPOR_STD)}</span>`:`<span class="delta pos">${fmtN2(dayMPOR-MPOR_STD)}</span>` )} vs 25m</span>
           </div>
         </div>
       </td>
@@ -934,7 +980,7 @@
       const adr = r.adr==null ? '—' : fmtN2(r.adr);
       const rev = r.rev==null ? '—' : fmtC(r.rev);
       const dRooms = (r.dRooms==null) ? '' : `<span class="delta ${r.dRooms>=0?'pos':'neg'}">${r.dRooms>=0?'+':''}${fmtN0(r.dRooms)}</span>`;
-      const dRev = (r.dRev==null) ? '' : `<span class="delta ${r.dRev>=0?'pos':'neg'}">${r.dRev>=0?'+':''}${fmtC(r.dRev)}</span>`;
+          const dRev = (r.dRev==null) ? '' : `<span class="delta ${r.dRev>=0?'pos':'neg'}">${r.dRev>=0?'+':''}${fmtC(r.dRev)}</span>`;
 
       const hours = getHours(label);
       const totalHours = hours.sal + hours.str;
@@ -1022,7 +1068,7 @@
       const lines = [];
       if(inc.length){
         lines.push(`Substantial OTB pickup (≥ ${DELTA_TH} rooms):`);
-        inc.sort((a,b)=>b.d-a.d).forEach(x=> lines.push(`• ${x.date}: +${x.d} rooms`));
+        inc.sort((a,b)=>b.d-a.d).forEach(x=> lines.push(`• ${x.date}: +${fmtN0(x.d)} rooms`));
         lines.push('');
       }
       if(dec.length){
@@ -1036,14 +1082,14 @@
     }
   }
 
-  // ---------- PDF summary
+  // ---------- PDF summary (with OCC%)
   function computeSummary(){
     const ym = ymFromInput();
     const hotel = hotelSel.value;
     const tz = 'America/New_York';
     const genAt = new Date().toLocaleString('en-US', { timeZone: tz });
 
-    // MTD (Actual days only)
+    // MTD (Actual only)
     let mtdActRooms=0, mtdActRev=0, mtdSal=0, mtdStr=0, mtdHKHrs=0, mtdCO=0, mtdSO=0, mtdDND=0;
     merged.forEach(r=>{
       if(r.status==='Actual'){
@@ -1058,7 +1104,7 @@
     const mtdMPOR = (cleaned>0 && mtdHKHrs>0) ? ((mtdHKHrs*60)/cleaned) : null;
     const mtdMPORVar = (mtdMPOR!=null) ? (mtdMPOR - MPOR_STD) : null;
 
-    // Month ADR overall + totals
+    // Month totals
     let mRooms=0, mRev=0, otbRooms=0, otbRev=0, monthCurrentTotal=0;
     merged.forEach(r=>{
       if(r.rooms!=null && r.rev!=null){ mRooms += r.rooms; mRev += r.rev; }
@@ -1066,6 +1112,11 @@
       if(r.rev!=null){ monthCurrentTotal += r.rev; }
     });
     const monthADR = (mRooms>0)? (mRev/mRooms) : null;
+
+    // Occ %
+    const roomsPhys = getHotelRooms ? getHotelRooms() : 0;
+    const dim = daysInActiveMonth ? daysInActiveMonth() : 0;
+    const occPct = (roomsPhys>0 && dim>0 && mRooms>0) ? ((mRooms / (roomsPhys * dim)) * 100) : null;
 
     // Pickup vs baseline (all OTB)
     const baselineSnap = bookingStatsPrev || baselineInfo.snap;
@@ -1084,7 +1135,7 @@
       dec.sort((a,b)=>a.d-b.d);
     }
 
-    // Total Month Pickup (vs first upload)
+    // Month pickup vs first upload
     const { snap:firstSnap, date:firstDate } = getFirstMonthSnapshot();
     let firstSnapTotal = null, monthPickup = null;
     if(firstSnap){
@@ -1099,7 +1150,8 @@
       monthADR, otbRooms, otbRev,
       pRooms, pRev, inc, dec,
       baselineLabel: bookingStatsPrev ? 'previous upload' : (baselineInfo.label || '—'),
-      firstSnapDate: firstDate, firstSnapTotal, monthCurrentTotal, monthPickup
+      firstSnapDate: firstDate, firstSnapTotal, monthCurrentTotal, monthPickup,
+      occPct, roomsPhys, dim
     };
   }
 
@@ -1143,13 +1195,15 @@
         <div class="k"><div class="label">HK & Rooms (MTD)</div><div class="val">${fmtN2(d.mtdHKHrs||0)} hrs — ${fmtN0(Math.max(0,(d.mtdCO||0)+(d.mtdSO||0)-(d.mtdDND||0)))} cleaned <span class="muted">(CO ${fmtN0(d.mtdCO||0)} / SO ${fmtN0(d.mtdSO||0)} / DND ${fmtN0(d.mtdDND||0)})</span></div></div>
       </div>
 
-      <h2>High-demand Pickup Alerts</h2>
-      ${ (d.inc && d.inc.length) ? `<ul>${d.inc.slice(0,10).map(x=>`<li>▲ ${x.date}: +${fmtN0(x.d)} rooms</li>`).join('')}</ul>` : '<div class="muted">No substantial pickup days detected.</div>' }
-      ${ (d.dec && d.dec.length) ? `<h2>Significant Drops</h2><ul>${d.dec.slice(0,10).map(x=>`<li>▼ ${x.date}: ${fmtN0(x.d)} rooms</li>`).join('')}</ul>` : '' }
-
       <h2>Additional KPIs</h2>
       <div class="grid">
         <div class="k"><div class="label">Month ADR (Actual + OTB)</div><div class="val">${safe(d.monthADR, fmtN2)}</div></div>
+        <div class="k">
+          <div class="label">Occupancy (Actual + OTB)</div>
+          <div class="val">${(d.occPct==null)?'—':(fmtN2(d.occPct)+'%')}
+            <span class="muted" style="display:block;margin-top:2px">vs ${fmtN0(d.roomsPhys||0)} rooms × ${d.dim||0} days</span>
+          </div>
+        </div>
         <div class="k"><div class="label">Remaining OTB Rooms (Month)</div><div class="val">${fmtN0(d.otbRooms||0)}</div></div>
         <div class="k"><div class="label">Remaining OTB Rev (Month)</div><div class="val">${fmtC(d.otbRev||0)}</div></div>
       </div>
@@ -1166,23 +1220,21 @@
     return el;
   }
 
-  // UPDATED: robust PDF export (clone + jsPDF.html with html2canvas fallback)
+  // UPDATED: robust PDF export (clone + jsPDF.html with html2canvas fallback, zIndex fix + settle)
   async function downloadPDF(){
-    // Build/refresh the source node
     const data = computeSummary();
     const src = buildPDFNode(data);
 
-    // Clone into a visible-but-invisible node so html2canvas/jsPDF find it reliably
     const tmp = src.cloneNode(true);
     tmp.id = 'pdfSummaryClone';
     Object.assign(tmp.style, {
       position:'fixed', left:'0', top:'0', width:'800px',
-      opacity:'0', pointerEvents:'none', zIndex:'-1', background:'#fff'
+      opacity:'0', pointerEvents:'none', zIndex:'0', background:'#fff' // zIndex fix
     });
     document.body.appendChild(tmp);
 
-    // Allow layout to settle so sizes are correct
     await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => setTimeout(r, 50)); // small settle delay
 
     const { jsPDF } = (window.jspdf || {});
     const haveLibs = !!jsPDF && !!window.html2canvas;
@@ -1194,7 +1246,6 @@
 
     const fname = `Pickup_Summary_${data.hotel}_${data.ym}.pdf`;
 
-    // First try: jsPDF.html (keeps text selectable & paginates by text)
     try {
       const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
       await pdf.html(tmp, {
@@ -1211,8 +1262,6 @@
       pdf.save(fname);
     } catch (err) {
       console.warn('jsPDF.html failed, falling back to image mode:', err);
-
-      // Fallback: rasterize with html2canvas, then add as images (handles tricky CSS)
       try {
         const canvas = await window.html2canvas(tmp, {
           scale: 2,
@@ -1224,24 +1273,19 @@
         const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
         const pageW = pdf.internal.pageSize.getWidth();
         const pageH = pdf.internal.pageSize.getHeight();
-        const margin = 36;                       // 0.5"
+        const margin = 36;
         const drawW = pageW - margin*2;
         const scale = drawW / canvas.width;
-        const drawHpx = Math.floor((pageH - margin*2) / scale); // slice height in source px
+        const drawHpx = Math.floor((pageH - margin*2) / scale);
 
         let ySlice = 0;
         while (ySlice < canvas.height) {
           if (ySlice > 0) pdf.addPage();
-          // Slice the big canvas into page-height chunks
           const slice = document.createElement('canvas');
           slice.width = canvas.width;
           slice.height = Math.min(drawHpx, canvas.height - ySlice);
           const ctx = slice.getContext('2d');
-          ctx.drawImage(
-            canvas,
-            0, ySlice, canvas.width, slice.height,   // src rect
-            0, 0,     canvas.width, slice.height     // dst rect
-          );
+          ctx.drawImage(canvas, 0, ySlice, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
           const img = slice.toDataURL('image/png');
           pdf.addImage(img, 'PNG', margin, margin, drawW, slice.height * scale, '', 'FAST');
           ySlice += slice.height;
@@ -1257,7 +1301,7 @@
     }
   }
 
-  // ---------- SHARE / EXPORT / IMPORT (no-backend collaboration)
+  // ---------- SHARE / EXPORT / IMPORT
   function collectBundle(){
     const hotel = hotelSel.value;
     const ym = ymFromInput();
@@ -1276,17 +1320,18 @@
     });
     const ui = localStorage.getItem(UIKEY) || null;
     const logo = localStorage.getItem(LOGO_KEY) || null;
+    const rooms = localStorage.getItem(ROOMSKEY(hotel)) || null;
 
     return {
-      version: 1,
+      version: 2,
       hotel, ym,
       bsCur, bsPrev, rev, hours, hk,
       snapIndex, snapDays,
-      ui, logo
+      ui, logo, rooms
     };
   }
   function writeBundle(bundle){
-    if(!bundle || bundle.version!==1) throw new Error('Invalid or unsupported snapshot.');
+    if(!bundle || (bundle.version!==1 && bundle.version!==2)) throw new Error('Invalid or unsupported snapshot.');
     const {hotel, ym} = bundle;
 
     if(bundle.bsCur) localStorage.setItem(BS_CUR(hotel, ym), bundle.bsCur); else localStorage.removeItem(BS_CUR(hotel, ym));
@@ -1306,17 +1351,17 @@
 
     if(bundle.ui) localStorage.setItem(UIKEY, bundle.ui);
     if(bundle.logo) localStorage.setItem(LOGO_KEY, bundle.logo);
+    if(bundle.rooms) localStorage.setItem(ROOMSKEY(hotel), bundle.rooms);
 
-    // Also set "compat" key for baseline if present
+    // compat baseline key
     const compat = bundle.bsCur ? JSON.parse(bundle.bsCur) : null;
     if(compat) localStorage.setItem(SNAPKEY(hotel, ym), JSON.stringify(compat));
 
-    // Switch UI to that hotel/month
+    // Switch UI
     hotelSel.value = hotel;
     monthInput.value = ym;
     ensureRangeDefaults();
   }
-
   function shareLinkFromBundle(b){
     const raw = JSON.stringify(b);
     const enc = (window.LZString && LZString.compressToEncodedURIComponent) ? LZString.compressToEncodedURIComponent(raw) : encodeURIComponent(raw);
@@ -1332,7 +1377,9 @@
 
       // Reload in-memory state & render
       loadUIState();
+      ensureRangeDefaults();
       loadLogo();
+      loadHotelRooms();
       loadLaborMap();
       loadHKMap();
       loadRevenueMap();
@@ -1394,7 +1441,9 @@
       writeBundle(b);
       // reload state after import
       loadUIState();
+      ensureRangeDefaults();
       loadLogo();
+      loadHotelRooms();
       loadLaborMap();
       loadHKMap();
       loadRevenueMap();
@@ -1413,12 +1462,11 @@
   // ---------- IO wiring (and UI persistence hooks)
   filterInput.addEventListener('input', ()=>{ updateAndRender(); saveUIState(); });
 
-  compareToggle.addEventListener('change', ()=>{
-    mergeData(); updateAndRender(); saveUIState();
-  });
+  compareToggle.addEventListener('change', ()=>{ mergeData(); updateAndRender(); saveUIState(); });
 
   monthInput.addEventListener('change', ()=>{
     ensureRangeDefaults();
+    loadHotelRooms();
     loadLaborMap(); loadHKMap(); loadRevenueMap();
     loadExplicitSnapshots(); loadBaselineInfo();
     mergeData(); updateAndRender();
@@ -1426,6 +1474,7 @@
   });
 
   hotelSel.addEventListener('change', ()=>{
+    loadHotelRooms();
     loadLaborMap(); loadHKMap(); loadRevenueMap();
     loadExplicitSnapshots(); loadBaselineInfo();
     mergeData(); updateAndRender();
@@ -1435,6 +1484,9 @@
   rangeMode.addEventListener('change', ()=>{ ensureRangeDefaults(); updateAndRender(); saveUIState(); });
   rangeStart.addEventListener('change', ()=>{ rangeStart.value = clampToMonth(rangeStart.value); updateAndRender(); saveUIState(); });
   rangeEnd.addEventListener('change', ()=>{ rangeEnd.value = clampToMonth(rangeEnd.value); updateAndRender(); saveUIState(); });
+
+  // NEW: total rooms input wiring
+  hotelRooms.addEventListener('input', ()=>{ saveHotelRooms(); updateKPIs(); });
 
   // Help modal
   function openHelp(){ helpModal.classList.add('show'); helpBackdrop.classList.add('show'); }
@@ -1465,7 +1517,7 @@
       if(parsed?.start){
         const ymFile = ymFromDateUTC(parsed.start);
         if(ymFile !== ymFromInput()){
-          monthInput.value = ymFile; ensureRangeDefaults(); loadRevenueMap(); saveUIState();
+          monthInput.value = ymFile; ensureRangeDefaults(); loadRevenueMap(); loadHotelRooms(); saveUIState();
         }
       }
       loadLaborMap(); loadHKMap();
@@ -1490,7 +1542,7 @@
       const parsed = parseBookingStats(text);
       if(parsed?.start){
         const ymFile = ymFromDateUTC(parsed.start);
-        if(ymFile !== ymFromInput()){ monthInput.value = ymFile; ensureRangeDefaults(); loadRevenueMap(); }
+        if(ymFile !== ymFromInput()){ monthInput.value = ymFile; ensureRangeDefaults(); loadRevenueMap(); loadHotelRooms(); }
       }
       bookingStatsPrev = parsed;
       localStorage.setItem(BS_PREV(hotelSel.value, ymFromInput()), JSON.stringify(bookingStatsPrev));
@@ -1574,14 +1626,13 @@
   btnPDF.addEventListener('click', downloadPDF);
 
   // ---------- Initialize
-  // 1) If a share link hash is present, import it before anything else.
   window.addEventListener('load', ()=>{
     const imported = tryLoadBundleFromHash();
     if(imported) return; // state already loaded & rendered
-    // Otherwise normal boot
     loadUIState();
     ensureRangeDefaults();
     loadLogo();
+    loadHotelRooms();
     loadLaborMap();
     loadHKMap();
     loadRevenueMap();
@@ -1591,5 +1642,4 @@
   });
 })();
 </script>
-</body>
-</html>
+
