@@ -4,60 +4,83 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bill Book — Personal Finance (Local Only)</title>
+
 <style>
   :root{
-    --ink:#111827; --ink-soft:#6b7280; --bg:#ffffff; --card:#11172a; --muted:#0e1426;
-    --brand:#60a5fa; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --ring:#93c5fd;
+    /* Softer, readable light theme */
+    --ink:#111827; --ink-soft:#6b7280; --bg:#ffffff;
+    --card:#ffffff; --border:#e5e7eb; --ring:#93c5fd;
+    --thead:#f5f7fb; --row-alt:#fafcff; --row-hover:#f0f6ff;
+
+    --brand:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
   }
+
   *{box-sizing:border-box}
   html,body{height:100%}
   body{
     margin:0;
-    font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial;
     color:var(--ink);
-    background:var(--bg); /* WHITE background for contrast outside tables */
+    background:var(--bg); /* keep WHITE background outside tables */
   }
+
   .wrap{max-width:1200px; margin:16px auto; padding:0 12px}
   h1{font-size:clamp(20px,5vw,26px); color:var(--ink); margin:8px 0; text-align:center}
   .sub{text-align:center; color:var(--ink-soft); font-size:12px; margin-bottom:12px}
 
   /* Controls */
   .bar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px}
-  .btn{appearance:none; border:1px solid #22305a; background:#0f1631; color:#e5e7eb;
-       padding:10px 12px; border-radius:12px; cursor:pointer; font-size:14px; flex-shrink:0}
-  .btn:hover{border-color:#2c3f7a}
-  .btn.brand{background:linear-gradient(180deg,#1a4dc5,#0f3b9a); border-color:#1b3e88}
-  .btn.ok{background:#0f2d1a; border-color:#1b5e2b}
-  .btn.bad{background:#2d1416; border-color:#7a2b31}
-  .btn.warn{background:#2d2610; border-color:#7a632b}
-  .pill{padding:6px 10px; border-radius:999px; font-size:12px; color:#d1d5db; background:#0e152c; border:1px solid #22305a}
-  .inp{width:100%; padding:10px 12px; border-radius:12px; border:1px solid #1f2a4d; background:#0e152c; color:#e5e7eb; font-size:14px}
-  .inp:focus{outline:none; border-color:var(--ring); box-shadow:0 0 0 3px rgba(147,197,253,.25)}
+  .btn{
+    appearance:none; border:1px solid var(--border); background:#f8fafc; color:#0f172a;
+    padding:10px 12px; border-radius:12px; cursor:pointer; font-size:14px; flex-shrink:0
+  }
+  .btn:hover{background:#eef2f7}
+  .btn.brand{background:linear-gradient(180deg,#3b82f6,#2563eb); color:#fff; border-color:#1e40af}
+  .btn.ok{background:#e8f6ee; border-color:#b7e2c7; color:#065f46}
+  .btn.bad{background:#fdecec; border-color:#f8c7c7; color:#7f1d1d}
+  .btn.warn{background:#fff3e1; border-color:#fbd19f; color:#92400e}
+  .btn.ghost{background:transparent}
+  .pill{padding:6px 10px; border-radius:999px; font-size:12px; color:#0f172a; background:#f3f4f6; border:1px solid var(--border)}
+  .inp{
+    width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+    background:#fff; color:#111827; font-size:14px
+  }
+  .inp:focus{outline:none; border-color:var(--ring); box-shadow:0 0 0 3px rgba(147,197,253,.35)}
 
   /* Layout */
   .grid{display:grid; gap:12px}
   .grid.cols-2{grid-template-columns:1fr 1fr}
   .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 
-  /* Cards (keep tables dark inside) */
-  .card{background:var(--card); border:1px solid #1f2640; border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.08)}
+  /* Cards */
+  .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.06)}
+  .section-title{font-weight:600; margin-bottom:6px}
+  .note{color:var(--ink-soft); font-size:12px}
 
-  /* Tables (keep existing dark colors) */
+  /* Tables — softened for readability */
   .tbl{width:100%; border-collapse:separate; border-spacing:0; font-size:14px}
-  .tbl th,.tbl td{border-bottom:1px dashed #263057; padding:10px; color:#d1d5db}
-  .tbl th{position:sticky; top:0; background:linear-gradient(180deg,#0e152c,#0d142a); z-index:2; font-size:12px}
+  .tbl th,.tbl td{padding:10px; color:#111827}
+  .tbl th{
+    position:sticky; top:0; z-index:2; background:var(--thead); font-size:12px; text-align:left;
+    border-bottom:1px solid var(--border)
+  }
+  .tbl td{border-bottom:1px solid var(--border)}
+  .tbl tr:nth-child(even) td{background:var(--row-alt)}
+  .tbl tbody tr:hover td{background:var(--row-hover)}
   .tbl input{font-size:14px}
+  .right{text-align:right}
+  .center{text-align:center}
 
-  /* Horizontal scroll helpers for mobile */
+  /* Horizontal scroll for mobile */
   .scroll-x{overflow-x:auto; -webkit-overflow-scrolling:touch}
 
   /* KPI cards */
   .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px}
-  .kpi{background:#0e152c; border:1px solid #22305a; border-radius:12px; padding:10px; text-align:center}
-  .kpi .label{color:#9ca3af; font-size:12px}
-  .kpi .val{color:#e5e7eb; font-size:clamp(16px,5vw,20px); font-weight:700}
+  .kpi{background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:10px; text-align:center}
+  .kpi .label{color:#6b7280; font-size:12px}
+  .kpi .val{color:#0f172a; font-size:clamp(16px,5vw,20px); font-weight:700}
 
-  /* Mobile-first improvements */
+  /* Mobile-first */
   @media (max-width:900px){
     .grid.cols-2{grid-template-columns:1fr}
     .bar{justify-content:center}
@@ -68,9 +91,7 @@
     .inp{font-size:16px; padding:12px 14px}
     .tbl{font-size:15px}
     .tbl th,.tbl td{padding:12px}
-    /* Larger checkboxes for touch */
     input[type=checkbox]{width:22px; height:22px}
-    /* Make pills easier to tap */
     .pill{padding:8px 12px}
   }
 </style>
@@ -102,9 +123,16 @@
       <div class="card">
         <div class="section-title">Settings</div>
         <div class="bar">
-          <label class="chip"><span>Hotel / Household Rooms (optional)</span> <input type="number" min="0" id="rooms" class="inp" style="width:120px"> </label>
-          <label class="chip"><span>Days in Active Month</span> <input type="number" min="28" max="31" id="daysInMonth" class="inp" style="width:90px"> </label>
-          <label class="chip"><span>Currency</span> 
+          <label class="pill" style="display:flex;gap:8px;align-items:center;background:#f9fafb">
+            <span>Hotel / Household Rooms (optional)</span>
+            <input type="number" min="0" id="rooms" class="inp" style="width:120px">
+          </label>
+          <label class="pill" style="display:flex;gap:8px;align-items:center;background:#f9fafb">
+            <span>Days in Active Month</span>
+            <input type="number" min="28" max="31" id="daysInMonth" class="inp" style="width:90px">
+          </label>
+          <label class="pill" style="display:flex;gap:8px;align-items:center;background:#f9fafb">
+            <span>Currency</span>
             <select id="currency" class="inp" style="width:120px">
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
@@ -143,7 +171,10 @@
       <div class="bar">
         <button id="addExpense" class="btn ok">+ Add Expense</button>
         <button id="markAllPaid" class="btn warn">Mark All Paid (Active Month)</button>
-        <label class="chip"><span>Filter</span> <input id="filterTxt" class="inp" placeholder="Type to filter by name…" style="width:220px"></label>
+        <label class="pill" style="display:flex;gap:8px;align-items:center;background:#f9fafb">
+          <span>Filter</span>
+          <input id="filterTxt" class="inp" placeholder="Type to filter by name…" style="width:220px">
+        </label>
       </div>
       <div class="squeeze scroll-x">
         <table class="tbl" id="expenseTbl"></table>
@@ -158,9 +189,9 @@
   // ---------- Utilities ----------
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
-  const today = new Date();
   const fmtMonth = (ym) => {
     // ym: 'YYYY-MM'
+    if(!ym) return '';
     const [y,m] = ym.split('-').map(Number);
     const d = new Date(y, m-1, 1);
     return d.toLocaleDateString(undefined,{month:'long', year:'numeric'});
@@ -196,7 +227,11 @@
   }
   let state = load() || defaultState();
 
-  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); renderAll(); }
+  // CHANGED: allow saving with or without re-render to fix single-character typing issue
+  function save(render = true){
+    localStorage.setItem(KEY, JSON.stringify(state));
+    if(render) renderAll();
+  }
   function load(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
   function reset(){ localStorage.removeItem(KEY); state = defaultState(); renderAll(); }
 
@@ -345,13 +380,19 @@
             `<td class="right">${money(sumAllIncome(), state.currency)}</td><td></td></tr></tfoot>`;
 
     incomeTbl.innerHTML = html;
-    // wire events
+
+    // NOTE: for name fields, save WITHOUT re-render while typing; re-render on blur
     incomeTbl.querySelectorAll('input[data-act="income-name"]').forEach(el=>{
-      el.addEventListener('input', ()=>{ const i = state.incomes.find(x=>x.id===el.dataset.id); if(i){ i.name = el.value; save(); }});
+      el.addEventListener('input', ()=>{
+        const i = state.incomes.find(x=>x.id===el.dataset.id);
+        if(i){ i.name = el.value; save(false); } // <-- key fix
+      });
+      el.addEventListener('blur', ()=> save(true)); // re-render once finished typing
     });
     incomeTbl.querySelectorAll('input[data-act="income-amt"]').forEach(el=>{
       el.addEventListener('change', ()=>{
-        const i = state.incomes.find(x=>x.id===el.dataset.id); if(i){ i.amounts[el.dataset.month] = +el.value||0; save(); }
+        const i = state.incomes.find(x=>x.id===el.dataset.id);
+        if(i){ i.amounts[el.dataset.month] = +el.value||0; save(); }
       });
     });
     incomeTbl.querySelectorAll('button[data-act="income-del"]').forEach(el=>{
@@ -378,8 +419,8 @@
       if(f && !ex.name.toLowerCase().includes(f)) continue;
       const rowTotal = months.reduce((s,m)=> s + (+ex.amounts[m]||0), 0);
       const overdue = isOverdue(ex, state.activeMonth);
-      html += `<tr${overdue ? ' class="due-row"' : ''}>
-        <td${overdue? ' class="danger"':''}><input class="inp" value="${escapeHtml(ex.name)}" data-act="exp-name" data-id="${ex.id}"></td>
+      html += `<tr${overdue ? ' style="outline:2px solid rgba(220,38,38,.15); outline-offset:-2px"' : ''}>
+        <td${overdue? ' style="color:#991b1b"':''}><input class="inp" value="${escapeHtml(ex.name)}" data-act="exp-name" data-id="${ex.id}"></td>
         <td class="center"><input class="inp" type="number" min="1" max="31" value="${+ex.dueDay||1}" data-act="exp-due" data-id="${ex.id}" style="width:70px"></td>
         ${months.map(m=>`<td class="right"><input class="inp" type="number" step="0.01" value="${+ex.amounts[m]||0}" data-act="exp-amt" data-id="${ex.id}" data-month="${m}"></td>`).join('')}
         ${months.map(m=>`<td class="center"><input type="checkbox" ${ex.paid[m]? 'checked':''} data-act="exp-paid" data-id="${ex.id}" data-month="${m}"></td>`).join('')}
@@ -409,24 +450,46 @@
 
     expenseTbl.innerHTML = html;
 
-    // wire
+    // CHANGED: name fields save quietly on input; re-render on blur (fixes "one character" problem)
     expenseTbl.querySelectorAll('input[data-act="exp-name"]').forEach(el=>{
-      el.addEventListener('input', ()=>{ const x = findExp(el.dataset.id); if(x){ x.name=el.value; save(); }});
+      el.addEventListener('input', ()=>{
+        const x = findExp(el.dataset.id);
+        if(x){ x.name = el.value; save(false); } // don't re-render while typing
+      });
+      el.addEventListener('blur', ()=> save(true)); // re-render after edit finishes
     });
+
     expenseTbl.querySelectorAll('input[data-act="exp-due"]').forEach(el=>{
-      el.addEventListener('change', ()=>{ const x = findExp(el.dataset.id); if(x){ x.dueDay=clamp(+el.value,1,31); el.value=x.dueDay; save(); }});
+      el.addEventListener('change', ()=>{
+        const x = findExp(el.dataset.id);
+        if(x){ x.dueDay = clamp(+el.value,1,31); el.value = x.dueDay; save(); }
+      });
     });
     expenseTbl.querySelectorAll('input[data-act="exp-amt"]').forEach(el=>{
-      el.addEventListener('change', ()=>{ const x = findExp(el.dataset.id); if(x){ x.amounts[el.dataset.month]= +el.value||0; save(); }});
+      el.addEventListener('change', ()=>{
+        const x = findExp(el.dataset.id);
+        if(x){ x.amounts[el.dataset.month] = +el.value||0; save(); }
+      });
     });
     expenseTbl.querySelectorAll('input[data-act="exp-paid"]').forEach(el=>{
-      el.addEventListener('change', ()=>{ const x = findExp(el.dataset.id); if(x){ x.paid[el.dataset.month]= el.checked; save(); }});
+      el.addEventListener('change', ()=>{
+        const x = findExp(el.dataset.id);
+        if(x){ x.paid[el.dataset.month] = el.checked; save(); }
+      });
     });
     expenseTbl.querySelectorAll('button[data-act="exp-apply"]').forEach(el=>{
-      el.addEventListener('click', ()=>{ const x = findExp(el.dataset.id); if(!x) return; const pctEl = expenseTbl.querySelector(`input[data-act="exp-pct"][data-id="${x.id}"]`); const pct=+pctEl.value||0; adjustRowByPct(x, pct); pctEl.value=''; save(); });
+      el.addEventListener('click', ()=>{
+        const x = findExp(el.dataset.id); if(!x) return;
+        const pctEl = expenseTbl.querySelector(`input[data-act="exp-pct"][data-id="${x.id}"]`);
+        const pct = +pctEl.value||0; adjustRowByPct(x, pct); pctEl.value=''; save();
+      });
     });
     expenseTbl.querySelectorAll('button[data-act="exp-copy-active"]').forEach(el=>{
-      el.addEventListener('click', ()=>{ const x = findExp(el.dataset.id); if(!x) return; const m=state.activeMonth; const val=+x.amounts[m]||0; state.months.forEach(mm=>{ x.amounts[mm]=val; }); save(); });
+      el.addEventListener('click', ()=>{
+        const x = findExp(el.dataset.id); if(!x) return;
+        const m = state.activeMonth; const val = +x.amounts[m]||0;
+        state.months.forEach(mm=>{ x.amounts[mm]=val; }); save();
+      });
     });
     expenseTbl.querySelectorAll('button[data-act="exp-del"]').forEach(el=>{
       el.addEventListener('click', ()=> deleteExpense(el.dataset.id));
@@ -442,7 +505,6 @@
   function isOverdue(exp, ym){
     if(!ym) return false;
     const [y,m] = ym.split('-').map(Number);
-    const due = new Date(y, m-1, exp.dueDay||1);
     const now = new Date();
     if(now < new Date(y, m-1, 1) || now > new Date(y, m-1, 31)) return false; // only flag for current calendar month
     return (now.getDate() > (exp.dueDay||1)) && !exp.paid[ym];
