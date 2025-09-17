@@ -46,18 +46,17 @@
     background:#fff; color:#111827; font-size:14px
   }
   .inp:focus{outline:none; border-color:var(--ring); box-shadow:0 0 0 3px rgba(147,197,253,.35)}
-  /* Numeric fields: monospace + autosize */
+
+  /* Numeric fields: monospace + pixel autosize */
   .inp.num{
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    min-width: 8ch; width:auto; max-width:none;
     text-align:right; font-variant-numeric:tabular-nums;
-    display:inline-block; white-space:nowrap;
+    width:auto; min-width:8ch; max-width:none; display:inline-block; white-space:nowrap;
   }
 
   /* Layout */
   .grid{display:grid; gap:12px}
   .grid.cols-2{grid-template-columns:1fr 1fr}
-  .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 
   /* Cards */
   .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.06)}
@@ -124,7 +123,6 @@
     <div class="grid cols-2">
       <div class="card">
         <div class="section-title">Months</div>
-        <!-- Year & Month controls -->
         <div class="bar">
           <select id="yearSelect" class="inp" style="max-width:120px"></select>
           <select id="monthSelect" class="inp" style="max-width:180px"></select>
@@ -191,7 +189,7 @@
   const pad2 = n => String(n).padStart(2,'0');
   const ymOf = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
   const ymFrom = (y,m) => `${y}-${pad2(m)}`;
-  const moneyFmt = (n,curr) => new Intl.NumberFormat(undefined,{style:'currency',currency:curr}).format(+n||0);
+  const moneyFmt = (n,curr='USD') => new Intl.NumberFormat(undefined,{style:'currency',currency:curr}).format(+n||0);
   const uid = () => Math.random().toString(36).slice(2,9);
   const now = new Date();
 
@@ -203,7 +201,6 @@
     const next = ymOf(new Date(now.getFullYear(), now.getMonth()+1, 1));
     return {
       year: now.getFullYear(),
-      currency: 'USD',
       months: [prev, cur, next],
       activeMonth: cur,
       incomes: [
@@ -330,14 +327,37 @@
 
   function setActiveMonth(m){ state.activeMonth=m; save(); }
 
-  // ---------- Auto-size numeric inputs ----------
-  function autoSizeInput(el){
-    // ch units are accurate with monospace; add a little padding
-    const len = (el.value || '').length;
-    el.style.width = Math.max(8, len + 2) + 'ch';
+  // ---------- Pixel-accurate autosize for inputs ----------
+  const meas = document.createElement('span');
+  meas.style.cssText = `
+    position:absolute; visibility:hidden; white-space:pre; top:-9999px; left:-9999px;
+    font:inherit; padding:0; border:0; letter-spacing:normal;
+  `;
+  document.body.appendChild(meas);
+
+  function copyComputedFont(el, target){
+    const cs = getComputedStyle(el);
+    const props = ['font-family','font-size','font-weight','font-style','font-variant','letter-spacing'];
+    props.forEach(p=> target.style.setProperty(p, cs.getPropertyValue(p)));
+  }
+
+  function autoSizeInputPx(el){
+    // Use value or placeholder for minimum width
+    const text = el.value || el.getAttribute('placeholder') || '';
+    copyComputedFont(el, meas);
+    meas.textContent = text;
+    const extra = 22; // padding for input's left+right + caret space
+    const w = Math.max(8, meas.getBoundingClientRect().width + extra);
+    el.style.width = w + 'px';
   }
 
   // ---------- Income ----------
+  const numberFrom = (s) => {
+    if (s == null) return 0;
+    const n = parseFloat(String(s).replace(/,/g,'')); // tolerate commas
+    return Number.isFinite(n) ? n : 0;
+  };
+
   addIncomeBtn.addEventListener('click', ()=>{
     state.incomes.push({id:uid(), name:'New Income', amounts:{}});
     state.months.forEach(m=>{ state.incomes[state.incomes.length-1].amounts[m]=0; });
@@ -395,14 +415,12 @@
 
   // ---------- Rendering ----------
   function renderYearMonthControls(){
-    // Year select: prev, current, next two years
     const yNow = now.getFullYear();
     const years = [yNow-1, yNow, yNow+1, yNow+2];
     yearSelect.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
     if(!state.year) state.year = yNow;
     yearSelect.value = state.year;
 
-    // Month select from state.months
     ensureActiveMonth();
     monthSelect.innerHTML = state.months.map(m=>`<option value="${m}">${fmtMonth(m)}</option>`).join('');
     if(state.activeMonth) monthSelect.value = state.activeMonth;
@@ -444,11 +462,11 @@
         <td><input class="inp" value="${escapeHtml(inc.name)}" data-act="income-name" data-id="${inc.id}"></td>
         ${months.map(m=>`
           <td class="right" style="white-space:nowrap">
-            <input class="inp num" type="number" inputmode="decimal" step="0.01"
-              value="\${+inc.amounts[m]||0}" data-act="income-amt" data-id="${inc.id}" data-month="${m}">
+            <input class="inp num" type="text" inputmode="decimal" placeholder="0.00"
+              value="${+inc.amounts[m]||0}" data-act="income-amt" data-id="${inc.id}" data-month="${m}">
           </td>
         `).join('')}
-        <td class="right"><span>${moneyFmt(rowTotal,state.currency)}</span></td>
+        <td class="right"><span>${moneyFmt(rowTotal)}</span></td>
         <td class="center">
           <div class="row-controls">
             <button class="btn ghost small" data-act="income-del" data-id="${inc.id}">Delete</button>
@@ -458,12 +476,12 @@
     }
     html += '</tbody>';
     html += '<tfoot><tr><td class="right">Monthly Total</td>'+
-            months.map(m=>`<td class="right">${moneyFmt(state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0),0), state.currency)}</td>`).join('')+
-            `<td class="right">${moneyFmt(sumAllIncome(), state.currency)}</td><td></td></tr></tfoot>`;
+            months.map(m=>`<td class="right">${moneyFmt(state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0),0))}</td>`).join('')+
+            `<td class="right">${moneyFmt(sumAllIncome())}</td><td></td></tr></tfoot>`;
 
     incomeTbl.innerHTML = html;
 
-    // Smooth typing + autosize
+    // Name fields: save quietly
     incomeTbl.querySelectorAll('input[data-act="income-name"]').forEach(el=>{
       el.addEventListener('input', ()=>{
         const i = state.incomes.find(x=>x.id===el.dataset.id);
@@ -471,15 +489,21 @@
       });
       el.addEventListener('blur', ()=> save(true));
     });
+
+    // Amount fields: autosize on input, commit on blur
     incomeTbl.querySelectorAll('input[data-act="income-amt"]').forEach(el=>{
-      autoSizeInput(el);
-      el.addEventListener('input', ()=>{
+      autoSizeInputPx(el);
+      el.addEventListener('input', ()=> autoSizeInputPx(el));
+      el.addEventListener('blur', ()=>{
         const i = state.incomes.find(x=>x.id===el.dataset.id);
-        if(i){ i.amounts[el.dataset.month] = +el.value||0; save(false); }
-        autoSizeInput(el);
+        if(i){
+          i.amounts[el.dataset.month] = numberFrom(el.value);
+          el.value = i.amounts[el.dataset.month]; // normalize
+        }
+        save(true);
       });
-      el.addEventListener('blur', ()=> save(true));
     });
+
     incomeTbl.querySelectorAll('button[data-act="income-del"]').forEach(el=>{
       el.addEventListener('click', ()=> deleteIncome(el.dataset.id));
     });
@@ -509,15 +533,15 @@
           <input class="inp" value="${escapeHtml(ex.name)}" data-act="exp-name" data-id="${ex.id}">
         </td>
         <td class="center" style="white-space:nowrap">
-          <input class="inp num" type="number" inputmode="numeric" min="1" max="31"
+          <input class="inp num" type="text" inputmode="numeric" placeholder="1-31"
                  value="${+ex.dueDay||1}" data-act="exp-due" data-id="${ex.id}">
         </td>
         ${months.map(m=>`<td class="right" style="white-space:nowrap">
-            <input class="inp num" type="number" inputmode="decimal" step="0.01"
+            <input class="inp num" type="text" inputmode="decimal" placeholder="0.00"
                    value="${+ex.amounts[m]||0}" data-act="exp-amt" data-id="${ex.id}" data-month="${m}">
           </td>`).join('')}
         ${months.map(m=>`<td class="center"><input type="checkbox" ${ex.paid[m]? 'checked':''} data-act="exp-paid" data-id="${ex.id}" data-month="${m}"></td>`).join('')}
-        <td class="right">${moneyFmt(rowTotal,state.currency)}</td>
+        <td class="right">${moneyFmt(rowTotal)}</td>
         <td class="center">
           <div class="bar" style="gap:6px;margin:0">
             <button class="btn small" data-copy="next" data-id="${ex.id}">Active → Next</button>
@@ -535,14 +559,14 @@
     html += '</tbody>';
 
     html += '<tfoot><tr><td class="right" colspan="2">Monthly Total</td>'+
-            months.map(m=>`<td class="right">${moneyFmt(state.expenses.reduce((s,x)=> s+(+x.amounts[m]||0),0), state.currency)}</td>`).join('')+
+            months.map(m=>`<td class="right">${moneyFmt(state.expenses.reduce((s,x)=> s+(+x.amounts[m]||0),0))}</td>`).join('')+
             months.map(m=>`<td class="center">${state.expenses.reduce((s,x)=> s + (x.paid[m]?1:0),0)}</td>`).join('')+
-            `<td class="right">${moneyFmt(sumAllExpenses(), state.currency)}</td>`+
+            `<td class="right">${moneyFmt(sumAllExpenses())}</td>`+
             '<td></td><td></td></tr></tfoot>';
 
     expenseTbl.innerHTML = html;
 
-    // Smooth typing + autosize numeric
+    // Name fields
     expenseTbl.querySelectorAll('input[data-act="exp-name"]').forEach(el=>{
       el.addEventListener('input', ()=>{
         const x = findExp(el.dataset.id);
@@ -550,24 +574,36 @@
       });
       el.addEventListener('blur', ()=> save(true));
     });
+
+    // Due day: autosize on input, clamp & save on blur
     expenseTbl.querySelectorAll('input[data-act="exp-due"]').forEach(el=>{
-      autoSizeInput(el);
-      el.addEventListener('input', ()=>{
+      autoSizeInputPx(el);
+      el.addEventListener('input', ()=> autoSizeInputPx(el));
+      el.addEventListener('blur', ()=>{
         const x = findExp(el.dataset.id);
-        if(x){ x.dueDay = clamp(+el.value||1,1,31); save(false); }
-        autoSizeInput(el);
+        if(x){
+          let v = Math.max(1, Math.min(31, parseInt(el.value,10)||1));
+          x.dueDay = v; el.value = v;
+        }
+        save(true);
       });
-      el.addEventListener('blur', ()=> save(true));
     });
+
+    // Amounts: autosize on input, commit on blur
     expenseTbl.querySelectorAll('input[data-act="exp-amt"]').forEach(el=>{
-      autoSizeInput(el);
-      el.addEventListener('input', ()=>{
+      autoSizeInputPx(el);
+      el.addEventListener('input', ()=> autoSizeInputPx(el));
+      el.addEventListener('blur', ()=>{
         const x = findExp(el.dataset.id);
-        if(x){ x.amounts[el.dataset.month] = +el.value||0; save(false); }
-        autoSizeInput(el);
+        if(x){
+          const val = numberFrom(el.value);
+          x.amounts[el.dataset.month] = val;
+          el.value = val; // normalize
+        }
+        save(true);
       });
-      el.addEventListener('blur', ()=> save(true));
     });
+
     expenseTbl.querySelectorAll('input[data-act="exp-paid"]').forEach(el=>{
       el.addEventListener('change', ()=>{
         const x = findExp(el.dataset.id);
@@ -602,7 +638,6 @@
   function sumAllExpenses(){ return state.months.reduce((s,m)=> s + state.expenses.reduce((t,x)=> t+(+x.amounts[m]||0),0), 0); }
 
   function findExp(id){ return state.expenses.find(x=>x.id===id); }
-  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
 
   function renderKPIs(){
@@ -610,9 +645,9 @@
     const inc = state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0), 0);
     const exp = state.expenses.reduce((s,x)=> s+(+x.amounts[m]||0), 0);
     const unpaid = state.expenses.reduce((s,x)=> s + (x.paid[m]?0:1), 0);
-    $('#kpiIncome').textContent = moneyFmt(inc, state.currency);
-    $('#kpiExpenses').textContent = moneyFmt(exp, state.currency);
-    $('#kpiNet').textContent = moneyFmt(inc-exp, state.currency);
+    $('#kpiIncome').textContent = moneyFmt(inc);
+    $('#kpiExpenses').textContent = moneyFmt(exp);
+    $('#kpiNet').textContent = moneyFmt(inc-exp);
     $('#kpiUnpaid').textContent = unpaid;
   }
 
@@ -622,8 +657,8 @@
     renderExpenses();
     renderKPIs();
 
-    // After render, make sure all numeric inputs are sized correctly
-    $$('#incomeTbl .inp.num, #expenseTbl .inp.num').forEach(autoSizeInput);
+    // Ensure all numeric inputs are sized correctly after first render
+    $$('#incomeTbl .inp.num, #expenseTbl .inp.num').forEach(autoSizeInputPx);
   }
 
   // initial
