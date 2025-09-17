@@ -428,7 +428,7 @@ details.master-drop[open] summary{color:#0b5ed7}
       </tr>
       <tr><th>Budget (Revenue)</th>${mkCells(12,'input-cell','data-rev="budget"')}<td class="calculated-cell" data-rev="budget-total">$0</td></tr>
       <tr><th>Variance vs LY ($)</th>${mkCalc(12,'data-rev="var-ly"','$0')}<td class="calculated-cell" data-rev="var-ly-total">$0</td></tr>
-      <tr><th>Variance vs LY (%)</th>${mkCalc(12,'data-rev="varpct-ly"','0%')}<td class="calculated-cell" data-rev="varpct-ly-total">0%</td></tr>
+      <tr><th>Variance vs LY (%)</th>${mkCalc(12,'data-rev="varpct-ly','0%')}<td class="calculated-cell" data-rev="varpct-ly-total">0%</td></tr>
       <tr><th>Variance vs Budget ($)</th>${mkCalc(12,'data-rev="var-bud"','$0')}<td class="calculated-cell" data-rev="var-bud-total">$0</td></tr>
       <tr><th>Variance vs Budget (%)</th>${mkCalc(12,'data-rev="varpct-bud"','0%')}<td class="calculated-cell" data-rev="varpct-bud-total">0%</td></tr>
     `;
@@ -1018,8 +1018,14 @@ details.master-drop[open] summary{color:#0b5ed7}
     }
   }
 
-  // Boot
-  calculateMonthly();
+  // Boot: auto-load state from this device, then calc once
+  loadFromLocal();        // pulls saved Rev/Exp files, budgets, and daily data back into the UI
+  calculateMonthly();     // safe even if no save exists
+
+  // Save on tab close/refresh if Auto-save is ON
+  window.addEventListener('beforeunload', () => {
+    if (qs('#autoSaveToggle').checked) saveToLocal(false);
+  });
 })();
 </script>
 </body>
