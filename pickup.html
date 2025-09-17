@@ -7,10 +7,12 @@
 <title>OTB Pickup — Daily Booking Stats + Revenue</title>
 
 <!-- PDF libs (deferred so they’re ready by the time the page is interactive) -->
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
 <!-- Small compressor for share links -->
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js" defer></script>
+<!-- jsPDF (already present) -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+<!-- ADD THIS: AutoTable plugin (must load after jsPDF) -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js" defer></script>
 
 <style>
   :root{
@@ -172,25 +174,6 @@
   .toast.ok{border-left-color:var(--ok)}
   .toast.info{border-left-color:var(--brand)}
 
-  /* PDF summary panel (kept in-viewport but invisible so html2canvas/jspdf can capture it) */
-  #pdfSummary{
-    position:fixed;
-    left:0; top:0;
-    width:800px;
-    opacity:0;
-    pointer-events:none;
-    z-index:-1;
-    background:#fff; color:#263238; padding:24px; border:1px solid #eef2f7; border-radius:12px;
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-  }
-  #pdfSummary h1{font-size:20px; margin:0 0 6px; font-weight:800}
-  #pdfSummary h2{font-size:16px; margin:16px 0 8px; font-weight:800}
-  #pdfSummary .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px}
-  #pdfSummary .k{border:1px solid #e7edf6; border-radius:12px; padding:10px; background:#fafcff;}
-  #pdfSummary .k .label{font-size:11px; text-transform:uppercase; color:#64748b; font-weight:700; letter-spacing:.3px}
-  #pdfSummary .k .val{font-size:20px; font-weight:800; margin-top:4px}
-  #pdfSummary ul{margin:6px 0 0 18px}
-  #pdfSummary .muted{color:#6b7a8c; font-size:12px}
 </style>
 </head>
 <body>
@@ -380,8 +363,6 @@
   <!-- Toast container -->
   <div class="toast-wrap" id="toastWrap" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- Off-screen PDF summary node (kept invisible but measurable) -->
-  <div id="pdfSummary" aria-hidden="true"></div>
 <script>
 (function(){
   // ---------- DOM (core)
@@ -1155,191 +1136,199 @@
     };
   }
 
-  function buildPDFNode(d){
-    const el = document.getElementById('pdfSummary');
-    const safe = (v, fmt) => (v==null || Number.isNaN(v)) ? '—' : (fmt?fmt(v):v);
-    const logoTag = logoDataUrl ? `<img src="${logoDataUrl}" alt="Logo" style="height:36px;display:block">` : '';
-    el.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-        ${logoTag}
-        <div>
-          <h1 style="margin:0">Pickup Summary — ${d.hotel} — ${d.ym}</h1>
-          <div class="muted">Generated ${d.genAt} (America/New_York)</div>
-        </div>
-      </div>
-
-      <h2>Pickup vs Previous Day</h2>
-      <div class="grid">
-        <div class="k"><div class="label">Rooms Pickup</div><div class="val">${(d.pRooms>=0?'+':'') + fmtN0(d.pRooms||0)}</div></div>
-        <div class="k"><div class="label">Revenue Pickup</div><div class="val">${(d.pRev>=0?'+':'') + fmtC(d.pRev||0)}</div></div>
-        <div class="k"><div class="label">Baseline</div><div class="val">${d.baselineLabel}</div></div>
-      </div>
-
-      <h2>Total Month Pickup</h2>
-      <div class="grid">
-        <div class="k"><div class="label">First Upload (${d.firstSnapDate || '—'})</div><div class="val">${safe(d.firstSnapTotal, fmtC)}</div></div>
-        <div class="k"><div class="label">Current Month Total</div><div class="val">${safe(d.monthCurrentTotal, fmtC)}</div></div>
-        <div class="k"><div class="label">Pickup (Month vs First)</div><div class="val">${d.monthPickup==null?'—':((d.monthPickup>=0?'+':'')+fmtC(d.monthPickup))}</div></div>
-      </div>
-
-      <h2>MTD Productivity</h2>
-      <div class="grid">
-        <div class="k"><div class="label">MTD HPOR</div><div class="val">${safe(d.mtdHPOR, fmtN2)}</div></div>
-        <div class="k"><div class="label">MTD MPOR</div><div class="val">${safe(d.mtdMPOR, x=>fmtN2(x)+' min')}</div></div>
-        <div class="k"><div class="label">MPOR Var vs 25m</div><div class="val">${(d.mtdMPORVar==null)?'—':((d.mtdMPORVar>=0?'+':'')+fmtN2(d.mtdMPORVar)+' min')}</div></div>
-      </div>
-      <div class="grid" style="margin-top:6px">
-        <div class="k"><div class="label">Actual Rooms (MTD)</div><div class="val">${fmtN0(d.mtdActRooms||0)}</div></div>
-        <div class="k"><div class="label">Actual Room Rev (MTD)</div><div class="val">${fmtC(d.mtdActRev||0)}</div></div>
-        <div class="k"><div class="label">Labor Hours (MTD)</div><div class="val">${fmtN2((d.mtdSal||0)+(d.mtdStr||0))} <span class="muted">(${fmtN2(d.mtdSal||0)} sal / ${fmtN2(d.mtdStr||0)} str)</span></div></div>
-        <div class="k"><div class="label">HK & Rooms (MTD)</div><div class="val">${fmtN2(d.mtdHKHrs||0)} hrs — ${fmtN0(Math.max(0,(d.mtdCO||0)+(d.mtdSO||0)-(d.mtdDND||0)))} cleaned <span class="muted">(CO ${fmtN0(d.mtdCO||0)} / SO ${fmtN0(d.mtdSO||0)} / DND ${fmtN0(d.mtdDND||0)})</span></div></div>
-      </div>
-
-      <h2>Additional KPIs</h2>
-      <div class="grid">
-        <div class="k"><div class="label">Month ADR (Actual + OTB)</div><div class="val">${safe(d.monthADR, fmtN2)}</div></div>
-        <div class="k">
-          <div class="label">Occupancy (Actual + OTB)</div>
-          <div class="val">${(d.occPct==null)?'—':(fmtN2(d.occPct)+'%')}
-            <span class="muted" style="display:block;margin-top:2px">vs ${fmtN0(d.roomsPhys||0)} rooms × ${d.dim||0} days</span>
-          </div>
-        </div>
-        <div class="k"><div class="label">Remaining OTB Rooms (Month)</div><div class="val">${fmtN0(d.otbRooms||0)}</div></div>
-        <div class="k"><div class="label">Remaining OTB Rev (Month)</div><div class="val">${fmtC(d.otbRev||0)}</div></div>
-      </div>
-
-      <div style="margin-top:16px;padding-top:10px;border-top:1px solid #e7edf6;display:flex;justify-content:space-between;align-items:center">
-        <div>Prepared by: ________________________________</div>
-        <div>Date: ____________</div>
-      </div>
-
-      <div class="muted" style="margin-top:10px">
-        Notes: HPOR = (Salaried + Straight Hours) ÷ Actual Rooms. MPOR = (HK Hours × 60) ÷ (CO + SO − DND). Standard MPOR = 25 minutes.
-      </div>
-    `;
-    return el;
+  // FINAL: Programmatic PDF (no DOM/html2canvas)
+// Requires: jsPDF UMD + AutoTable (see script tag above)
+async function downloadPDF(){
+  const { jsPDF } = (window.jspdf || {});
+  if (!jsPDF) {
+    alert('jsPDF is not loaded yet. Try again in a moment.');
+    return;
   }
 
-  // FINAL: capture the *real* #pdfSummary by temporarily making it visible
-async function downloadPDF(){
-  const data = computeSummary();
-  const src = buildPDFNode(data); // fills #pdfSummary with fresh HTML
+  const d = computeSummary();        // uses your existing function
+  const rows = visibleRows();        // uses your existing function
+  const ym  = ymFromInput();         // existing helper
+  const hotel = hotelSel.value;      // existing DOM ref
 
-  // Remember original inline styles to restore later
-  const orig = {
-    position: src.style.position,
-    left: src.style.left,
-    top: src.style.top,
-    width: src.style.width,
-    opacity: src.style.opacity,
-    zIndex: src.style.zIndex,
-    pointerEvents: src.style.pointerEvents,
-    visibility: src.style.visibility,
-    transform: src.style.transform
-  };
+  const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
+  const margin = 48;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
 
-  // Make the *real* node fully paintable but off-screen
-  Object.assign(src.style, {
-    position: 'fixed',
-    left: '-10000px',
-    top: '0',
-    width: '800px',
-    opacity: '1',           // IMPORTANT: fully visible to renderer
-    visibility: 'visible',
-    pointerEvents: 'auto',
-    zIndex: '0',
-    transform: 'none',
-    background: '#ffffff'
-  });
+  doc.setLineHeightFactor(1.25);
 
-  // Allow fonts/layout to settle
+  // Header bar
+  doc.setFillColor(52,73,94);
+  doc.rect(0,0,pageW,72,'F');
+
+  // Optional logo (you already persist this as base64)
   try {
-    await new Promise(r => requestAnimationFrame(r));
-    if (document.fonts && document.fonts.ready) {
-      await document.fonts.ready;
+    if (logoDataUrl) {
+      // 120×30-ish looks good in the bar
+      doc.addImage(logoDataUrl, 'PNG', margin, 18, 120, 36, undefined, 'FAST');
     }
-    await new Promise(r => setTimeout(r, 60));
   } catch {}
 
-  // Sanity: ensure we have measurable size before capture
-  const w = src.scrollWidth || src.getBoundingClientRect().width;
-  const h = src.scrollHeight || src.getBoundingClientRect().height;
-  if (!w || !h) {
-    // Restore styles and abort early
-    Object.assign(src.style, orig);
-    alert('PDF could not render because the summary measured 0×0. Check console.');
-    console.warn('pdfSummary measured size:', {w, h, rect: src.getBoundingClientRect()});
-    return;
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(255,255,255);
+  const titleX = logoDataUrl ? (margin + 130) : margin;
+  doc.text(`OTB Pickup — ${hotel} — ${ym}`, titleX, 46);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, pageW - margin, 46, { align: 'right' });
+
+  // --- KPI blocks (use AutoTable, like your working file) ---
+  let y = 96;
+  doc.setTextColor(44,62,80);
+
+  // Pickup vs baseline
+  {
+    const head = [['Metric','Value']];
+    const body = [
+      ['Rooms Pickup', (d.pRooms>=0?'+':'') + (Number.isFinite(d.pRooms)? d.pRooms.toLocaleString('en-US') : '—')],
+      ['Revenue Pickup', (d.pRev>=0?'+':'') + (Number.isFinite(d.pRev)? d.pRev.toLocaleString('en-US', {style:'currency', currency:'USD'}) : '—')],
+      ['Baseline', d.baselineLabel || '—']
+    ];
+    doc.autoTable({
+      head, body, startY: y, theme: 'grid',
+      styles: { fontSize:10, cellPadding:6, lineColor:[220,225,230], lineWidth:0.75, overflow:'linebreak' },
+      headStyles: { fillColor:[52,152,219], textColor:255, fontStyle:'bold', fontSize:10 },
+      margin: { left: margin, right: margin },
+      tableWidth: (pageW - margin*2)/2 - 8
+    });
   }
 
-  const { jsPDF } = (window.jspdf || {});
-  if (!jsPDF || !window.html2canvas) {
-    Object.assign(src.style, orig);
-    alert('PDF libraries not ready yet. Please try again in a moment.');
-    return;
+  // Additional KPIs (next to it)
+  let rightY = y;
+  {
+    const occText = (d.occPct==null) ? '—' : `${d.occPct.toFixed(2)}% (vs ${ (d.roomsPhys||0).toLocaleString('en-US') } × ${ d.dim||0 } days)`;
+    const head = [['Metric','Value']];
+    const body = [
+      ['Month ADR (Act+OTB)', (d.monthADR==null)?'—':d.monthADR.toFixed(2)],
+      ['Occupancy % (Act+OTB)', occText],
+      ['Remaining OTB Rooms', (d.otbRooms||0).toLocaleString('en-US')],
+      ['Remaining OTB Rev', (d.otbRev||0).toLocaleString('en-US', {style:'currency', currency:'USD'})]
+    ];
+    doc.autoTable({
+      head, body, startY: rightY, theme: 'grid',
+      styles: { fontSize:10, cellPadding:6, lineColor:[220,225,230], lineWidth:0.75, overflow:'linebreak' },
+      headStyles: { fillColor:[52,152,219], textColor:255, fontStyle:'bold', fontSize:10 },
+      margin: { left: margin + (pageW - margin*2)/2 + 8, right: margin },
+      tableWidth: (pageW - margin*2)/2 - 8
+    });
+    rightY = doc.lastAutoTable.finalY;
   }
 
-  const fname = `Pickup_Summary_${data.hotel}_${data.ym}.pdf`;
+  y = Math.max(doc.lastAutoTable.finalY, rightY) + 12;
 
-  try {
-    // Preferred HTML → vector path
-    const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
-    await pdf.html(src, {
-      x: 36,
-      y: 36,
-      width: 540,
-      windowWidth: Math.max(1080, w),  // help rendering large content
-      autoPaging: 'text',
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false
+  // Month pickup vs first upload
+  {
+    const head = [['Metric','Reference','Amount']];
+    const body = [
+      ['First Upload', d.firstSnapDate || '—', d.firstSnapTotal==null?'—':d.firstSnapTotal.toLocaleString('en-US',{style:'currency',currency:'USD'})],
+      ['Current Month Total', '—', d.monthCurrentTotal==null?'—':d.monthCurrentTotal.toLocaleString('en-US',{style:'currency',currency:'USD'})],
+      ['Pickup (Month vs First)', '—', d.monthPickup==null?'—':((d.monthPickup>=0?'+':'') + d.monthPickup.toLocaleString('en-US',{style:'currency',currency:'USD'}))]
+    ];
+    doc.autoTable({
+      head, body, startY: y, theme: 'grid',
+      styles: { fontSize:10, cellPadding:6, lineColor:[220,225,230], lineWidth:0.75, overflow:'linebreak' },
+      headStyles: { fillColor:[52,152,219], textColor:255, fontStyle:'bold', fontSize:10 },
+      margin: { left: margin, right: margin }
+    });
+    y = doc.lastAutoTable.finalY + 12;
+  }
+
+  // MTD productivity
+  {
+    const head = [['Metric','Value']];
+    const hp = (d.mtdHPOR==null)?'—':d.mtdHPOR.toFixed(2);
+    const mp = (d.mtdMPOR==null)?'—':(d.mtdMPOR.toFixed(2) + ' min');
+    const mv = (d.mtdMPORVar==null)?'—':((d.mtdMPORVar>=0?'+':'') + d.mtdMPORVar.toFixed(2) + ' min');
+    const labor = `${((d.mtdSal||0)+(d.mtdStr||0)).toFixed(2)} (sal ${ (d.mtdSal||0).toFixed(2) } / str ${ (d.mtdStr||0).toFixed(2) })`;
+    const cleaned = Math.max(0,(d.mtdCO||0)+(d.mtdSO||0)-(d.mtdDND||0));
+    const hkLine = `${(d.mtdHKHrs||0).toFixed(2)} hrs — ${cleaned.toLocaleString('en-US')} cleaned (CO ${ (d.mtdCO||0).toLocaleString('en-US') } / SO ${ (d.mtdSO||0).toLocaleString('en-US') } / DND ${ (d.mtdDND||0).toLocaleString('en-US') })`;
+
+    const body = [
+      ['MTD HPOR', hp],
+      ['MTD MPOR', mp],
+      ['MPOR Var vs 25m', mv],
+      ['Labor Hours (MTD)', labor],
+      ['HK & Rooms (MTD)', hkLine]
+    ];
+    doc.autoTable({
+      head, body, startY: y, theme: 'grid',
+      styles: { fontSize:10, cellPadding:6, lineColor:[220,225,230], lineWidth:0.75, overflow:'linebreak' },
+      headStyles: { fillColor:[52,152,219], textColor:255, fontStyle:'bold', fontSize:10 },
+      margin: { left: margin, right: margin }
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  }
+
+  // Detail grid (range-limited rows you already show in the UI)
+  {
+    const head = [[
+      'Date','Status','Rooms','ADR','Room Rev',
+      'Sal Hrs','Str Hrs','Tot Hrs','HPOR','Δ Rooms','Δ Rev'
+    ]];
+
+    const body = rows.map(r=>{
+      const hrs = getHours(r.date);
+      const tot = (hrs.sal||0) + (hrs.str||0);
+      const hpor = (r.rooms && tot>0) ? (tot/r.rooms) : null;
+
+      const dRooms = (r.dRooms==null) ? '' : ((r.dRooms>=0?'+':'') + (r.dRooms||0).toLocaleString('en-US'));
+      const dRev = (r.dRev==null) ? '' : ((r.dRev>=0?'+':'') + (Number(r.dRev)||0).toLocaleString('en-US',{style:'currency',currency:'USD'}));
+
+      return [
+        r.date,
+        r.status||'',
+        (r.rooms==null)?'':(r.rooms).toLocaleString('en-US'),
+        (r.adr==null)?'':(Number(r.adr).toFixed(2)),
+        (r.rev==null)?'':((Number(r.rev)||0).toLocaleString('en-US',{style:'currency',currency:'USD'})),
+        hrs.sal ? hrs.sal.toFixed(2) : '',
+        hrs.str ? hrs.str.toFixed(2) : '',
+        tot ? tot.toFixed(2) : '',
+        (hpor==null)?'':hpor.toFixed(2),
+        dRooms,
+        dRev
+      ];
+    });
+
+    doc.autoTable({
+      head, body,
+      startY: y,
+      theme: 'grid',
+      styles: { fontSize:9, cellPadding:5, overflow:'linebreak', lineColor:[220,225,230], lineWidth:0.75, minCellHeight:14 },
+      headStyles: { fillColor:[52,152,219], textColor:255, fontStyle:'bold', fontSize:9 },
+      margin: { left: margin, right: margin },
+      columnStyles: {
+        0:{ cellWidth:72 },      // Date
+        1:{ cellWidth:54 },      // Status
+        2:{ cellWidth:54, halign:'right' }, // Rooms
+        3:{ cellWidth:54, halign:'right' }, // ADR
+        4:{ cellWidth:82, halign:'right' }, // Room Rev
+        5:{ cellWidth:58, halign:'right' }, // Sal Hrs
+        6:{ cellWidth:58, halign:'right' }, // Str Hrs
+        7:{ cellWidth:58, halign:'right' }, // Tot Hrs
+        8:{ cellWidth:50, halign:'right' }, // HPOR
+        9:{ cellWidth:60, halign:'right' }, // Δ Rooms
+        10:{ cellWidth:82, halign:'right' } // Δ Rev
+      },
+      didDrawPage: ({ pageNumber })=>{
+        doc.setFontSize(9); doc.setTextColor(150);
+        doc.text(`Page ${pageNumber}`, pageW - margin, pageH - 16, {align:'right'});
       }
     });
-    pdf.save(fname);
-  } catch (err) {
-    console.warn('jsPDF.html failed, using html2canvas fallback:', err);
-    try {
-      // Fallback: rasterize the visible #pdfSummary
-      const canvas = await window.html2canvas(src, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false
-      });
-
-      const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 36;
-      const drawW = pageW - margin*2;
-      const scale = drawW / canvas.width;
-      const drawHpx = Math.floor((pageH - margin*2) / scale);
-
-      let ySlice = 0;
-      while (ySlice < canvas.height) {
-        if (ySlice > 0) pdf.addPage();
-        const slice = document.createElement('canvas');
-        slice.width = canvas.width;
-        slice.height = Math.min(drawHpx, canvas.height - ySlice);
-        const ctx = slice.getContext('2d');
-        ctx.drawImage(canvas, 0, ySlice, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
-        const img = slice.toDataURL('image/png');
-        pdf.addImage(img, 'PNG', margin, margin, drawW, slice.height * scale, '', 'FAST');
-        ySlice += slice.height;
-      }
-
-      pdf.save(fname);
-    } catch (e2) {
-      console.error('html2canvas fallback also failed:', e2);
-      alert('Failed to render PDF. See console for details.');
-    }
-  } finally {
-    // Always restore original styles
-    Object.assign(src.style, orig);
+    y = doc.lastAutoTable.finalY + 16;
   }
+
+  // Signature line
+  if (y + 48 > pageH - 56) { doc.addPage('letter','landscape'); y = 56; }
+  doc.setDrawColor(180);
+  doc.line(margin, pageH - 92, margin + 260, pageH - 92);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(100);
+  doc.text('Signature (Prepared By)', margin, pageH - 76);
+
+  const fname = `Pickup_Summary_${hotel}_${ym}.pdf`;
+  doc.save(fname);
 }
 
   // ---------- SHARE / EXPORT / IMPORT
