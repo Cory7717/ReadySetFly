@@ -599,7 +599,7 @@
           '<td class="center"><button class="btn ghost small" data-act="income-del" data-id="'+inc.id+'">Delete</button></td>'+
         '</tr>';
 
-        // calc drawer row
+               // calc drawer row
         var colSpan = months.length + 4; // Source + months + Total + Calc + Actions
         html += '<tr data-calc-row="'+inc.id+'" style="display:none"><td colspan="'+colSpan+'">'+
           '<div class="calc-drawer">'+
@@ -632,7 +632,7 @@
               '<div><div class="note">State Tax % (flat)</div>'+
                 '<input class="inp num" type="text" inputmode="decimal" placeholder="0" value="'+((inc.calc&&inc.calc.stateRate)||0)+'" data-calc="state" data-id="'+inc.id+'"></div>'+
             '</div>'+
-            <div class="calc-actions">'+
+            '<div class="calc-actions">'+
               '<span class="pill" data-calc-out="'+inc.id+'">Gross/mo: — • Net/mo: —</span>'+
               '<button class="btn ok" data-apply="gross-active" data-id="'+inc.id+'">Apply GROSS → Active</button>'+
               '<button class="btn ok" data-apply="gross-rest" data-id="'+inc.id+'">GROSS → Rest</button>'+
@@ -645,6 +645,7 @@
             '</div>'+
           '</div>'+
         '</td></tr>';
+
       }
       html += '</tbody>';
       html += '<tfoot><tr><td class="right">Monthly Total</td>'+
