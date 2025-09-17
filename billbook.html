@@ -6,60 +6,73 @@
 <title>Bill Book — Personal Finance (Local Only)</title>
 <style>
   :root{
-    --ink:#1f2937; --ink-soft:#6b7280; --bg:#0b1020; --card:#11172a; --muted:#0e1426;
+    --ink:#111827; --ink-soft:#6b7280; --bg:#ffffff; --card:#11172a; --muted:#0e1426;
     --brand:#60a5fa; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --ring:#93c5fd;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0; font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial;
-       color:var(--ink); background:linear-gradient(180deg,#0b1020,#0b1020 40%,#0d1430)}
-  .wrap{max-width:1200px; margin:24px auto; padding:0 16px}
-  h1{font-size:22px; color:#e5e7eb; margin:0 0 12px}
-  .sub{color:#a3a3a3; font-size:12px; margin-bottom:16px}
-  .bar{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:14px}
-  .card{background:var(--card); border:1px solid #1f2640; border-radius:14px; padding:14px}
-  .grid{display:grid; gap:14px}
-  .grid.cols-2{grid-template-columns:1fr 1fr}
-  .grid.cols-3{grid-template-columns:repeat(3,1fr)}
-  .grid.cols-4{grid-template-columns:repeat(4,1fr)}
+  body{
+    margin:0;
+    font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    color:var(--ink);
+    background:var(--bg); /* WHITE background for contrast outside tables */
+  }
+  .wrap{max-width:1200px; margin:16px auto; padding:0 12px}
+  h1{font-size:clamp(20px,5vw,26px); color:var(--ink); margin:8px 0; text-align:center}
+  .sub{text-align:center; color:var(--ink-soft); font-size:12px; margin-bottom:12px}
+
+  /* Controls */
+  .bar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px}
   .btn{appearance:none; border:1px solid #22305a; background:#0f1631; color:#e5e7eb;
-       padding:8px 12px; border-radius:10px; cursor:pointer}
+       padding:10px 12px; border-radius:12px; cursor:pointer; font-size:14px; flex-shrink:0}
   .btn:hover{border-color:#2c3f7a}
-  .btn.ghost{background:transparent}
   .btn.brand{background:linear-gradient(180deg,#1a4dc5,#0f3b9a); border-color:#1b3e88}
   .btn.ok{background:#0f2d1a; border-color:#1b5e2b}
   .btn.bad{background:#2d1416; border-color:#7a2b31}
   .btn.warn{background:#2d2610; border-color:#7a632b}
-  .pill{padding:4px 8px; border-radius:999px; font-size:12px; color:#d1d5db; background:#0e152c; border:1px solid #22305a}
-  .inp{width:100%; padding:8px 10px; border-radius:10px; border:1px solid #1f2a4d; background:#0e152c; color:#e5e7eb}
-  .inp:focus{outline:none; border-color:var(--ring); box-shadow:0 0 0 3px rgba(147,197,253,.2)}
-  .tbl{width:100%; border-collapse:separate; border-spacing:0}
+  .pill{padding:6px 10px; border-radius:999px; font-size:12px; color:#d1d5db; background:#0e152c; border:1px solid #22305a}
+  .inp{width:100%; padding:10px 12px; border-radius:12px; border:1px solid #1f2a4d; background:#0e152c; color:#e5e7eb; font-size:14px}
+  .inp:focus{outline:none; border-color:var(--ring); box-shadow:0 0 0 3px rgba(147,197,253,.25)}
+
+  /* Layout */
+  .grid{display:grid; gap:12px}
+  .grid.cols-2{grid-template-columns:1fr 1fr}
+  .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+
+  /* Cards (keep tables dark inside) */
+  .card{background:var(--card); border:1px solid #1f2640; border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.08)}
+
+  /* Tables (keep existing dark colors) */
+  .tbl{width:100%; border-collapse:separate; border-spacing:0; font-size:14px}
   .tbl th,.tbl td{border-bottom:1px dashed #263057; padding:10px; color:#d1d5db}
-  .tbl th{position:sticky; top:0; background:linear-gradient(180deg,#0e152c,#0d142a); z-index:2}
-  .tbl tfoot td{border-top:1px solid #2a375f; font-weight:600}
-  .muted{color:#9ca3af}
-  .right{text-align:right}
-  .center{text-align:center}
-  .chip{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid #22305a; background:#0e152c; color:#e5e7eb}
-  .danger{color:#fecaca}
-  .due-bad{background:#261216; border-color:#7a2b31}
-  .scroll-x{overflow:auto}
-  .row-controls{display:flex; gap:6px; align-items:center}
-  .small{font-size:12px}
-  .note{color:#cbd5e1; font-size:12px}
-  .section-title{color:#e5e7eb; font-size:16px; margin:0 0 10px}
-  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
-  .kpi{background:#0e152c; border:1px solid #22305a; border-radius:12px; padding:12px}
+  .tbl th{position:sticky; top:0; background:linear-gradient(180deg,#0e152c,#0d142a); z-index:2; font-size:12px}
+  .tbl input{font-size:14px}
+
+  /* Horizontal scroll helpers for mobile */
+  .scroll-x{overflow-x:auto; -webkit-overflow-scrolling:touch}
+
+  /* KPI cards */
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px}
+  .kpi{background:#0e152c; border:1px solid #22305a; border-radius:12px; padding:10px; text-align:center}
   .kpi .label{color:#9ca3af; font-size:12px}
-  .kpi .val{color:#e5e7eb; font-size:18px; font-weight:600}
-  .switch{display:inline-flex; gap:8px; align-items:center}
-  .switch input{accent-color:#3b82f6}
-  .squeeze{max-height:58vh; overflow:auto; border-radius:12px; border:1px solid #1f2640}
-  .tooltip{border-bottom:1px dotted #9ca3af; cursor:help}
-  .file{display:inline-block}
-  .divider{height:1px; background:#1f2640; margin:12px 0}
-  .month-chip{cursor:pointer}
-  .month-chip.active{background:#11306a; border-color:#2c4a8a}
+  .kpi .val{color:#e5e7eb; font-size:clamp(16px,5vw,20px); font-weight:700}
+
+  /* Mobile-first improvements */
+  @media (max-width:900px){
+    .grid.cols-2{grid-template-columns:1fr}
+    .bar{justify-content:center}
+    .wrap{padding:0 10px}
+  }
+  @media (max-width:600px){
+    .btn{font-size:15px; padding:12px 14px}
+    .inp{font-size:16px; padding:12px 14px}
+    .tbl{font-size:15px}
+    .tbl th,.tbl td{padding:12px}
+    /* Larger checkboxes for touch */
+    input[type=checkbox]{width:22px; height:22px}
+    /* Make pills easier to tap */
+    .pill{padding:8px 12px}
+  }
 </style>
 </head>
 <body>
