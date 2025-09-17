@@ -15,7 +15,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 .header{background:linear-gradient(135deg,var(--dark1),var(--brand1));color:#fff;padding:24px;text-align:center}
 .header h1{font-size:2em;margin-bottom:6px;text-shadow:2px 2px 4px rgba(0,0,0,.25)}
 .toolbar{position:sticky;top:0;z-index:5;background:#f9fbff;border-bottom:1px solid #e9edf3;padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-.btn{border:1px solid #dbe3ee;background:#fff;color:#1f2d3d;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;transition:.2s transform,.2s box-shadow}
+.btn{border:1px solid #dbe3ee;background:#fff;color:#1f2d3d;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600;transition:.2s transform,.2s box-shadow;min-height:40px}
 .btn.primary{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;border:none}
 .btn.danger{background:#fff;border-color:#f1c1c1;color:#b10d0d}
 .btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.08)}
@@ -28,14 +28,13 @@ input[type="file"]{display:none}
 .notice.critical{background:#ffe9e9;border-top-color:#f3b0b0;color:#861b1b}
 .field-row{display:flex;flex-wrap:wrap;gap:12px;padding:14px 16px;background:#f7faff;border-bottom:1px solid #edf2f7}
 .field-row label{font-size:13px;color:#34495e}
-.field-row input,.field-row select,.field-row textarea{padding:8px;border:1px solid #dbe3ee;border-radius:8px;background:#fff}
+.field-row input,.field-row select,.field-row textarea{padding:10px;border:1px solid #dbe3ee;border-radius:8px;background:#fff}
 .field{display:flex;flex-direction:column;gap:6px;min-width:200px}
 .table-container{overflow:auto;padding:14px}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{padding:9px 8px;text-align:left;border:1px solid var(--grid);white-space:nowrap;vertical-align:top}
 th{background:linear-gradient(135deg,#f8f9fa,#e9ecef);font-weight:800;color:#2c3e50;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
-.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #e5e7eb;background:#f5f7fb;color: var(--ink);
-}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #e5e7eb;background:#f5f7fb;color: var(--ink);}
 .status-ok{background:var(--posBg);color:var(--pos);border-color:#b8e0b2}
 .status-attn{background:var(--warnBg);color:#856404;border-color:#f2df8a}
 .status-bad{background:var(--negBg);color:#721c24;border-color:#f4b6bc}
@@ -49,11 +48,18 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 .req-chip{display:inline-block;margin-top:6px;font-size:12px;color:#861b1b;background:#ffe1e1;border:1px solid #f3b0b0;border-radius:999px;padding:2px 8px}
 .add-row td{background:#f9fbff;border-top:none;border-bottom:1px solid var(--grid)}
 .add-row .btn{width:100%}
-.table-footer{display:flex;justify-content:flex-end;gap:10px;padding:10px 14px;border-top:1px solid #edf2f7;background:#fafcff}
+.table-footer{display:flex;justify-content:space-between;gap:10px;padding:10px 14px;border-top:1px solid #edf2f7;background:#fafcff}
+.footer-actions{display:flex;gap:10px;flex-wrap:wrap}
+
+/* Tablet / touch friendliness */
 @media (max-width: 900px){
   .field{min-width:100%}
-  .btn{padding:10px 14px}
+  .btn{padding:12px 16px}
   th,td{min-width:100px}
+}
+@media (pointer:coarse){
+  .btn{min-height:44px}
+  select,input,textarea{font-size:16px} /* prevent iOS zoom */
 }
 </style>
 </head>
@@ -71,6 +77,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     <label class="pill"><input id="autoSave" type="checkbox" checked/> Auto-save</label>
     <button class="btn" id="submitBtn" title="Validate & archive this inventory">Submit Inventory</button>
     <button class="btn" id="pdfBtn">Download Inventory (PDF)</button>
+    <!-- NEW: global add item -->
+    <button class="btn primary" id="addItemBtn">+ Add Item</button>
   </div>
 
   <div class="content">
@@ -90,7 +98,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         </div>
         <div class="field">
           <label>Inventory Date</label>
-          <input type="date" id="invDate"/>
+          <input type="date" id="invDate" placeholder="YYYY-MM-DD"/>
         </div>
         <div class="field">
           <label>Conducted By</label>
@@ -178,7 +186,12 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         </table>
       </div>
       <div class="table-footer">
-        <button class="btn" id="saveBtn">Save</button>
+        <div class="footer-actions">
+          <button class="btn primary" id="addItemBtnFooter">+ Add Item</button>
+        </div>
+        <div class="footer-actions">
+          <button class="btn" id="saveBtn">Save</button>
+        </div>
       </div>
     </div>
   </div>
@@ -186,6 +199,34 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 
 <script>
 (()=>{
+
+  /* -------------------------
+     Robust UUID (mobile safe)
+  ------------------------- */
+  (function ensureUUID(){
+    try{
+      if(!globalThis.crypto) globalThis.crypto = {};
+      if(typeof globalThis.crypto.randomUUID !== 'function'){
+        const rnd = () => (crypto.getRandomValues ? crypto.getRandomValues(new Uint8Array(1))[0] : Math.floor(Math.random()*256));
+        const hex = (n)=>n.toString(16).padStart(2,'0');
+        globalThis.crypto.randomUUID = function(){
+          const b = new Uint8Array(16);
+          if(crypto.getRandomValues) crypto.getRandomValues(b);
+          else for(let i=0;i<16;i++) b[i]=rnd();
+          b[6] = (b[6] & 0x0f) | 0x40; // version 4
+          b[8] = (b[8] & 0x3f) | 0x80; // variant
+          const h = Array.from(b,hex).join('');
+          return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+        };
+      }
+    }catch(e){ /* last-ditch fallback */ 
+      globalThis.crypto = globalThis.crypto || {};
+      globalThis.crypto.randomUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+        const r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8); return v.toString(16);
+      });
+    }
+  })();
+
   const qs=(s,r=document)=>r.querySelector(s);
   const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const STORAGE_KEY='maintInv_v2_working';
@@ -232,8 +273,10 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   }
 
   function saveLocal(show=true){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(workingPayload()));
-    if(show) flash('Saved.');
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(workingPayload()));
+      if(show) flash('Saved.');
+    }catch(e){ console.error(e); if(show) flash('Save failed.'); }
   }
 
   function loadLocal(){
@@ -296,16 +339,18 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     items.push(it);
     render();
     if(qs('#autoSave').checked) saveLocal(false);
+    flash('Item added.');
   }
 
   function addItemAfterId(id){
     const idx = items.findIndex(x=>x.id===id);
-    if(idx<0) return;
+    if(idx<0){ addItem(); return; }
     const it = defaultItem();
     items.splice(idx+1, 0, it);
     render();
     setTimeout(()=>{ const el = qs(`[data-bind="${it.id}:name"]`); el?.scrollIntoView({behavior:'smooth', block:'center'}); el?.focus(); },0);
     if(qs('#autoSave').checked) saveLocal(false);
+    flash('Item inserted.');
   }
 
   function removeItem(id){
@@ -313,6 +358,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     items = items.filter(x=>x.id!==id);
     render();
     if(qs('#autoSave').checked) saveLocal(false);
+    flash('Item removed.');
   }
 
   function onPhotoUpload(e, id){
@@ -431,15 +477,11 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       addRow.innerHTML = `<td colspan="14"><button class="btn primary" data-add-after="${it.id}">+ Add Item Below</button></td>`;
       tb.appendChild(addRow);
 
+      // photo input (can't delegate 'change' easily)
       tr.querySelector(`#photo_${it.id}`).addEventListener('change', e=>onPhotoUpload(e, it.id));
-      tr.querySelectorAll('[data-remove-photo]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const [id, idx] = btn.dataset.removePhoto.split(':');
-          removePhoto(id, Number(idx));
-        });
-      });
     }
 
+    // bind model updates
     qsa('[data-bind]').forEach(el=>{
       el.addEventListener('input', onBind);
       el.addEventListener('change', onBind);
@@ -448,13 +490,25 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       }
     });
 
-    qsa('[data-add-after]').forEach(btn=>{
-      btn.addEventListener('click', ()=> addItemAfterId(btn.dataset.addAfter));
-    });
+    updateTotalValueChip();
+    updateChangeNotice();
+  }
 
-    qsa('[data-del]').forEach(b=>b.addEventListener('click',()=>removeItem(b.dataset.del)));
-    qsa('[data-dup]').forEach(b=>b.addEventListener('click',()=>{
-      const base = items.find(x=>x.id===b.dataset.dup);
+  // Event delegation for robust mobile behavior
+  qs('#invBody').addEventListener('click', (ev)=>{
+    const t = ev.target;
+    // add after
+    const addBtn = t.closest('[data-add-after]');
+    if(addBtn){ addItemAfterId(addBtn.dataset.addAfter); return; }
+
+    // remove item
+    const delBtn = t.closest('[data-del]');
+    if(delBtn){ removeItem(delBtn.dataset.del); return; }
+
+    // duplicate
+    const dupBtn = t.closest('[data-dup]');
+    if(dupBtn){
+      const base = items.find(x=>x.id===dupBtn.dataset.dup);
       if(!base) return;
       const clone = JSON.parse(JSON.stringify(base));
       clone.id = crypto.randomUUID();
@@ -463,24 +517,36 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       items.splice(idx+1,0,clone);
       render(); if(qs('#autoSave').checked) saveLocal(false);
       updateChangeNotice();
-    }));
+      flash('Item duplicated.');
+      return;
+    }
 
-    updateTotalValueChip();
-    updateChangeNotice();
-  }
+    // remove photo
+    const rmPhoto = t.closest('[data-remove-photo]');
+    if(rmPhoto){
+      const [id, idx] = rmPhoto.dataset.removePhoto.split(':');
+      removePhoto(id, Number(idx));
+      return;
+    }
+  });
 
   function onBind(e){
-    const [id, field] = e.target.dataset.bind?.split(':')||[];
-    if(id){
-      const it = items.find(x=>x.id===id);
-      if(it){
-        let val = e.target.type==='checkbox' ? e.target.checked : e.target.value;
-        if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
-        it[field] = val;
-        if(field==='qty' || field==='estimatedValue'){ updateTotalValueChip(); }
-        if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox' || e.target.type === 'date') { render(); }
-      }
-    }
+    const target = e.target;
+    const ds = target.dataset.bind || '';
+    const parts = ds.split(':');
+    if(parts.length<2) return;
+    const [id, field] = parts;
+
+    const it = items.find(x=>x.id===id);
+    if(!it) return;
+
+    let val = target.type==='checkbox' ? target.checked : target.value;
+    if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
+    it[field] = val;
+
+    if(field==='qty' || field==='estimatedValue'){ updateTotalValueChip(); }
+    if (target.tagName === 'SELECT' || target.type === 'checkbox' || target.type === 'date') { render(); }
+
     if(qs('#autoSave').checked) saveLocal(false);
   }
 
@@ -565,7 +631,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       doc.setFont('helvetica','bold'); doc.setFontSize(13);
       const propIdWrapped = doc.splitTextToSize(`Property: ${propId}`, pageWidth - margin*2);
       doc.text(propIdWrapped, margin, y);
-      y += propIdWrapped.length*14; // line height estimate
+      y += propIdWrapped.length*14;
     }
 
     doc.setFont('helvetica','normal'); doc.setFontSize(12);
@@ -644,7 +710,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y += 42;
     }
 
-    /* Inventory table: photo-left, 2-row cards */
+    /* Inventory table */
     const all = items;
     const head = [['Photo','Name','Location','Model','Serial','Qty','Est. Value','Line Total']];
     const body = [];
@@ -725,7 +791,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       }
     });
 
-    // Optional photo gallery
+    // Photo gallery
     let py = doc.lastAutoTable.finalY + 24;
     if(py + 60 > pageHeight){ doc.addPage('letter','landscape'); py = 56; }
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
@@ -780,6 +846,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     flash('PDF downloaded.');
   }
 
+  // Top-level controls
   qs('#saveBtn').addEventListener('click', ()=>saveLocal(true));
   qs('#loadBtn').addEventListener('click', loadLocal);
   qs('#exportJsonBtn').addEventListener('click', exportJSON);
@@ -798,6 +865,10 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     render(); updateChangeNotice(); flash('Reset.');
   });
 
+  // NEW: global add buttons
+  qs('#addItemBtn').addEventListener('click', ()=>addItem());
+  qs('#addItemBtnFooter').addEventListener('click', ()=>addItem());
+
   ['#searchTxt','#fCondition','#fStatus','#fLocation'].forEach(sel=>{
     qs(sel).addEventListener('input', render);
     qs(sel).addEventListener('change', render);
@@ -812,8 +883,10 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     qs(sel).addEventListener('input',  ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
   });
 
+  // Initial load + seed item
   loadLocal();
   if(items.length===0){ addItem({name:'Boiler Pump', location:'Boiler Room'}); }
+
 })();
 </script>
 </body>
