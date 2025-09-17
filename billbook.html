@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bill Book — Personal Finance (Local Only)</title>
+<style>
+  :root{
+    --ink:#1f2937; --ink-soft:#6b7280; --bg:#0b1020; --card:#11172a; --muted:#0e1426;
+    --brand:#60a5fa; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --ring:#93c5fd;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0; font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+       color:var(--ink); background:linear-gradient(180deg,#0b1020,#0b1020 40%,#0d1430)}
+  .wrap{max-width:1200px; margin:24px auto; padding:0 16px}
+  h1{font-size:22px; color:#e5e7eb; margin:0 0 12px}
+  .sub{color:#a3a3a3; font-size:12px; margin-bottom:16px}
+  .bar{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:14px}
+  .card{background:var(--card); border:1px solid #1f2640; border-radius:14px; padding:14px}
+  .grid{display:grid; gap:14px}
+  .grid.cols-2{grid-template-columns:1fr 1fr}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+  .grid.cols-4{grid-template-columns:repeat(4,1fr)}
+  .btn{appearance:none; border:1px solid #22305a; background:#0f1631; color:#e5e7eb;
+       padding:8px 12px; border-radius:10px; cursor:pointer}
+  .btn:hover{border-color:#2c3f7a}
+  .btn.ghost{background:transparent}
+  .btn.brand{background:linear-gradient(180deg,#1a4dc5,#0f3b9a); border-color:#1b3e88}
+  .btn.ok{background:#0f2d1a; border-color:#1b5e2b}
+  .btn.bad{background:#2d1416; border-color:#7a2b31}
+  .btn.warn{background:#2d2610; border-color:#7a632b}
+  .pill{padding:4px 8px; border-radius:999px; font-size:12px; color:#d1d5db; background:#0e152c; border:1px solid #22305a}
+  .inp{width:100%; padding:8px 10px; border-radius:10px; border:1px solid #1f2a4d; background:#0e152c; color:#e5e7eb}
+  .inp:focus{outline:none; border-color:var(--ring); box-shadow:0 0 0 3px rgba(147,197,253,.2)}
+  .tbl{width:100%; border-collapse:separate; border-spacing:0}
+  .tbl th,.tbl td{border-bottom:1px dashed #263057; padding:10px; color:#d1d5db}
+  .tbl th{position:sticky; top:0; background:linear-gradient(180deg,#0e152c,#0d142a); z-index:2}
+  .tbl tfoot td{border-top:1px solid #2a375f; font-weight:600}
+  .muted{color:#9ca3af}
+  .right{text-align:right}
+  .center{text-align:center}
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid #22305a; background:#0e152c; color:#e5e7eb}
+  .danger{color:#fecaca}
+  .due-bad{background:#261216; border-color:#7a2b31}
+  .scroll-x{overflow:auto}
+  .row-controls{display:flex; gap:6px; align-items:center}
+  .small{font-size:12px}
+  .note{color:#cbd5e1; font-size:12px}
+  .section-title{color:#e5e7eb; font-size:16px; margin:0 0 10px}
+  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+  .kpi{background:#0e152c; border:1px solid #22305a; border-radius:12px; padding:12px}
+  .kpi .label{color:#9ca3af; font-size:12px}
+  .kpi .val{color:#e5e7eb; font-size:18px; font-weight:600}
+  .switch{display:inline-flex; gap:8px; align-items:center}
+  .switch input{accent-color:#3b82f6}
+  .squeeze{max-height:58vh; overflow:auto; border-radius:12px; border:1px solid #1f2640}
+  .tooltip{border-bottom:1px dotted #9ca3af; cursor:help}
+  .file{display:inline-block}
+  .divider{height:1px; background:#1f2640; margin:12px 0}
+  .month-chip{cursor:pointer}
+  .month-chip.active{background:#11306a; border-color:#2c4a8a}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Bill Book — Personal Finance (Local)</h1>
+    <div class="sub">Data is saved in your browser’s <strong>localStorage</strong>. No servers. You can export/import JSON anytime.</div>
+
+    <div class="bar">
+      <button id="addMonthBtn" class="btn brand">+ Add Month</button>
+      <button id="removeMonthBtn" class="btn ghost">Remove Last Month</button>
+      <span class="pill" id="monthCount"></span>
+      <span class="pill">Today: <span id="today"></span></span>
+      <span class="pill">Active Month: <span id="activeMonthLbl"></span></span>
+      <span class="pill">Autosave On</span>
+      <div style="flex:1"></div>
+      <button id="exportBtn" class="btn">Export JSON</button>
+      <label class="btn ghost file">Import JSON <input id="importInput" type="file" accept="application/json" style="display:none"></label>
+      <button id="resetBtn" class="btn bad">Reset (Clear Local)</button>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="section-title">Months</div>
+        <div id="monthsBar" class="bar" style="flex-wrap:wrap"></div>
+        <div class="note">Tip: Click a month to make it the active month for quick-entry and due-date highlighting.</div>
+      </div>
+      <div class="card">
+        <div class="section-title">Settings</div>
+        <div class="bar">
+          <label class="chip"><span>Hotel / Household Rooms (optional)</span> <input type="number" min="0" id="rooms" class="inp" style="width:120px"> </label>
+          <label class="chip"><span>Days in Active Month</span> <input type="number" min="28" max="31" id="daysInMonth" class="inp" style="width:90px"> </label>
+          <label class="chip"><span>Currency</span> 
+            <select id="currency" class="inp" style="width:120px">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="CAD">CAD</option>
+              <option value="AUD">AUD</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:14px">
+      <div class="card">
+        <div class="section-title">Income</div>
+        <div class="bar">
+          <button id="addIncome" class="btn ok">+ Add Income Source</button>
+        </div>
+        <div class="squeeze scroll-x">
+          <table class="tbl" id="incomeTbl"></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">Quick Totals (Active Month)</div>
+        <div class="kpis">
+          <div class="kpi"><div class="label">Income</div><div class="val" id="kpiIncome">$0</div></div>
+          <div class="kpi"><div class="label">Expenses</div><div class="val" id="kpiExpenses">$0</div></div>
+          <div class="kpi"><div class="label">Net</div><div class="val" id="kpiNet">$0</div></div>
+          <div class="kpi"><div class="label">Unpaid Bills</div><div class="val" id="kpiUnpaid">0</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="section-title">Expenses</div>
+      <div class="bar">
+        <button id="addExpense" class="btn ok">+ Add Expense</button>
+        <button id="markAllPaid" class="btn warn">Mark All Paid (Active Month)</button>
+        <label class="chip"><span>Filter</span> <input id="filterTxt" class="inp" placeholder="Type to filter by name…" style="width:220px"></label>
+      </div>
+      <div class="squeeze scroll-x">
+        <table class="tbl" id="expenseTbl"></table>
+      </div>
+      <div class="note" style="margin-top:8px">Overdue and unpaid items for the active month are highlighted.</div>
+    </div>
+
+  </div>
+
+<script>
+(function(){
+  // ---------- Utilities ----------
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const today = new Date();
+  const fmtMonth = (ym) => {
+    // ym: 'YYYY-MM'
+    const [y,m] = ym.split('-').map(Number);
+    const d = new Date(y, m-1, 1);
+    return d.toLocaleDateString(undefined,{month:'long', year:'numeric'});
+  };
+  const pad2 = n => String(n).padStart(2,'0');
+  const ymOf = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
+  const money = (n,curr) => new Intl.NumberFormat(undefined,{style:'currency',currency:curr}).format(+n||0);
+  const uid = () => Math.random().toString(36).slice(2,9);
+
+  // ---------- State ----------
+  const KEY = 'billbook.v1';
+  function defaultState(){
+    const now = new Date();
+    const cur = ymOf(now);
+    const prev = ymOf(new Date(now.getFullYear(), now.getMonth()-1, 1));
+    const next = ymOf(new Date(now.getFullYear(), now.getMonth()+1, 1));
+    return {
+      currency: 'USD',
+      months: [prev, cur, next],
+      activeMonth: cur,
+      rooms: 0,
+      daysInMonth: new Date(now.getFullYear(), now.getMonth()+1, 0).getDate(),
+      incomes: [
+        {id: uid(), name: "Cory's Wages", amounts: {[prev]: 0, [cur]: 0, [next]: 0}},
+        {id: uid(), name: "Amy's Wages",  amounts: {[prev]: 0, [cur]: 0, [next]: 0}}
+      ],
+      expenses: [
+        {id: uid(), name: 'Rent/Mortgage', dueDay: 1,  amounts: {[prev]: 0,[cur]: 0,[next]: 0}, paid: {}},
+        {id: uid(), name: 'Electric',      dueDay: 15, amounts: {[prev]: 0,[cur]: 0,[next]: 0}, paid: {}},
+        {id: uid(), name: 'Internet',      dueDay: 20, amounts: {[prev]: 0,[cur]: 0,[next]: 0}, paid: {}}
+      ]
+    };
+  }
+  let state = load() || defaultState();
+
+  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); renderAll(); }
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
+  function reset(){ localStorage.removeItem(KEY); state = defaultState(); renderAll(); }
+
+  // ---------- DOM refs ----------
+  const addMonthBtn = $('#addMonthBtn');
+  const removeMonthBtn = $('#removeMonthBtn');
+  const monthCount = $('#monthCount');
+  const monthsBar = $('#monthsBar');
+  const activeMonthLbl = $('#activeMonthLbl');
+  const todayLbl = $('#today');
+  const roomsInp = $('#rooms');
+  const daysInMonthInp = $('#daysInMonth');
+  const currencySel = $('#currency');
+  const addIncomeBtn = $('#addIncome');
+  const addExpenseBtn = $('#addExpense');
+  const markAllPaidBtn = $('#markAllPaid');
+  const filterTxt = $('#filterTxt');
+  const incomeTbl = $('#incomeTbl');
+  const expenseTbl = $('#expenseTbl');
+  const exportBtn = $('#exportBtn');
+  const importInput = $('#importInput');
+  const resetBtn = $('#resetBtn');
+
+  todayLbl.textContent = new Date().toLocaleDateString();
+
+  // ---------- Month mgmt ----------
+  addMonthBtn.addEventListener('click', ()=>{
+    const d = prompt('Add month (YYYY-MM), e.g., 2025-10');
+    if(!d) return;
+    if(!/^\d{4}-\d{2}$/.test(d)) return alert('Format must be YYYY-MM');
+    if(state.months.includes(d)) return alert('Month already exists.');
+    state.months.push(d);
+    // initialize values for new month
+    state.incomes.forEach(i=> i.amounts[d] = i.amounts[d] ?? 0);
+    state.expenses.forEach(x=> {
+      x.amounts[d] = x.amounts[d] ?? 0;
+      x.paid[d] = x.paid[d] ?? false;
+    });
+    save();
+  });
+  removeMonthBtn.addEventListener('click', ()=>{
+    if(!state.months.length) return;
+    const last = state.months[state.months.length-1];
+    if(!confirm(`Remove month ${fmtMonth(last)}?`)) return;
+    state.months.pop();
+    // keep data but it won’t show; or purge? we’ll keep to avoid accidental loss
+    if(state.activeMonth===last) state.activeMonth = state.months[state.months.length-1]||'';
+    save();
+  });
+
+  function setActiveMonth(m){ state.activeMonth=m; save(); }
+
+  // ---------- Income ----------
+  addIncomeBtn.addEventListener('click', ()=>{
+    state.incomes.push({id:uid(), name:'New Income', amounts:{}});
+    // fill per month
+    state.months.forEach(m=>{ state.incomes[state.incomes.length-1].amounts[m]=0; });
+    save();
+  });
+  function deleteIncome(id){ state.incomes = state.incomes.filter(i=>i.id!==id); save(); }
+
+  // ---------- Expenses ----------
+  addExpenseBtn.addEventListener('click', ()=>{
+    const d = {id:uid(), name:'New Expense', dueDay: 1, amounts:{}, paid:{}};
+    state.months.forEach(m=>{ d.amounts[m]=0; d.paid[m]=false; });
+    state.expenses.push(d); save();
+  });
+  function deleteExpense(id){ state.expenses = state.expenses.filter(x=>x.id!==id); save(); }
+  function markAllPaidActive(){ state.expenses.forEach(x=> x.paid[state.activeMonth]=true); save(); }
+
+  markAllPaidBtn.addEventListener('click', ()=>{ if(confirm('Mark all expenses paid for the active month?')) markAllPaidActive(); });
+  filterTxt.addEventListener('input', renderExpenses);
+
+  // ---------- Export / Import / Reset ----------
+  exportBtn.addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='billbook.json';
+    a.click();
+  });
+  importInput.addEventListener('change', async (e)=>{
+    const f = e.target.files[0]; if(!f) return;
+    try{
+      const text = await f.text();
+      const obj = JSON.parse(text);
+      if(!obj || !obj.months) throw new Error('Invalid file');
+      state = obj; save();
+    }catch(err){ alert('Import failed: '+err.message); }
+    importInput.value='';
+  });
+  resetBtn.addEventListener('click', ()=>{
+    if(confirm('Clear all local data and reset?')) reset();
+  });
+
+  // ---------- Rendering ----------
+  function renderMonths(){
+    monthsBar.innerHTML='';
+    state.months.forEach(m=>{
+      const b = document.createElement('button');
+      b.className = 'pill month-chip' + (m===state.activeMonth?' active':'');
+      b.textContent = fmtMonth(m);
+      b.title = m;
+      b.addEventListener('click', ()=> setActiveMonth(m));
+      monthsBar.appendChild(b);
+    });
+    monthCount.textContent = `${state.months.length} month(s)`;
+    activeMonthLbl.textContent = fmtMonth(state.activeMonth||'');
+  }
+
+  roomsInp.value = state.rooms||0;
+  roomsInp.addEventListener('change', ()=>{ state.rooms = +roomsInp.value||0; save(); });
+  daysInMonthInp.value = state.daysInMonth||30;
+  daysInMonthInp.addEventListener('change', ()=>{ state.daysInMonth = +daysInMonthInp.value||30; save(); });
+  currencySel.value = state.currency;
+  currencySel.addEventListener('change', ()=>{ state.currency = currencySel.value; renderAll(); save(); });
+
+  function renderIncome(){
+    const months = state.months;
+    let html = '';
+    html += '<thead><tr>'+
+            '<th style="min-width:220px">Source</th>'+
+            months.map(m=>`<th class="right">${fmtMonth(m)}<div class="small muted">Amount</div></th>`).join('')+
+            '<th class="right">Total</th><th class="center">Actions</th>'+
+            '</tr></thead>';
+    html += '<tbody>';
+    for(const inc of state.incomes){
+      const rowTotal = months.reduce((s,m)=> s + (+inc.amounts[m]||0), 0);
+      html += `<tr>
+        <td><input class="inp" value="${escapeHtml(inc.name)}" data-act="income-name" data-id="${inc.id}"></td>
+        ${months.map(m=>`
+          <td class="right"><input class="inp" type="number" step="0.01" value="${+inc.amounts[m]||0}" data-act="income-amt" data-id="${inc.id}" data-month="${m}"></td>
+        `).join('')}
+        <td class="right"><span>${money(rowTotal,state.currency)}</span></td>
+        <td class="center">
+          <div class="row-controls">
+            <button class="btn ghost small" data-act="income-del" data-id="${inc.id}">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody>';
+    // footer totals per month
+    html += '<tfoot><tr><td class="right">Monthly Total</td>'+
+            months.map(m=>`<td class="right">${money(state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0),0), state.currency)}</td>`).join('')+
+            `<td class="right">${money(sumAllIncome(), state.currency)}</td><td></td></tr></tfoot>`;
+
+    incomeTbl.innerHTML = html;
+    // wire events
+    incomeTbl.querySelectorAll('input[data-act="income-name"]').forEach(el=>{
+      el.addEventListener('input', ()=>{ const i = state.incomes.find(x=>x.id===el.dataset.id); if(i){ i.name = el.value; save(); }});
+    });
+    incomeTbl.querySelectorAll('input[data-act="income-amt"]').forEach(el=>{
+      el.addEventListener('change', ()=>{
+        const i = state.incomes.find(x=>x.id===el.dataset.id); if(i){ i.amounts[el.dataset.month] = +el.value||0; save(); }
+      });
+    });
+    incomeTbl.querySelectorAll('button[data-act="income-del"]').forEach(el=>{
+      el.addEventListener('click', ()=> deleteIncome(el.dataset.id));
+    });
+  }
+
+  function renderExpenses(){
+    const months = state.months;
+    const f = (filterTxt.value||'').toLowerCase();
+    let html = '';
+    html += '<thead><tr>'+
+            '<th style="min-width:220px">Expense</th>'+
+            '<th class="center">Due Day</th>'+
+            months.map(m=>`<th class="right">${fmtMonth(m)}<div class="small muted">Amount</div></th>`).join('')+
+            months.map(m=>`<th class="center">${fmtMonth(m)}<div class="small muted">Paid</div></th>`).join('')+
+            '<th class="right">Row Total</th>'+
+            '<th class="center">Adj %</th>'+
+            '<th class="center">Actions</th>'+
+            '</tr></thead>';
+    html += '<tbody>';
+
+    for(const ex of state.expenses){
+      if(f && !ex.name.toLowerCase().includes(f)) continue;
+      const rowTotal = months.reduce((s,m)=> s + (+ex.amounts[m]||0), 0);
+      const overdue = isOverdue(ex, state.activeMonth);
+      html += `<tr${overdue ? ' class="due-row"' : ''}>
+        <td${overdue? ' class="danger"':''}><input class="inp" value="${escapeHtml(ex.name)}" data-act="exp-name" data-id="${ex.id}"></td>
+        <td class="center"><input class="inp" type="number" min="1" max="31" value="${+ex.dueDay||1}" data-act="exp-due" data-id="${ex.id}" style="width:70px"></td>
+        ${months.map(m=>`<td class="right"><input class="inp" type="number" step="0.01" value="${+ex.amounts[m]||0}" data-act="exp-amt" data-id="${ex.id}" data-month="${m}"></td>`).join('')}
+        ${months.map(m=>`<td class="center"><input type="checkbox" ${ex.paid[m]? 'checked':''} data-act="exp-paid" data-id="${ex.id}" data-month="${m}"></td>`).join('')}
+        <td class="right">${money(rowTotal,state.currency)}</td>
+        <td class="center">
+          <div class="row-controls">
+            <input class="inp" type="number" step="0.1" placeholder="%" style="width:80px" data-act="exp-pct" data-id="${ex.id}">
+            <button class="btn small" data-act="exp-apply" data-id="${ex.id}">Apply</button>
+          </div>
+        </td>
+        <td class="center">
+          <div class="row-controls">
+            <button class="btn ghost small" data-act="exp-copy-active" data-id="${ex.id}">Copy → Active</button>
+            <button class="btn ghost small" data-act="exp-del" data-id="${ex.id}">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody>';
+
+    // footer totals
+    html += '<tfoot><tr><td class="right" colspan="2">Monthly Total</td>'+
+            months.map(m=>`<td class="right">${money(state.expenses.reduce((s,x)=> s+(+x.amounts[m]||0),0), state.currency)}</td>`).join('')+
+            months.map(m=>`<td class="center">${state.expenses.reduce((s,x)=> s + (x.paid[m]?1:0),0)}</td>`).join('')+
+            `<td class="right">${money(sumAllExpenses(), state.currency)}</td>`+
+            '<td></td><td></td></tr></tfoot>';
+
+    expenseTbl.innerHTML = html;
+
+    // wire
+    expenseTbl.querySelectorAll('input[data-act="exp-name"]').forEach(el=>{
+      el.addEventListener('input', ()=>{ const x = findExp(el.dataset.id); if(x){ x.name=el.value; save(); }});
+    });
+    expenseTbl.querySelectorAll('input[data-act="exp-due"]').forEach(el=>{
+      el.addEventListener('change', ()=>{ const x = findExp(el.dataset.id); if(x){ x.dueDay=clamp(+el.value,1,31); el.value=x.dueDay; save(); }});
+    });
+    expenseTbl.querySelectorAll('input[data-act="exp-amt"]').forEach(el=>{
+      el.addEventListener('change', ()=>{ const x = findExp(el.dataset.id); if(x){ x.amounts[el.dataset.month]= +el.value||0; save(); }});
+    });
+    expenseTbl.querySelectorAll('input[data-act="exp-paid"]').forEach(el=>{
+      el.addEventListener('change', ()=>{ const x = findExp(el.dataset.id); if(x){ x.paid[el.dataset.month]= el.checked; save(); }});
+    });
+    expenseTbl.querySelectorAll('button[data-act="exp-apply"]').forEach(el=>{
+      el.addEventListener('click', ()=>{ const x = findExp(el.dataset.id); if(!x) return; const pctEl = expenseTbl.querySelector(`input[data-act="exp-pct"][data-id="${x.id}"]`); const pct=+pctEl.value||0; adjustRowByPct(x, pct); pctEl.value=''; save(); });
+    });
+    expenseTbl.querySelectorAll('button[data-act="exp-copy-active"]').forEach(el=>{
+      el.addEventListener('click', ()=>{ const x = findExp(el.dataset.id); if(!x) return; const m=state.activeMonth; const val=+x.amounts[m]||0; state.months.forEach(mm=>{ x.amounts[mm]=val; }); save(); });
+    });
+    expenseTbl.querySelectorAll('button[data-act="exp-del"]').forEach(el=>{
+      el.addEventListener('click', ()=> deleteExpense(el.dataset.id));
+    });
+  }
+
+  function adjustRowByPct(exp, pct){
+    // pct can be + or - (e.g., 5 or -5)
+    const f = 1 + (pct/100);
+    state.months.forEach(m=>{ exp.amounts[m] = round2((+exp.amounts[m]||0)*f); });
+  }
+
+  function isOverdue(exp, ym){
+    if(!ym) return false;
+    const [y,m] = ym.split('-').map(Number);
+    const due = new Date(y, m-1, exp.dueDay||1);
+    const now = new Date();
+    if(now < new Date(y, m-1, 1) || now > new Date(y, m-1, 31)) return false; // only flag for current calendar month
+    return (now.getDate() > (exp.dueDay||1)) && !exp.paid[ym];
+  }
+
+  function sumAllIncome(){ return state.months.reduce((s,m)=> s + state.incomes.reduce((t,i)=> t+(+i.amounts[m]||0),0), 0); }
+  function sumAllExpenses(){ return state.months.reduce((s,m)=> s + state.expenses.reduce((t,x)=> t+(+x.amounts[m]||0),0), 0); }
+
+  function findExp(id){ return state.expenses.find(x=>x.id===id); }
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function round2(n){ return Math.round(n*100)/100; }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
+
+  function renderKPIs(){
+    const m = state.activeMonth;
+    const inc = state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0), 0);
+    const exp = state.expenses.reduce((s,x)=> s+(+x.amounts[m]||0), 0);
+    const unpaid = state.expenses.reduce((s,x)=> s + (x.paid[m]?0:1), 0);
+    $('#kpiIncome').textContent = money(inc, state.currency);
+    $('#kpiExpenses').textContent = money(exp, state.currency);
+    $('#kpiNet').textContent = money(inc-exp, state.currency);
+    $('#kpiUnpaid').textContent = unpaid;
+  }
+
+  function renderAll(){
+    renderMonths();
+    renderIncome();
+    renderExpenses();
+    renderKPIs();
+  }
+
+  // initial
+  renderAll();
+})();
+</script>
+</body>
+</html>
