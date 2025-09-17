@@ -21,7 +21,7 @@
     margin:0;
     font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial;
     color:var(--ink);
-    background:var(--bg); /* keep WHITE background outside tables */
+    background:var(--bg);
   }
 
   .wrap{max-width:1200px; margin:16px auto; padding:0 12px}
@@ -46,6 +46,13 @@
     background:#fff; color:#111827; font-size:14px
   }
   .inp:focus{outline:none; border-color:var(--ring); box-shadow:0 0 0 3px rgba(147,197,253,.35)}
+  /* Numeric fields: monospace + autosize */
+  .inp.num{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    min-width: 8ch; width:auto; max-width:none;
+    text-align:right; font-variant-numeric:tabular-nums;
+    display:inline-block; white-space:nowrap;
+  }
 
   /* Layout */
   .grid{display:grid; gap:12px}
@@ -58,16 +65,16 @@
   .note{color:var(--ink-soft); font-size:12px}
 
   /* Tables — softened for readability */
-  .tbl{width:100%; border-collapse:separate; border-spacing:0; font-size:14px}
-  .tbl th,.tbl td{padding:10px; color:#111827}
+  .tbl{width:100%; border-collapse:separate; border-spacing:0; font-size:14px; table-layout:auto}
+  .tbl th,.tbl td{padding:10px; color:#111827; vertical-align:middle}
   .tbl th{
     position:sticky; top:0; z-index:2; background:var(--thead); font-size:12px; text-align:left;
-    border-bottom:1px solid var(--border)
+    border-bottom:1px solid var(--border); white-space:nowrap;
   }
   .tbl td{border-bottom:1px solid var(--border)}
   .tbl tr:nth-child(even) td{background:var(--row-alt)}
   .tbl tbody tr:hover td{background:var(--row-hover)}
-  .tbl input{font-size:14px}
+  .tbl td.right{white-space:nowrap}
   .right{text-align:right}
   .center{text-align:center}
 
@@ -117,32 +124,18 @@
     <div class="grid cols-2">
       <div class="card">
         <div class="section-title">Months</div>
-        <div id="monthsBar" class="bar" style="flex-wrap:wrap"></div>
-        <div class="note">Tip: Click a month to make it the active month for quick-entry and due-date highlighting.</div>
-      </div>
-      <div class="card">
-        <div class="section-title">Settings</div>
+        <!-- Year & Month controls -->
         <div class="bar">
-          <label class="pill" style="display:flex;gap:8px;align-items:center;background:#f9fafb">
-            <span>Hotel / Household Rooms (optional)</span>
-            <input type="number" min="0" id="rooms" class="inp" style="width:120px">
-          </label>
-          <label class="pill" style="display:flex;gap:8px;align-items:center;background:#f9fafb">
-            <span>Days in Active Month</span>
-            <input type="number" min="28" max="31" id="daysInMonth" class="inp" style="width:90px">
-          </label>
-          <label class="pill" style="display:flex;gap:8px;align-items:center;background:#f9fafb">
-            <span>Currency</span>
-            <select id="currency" class="inp" style="width:120px">
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="GBP">GBP</option>
-              <option value="CAD">CAD</option>
-              <option value="AUD">AUD</option>
-            </select>
-          </label>
+          <select id="yearSelect" class="inp" style="max-width:120px"></select>
+          <select id="monthSelect" class="inp" style="max-width:180px"></select>
+          <button id="populateYearBtn" class="btn brand">Populate Year</button>
+          <button id="addRestBtn" class="btn">Add Rest of Year</button>
         </div>
+        <div id="monthsBar" class="bar" style="flex-wrap:wrap"></div>
+        <div class="note">Tip: Click a month chip or use the Month dropdown to set the active month.</div>
       </div>
+
+      <!-- Settings card removed per request -->
     </div>
 
     <div class="grid cols-2" style="margin-top:14px">
@@ -190,7 +183,6 @@
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
   const fmtMonth = (ym) => {
-    // ym: 'YYYY-MM'
     if(!ym) return '';
     const [y,m] = ym.split('-').map(Number);
     const d = new Date(y, m-1, 1);
@@ -198,22 +190,22 @@
   };
   const pad2 = n => String(n).padStart(2,'0');
   const ymOf = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
-  const money = (n,curr) => new Intl.NumberFormat(undefined,{style:'currency',currency:curr}).format(+n||0);
+  const ymFrom = (y,m) => `${y}-${pad2(m)}`;
+  const moneyFmt = (n,curr) => new Intl.NumberFormat(undefined,{style:'currency',currency:curr}).format(+n||0);
   const uid = () => Math.random().toString(36).slice(2,9);
+  const now = new Date();
 
   // ---------- State ----------
   const KEY = 'billbook.v1';
   function defaultState(){
-    const now = new Date();
     const cur = ymOf(now);
     const prev = ymOf(new Date(now.getFullYear(), now.getMonth()-1, 1));
     const next = ymOf(new Date(now.getFullYear(), now.getMonth()+1, 1));
     return {
+      year: now.getFullYear(),
       currency: 'USD',
       months: [prev, cur, next],
       activeMonth: cur,
-      rooms: 0,
-      daysInMonth: new Date(now.getFullYear(), now.getMonth()+1, 0).getDate(),
       incomes: [
         {id: uid(), name: "Cory's Wages", amounts: {[prev]: 0, [cur]: 0, [next]: 0}},
         {id: uid(), name: "Amy's Wages",  amounts: {[prev]: 0, [cur]: 0, [next]: 0}}
@@ -227,7 +219,6 @@
   }
   let state = load() || defaultState();
 
-  // CHANGED: allow saving with or without re-render to fix single-character typing issue
   function save(render = true){
     localStorage.setItem(KEY, JSON.stringify(state));
     if(render) renderAll();
@@ -242,9 +233,6 @@
   const monthsBar = $('#monthsBar');
   const activeMonthLbl = $('#activeMonthLbl');
   const todayLbl = $('#today');
-  const roomsInp = $('#rooms');
-  const daysInMonthInp = $('#daysInMonth');
-  const currencySel = $('#currency');
   const addIncomeBtn = $('#addIncome');
   const addExpenseBtn = $('#addExpense');
   const markAllPaidBtn = $('#markAllPaid');
@@ -254,8 +242,67 @@
   const exportBtn = $('#exportBtn');
   const importInput = $('#importInput');
   const resetBtn = $('#resetBtn');
+  const yearSelect = $('#yearSelect');
+  const monthSelect = $('#monthSelect');
+  const populateYearBtn = $('#populateYearBtn');
+  const addRestBtn = $('#addRestBtn');
 
   todayLbl.textContent = new Date().toLocaleDateString();
+
+  // ---------- Month/Year helpers ----------
+  function ensureActiveMonth(){
+    if(!state.activeMonth){
+      const y = state.year || now.getFullYear();
+      const guess = ymFrom(y, (y===now.getFullYear()? now.getMonth()+1 : 1));
+      state.activeMonth = state.months.includes(guess) ? guess : (state.months[0] || guess);
+    }
+  }
+
+  function populateYear(y){
+    state.year = +y;
+    state.months = [];
+    for(let m=1; m<=12; m++) state.months.push(ymFrom(+y,m));
+    // backfill structures
+    state.incomes.forEach(i=>{
+      if(!i.amounts) i.amounts={};
+      state.months.forEach(m=>{ if(i.amounts[m]==null) i.amounts[m]=0; });
+    });
+    state.expenses.forEach(x=>{
+      if(!x.amounts) x.amounts={};
+      if(!x.paid) x.paid={};
+      state.months.forEach(m=>{
+        if(x.amounts[m]==null) x.amounts[m]=0;
+        if(x.paid[m]==null) x.paid[m]=false;
+      });
+    });
+    state.activeMonth = ymFrom(+y,1);
+    save();
+  }
+
+  function addRestOfYear(){
+    const y = +yearSelect.value || state.year || now.getFullYear();
+    ensureActiveMonth();
+    const startM = state.activeMonth.startsWith(String(y)) ? +state.activeMonth.split('-')[1] : (y===now.getFullYear()? now.getMonth()+1 : 1);
+    for(let m=startM; m<=12; m++){
+      const key = ymFrom(y,m);
+      if(!state.months.includes(key)) state.months.push(key);
+    }
+    state.months.sort();
+    // backfill
+    state.incomes.forEach(i=>{
+      if(!i.amounts) i.amounts={};
+      state.months.forEach(m=>{ if(i.amounts[m]==null) i.amounts[m]=0; });
+    });
+    state.expenses.forEach(x=>{
+      if(!x.amounts) x.amounts={};
+      if(!x.paid) x.paid={};
+      state.months.forEach(m=>{
+        if(x.amounts[m]==null) x.amounts[m]=0;
+        if(x.paid[m]==null) x.paid[m]=false;
+      });
+    });
+    save();
+  }
 
   // ---------- Month mgmt ----------
   addMonthBtn.addEventListener('click', ()=>{
@@ -277,17 +324,22 @@
     const last = state.months[state.months.length-1];
     if(!confirm(`Remove month ${fmtMonth(last)}?`)) return;
     state.months.pop();
-    // keep data but it won’t show; or purge? we’ll keep to avoid accidental loss
     if(state.activeMonth===last) state.activeMonth = state.months[state.months.length-1]||'';
     save();
   });
 
   function setActiveMonth(m){ state.activeMonth=m; save(); }
 
+  // ---------- Auto-size numeric inputs ----------
+  function autoSizeInput(el){
+    // ch units are accurate with monospace; add a little padding
+    const len = (el.value || '').length;
+    el.style.width = Math.max(8, len + 2) + 'ch';
+  }
+
   // ---------- Income ----------
   addIncomeBtn.addEventListener('click', ()=>{
     state.incomes.push({id:uid(), name:'New Income', amounts:{}});
-    // fill per month
     state.months.forEach(m=>{ state.incomes[state.incomes.length-1].amounts[m]=0; });
     save();
   });
@@ -301,9 +353,25 @@
   });
   function deleteExpense(id){ state.expenses = state.expenses.filter(x=>x.id!==id); save(); }
   function markAllPaidActive(){ state.expenses.forEach(x=> x.paid[state.activeMonth]=true); save(); }
-
   markAllPaidBtn.addEventListener('click', ()=>{ if(confirm('Mark all expenses paid for the active month?')) markAllPaidActive(); });
   filterTxt.addEventListener('input', renderExpenses);
+
+  // ---------- Expense copy helpers ----------
+  function copyExpenseFromActive(ex, mode){
+    const src = state.activeMonth; if(!src) return;
+    const srcVal = +ex.amounts[src]||0;
+    if(mode==='next'){
+      const idx = state.months.indexOf(src);
+      if(idx>-1 && idx+1<state.months.length){
+        ex.amounts[state.months[idx+1]] = srcVal;
+      }
+    }else if(mode==='rest'){
+      let seen=false;
+      state.months.forEach(m=>{ if(m===src){ seen=true; return; } if(seen){ ex.amounts[m]=srcVal; }});
+    }else if(mode==='all'){
+      state.months.forEach(m=> ex.amounts[m]=srcVal);
+    }
+  }
 
   // ---------- Export / Import / Reset ----------
   exportBtn.addEventListener('click', ()=>{
@@ -323,11 +391,28 @@
     }catch(err){ alert('Import failed: '+err.message); }
     importInput.value='';
   });
-  resetBtn.addEventListener('click', ()=>{
-    if(confirm('Clear all local data and reset?')) reset();
-  });
+  resetBtn.addEventListener('click', ()=>{ if(confirm('Clear all local data and reset?')) reset(); });
 
   // ---------- Rendering ----------
+  function renderYearMonthControls(){
+    // Year select: prev, current, next two years
+    const yNow = now.getFullYear();
+    const years = [yNow-1, yNow, yNow+1, yNow+2];
+    yearSelect.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    if(!state.year) state.year = yNow;
+    yearSelect.value = state.year;
+
+    // Month select from state.months
+    ensureActiveMonth();
+    monthSelect.innerHTML = state.months.map(m=>`<option value="${m}">${fmtMonth(m)}</option>`).join('');
+    if(state.activeMonth) monthSelect.value = state.activeMonth;
+
+    yearSelect.onchange = () => { state.year = +yearSelect.value; save(false); };
+    monthSelect.onchange = () => { state.activeMonth = monthSelect.value; save(); };
+    populateYearBtn.onclick = () => populateYear(+yearSelect.value);
+    addRestBtn.onclick = addRestOfYear;
+  }
+
   function renderMonths(){
     monthsBar.innerHTML='';
     state.months.forEach(m=>{
@@ -340,14 +425,9 @@
     });
     monthCount.textContent = `${state.months.length} month(s)`;
     activeMonthLbl.textContent = fmtMonth(state.activeMonth||'');
-  }
 
-  roomsInp.value = state.rooms||0;
-  roomsInp.addEventListener('change', ()=>{ state.rooms = +roomsInp.value||0; save(); });
-  daysInMonthInp.value = state.daysInMonth||30;
-  daysInMonthInp.addEventListener('change', ()=>{ state.daysInMonth = +daysInMonthInp.value||30; save(); });
-  currencySel.value = state.currency;
-  currencySel.addEventListener('change', ()=>{ state.currency = currencySel.value; renderAll(); save(); });
+    renderYearMonthControls();
+  }
 
   function renderIncome(){
     const months = state.months;
@@ -363,9 +443,12 @@
       html += `<tr>
         <td><input class="inp" value="${escapeHtml(inc.name)}" data-act="income-name" data-id="${inc.id}"></td>
         ${months.map(m=>`
-          <td class="right"><input class="inp" type="number" step="0.01" value="${+inc.amounts[m]||0}" data-act="income-amt" data-id="${inc.id}" data-month="${m}"></td>
+          <td class="right" style="white-space:nowrap">
+            <input class="inp num" type="number" inputmode="decimal" step="0.01"
+              value="\${+inc.amounts[m]||0}" data-act="income-amt" data-id="${inc.id}" data-month="${m}">
+          </td>
         `).join('')}
-        <td class="right"><span>${money(rowTotal,state.currency)}</span></td>
+        <td class="right"><span>${moneyFmt(rowTotal,state.currency)}</span></td>
         <td class="center">
           <div class="row-controls">
             <button class="btn ghost small" data-act="income-del" data-id="${inc.id}">Delete</button>
@@ -374,26 +457,28 @@
       </tr>`;
     }
     html += '</tbody>';
-    // footer totals per month
     html += '<tfoot><tr><td class="right">Monthly Total</td>'+
-            months.map(m=>`<td class="right">${money(state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0),0), state.currency)}</td>`).join('')+
-            `<td class="right">${money(sumAllIncome(), state.currency)}</td><td></td></tr></tfoot>`;
+            months.map(m=>`<td class="right">${moneyFmt(state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0),0), state.currency)}</td>`).join('')+
+            `<td class="right">${moneyFmt(sumAllIncome(), state.currency)}</td><td></td></tr></tfoot>`;
 
     incomeTbl.innerHTML = html;
 
-    // NOTE: for name fields, save WITHOUT re-render while typing; re-render on blur
+    // Smooth typing + autosize
     incomeTbl.querySelectorAll('input[data-act="income-name"]').forEach(el=>{
       el.addEventListener('input', ()=>{
         const i = state.incomes.find(x=>x.id===el.dataset.id);
-        if(i){ i.name = el.value; save(false); } // <-- key fix
+        if(i){ i.name = el.value; save(false); }
       });
-      el.addEventListener('blur', ()=> save(true)); // re-render once finished typing
+      el.addEventListener('blur', ()=> save(true));
     });
     incomeTbl.querySelectorAll('input[data-act="income-amt"]').forEach(el=>{
-      el.addEventListener('change', ()=>{
+      autoSizeInput(el);
+      el.addEventListener('input', ()=>{
         const i = state.incomes.find(x=>x.id===el.dataset.id);
-        if(i){ i.amounts[el.dataset.month] = +el.value||0; save(); }
+        if(i){ i.amounts[el.dataset.month] = +el.value||0; save(false); }
+        autoSizeInput(el);
       });
+      el.addEventListener('blur', ()=> save(true));
     });
     incomeTbl.querySelectorAll('button[data-act="income-del"]').forEach(el=>{
       el.addEventListener('click', ()=> deleteIncome(el.dataset.id));
@@ -410,7 +495,7 @@
             months.map(m=>`<th class="right">${fmtMonth(m)}<div class="small muted">Amount</div></th>`).join('')+
             months.map(m=>`<th class="center">${fmtMonth(m)}<div class="small muted">Paid</div></th>`).join('')+
             '<th class="right">Row Total</th>'+
-            '<th class="center">Adj %</th>'+
+            '<th class="center">Copy</th>'+
             '<th class="center">Actions</th>'+
             '</tr></thead>';
     html += '<tbody>';
@@ -420,20 +505,28 @@
       const rowTotal = months.reduce((s,m)=> s + (+ex.amounts[m]||0), 0);
       const overdue = isOverdue(ex, state.activeMonth);
       html += `<tr${overdue ? ' style="outline:2px solid rgba(220,38,38,.15); outline-offset:-2px"' : ''}>
-        <td${overdue? ' style="color:#991b1b"':''}><input class="inp" value="${escapeHtml(ex.name)}" data-act="exp-name" data-id="${ex.id}"></td>
-        <td class="center"><input class="inp" type="number" min="1" max="31" value="${+ex.dueDay||1}" data-act="exp-due" data-id="${ex.id}" style="width:70px"></td>
-        ${months.map(m=>`<td class="right"><input class="inp" type="number" step="0.01" value="${+ex.amounts[m]||0}" data-act="exp-amt" data-id="${ex.id}" data-month="${m}"></td>`).join('')}
+        <td${overdue? ' style="color:#991b1b"':''}>
+          <input class="inp" value="${escapeHtml(ex.name)}" data-act="exp-name" data-id="${ex.id}">
+        </td>
+        <td class="center" style="white-space:nowrap">
+          <input class="inp num" type="number" inputmode="numeric" min="1" max="31"
+                 value="${+ex.dueDay||1}" data-act="exp-due" data-id="${ex.id}">
+        </td>
+        ${months.map(m=>`<td class="right" style="white-space:nowrap">
+            <input class="inp num" type="number" inputmode="decimal" step="0.01"
+                   value="${+ex.amounts[m]||0}" data-act="exp-amt" data-id="${ex.id}" data-month="${m}">
+          </td>`).join('')}
         ${months.map(m=>`<td class="center"><input type="checkbox" ${ex.paid[m]? 'checked':''} data-act="exp-paid" data-id="${ex.id}" data-month="${m}"></td>`).join('')}
-        <td class="right">${money(rowTotal,state.currency)}</td>
+        <td class="right">${moneyFmt(rowTotal,state.currency)}</td>
         <td class="center">
-          <div class="row-controls">
-            <input class="inp" type="number" step="0.1" placeholder="%" style="width:80px" data-act="exp-pct" data-id="${ex.id}">
-            <button class="btn small" data-act="exp-apply" data-id="${ex.id}">Apply</button>
+          <div class="bar" style="gap:6px;margin:0">
+            <button class="btn small" data-copy="next" data-id="${ex.id}">Active → Next</button>
+            <button class="btn small" data-copy="rest" data-id="${ex.id}">Active → Rest</button>
+            <button class="btn small" data-copy="all"  data-id="${ex.id}">Active → All</button>
           </div>
         </td>
         <td class="center">
           <div class="row-controls">
-            <button class="btn ghost small" data-act="exp-copy-active" data-id="${ex.id}">Copy → Active</button>
             <button class="btn ghost small" data-act="exp-del" data-id="${ex.id}">Delete</button>
           </div>
         </td>
@@ -441,35 +534,39 @@
     }
     html += '</tbody>';
 
-    // footer totals
     html += '<tfoot><tr><td class="right" colspan="2">Monthly Total</td>'+
-            months.map(m=>`<td class="right">${money(state.expenses.reduce((s,x)=> s+(+x.amounts[m]||0),0), state.currency)}</td>`).join('')+
+            months.map(m=>`<td class="right">${moneyFmt(state.expenses.reduce((s,x)=> s+(+x.amounts[m]||0),0), state.currency)}</td>`).join('')+
             months.map(m=>`<td class="center">${state.expenses.reduce((s,x)=> s + (x.paid[m]?1:0),0)}</td>`).join('')+
-            `<td class="right">${money(sumAllExpenses(), state.currency)}</td>`+
+            `<td class="right">${moneyFmt(sumAllExpenses(), state.currency)}</td>`+
             '<td></td><td></td></tr></tfoot>';
 
     expenseTbl.innerHTML = html;
 
-    // CHANGED: name fields save quietly on input; re-render on blur (fixes "one character" problem)
+    // Smooth typing + autosize numeric
     expenseTbl.querySelectorAll('input[data-act="exp-name"]').forEach(el=>{
       el.addEventListener('input', ()=>{
         const x = findExp(el.dataset.id);
-        if(x){ x.name = el.value; save(false); } // don't re-render while typing
+        if(x){ x.name = el.value; save(false); }
       });
-      el.addEventListener('blur', ()=> save(true)); // re-render after edit finishes
+      el.addEventListener('blur', ()=> save(true));
     });
-
     expenseTbl.querySelectorAll('input[data-act="exp-due"]').forEach(el=>{
-      el.addEventListener('change', ()=>{
+      autoSizeInput(el);
+      el.addEventListener('input', ()=>{
         const x = findExp(el.dataset.id);
-        if(x){ x.dueDay = clamp(+el.value,1,31); el.value = x.dueDay; save(); }
+        if(x){ x.dueDay = clamp(+el.value||1,1,31); save(false); }
+        autoSizeInput(el);
       });
+      el.addEventListener('blur', ()=> save(true));
     });
     expenseTbl.querySelectorAll('input[data-act="exp-amt"]').forEach(el=>{
-      el.addEventListener('change', ()=>{
+      autoSizeInput(el);
+      el.addEventListener('input', ()=>{
         const x = findExp(el.dataset.id);
-        if(x){ x.amounts[el.dataset.month] = +el.value||0; save(); }
+        if(x){ x.amounts[el.dataset.month] = +el.value||0; save(false); }
+        autoSizeInput(el);
       });
+      el.addEventListener('blur', ()=> save(true));
     });
     expenseTbl.querySelectorAll('input[data-act="exp-paid"]').forEach(el=>{
       el.addEventListener('change', ()=>{
@@ -477,37 +574,28 @@
         if(x){ x.paid[el.dataset.month] = el.checked; save(); }
       });
     });
-    expenseTbl.querySelectorAll('button[data-act="exp-apply"]').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        const x = findExp(el.dataset.id); if(!x) return;
-        const pctEl = expenseTbl.querySelector(`input[data-act="exp-pct"][data-id="${x.id}"]`);
-        const pct = +pctEl.value||0; adjustRowByPct(x, pct); pctEl.value=''; save();
+
+    // Copy buttons
+    expenseTbl.querySelectorAll('button[data-copy]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const e = findExp(b.dataset.id); if(!e) return;
+        copyExpenseFromActive(e, b.dataset.copy);
+        save();
       });
     });
-    expenseTbl.querySelectorAll('button[data-act="exp-copy-active"]').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        const x = findExp(el.dataset.id); if(!x) return;
-        const m = state.activeMonth; const val = +x.amounts[m]||0;
-        state.months.forEach(mm=>{ x.amounts[mm]=val; }); save();
-      });
-    });
+
+    // delete row
     expenseTbl.querySelectorAll('button[data-act="exp-del"]').forEach(el=>{
       el.addEventListener('click', ()=> deleteExpense(el.dataset.id));
     });
   }
 
-  function adjustRowByPct(exp, pct){
-    // pct can be + or - (e.g., 5 or -5)
-    const f = 1 + (pct/100);
-    state.months.forEach(m=>{ exp.amounts[m] = round2((+exp.amounts[m]||0)*f); });
-  }
-
   function isOverdue(exp, ym){
     if(!ym) return false;
     const [y,m] = ym.split('-').map(Number);
-    const now = new Date();
-    if(now < new Date(y, m-1, 1) || now > new Date(y, m-1, 31)) return false; // only flag for current calendar month
-    return (now.getDate() > (exp.dueDay||1)) && !exp.paid[ym];
+    const nowD = new Date();
+    if(nowD < new Date(y, m-1, 1) || nowD > new Date(y, m-1, 31)) return false;
+    return (nowD.getDate() > (exp.dueDay||1)) && !exp.paid[ym];
   }
 
   function sumAllIncome(){ return state.months.reduce((s,m)=> s + state.incomes.reduce((t,i)=> t+(+i.amounts[m]||0),0), 0); }
@@ -515,7 +603,6 @@
 
   function findExp(id){ return state.expenses.find(x=>x.id===id); }
   function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-  function round2(n){ return Math.round(n*100)/100; }
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m])); }
 
   function renderKPIs(){
@@ -523,9 +610,9 @@
     const inc = state.incomes.reduce((s,i)=> s+(+i.amounts[m]||0), 0);
     const exp = state.expenses.reduce((s,x)=> s+(+x.amounts[m]||0), 0);
     const unpaid = state.expenses.reduce((s,x)=> s + (x.paid[m]?0:1), 0);
-    $('#kpiIncome').textContent = money(inc, state.currency);
-    $('#kpiExpenses').textContent = money(exp, state.currency);
-    $('#kpiNet').textContent = money(inc-exp, state.currency);
+    $('#kpiIncome').textContent = moneyFmt(inc, state.currency);
+    $('#kpiExpenses').textContent = moneyFmt(exp, state.currency);
+    $('#kpiNet').textContent = moneyFmt(inc-exp, state.currency);
     $('#kpiUnpaid').textContent = unpaid;
   }
 
@@ -534,6 +621,9 @@
     renderIncome();
     renderExpenses();
     renderKPIs();
+
+    // After render, make sure all numeric inputs are sized correctly
+    $$('#incomeTbl .inp.num, #expenseTbl .inp.num').forEach(autoSizeInput);
   }
 
   // initial
