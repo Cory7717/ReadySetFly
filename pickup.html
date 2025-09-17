@@ -1220,86 +1220,103 @@
     return el;
   }
 
-  // UPDATED: robust PDF export (clone + jsPDF.html with html2canvas fallback, zIndex fix + settle)
-  async function downloadPDF(){
-    const data = computeSummary();
-    const src = buildPDFNode(data);
+  // UPDATED: robust PDF export (clone off-screen, visible to renderer)
+async function downloadPDF(){
+  const data = computeSummary();
+  const src = buildPDFNode(data);
 
-    const tmp = src.cloneNode(true);
-    tmp.id = 'pdfSummaryClone';
-    Object.assign(tmp.style, {
-      position:'fixed', left:'0', top:'0', width:'800px',
-      opacity:'0', pointerEvents:'none', zIndex:'0', background:'#fff' // zIndex fix
-    });
-    document.body.appendChild(tmp);
+  // Make a clone that is off-screen but fully visible to the renderer
+  const tmp = src.cloneNode(true);
+  tmp.id = 'pdfSummaryClone';
+  Object.assign(tmp.style, {
+    position: 'fixed',
+    left: '-10000px',   // keep off-screen (not visible to users)
+    top: '0',
+    width: '800px',
+    // IMPORTANT: visible for capture
+    opacity: '1',
+    visibility: 'visible',
+    pointerEvents: 'none',
+    zIndex: '0',
+    background: '#ffffff'
+  });
+  document.body.appendChild(tmp);
 
+  // Give layout a moment to settle & ensure fonts are ready
+  try {
     await new Promise(r => requestAnimationFrame(r));
-    await new Promise(r => setTimeout(r, 50)); // small settle delay
-
-    const { jsPDF } = (window.jspdf || {});
-    const haveLibs = !!jsPDF && !!window.html2canvas;
-    if(!haveLibs){
-      alert('PDF libraries are not loaded yet. Try again in a moment.');
-      tmp.remove();
-      return;
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
     }
+    await new Promise(r => setTimeout(r, 60));
+  } catch {}
 
-    const fname = `Pickup_Summary_${data.hotel}_${data.ym}.pdf`;
-
-    try {
-      const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
-      await pdf.html(tmp, {
-        x:36, y:36, width:540,
-        windowWidth:1080,
-        autoPaging:'text',
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: false,
-          backgroundColor: '#ffffff'
-        }
-      });
-      pdf.save(fname);
-    } catch (err) {
-      console.warn('jsPDF.html failed, falling back to image mode:', err);
-      try {
-        const canvas = await window.html2canvas(tmp, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false
-        });
-
-        const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-        const margin = 36;
-        const drawW = pageW - margin*2;
-        const scale = drawW / canvas.width;
-        const drawHpx = Math.floor((pageH - margin*2) / scale);
-
-        let ySlice = 0;
-        while (ySlice < canvas.height) {
-          if (ySlice > 0) pdf.addPage();
-          const slice = document.createElement('canvas');
-          slice.width = canvas.width;
-          slice.height = Math.min(drawHpx, canvas.height - ySlice);
-          const ctx = slice.getContext('2d');
-          ctx.drawImage(canvas, 0, ySlice, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
-          const img = slice.toDataURL('image/png');
-          pdf.addImage(img, 'PNG', margin, margin, drawW, slice.height * scale, '', 'FAST');
-          ySlice += slice.height;
-        }
-
-        pdf.save(fname);
-      } catch (e2) {
-        console.error('html2canvas fallback also failed:', e2);
-        alert('Failed to render PDF. Check console for details.');
-      }
-    } finally {
-      tmp.remove();
-    }
+  const { jsPDF } = (window.jspdf || {});
+  if (!jsPDF || !window.html2canvas) {
+    alert('PDF libraries are not loaded yet. Please try again in a moment.');
+    tmp.remove();
+    return;
   }
+
+  const fname = `Pickup_Summary_${data.hotel}_${data.ym}.pdf`;
+
+  try {
+    // Try vector/HTML path first
+    const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
+    await pdf.html(tmp, {
+      x: 36, y: 36, width: 540,
+      windowWidth: 1080,
+      autoPaging: 'text',
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false
+      }
+    });
+    pdf.save(fname);
+  } catch (err) {
+    console.warn('jsPDF.html failed, falling back to image mode:', err);
+    try {
+      // Fallback: rasterize with html2canvas and paginate
+      const canvas = await window.html2canvas(tmp, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+
+      const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 36;
+      const drawW = pageW - margin*2;
+      const scale = drawW / canvas.width;
+      const drawHpx = Math.floor((pageH - margin*2) / scale);
+
+      let ySlice = 0;
+      while (ySlice < canvas.height) {
+        if (ySlice > 0) pdf.addPage();
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = Math.min(drawHpx, canvas.height - ySlice);
+        const ctx = slice.getContext('2d');
+        ctx.drawImage(canvas, 0, ySlice, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+        const img = slice.toDataURL('image/png');
+        pdf.addImage(img, 'PNG', margin, margin, drawW, slice.height * scale, '', 'FAST');
+        ySlice += slice.height;
+      }
+
+      pdf.save(fname);
+    } catch (e2) {
+      console.error('html2canvas fallback also failed:', e2);
+      alert('Failed to render PDF. Check console for details.');
+    }
+  } finally {
+    tmp.remove();
+  }
+}
 
   // ---------- SHARE / EXPORT / IMPORT
   function collectBundle(){
