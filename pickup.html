@@ -1220,29 +1220,39 @@
     return el;
   }
 
-  // UPDATED: robust PDF export (clone off-screen, visible to renderer)
+  // FINAL: capture the *real* #pdfSummary by temporarily making it visible
 async function downloadPDF(){
   const data = computeSummary();
-  const src = buildPDFNode(data);
+  const src = buildPDFNode(data); // fills #pdfSummary with fresh HTML
 
-  // Make a clone that is off-screen but fully visible to the renderer
-  const tmp = src.cloneNode(true);
-  tmp.id = 'pdfSummaryClone';
-  Object.assign(tmp.style, {
+  // Remember original inline styles to restore later
+  const orig = {
+    position: src.style.position,
+    left: src.style.left,
+    top: src.style.top,
+    width: src.style.width,
+    opacity: src.style.opacity,
+    zIndex: src.style.zIndex,
+    pointerEvents: src.style.pointerEvents,
+    visibility: src.style.visibility,
+    transform: src.style.transform
+  };
+
+  // Make the *real* node fully paintable but off-screen
+  Object.assign(src.style, {
     position: 'fixed',
-    left: '-10000px',   // keep off-screen (not visible to users)
+    left: '-10000px',
     top: '0',
     width: '800px',
-    // IMPORTANT: visible for capture
-    opacity: '1',
+    opacity: '1',           // IMPORTANT: fully visible to renderer
     visibility: 'visible',
-    pointerEvents: 'none',
+    pointerEvents: 'auto',
     zIndex: '0',
+    transform: 'none',
     background: '#ffffff'
   });
-  document.body.appendChild(tmp);
 
-  // Give layout a moment to settle & ensure fonts are ready
+  // Allow fonts/layout to settle
   try {
     await new Promise(r => requestAnimationFrame(r));
     if (document.fonts && document.fonts.ready) {
@@ -1251,21 +1261,34 @@ async function downloadPDF(){
     await new Promise(r => setTimeout(r, 60));
   } catch {}
 
+  // Sanity: ensure we have measurable size before capture
+  const w = src.scrollWidth || src.getBoundingClientRect().width;
+  const h = src.scrollHeight || src.getBoundingClientRect().height;
+  if (!w || !h) {
+    // Restore styles and abort early
+    Object.assign(src.style, orig);
+    alert('PDF could not render because the summary measured 0×0. Check console.');
+    console.warn('pdfSummary measured size:', {w, h, rect: src.getBoundingClientRect()});
+    return;
+  }
+
   const { jsPDF } = (window.jspdf || {});
   if (!jsPDF || !window.html2canvas) {
-    alert('PDF libraries are not loaded yet. Please try again in a moment.');
-    tmp.remove();
+    Object.assign(src.style, orig);
+    alert('PDF libraries not ready yet. Please try again in a moment.');
     return;
   }
 
   const fname = `Pickup_Summary_${data.hotel}_${data.ym}.pdf`;
 
   try {
-    // Try vector/HTML path first
+    // Preferred HTML → vector path
     const pdf = new jsPDF({ unit:'pt', format:'letter', compress:true });
-    await pdf.html(tmp, {
-      x: 36, y: 36, width: 540,
-      windowWidth: 1080,
+    await pdf.html(src, {
+      x: 36,
+      y: 36,
+      width: 540,
+      windowWidth: Math.max(1080, w),  // help rendering large content
       autoPaging: 'text',
       html2canvas: {
         scale: 2,
@@ -1277,10 +1300,10 @@ async function downloadPDF(){
     });
     pdf.save(fname);
   } catch (err) {
-    console.warn('jsPDF.html failed, falling back to image mode:', err);
+    console.warn('jsPDF.html failed, using html2canvas fallback:', err);
     try {
-      // Fallback: rasterize with html2canvas and paginate
-      const canvas = await window.html2canvas(tmp, {
+      // Fallback: rasterize the visible #pdfSummary
+      const canvas = await window.html2canvas(src, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
@@ -1311,10 +1334,11 @@ async function downloadPDF(){
       pdf.save(fname);
     } catch (e2) {
       console.error('html2canvas fallback also failed:', e2);
-      alert('Failed to render PDF. Check console for details.');
+      alert('Failed to render PDF. See console for details.');
     }
   } finally {
-    tmp.remove();
+    // Always restore original styles
+    Object.assign(src.style, orig);
   }
 }
 
@@ -1659,4 +1683,3 @@ async function downloadPDF(){
   });
 })();
 </script>
-
