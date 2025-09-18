@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Maintenance & Inventory Checklist</title>
+<title>Maintenance & Inventory Checklist (IndexedDB)</title>
 <!-- jsPDF + AutoTable for PDF export -->
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg1:#667eea;--bg2:#764ba2;--panelTint:rgba(255,255,255,.95);--ink:#2c3e50;--inkSoft:#7f8c8d;--brand1:#3498db;--brand2:#2980b9;--dark1:#2c3e50;--dark2:#34495e;--goodBg:#e8f5e8;--good:#27ae60;--warnBg:#fff3cd;--warn:#856404;--posBg:#d1edcc;--pos:#155724;--negBg:#f8d7da;--neg:#721c24;--grid:#e0e0e0}
+:root{--bg1:#667eea;--bg2:#764ba2;--panelTint:rgba(255,255,255,.95);--ink:#2c3e50;--inkSoft:#7f8c8d;--brand1:#3498db;--brand2:#2980b9;--dark1:#2c3e50;--dark2:#34495e;--posBg:#d1edcc;--pos:#155724;--warnBg:#fff3cd;--warn:#856404;--negBg:#f8d7da;--neg:#721c24;--grid:#e0e0e0}
 html,body{overscroll-behavior-y:contain}
 body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));min-height:100vh;padding:20px}
 .container{max-width:1300px;margin:0 auto;background:var(--panelTint);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.1);backdrop-filter:blur(10px);overflow:hidden}
@@ -200,9 +200,9 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 <script>
 (function(){
 
-  /* ---------- Polyfills & Setup ---------- */
+  /* ----------------- Polyfills & Setup ----------------- */
 
-  // closest() polyfill
+  // Element.closest polyfill
   if (!Element.prototype.closest) {
     Element.prototype.closest = function(s){
       var el=this;
@@ -215,7 +215,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     };
   }
 
-  // crypto.randomUUID polyfill (robust)
+  // crypto.randomUUID polyfill
   (function ensureUUID(){
     try{
       if(!window.crypto) window.crypto = {};
@@ -226,8 +226,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
           var b = new Uint8Array(16);
           if(window.crypto.getRandomValues) window.crypto.getRandomValues(b);
           else { for(var i=0;i<16;i++) b[i]=rnd(); }
-          b[6] = (b[6] & 0x0f) | 0x40;
-          b[8] = (b[8] & 0x3f) | 0x80;
+          b[6] = (b[6] & 0x0f) | 0x40; // v4
+          b[8] = (b[8] & 0x3f) | 0x80; // variant
           var h=''; for(var j=0;j<16;j++) h+=hex(b[j]);
           return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
         };
@@ -249,16 +249,26 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     });
   }
 
-  /* ---------- Helpers ---------- */
+  /* ----------------- Tiny Utilities ----------------- */
 
   function qs(sel, root){ return (root||document).querySelector(sel); }
   function qsa(sel, root){ var list=(root||document).querySelectorAll(sel); return Array.prototype.slice.call(list); }
 
-  var STORAGE_KEY='maintInv_v2_working';
-  var STORAGE_LAST='maintInv_v2_lastSubmitted';
+  function debounce(fn, wait){
+    var t=null;
+    return function(){
+      var ctx=this, args=arguments;
+      if(t) clearTimeout(t);
+      t=setTimeout(function(){ fn.apply(ctx,args); }, wait);
+    };
+  }
 
-  var items = [];
-  var userHasInteracted = false; // first-load guard
+  var STORAGE_KEY='maintInv_v3_working';           // bumped schema
+  var STORAGE_LAST='maintInv_v3_lastSubmitted';
+
+  var items = [];               // each item has photoIds[]
+  var objectUrlCache = {};      // photoId -> objectURL (to revoke)
+  var AUTO_SAVE_DELAY = 900;
 
   function defaultItem(){
     return {
@@ -267,13 +277,14 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       estimatedValue: 0,
       condition:'Good', status:'Active',
       lastService:'', nextDue:'', notes:'',
-      verified:false, photos:[]
+      verified:false, photoIds:[]
     };
   }
 
-  function itemKey(it){
-    function norm(s){ return (s?String(s):'').trim().toLowerCase(); }
-    return [norm(it.name), norm(it.location), norm(it.model), norm(it.serial)].join('|');
+  function currency(n){
+    var v=Number(n)||0;
+    try{ return v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}); }
+    catch(e){ return '$'+v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
   }
 
   var toastEl;
@@ -292,19 +303,17 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   }
 
   function showCritical(msg){
-    var box = qs('#submitNotice');
-    if (!box) return;
-    box.style.display='block';
-    box.textContent = msg;
+    var box = qs('#submitNotice'); if (!box) return;
+    box.style.display='block'; box.textContent = msg;
   }
   function hideCritical(){
-    var box = qs('#submitNotice');
-    if (!box) return;
+    var box = qs('#submitNotice'); if (!box) return;
     box.style.display='none';
   }
 
   function workingPayload(){
     return {
+      schemaVersion: 3,
       meta:{
         propertyId: (qs('#propertyId') && qs('#propertyId').value) || '',
         invDate: (qs('#invDate') && qs('#invDate').value) || '',
@@ -316,28 +325,26 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     };
   }
 
-  // Rotate backups so a bad save can't wipe everything
+  // Rolling backups (last 5)
   function checkpoint(){
     try{
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
-      var key = 'maintInv_v2_checkpoint_' + Date.now();
+      var key = 'maintInv_v3_checkpoint_' + Date.now();
       localStorage.setItem(key, raw);
-      // keep last 5
       var keys = [];
       for (var i=0;i<localStorage.length;i++){
         var k = localStorage.key(i);
-        if(/^maintInv_v2_checkpoint_/.test(k)) keys.push(k);
+        if(/^maintInv_v3_checkpoint_/.test(k)) keys.push(k);
       }
       keys.sort();
       while(keys.length > 5){
-        var drop = keys.shift();
-        localStorage.removeItem(drop);
+        localStorage.removeItem(keys.shift());
       }
     }catch(e){ /* ignore quota here */ }
   }
 
-  function saveLocal(show){
+  var saveLocal = debounce(function(show){
     if (typeof show === 'undefined') show = true;
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workingPayload()));
@@ -345,7 +352,20 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       hideCritical();
     }catch(e){
       console.error('Save error', e);
-      showCritical('Storage is full — photos are too large to auto-save. Please Export (.json) now, or remove some photos. PDF export is still available.');
+      showCritical('Storage quota reached for metadata. Please Export (.json) now, or remove some items. Photos are safe in IndexedDB.');
+      if(show) flash('Save failed.');
+    }
+  }, AUTO_SAVE_DELAY);
+
+  function saveLocalImmediate(show){
+    if (typeof show === 'undefined') show = true;
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(workingPayload()));
+      if(show) flash('Saved.');
+      hideCritical();
+    }catch(e){
+      console.error('Save error', e);
+      showCritical('Storage quota reached for metadata. Please Export (.json) now, or remove some items. Photos are safe in IndexedDB.');
       if(show) flash('Save failed.');
     }
   }
@@ -362,10 +382,10 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       if(qs('#property')) qs('#property').value = meta.property || '';
       if(qs('#overallNotes')) qs('#overallNotes').value = meta.overallNotes || '';
       items = (data && data.items && data.items.length) ? data.items : [];
-      // normalize estimatedValue
+      // normalize
       for (var i=0;i<items.length;i++){
         if (typeof items[i].estimatedValue === 'undefined') items[i].estimatedValue = 0;
-        if (!items[i].photos) items[i].photos = [];
+        if (!items[i].photoIds) items[i].photoIds = [];
       }
       render(); updateChangeNotice(); flash('Loaded.');
     }catch(e){
@@ -388,7 +408,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   }
 
   function exportJSON(){
-    saveLocal(false);
+    saveLocalImmediate(false);
     checkpoint();
     var raw = localStorage.getItem(STORAGE_KEY) || '{}';
     var blob=new Blob([raw],{type:'application/json'});
@@ -403,19 +423,10 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       try{
         localStorage.setItem(STORAGE_KEY, e.target.result);
         loadLocal();
-        flash('Imported.');
+        flash('Imported (metadata). Note: photos must already be on this device.');
       }catch(err){ console.error(err); flash('Import failed.'); }
     };
     r.readAsText(file);
-  }
-
-  function currency(n){
-    var v=Number(n)||0;
-    try{
-      return v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
-    }catch(e){
-      return '$'+v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
-    }
   }
 
   function updateTotalValueChip(){
@@ -465,7 +476,193 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     flash('Item removed.');
   }
 
-  /* ---------- Photo handling: downscale/compress before save ---------- */
+  function conditionBadge(cond){
+    if(cond==='Excellent' || cond==='Good') return 'badge status-ok';
+    if(cond==='Fair') return 'badge status-attn';
+    return 'badge status-bad';
+  }
+
+  /* ----------------- IndexedDB: photos store ----------------- */
+
+  function openDB(){
+    return new Promise(function(res, rej){
+      var req = indexedDB.open('maintInvDB', 1);
+      req.onupgradeneeded = function(e){
+        var db = e.target.result;
+        if(!db.objectStoreNames.contains('photos')){
+          db.createObjectStore('photos'); // key: photoId, value: Blob
+        }
+      };
+      req.onsuccess = function(e){ res(e.target.result); };
+      req.onerror   = function(e){ rej(e.target.error); };
+    });
+  }
+
+  function idbSavePhoto(photoId, blob){
+    return openDB().then(function(db){
+      return new Promise(function(res, rej){
+        var tx = db.transaction('photos','readwrite');
+        tx.objectStore('photos').put(blob, photoId);
+        tx.oncomplete = function(){ res(true); };
+        tx.onerror = function(e){ rej(e.target.error); };
+      });
+    });
+  }
+
+  function idbGetPhotoBlob(photoId){
+    return openDB().then(function(db){
+      return new Promise(function(res, rej){
+        var tx = db.transaction('photos','readonly');
+        var req = tx.objectStore('photos').get(photoId);
+        req.onsuccess = function(){
+          res(req.result || null);
+        };
+        req.onerror = function(e){ rej(e.target.error); };
+      });
+    });
+  }
+
+  function idbDeletePhoto(photoId){
+    return openDB().then(function(db){
+      return new Promise(function(res, rej){
+        var tx = db.transaction('photos','readwrite');
+        tx.objectStore('photos').delete(photoId);
+        tx.oncomplete = function(){ res(true); };
+        tx.onerror = function(e){ rej(e.target.error); };
+      });
+    });
+  }
+
+  // Object URL cache helpers
+  function revokeObjectURL(photoId){
+    var url = objectUrlCache[photoId];
+    if (url){ URL.revokeObjectURL(url); delete objectUrlCache[photoId]; }
+  }
+  function getObjectURLForPhoto(photoId){
+    // returns Promise<string|null>
+    if (objectUrlCache[photoId]) return Promise.resolve(objectUrlCache[photoId]);
+    return idbGetPhotoBlob(photoId).then(function(blob){
+      if(!blob) return null;
+      var url = URL.createObjectURL(blob);
+      objectUrlCache[photoId] = url;
+      return url;
+    });
+  }
+
+  /* ----------------- Legacy Migration (v2 -> v3) + Smart Load ----------------- */
+
+  // base64 dataURL -> Blob
+  function dataURLToBlob(durl){
+    try{
+      var parts = durl.split(',');
+      var mimeMatch = parts[0].match(/:(.*?);/);
+      var mime = (mimeMatch && mimeMatch[1]) || 'image/jpeg';
+      var bin = atob(parts[1]||'');
+      var arr = new Uint8Array(bin.length);
+      for (var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+      return new Blob([arr], {type:mime});
+    }catch(e){ return null; }
+  }
+
+  async function migrateV2PayloadToV3(payloadV2){
+    if (!payloadV2 || !Array.isArray(payloadV2.items)) return null;
+    var v3 = { schemaVersion:3, meta: payloadV2.meta || {}, items: [] };
+
+    for (var idx=0; idx<payloadV2.items.length; idx++){
+      var old = payloadV2.items[idx] || {};
+      var it = {
+        id: old.id || window.crypto.randomUUID(),
+        name: old.name||'', location: old.location||'',
+        model: old.model||'', serial: old.serial||'',
+        qty: Number(old.qty)||0, estimatedValue: Number(old.estimatedValue)||0,
+        condition: old.condition||'Good', status: old.status||'Active',
+        lastService: old.lastService||'', nextDue: old.nextDue||'',
+        notes: old.notes||'', verified: !!old.verified, photoIds: []
+      };
+
+      if (Array.isArray(old.photos) && old.photos.length){
+        for (var p=0; p<old.photos.length; p++){
+          var durl = old.photos[p];
+          var blob = dataURLToBlob(durl);
+          if (!blob) continue;
+          var pid = window.crypto.randomUUID();
+          try { await idbSavePhoto(pid, blob); it.photoIds.push(pid); } catch(e){}
+        }
+      }
+      v3.items.push(it);
+    }
+    return v3;
+  }
+
+  async function tryMigrateLegacy(){
+    var V2_KEY = 'maintInv_v2_working';
+    var existingV3 = localStorage.getItem(STORAGE_KEY);
+    if (existingV3) return false;
+
+    var rawV2 = localStorage.getItem(V2_KEY);
+    if (!rawV2) return false;
+
+    try{
+      var payloadV2 = JSON.parse(rawV2);
+      var migrated = await migrateV2PayloadToV3(payloadV2);
+      if (!migrated) return false;
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      localStorage.setItem('maintInv_v3_checkpoint_migrated_'+Date.now(), JSON.stringify(migrated));
+      flash('Legacy data found and migrated ✔');
+      return true;
+    }catch(e){
+      console.warn('Migration failed', e);
+      return false;
+    }
+  }
+
+  function listCheckpoints(){
+    var keys = [];
+    for (var i=0;i<localStorage.length;i++){
+      var k = localStorage.key(i);
+      if(/^maintInv_v3_checkpoint_/.test(k)) keys.push(k);
+    }
+    keys.sort(); // oldest → newest
+    return keys;
+  }
+
+  function restoreLatestCheckpoint(){
+    var cps = listCheckpoints();
+    if (!cps.length) return false;
+    var lastKey = cps[cps.length-1];
+    try{
+      var raw = localStorage.getItem(lastKey);
+      if (!raw) return false;
+      localStorage.setItem(STORAGE_KEY, raw);
+      flash('Restored from latest checkpoint.');
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function smartLoad(){
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw){
+      loadLocal();
+      return;
+    }
+    if (restoreLatestCheckpoint()){
+      loadLocal();
+    }else{
+      flash('No saved data found on this device.');
+      render(); updateChangeNotice();
+    }
+  }
+
+  /* ----------------- Photo upload & processing ----------------- */
+
+  function fileToDataURL(file){
+    return new Promise(function(res){
+      var rd = new FileReader();
+      rd.onload = function(ev){ res(ev.target.result); };
+      rd.readAsDataURL(file);
+    });
+  }
 
   function dataURLToImage(dataURL){
     return new Promise(function(res, rej){
@@ -475,68 +672,74 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       img.src = dataURL;
     });
   }
-  function resizeDataURL(dataURL, maxW, maxH, quality){
+
+  function resizeToBlob(dataURL, maxW, maxH, quality){
     return dataURLToImage(dataURL).then(function(img){
       var w = img.naturalWidth||img.width, h = img.naturalHeight||img.height;
-      var r = Math.min(maxW / w, maxH / h, 1); // only shrink
+      var r = Math.min(maxW / w, maxH / h, 1);
       var cw = Math.round(w * r), ch = Math.round(h * r);
       var c = document.createElement('canvas');
       c.width = cw; c.height = ch;
       var ctx = c.getContext('2d');
       ctx.drawImage(img, 0, 0, cw, ch);
-      try {
-        return c.toDataURL('image/jpeg', quality);
-      } catch(e) {
-        return dataURL; // fallback
-      }
+      return new Promise(function(res){
+        c.toBlob(function(blob){ res(blob || null); }, 'image/jpeg', quality);
+      });
     });
   }
 
-  function onPhotoUpload(e, id){
-    var files = e.target && e.target.files ? e.target.files : null;
+  function onPhotoUpload(e, itemId){
+    var files = e.target.files;
     if(!files || !files.length) return;
     var it = null;
-    for (var i=0;i<items.length;i++){ if(items[i].id===id){ it=items[i]; break; } }
+    for (var i=0;i<items.length;i++){ if(items[i].id===itemId){ it=items[i]; break; } }
     if(!it) return;
 
     var proms = [];
     for (var j=0;j<files.length;j++){
       (function(f){
-        var rd = new FileReader();
-        proms.push(new Promise(function(res){
-          rd.onload = function(ev){
-            // Downscale to max 1280 x 1280, JPEG quality 0.7
-            resizeDataURL(ev.target.result, 1280, 1280, 0.7).then(function(resized){
-              res(resized);
-            }).catch(function(){ res(ev.target.result); });
-          };
-          rd.readAsDataURL(f);
-        }));
+        proms.push(
+          fileToDataURL(f)
+            .then(function(durl){ return resizeToBlob(durl, 1600, 1600, 0.8); })
+            .then(function(blob){
+              if(!blob) return null;
+              var pid = window.crypto.randomUUID();
+              return idbSavePhoto(pid, blob).then(function(){ return pid; });
+            })
+            .catch(function(){ return null; })
+        );
       })(files[j]);
     }
 
-    Promise.all(proms).then(function(urls){
-      if (!it.photos) it.photos=[];
-      Array.prototype.push.apply(it.photos, urls);
+    Promise.all(proms).then(function(ids){
+      var added = 0;
+      for (var k=0;k<ids.length;k++){
+        if(ids[k]){
+          it.photoIds.push(ids[k]);
+          added++;
+        }
+      }
+      render(); // shows new photos once object URLs resolve
+      if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
+      if(added) flash(added+' photo'+(added!==1?'s':'')+' added.');
+    });
+  }
+
+  function removePhoto(itemId, idx){
+    var it = null;
+    for (var i=0;i<items.length;i++){ if(items[i].id===itemId){ it=items[i]; break; } }
+    if(!it) return;
+    var pid = it.photoIds[idx];
+    if(!pid) return;
+    idbDeletePhoto(pid).finally(function(){
+      revokeObjectURL(pid);
+      it.photoIds.splice(idx,1);
       render();
       if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
     });
   }
 
-  function removePhoto(id, idx){
-    var it = null;
-    for (var i=0;i<items.length;i++){ if(items[i].id===id){ it=items[i]; break; } }
-    if(!it || !it.photos) return;
-    it.photos.splice(idx,1);
-    render();
-    if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
-  }
-
-  function conditionBadge(cond){
-    if(cond==='Excellent' || cond==='Good') return 'badge status-ok';
-    if(cond==='Fair') return 'badge status-attn';
-    return 'badge status-bad';
-  }
+  /* ----------------- Rendering ----------------- */
 
   function render(){
     var qEl = qs('#searchTxt'), fcEl = qs('#fCondition'), fsEl = qs('#fStatus'), flEl = qs('#fLocation');
@@ -561,85 +764,96 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     var sumChip = qs('#summaryChip');
     if (sumChip) sumChip.textContent = filtered.length + ' item' + (filtered.length!==1?'s':'');
 
-    var tb = qs('#invBody');
-    if(!tb) return;
+    var tb = qs('#invBody'); if(!tb) return;
     tb.innerHTML = '';
 
+    // for (var pid in objectUrlCache){ if (objectUrlCache.hasOwnProperty(pid)) revokeObjectURL(pid); }
+
     for(var f=0; f<filtered.length; f++){
-      var it2 = filtered[f];
-      var needsPhotos = !it2.photos || it2.photos.length===0;
-      var tr = document.createElement('tr');
-      if(needsPhotos) tr.classList.add('row-missing-photos');
+      (function(it2){
+        var needsPhotos = !it2.photoIds || it2.photoIds.length===0;
+        var tr = document.createElement('tr');
+        if(needsPhotos) tr.classList.add('row-missing-photos');
 
-      // photos html
-      var photosHtmlParts = [];
-      photosHtmlParts.push('<div class="photo-stack">');
-      if (it2.photos && it2.photos.length){
-        for (var p=0;p<it2.photos.length;p++){
-          photosHtmlParts.push(
-            '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">'
-              + '<img src="'+it2.photos[p]+'" class="thumb" alt="photo"/>'
-              + '<button class="btn danger small" data-remove-photo="'+it2.id+':'+p+'">Remove</button>'
-            + '</div>'
-          );
+        var photosHtmlParts = [];
+        photosHtmlParts.push('<div class="photo-stack" data-photo-stack="'+it2.id+'">');
+        if (it2.photoIds && it2.photoIds.length){
+          for (var p=0;p<it2.photoIds.length;p++){
+            photosHtmlParts.push(
+              '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">'
+                + '<img data-photo-id="'+it2.photoIds[p]+'" class="thumb" alt="photo" />'
+                + '<button class="btn danger small" data-remove-photo="'+it2.id+':'+p+'">Remove</button>'
+              + '</div>'
+            );
+          }
         }
-      }
-      photosHtmlParts.push('</div>');
-      photosHtmlParts.push('<hr class="sep"/>');
-      photosHtmlParts.push('<label class="btn" for="photo_'+it2.id+'">+ Add Photos</label>');
-      photosHtmlParts.push('<input id="photo_'+it2.id+'" type="file" accept="image/*" capture="environment" multiple />');
-      if (needsPhotos){ photosHtmlParts.push('<div class="req-chip">Photos required</div>'); }
-      var photosHtml = photosHtmlParts.join('');
+        photosHtmlParts.push('</div>');
+        photosHtmlParts.push('<hr class="sep"/>');
+        photosHtmlParts.push('<label class="btn" for="photo_'+it2.id+'">+ Add Photos</label>');
+        photosHtmlParts.push('<input id="photo_'+it2.id+'" type="file" accept="image/*" capture="environment" multiple />');
+        if (needsPhotos){ photosHtmlParts.push('<div class="req-chip">Photos required</div>'); }
+        var photosHtml = photosHtmlParts.join('');
 
-      var estVal = Number(it2.estimatedValue)||0;
-      var qty = Number(it2.qty)||0;
+        var estVal = Number(it2.estimatedValue)||0;
+        var qty = Number(it2.qty)||0;
 
-      var rowHtml = ''
-        + '<td><input type="checkbox" '+(it2.verified?'checked':'')+' data-bind="'+it2.id+':verified"/></td>'
-        + '<td style="min-width:220px">'+photosHtml+'</td>'
-        + '<td><input type="text" value="'+(it2.name||'')+'" placeholder="Item name" data-bind="'+it2.id+':name"/></td>'
-        + '<td><input type="text" value="'+(it2.location||'')+'" placeholder="e.g., Boiler Room" data-bind="'+it2.id+':location"/></td>'
-        + '<td><input type="text" value="'+(it2.model||'')+'" placeholder="Model #" data-bind="'+it2.id+':model"/></td>'
-        + '<td><input type="text" value="'+(it2.serial||'')+'" placeholder="Serial #" data-bind="'+it2.id+':serial"/></td>'
-        + '<td><input type="number" min="0" value="'+(it2.qty||1)+'" style="width:90px" data-bind="'+it2.id+':qty"/></td>'
-        + '<td>'
-          + '<input type="number" min="0" step="0.01" value="'+(typeof it2.estimatedValue==='number'?it2.estimatedValue:0)+'" style="width:120px" data-bind="'+it2.id+':estimatedValue"/>'
-          + '<div class="small" style="margin-top:4px">'+currency(estVal)+' × '+(qty||0)+' = <b>'+currency(estVal*qty)+'</b></div>'
-        + '</td>'
-        + '<td>'
-          + '<select data-bind="'+it2.id+':condition">'
-            + ['Excellent','Good','Fair','Needs Repair','Out of Service'].map(function(c){ return '<option '+(c===it2.condition?'selected':'')+'>'+c+'</option>'; }).join('')
-          + '</select>'
-          + '<div class="'+conditionBadge(it2.condition)+'" style="margin-top:6px">'+it2.condition+'</div>'
-        + '</td>'
-        + '<td>'
-          + '<select data-bind="'+it2.id+':status">'
-            + ['Active','Spare','Retired'].map(function(s){ return '<option '+(s===it2.status?'selected':'')+'>'+s+'</option>'; }).join('')
-          + '</select>'
-        + '</td>'
-        + '<td><input type="date" value="'+(it2.lastService||'')+'" data-bind="'+it2.id+':lastService"/></td>'
-        + '<td><input type="date" value="'+(it2.nextDue||'')+'" data-bind="'+it2.id+':nextDue"/></td>'
-        + '<td><textarea class="notes" data-bind="'+it2.id+':notes" placeholder="Notes...">'+(it2.notes||'')+'</textarea></td>'
-        + '<td class="actions">'
-          + '<button class="btn" data-dup="'+it2.id+'">Duplicate</button>'
-          + '<button class="btn danger" data-del="'+it2.id+'">Remove</button>'
-        + '</td>';
+        var rowHtml = ''
+          + '<td><input type="checkbox" '+(it2.verified?'checked':'')+' data-bind="'+it2.id+':verified"/></td>'
+          + '<td style="min-width:220px">'+photosHtml+'</td>'
+          + '<td><input type="text" value="'+(it2.name||'')+'" placeholder="Item name" data-bind="'+it2.id+':name"/></td>'
+          + '<td><input type="text" value="'+(it2.location||'')+'" placeholder="e.g., Boiler Room" data-bind="'+it2.id+':location"/></td>'
+          + '<td><input type="text" value="'+(it2.model||'')+'" placeholder="Model #" data-bind="'+it2.id+':model"/></td>'
+          + '<td><input type="text" value="'+(it2.serial||'')+'" placeholder="Serial #" data-bind="'+it2.id+':serial"/></td>'
+          + '<td><input type="number" min="0" value="'+(it2.qty||1)+'" style="width:90px" data-bind="'+it2.id+':qty"/></td>'
+          + '<td>'
+            + '<input type="number" min="0" step="0.01" value="'+(typeof it2.estimatedValue==='number'?it2.estimatedValue:0)+'" style="width:120px" data-bind="'+it2.id+':estimatedValue"/>'
+            + '<div class="small" style="margin-top:4px">'+currency(estVal)+' × '+(qty||0)+' = <b>'+currency(estVal*qty)+'</b></div>'
+          + '</td>'
+          + '<td>'
+            + '<select data-bind="'+it2.id+':condition">'
+              + ['Excellent','Good','Fair','Needs Repair','Out of Service'].map(function(c){ return '<option '+(c===it2.condition?'selected':'')+'>'+c+'</option>'; }).join('')
+            + '</select>'
+            + '<div class="'+conditionBadge(it2.condition)+'" style="margin-top:6px">'+it2.condition+'</div>'
+          + '</td>'
+          + '<td>'
+            + '<select data-bind="'+it2.id+':status">'
+              + ['Active','Spare','Retired'].map(function(s){ return '<option '+(s===it2.status?'selected':'')+'>'+s+'</option>'; }).join('')
+            + '</select>'
+          + '</td>'
+          + '<td><input type="date" value="'+(it2.lastService||'')+'" data-bind="'+it2.id+':lastService"/></td>'
+          + '<td><input type="date" value="'+(it2.nextDue||'')+'" data-bind="'+it2.id+':nextDue"/></td>'
+          + '<td><textarea class="notes" data-bind="'+it2.id+':notes" placeholder="Notes...">'+(it2.notes||'')+'</textarea></td>'
+          + '<td class="actions">'
+            + '<button class="btn" data-dup="'+it2.id+'">Duplicate</button>'
+            + '<button class="btn danger" data-del="'+it2.id+'">Remove</button>'
+          + '</td>';
 
-      tr.innerHTML = rowHtml;
-      tb.appendChild(tr);
+        tr.innerHTML = rowHtml;
+        tb.appendChild(tr);
 
-      var addRow = document.createElement('tr');
-      addRow.className = 'add-row';
-      addRow.innerHTML = '<td colspan="14"><button class="btn primary" data-add-after="'+it2.id+'">+ Add Item Below</button></td>';
-      tb.appendChild(addRow);
+        var addRow = document.createElement('tr');
+        addRow.className = 'add-row';
+        addRow.innerHTML = '<td colspan="14"><button class="btn primary" data-add-after="'+it2.id+'">+ Add Item Below</button></td>';
+        tb.appendChild(addRow);
 
-      // bind photo input change (delegating 'change' is unreliable)
-      var photoInput = tr.querySelector('#photo_'+it2.id);
-      if (photoInput){
-        (function(xid){
-          photoInput.addEventListener('change', function(e){ onPhotoUpload(e, xid); });
-        })(it2.id);
-      }
+        var photoInput = tr.querySelector('#photo_'+it2.id);
+        if (photoInput){
+          (function(xid){
+            photoInput.addEventListener('change', function(e){ onPhotoUpload(e, xid); });
+          })(it2.id);
+        }
+
+        // Resolve photo object URLs async
+        var imgs = tr.querySelectorAll('img[data-photo-id]');
+        Array.prototype.forEach.call(imgs, function(imgEl){
+          var pid = imgEl.getAttribute('data-photo-id');
+          getObjectURLForPhoto(pid).then(function(url){
+            if(url) imgEl.src = url;
+            else imgEl.alt = 'missing';
+          });
+        });
+
+      })(filtered[f]);
     }
 
     // bind model updates
@@ -658,25 +872,17 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     updateChangeNotice();
   }
 
-  // Delegated actions for mobile robustness
+  // Delegated actions (clicks)
   var invBody = qs('#invBody');
   if (invBody){
     invBody.addEventListener('click', function(ev){
       var t = ev.target;
 
       var addBtn = t.closest && t.closest('[data-add-after]');
-      if(addBtn){
-        addItemAfterId(addBtn.getAttribute('data-add-after'));
-        userHasInteracted = true;
-        return;
-      }
+      if(addBtn){ addItemAfterId(addBtn.getAttribute('data-add-after')); return; }
 
       var delBtn = t.closest && t.closest('[data-del]');
-      if(delBtn){
-        removeItem(delBtn.getAttribute('data-del'));
-        userHasInteracted = true;
-        return;
-      }
+      if(delBtn){ removeItem(delBtn.getAttribute('data-del')); return; }
 
       var dupBtn = t.closest && t.closest('[data-dup]');
       if(dupBtn){
@@ -691,7 +897,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         render(); if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
         updateChangeNotice();
         flash('Item duplicated.');
-        userHasInteracted = true;
         return;
       }
 
@@ -699,14 +904,12 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       if(rmPhoto){
         var parts = rmPhoto.getAttribute('data-remove-photo').split(':');
         removePhoto(parts[0], parseInt(parts[1],10));
-        userHasInteracted = true;
         return;
       }
     });
   }
 
   function onBind(e){
-    userHasInteracted = true;
     var target = e.target;
     var ds = target.getAttribute('data-bind') || '';
     var parts = ds.split(':');
@@ -717,12 +920,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     for (var i=0;i<items.length;i++){ if(items[i].id===id){ it=items[i]; break; } }
     if(!it) return;
 
-    var val;
-    if(target.type==='checkbox') val = !!target.checked;
-    else val = target.value;
-
+    var val = (target.type==='checkbox') ? !!target.checked : target.value;
     if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
-
     it[field] = val;
 
     if(field==='qty' || field==='estimatedValue'){ updateTotalValueChip(); }
@@ -731,11 +930,15 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); }
   }
 
+  function itemKey(it){
+    function norm(s){ return (s?String(s):'').trim().toLowerCase(); }
+    return [norm(it.name), norm(it.location), norm(it.model), norm(it.serial)].join('|');
+  }
+
   function diffVsLast(currentItems){
     var last = getLastSubmitted();
     if(!last || !last.items || !last.items.length) return {added:[], missing:[]};
-    var mapPrev = {};
-    var mapCurr = {};
+    var mapPrev = {}, mapCurr = {};
     for (var i=0;i<last.items.length;i++){ mapPrev[itemKey(last.items[i])] = last.items[i]; }
     for (var j=0;j<currentItems.length;j++){ mapCurr[itemKey(currentItems[j])] = currentItems[j]; }
     var missing = [], added = [];
@@ -748,7 +951,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     var info = diffVsLast(items);
     var added = info.added||[], missing = info.missing||[], lastMeta = info.lastMeta, submittedAt = info.submittedAt;
     var box = qs('#changeNotice');
-
     if(!box) return;
 
     if(added.length===0 && missing.length===0){
@@ -775,11 +977,11 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       + '<div class="small" style="margin-top:6px">'+ lastLine +'</div>';
   }
 
-  qs('#submitBtn').addEventListener('click', onSubmitInventory);
-  function onSubmitInventory(){
+  // Submit → archive baseline locally
+  qs('#submitBtn').addEventListener('click', function(){
     var noPhoto = [];
     for (var i=0;i<items.length;i++){
-      if(!items[i].photos || !items[i].photos.length) noPhoto.push(items[i]);
+      if(!items[i].photoIds || !items[i].photoIds.length) noPhoto.push(items[i]);
     }
     var notice = qs('#submitNotice');
     if(noPhoto.length){
@@ -789,48 +991,78 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     }
     notice.style.display='none';
     var payload = workingPayload();
-    saveLocal(false); checkpoint();
+    saveLocalImmediate(false); checkpoint();
     setLastSubmitted(payload);
     updateChangeNotice();
     flash('Inventory submitted & archived as baseline.');
+  });
+
+  /* ----------------- PDF Export (pulls blobs from IDB) ----------------- */
+
+  qs('#pdfBtn').addEventListener('click', downloadPDF);
+
+  function blobToDataURL(blob, maxW, maxH, quality){
+    return new Promise(function(res){
+      var url = URL.createObjectURL(blob);
+      var img = new Image();
+      img.onload = function(){
+        var w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+        var r = Math.min(maxW / w, maxH / h, 1);
+        var cw = Math.round(w * r), ch = Math.round(h * r);
+        var c = document.createElement('canvas');
+        c.width = cw; c.height = ch;
+        var ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, cw, ch);
+        var durl = c.toDataURL('image/jpeg', quality);
+        URL.revokeObjectURL(url);
+        res(durl);
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); res(null); };
+      img.src = url;
+    });
   }
 
-  // PDF export (unchanged logic, with basic guards)
-  qs('#pdfBtn').addEventListener('click', downloadPDF);
-  function downloadPDF(){
+  async function getPhotoDataURL(photoId, maxW, maxH, q){
+    var blob = await idbGetPhotoBlob(photoId);
+    if(!blob) return null;
+    return await blobToDataURL(blob, maxW, maxH, q);
+  }
+
+  async function downloadPDF(){
     var jsPDF = window.jspdf && window.jspdf.jsPDF ? window.jspdf.jsPDF : null;
     if(!jsPDF){ flash('PDF library not loaded'); return; }
 
-    var doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
-    var margin = 48;
-    var pageWidth  = doc.internal.pageSize.getWidth();
-    var pageHeight = doc.internal.pageSize.getHeight();
+    const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
+    const margin = 48;
+    const pageWidth  = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     doc.setLineHeightFactor(1.25);
 
+    // Header
     doc.setFillColor(52,73,94);
     doc.rect(0,0,pageWidth,72,'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(255,255,255);
     doc.text('Maintenance & Equipment Inventory', margin, 46);
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    try{ doc.text('Generated: ' + (new Date().toLocaleString()), pageWidth - margin, 46, {align:'right'}); }catch(e){ doc.text('Generated', pageWidth - margin, 46, {align:'right'}); }
+    doc.text('Generated: ' + (new Date().toLocaleString()), pageWidth - margin, 46, {align:'right'});
 
-    var y = 96;
-    var propId = (qs('#propertyId') && qs('#propertyId').value) || '';
+    // Meta
+    let y = 96;
+    const propId = (qs('#propertyId') && qs('#propertyId').value) || '';
     doc.setTextColor(44,62,80);
 
     if(propId){
       doc.setFont('helvetica','bold'); doc.setFontSize(13);
-      var propIdWrapped = doc.splitTextToSize('Property: ' + propId, pageWidth - margin*2);
+      const propIdWrapped = doc.splitTextToSize('Property: ' + propId, pageWidth - margin*2);
       doc.text(propIdWrapped, margin, y);
       y += propIdWrapped.length*14;
     }
 
     doc.setFont('helvetica','normal'); doc.setFontSize(12);
-    var invDate = (qs('#invDate') && qs('#invDate').value) || '—';
-    var by = (qs('#conductedBy') && qs('#conductedBy').value) || '—';
-    var prop = (qs('#property') && qs('#property').value) || '—';
-    var notes = (qs('#overallNotes') && qs('#overallNotes').value) || '';
-    var totalVal = 0;
+    const invDate = (qs('#invDate') && qs('#invDate').value) || '—';
+    const by = (qs('#conductedBy') && qs('#conductedBy').value) || '—';
+    const prop = (qs('#property') && qs('#property').value) || '—';
+    let totalVal = 0;
     for (var i2=0;i2<items.length;i2++){
       var it = items[i2];
       totalVal += (Number(it.estimatedValue)||0)*(Number(it.qty)||0);
@@ -845,46 +1077,28 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     catch(e){ doc.text('Total Estimated Value: $' + totalVal.toFixed(2), margin, y); }
     y += 14;
 
-    if(notes){
-      doc.setFontSize(11); doc.setTextColor(127,140,141);
-      var wrapped = doc.splitTextToSize('Notes: ' + notes, pageWidth - margin*2);
-      doc.text(wrapped, margin, y);
-      y += wrapped.length*13 + 6;
-      doc.setTextColor(44,62,80); doc.setFontSize(12);
-    }
-
-    var info = (function(){
-      var last = getLastSubmitted();
-      if(!last || !last.items || !last.items.length) return {added:[], missing:[], submittedAt:null, lastMeta:null};
-      var mapPrev = {}, mapCurr = {};
-      for (var i3=0;i3<last.items.length;i3++){ mapPrev[itemKey(last.items[i3])] = last.items[i3]; }
-      for (var j3=0;j3<items.length;j3++){ mapCurr[itemKey(items[j3])] = items[j3]; }
-      var miss=[], add=[];
-      for (var k in mapPrev){ if(!mapCurr[k]) miss.push(mapPrev[k]); }
-      for (var k2 in mapCurr){ if(!mapPrev[k2]) add.push(mapCurr[k2]); }
-      return {added:add, missing:miss, submittedAt:last.submittedAt, lastMeta:last.meta};
-    })();
-
+       // Changes
+    const info = diffVsLast(items);
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
     doc.text('Changes vs Previous Submission', margin, y);
     y += 10;
-
     doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(90);
-    if(!getLastSubmitted()){
+    const last = getLastSubmitted();
+    if(!last){
       doc.text('No previous submitted inventory found. This report will become the baseline once submitted.', margin, y);
       y += 18;
     }else if((!info.added || !info.added.length) && (!info.missing || !info.missing.length)){
-      var noChTxt = 'No changes since last submission (' + (new Date(info.submittedAt).toLocaleString());
-      if(info.lastMeta && info.lastMeta.conductedBy) noChTxt += ' by ' + info.lastMeta.conductedBy;
+      let noChTxt = 'No changes since last submission (' + (new Date(last.submittedAt).toLocaleString());
+      if(last.meta && last.meta.conductedBy) noChTxt += ' by ' + last.meta.conductedBy;
       noChTxt += ').';
       doc.text(noChTxt, margin, y);
       y += 18;
     }else{
-      var lastTxt = 'Last submitted: ' + (new Date(info.submittedAt).toLocaleString());
-      if(info.lastMeta && info.lastMeta.conductedBy) lastTxt += ' by ' + info.lastMeta.conductedBy;
+      let lastTxt = 'Last submitted: ' + (new Date(last.submittedAt).toLocaleString());
+      if(last.meta && last.meta.conductedBy) lastTxt += ' by ' + last.meta.conductedBy;
       doc.text(lastTxt, margin, y);
       y += 14;
-      var rows = [];
+      const rows = [];
       for (var m=0;m<(info.missing?info.missing.length:0);m++){
         var mi = info.missing[m];
         rows.push(['Missing', mi.name||'', mi.location||'', mi.model||'', mi.serial||'', String(mi.qty||0)]);
@@ -915,10 +1129,10 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y = doc.lastAutoTable.finalY + 20;
     }
 
-    // Missing photos warning
+    // Missing photos banner
     var noPhoto = [];
     for (var n=0;n<items.length;n++){
-      if(!items[n].photos || !items[n].photos.length) noPhoto.push(items[n]);
+      if(!items[n].photoIds || !items[n].photoIds.length) noPhoto.push(items[n]);
     }
     if(noPhoto.length){
       doc.setFillColor(255,225,225);
@@ -929,20 +1143,33 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y += 42;
     }
 
-    // Inventory table + photo gallery (unchanged)
-    var head = [['Photo','Name','Location','Model','Serial','Qty','Est. Value','Line Total']];
-    var body = [];
+    // Inventory table: pull first photo (if any) from IDB and convert for PDF
+    const head = [['Photo','Name','Location','Model','Serial','Qty','Est. Value','Line Total']];
+    const body = [];
     for (var ii=0; ii<items.length; ii++) {
       var it3 = items[ii];
       var ev = Number(it3.estimatedValue) || 0;
       var q  = Number(it3.qty) || 0;
-      var line = ev * q;
-      var photoCell = {content:'', rowSpan:2, styles:{halign:'center',valign:'middle'}, _img:(it3.photos && it3.photos[0])?it3.photos[0]:null};
+      var lineTotal = ev * q;
 
-      var evStr='$'+ev.toFixed(2), lineStr='$'+line.toFixed(2);
-      try{ evStr = ev.toLocaleString('en-US',{style:'currency',currency:'USD'}); lineStr = line.toLocaleString('en-US',{style:'currency',currency:'USD'});}catch(e){}
+      var photoDataUrl = null;
+      if (it3.photoIds && it3.photoIds.length){
+        // Downscale to ~1000px for the PDF
+        // eslint-disable-next-line no-await-in-loop
+        photoDataUrl = await getPhotoDataURL(it3.photoIds[0], 1000, 1000, 0.8);
+      }
 
-      body.push([photoCell, it3.name||'', it3.location||'', it3.model||'', it3.serial||'', String(q), evStr, lineStr]);
+      body.push([
+        { content:'', rowSpan:2, styles:{ halign:'center', valign:'middle' }, _img: photoDataUrl },
+        it3.name || '',
+        it3.location || '',
+        it3.model || '',
+        it3.serial || '',
+        String(q),
+        (function(v){ try{return v.toLocaleString('en-US',{style:'currency',currency:'USD'});}catch(e){return '$'+v.toFixed(2);} })(ev),
+        (function(v){ try{return v.toLocaleString('en-US',{style:'currency',currency:'USD'});}catch(e){return '$'+v.toFixed(2);} })(lineTotal)
+      ]);
+
       var details = 'Condition: ' + (it3.condition || '—')
         + '   •   Status: ' + (it3.status || '—')
         + '   •   Service: ' + (it3.lastService || '—') + ' → ' + (it3.nextDue || '—')
@@ -952,8 +1179,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     }
 
     doc.autoTable({
-      head: head,
-      body: body,
+      head,
+      body,
       startY: y,
       theme: 'grid',
       tableWidth: 'wrap',
@@ -969,12 +1196,14 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         var x = data.cell.x, y0 = data.cell.y, width = data.cell.width, height = data.cell.height;
         var pad = 4, boxW = width - pad*2, boxH = height - pad*2;
         try {
-          var draw = function(fmt){ doc.addImage(raw._img, fmt, x + pad, y0 + pad, boxW, boxH, undefined, 'FAST'); };
-          try { draw('JPEG'); } catch (e1) { draw('PNG'); }
+          doc.addImage(raw._img, 'JPEG', x + pad, y0 + pad, boxW, boxH, undefined, 'FAST');
         } catch (e2) {
-          doc.setDrawColor(210); doc.rect(x + pad, y0 + pad, boxW, boxH);
-          doc.setFontSize(9); doc.setTextColor(130);
-          doc.text('No photo', x + pad + 6, y0 + pad + 14);
+          try { doc.addImage(raw._img, 'PNG', x + pad, y0 + pad, boxW, boxH, undefined, 'FAST'); }
+          catch(e3){
+            doc.setDrawColor(210); doc.rect(x + pad, y0 + pad, boxW, boxH);
+            doc.setFontSize(9); doc.setTextColor(130);
+            doc.text('No photo', x + pad + 6, y0 + pad + 14);
+          }
         }
       },
       didDrawPage: function(ctx){
@@ -984,44 +1213,50 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       }
     });
 
-    var thumbW = 120, thumbH = 90, gap = 10;
-    var py = doc.lastAutoTable.finalY + 24;
+    // Photo gallery (optional): embed every photo; beware large PDFs
+    let py = doc.lastAutoTable.finalY + 24;
     if(py + 60 > pageHeight){ doc.addPage('letter','landscape'); py = 56; }
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
     doc.text('Photo Verification', margin, py);
     py += 14;
-    var perRow = Math.floor((pageWidth - margin*2 + gap)/ (thumbW + gap));
 
-    for(var iii=0; iii<items.length; iii++){
-      var itp = items[iii];
+    const thumbW = 120, thumbH = 90, gap = 10;
+    const perRow = Math.floor((pageWidth - margin*2 + gap)/ (thumbW + gap));
+
+    for(const itp of items){
       if(py + 42 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; }
       doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(52,73,94);
       doc.text((itp.name || 'Unnamed Item') + ' — ' + (itp.location || '—'), margin, py);
       py += 12;
       doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
-      var line = 'Model: ' + (itp.model||'—') + '   Serial: ' + (itp.serial||'—') + '   Qty: ' + (itp.qty||0) + '   Verified: ' + (itp.verified?'Yes':'No');
+      const line = 'Model: ' + (itp.model||'—') + '   Serial: ' + (itp.serial||'—') + '   Qty: ' + (itp.qty||0) + '   Verified: ' + (itp.verified?'Yes':'No');
       doc.text(doc.splitTextToSize(line, pageWidth - margin*2), margin, py);
       py += 12;
 
-      if(!itp.photos || !itp.photos.length){
+      if(!itp.photoIds || !itp.photoIds.length){
         doc.setFontSize(10); doc.setTextColor(150);
         doc.text('No photos attached.', margin, py);
         py += 18;
         continue;
       }
 
-      var col = 0;
-      for(var pp=0; pp<itp.photos.length; pp++){
+      let col = 0;
+      for(const pid of itp.photoIds){
         if(py + thumbH + 22 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; col = 0; }
-        var x0 = margin + col*(thumbW+gap);
-        try{ doc.addImage(itp.photos[pp], 'JPEG', x0, py, thumbW, thumbH, undefined, 'FAST'); }
-        catch(e){ try{ doc.addImage(itp.photos[pp], 'PNG', x0, py, thumbW, thumbH, undefined, 'FAST'); } catch(e2){} }
+        // eslint-disable-next-line no-await-in-loop
+        const durl = await getPhotoDataURL(pid, 1000, 1000, 0.8);
+        if (durl){
+          const x0 = margin + col*(thumbW+gap);
+          try{ doc.addImage(durl, 'JPEG', x0, py, thumbW, thumbH, undefined, 'FAST'); }
+          catch(e){ try{ doc.addImage(durl, 'PNG', x0, py, thumbW, thumbH, undefined, 'FAST'); } catch(e2){} }
+        }
         col++;
         if(col>=perRow){ col=0; py += thumbH + 12; }
       }
       if(col>0) py += thumbH + 12;
     }
 
+    // Signature line
     if(py + 48 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; }
     doc.setDrawColor(180);
     doc.line(margin, pageHeight-92, margin+260, pageHeight-92);
@@ -1036,9 +1271,16 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     flash('PDF downloaded.');
   }
 
-  // Top-level controls
-  qs('#saveBtn').addEventListener('click', function(){ userHasInteracted = true; saveLocal(true); checkpoint(); });
-  qs('#loadBtn').addEventListener('click', function(){ loadLocal(); });
+  /* ----------------- Top-level controls ----------------- */
+
+  var userHasInteracted = false;
+
+  qs('#saveBtn').addEventListener('click', function(){
+    userHasInteracted = true;
+    saveLocal(true);
+    checkpoint();
+  });
+  qs('#loadBtn').addEventListener('click', function(){ smartLoad(); });
   qs('#exportJsonBtn').addEventListener('click', function(){ exportJSON(); });
   var importEl = qs('#importJson');
   if (importEl){
@@ -1050,7 +1292,11 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   qs('#bulkVerifyBtn').addEventListener('click', function(){
     if(!items.length) return;
     for (var i=0;i<items.length;i++){ items[i].verified=true; }
-    render(); if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
+    render();
+    if(qs('#autoSave') && qs('#autoSave').checked){
+      saveLocal(false);
+      checkpoint();
+    }
   });
 
   qs('#clearAllBtn').addEventListener('click', function(){
@@ -1064,8 +1310,14 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     render(); updateChangeNotice(); flash('Reset.');
   });
 
-  qs('#addItemBtn').addEventListener('click', function(){ addItem(); userHasInteracted = true; });
-  qs('#addItemBtnFooter').addEventListener('click', function(){ addItem(); userHasInteracted = true; });
+  qs('#addItemBtn').addEventListener('click', function(){
+    addItem();
+    userHasInteracted = true;
+  });
+  qs('#addItemBtnFooter').addEventListener('click', function(){
+    addItem();
+    userHasInteracted = true;
+  });
 
   // Filters
   var filterIds = ['#searchTxt','#fCondition','#fStatus','#fLocation'];
@@ -1089,14 +1341,23 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   for (var mi=0; mi<metaIds.length; mi++){
     (function(sel){
       var el = qs(sel); if(!el) return;
-      el.addEventListener('change', function(){ userHasInteracted = true; if(qs('#autoSave') && qs('#autoSave').checked) saveLocal(false); });
-      el.addEventListener('input',  function(){ userHasInteracted = true; if(qs('#autoSave') && qs('#autoSave').checked) saveLocal(false); });
+      el.addEventListener('change', function(){
+        userHasInteracted = true;
+        if(qs('#autoSave') && qs('#autoSave').checked) saveLocal(false);
+      });
+      el.addEventListener('input',  function(){
+        userHasInteracted = true;
+        if(qs('#autoSave') && qs('#autoSave').checked) saveLocal(false);
+      });
     })(metaIds[mi]);
   }
 
-  // Init
-  loadLocal();
-  if(items.length===0){ addItem({name:'Boiler Pump', location:'Boiler Room'}); }
+  // Init (migrate legacy if present, then load/checkpoint fallback)
+  (async function init(){
+    try { await tryMigrateLegacy(); } catch(e){}
+    smartLoad();
+    if(items.length===0){ addItem({name:'Boiler Pump', location:'Boiler Room'}); }
+  })();
 
 })();
 </script>
