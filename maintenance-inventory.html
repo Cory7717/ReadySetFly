@@ -75,6 +75,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     <button class="btn" id="loadBtn">Load</button>
     <button class="btn" id="exportJsonBtn">Export (.json)</button>
     <label class="btn" for="importJson">Import (.json)</label><input id="importJson" type="file" accept=".json"/>
+    <button class="btn" id="exportBaselineBtn">Export Baseline (.json)</button>
+    <label class="btn" for="importBaseline">Import Baseline (.json)</label><input id="importBaseline" type="file" accept=".json"/>
     <label class="pill"><input id="autoSave" type="checkbox" checked/> Auto-save</label>
     <button class="btn" id="submitBtn" title="Validate & archive this inventory">Submit Inventory</button>
     <button class="btn" id="pdfBtn">Download Inventory (PDF)</button>
@@ -131,7 +133,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
           <label>Condition</label>
           <select id="fCondition">
             <option value="">All</option>
-            <option>Excellent</option>
+            <option>Excellent</</option>
             <option>Good</option>
             <option>Fair</option>
             <option>Needs Repair</option>
@@ -263,12 +265,32 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     };
   }
 
+  // small pool mapper for async work (e.g., images)
+  async function mapWithLimit(arr, limit, mapper){
+    const res = new Array(arr.length);
+    let i = 0, active = 0;
+    return new Promise((resolve) => {
+      function next(){
+        if (i >= arr.length && active === 0) return resolve(res);
+        while (active < limit && i < arr.length){
+          const idx = i++, p = Promise.resolve().then(() => mapper(arr[idx], idx));
+          active++;
+          p.then(v => res[idx]=v).finally(()=>{ active--; next(); });
+        }
+      }
+      next();
+    });
+  }
+
   var STORAGE_KEY='maintInv_v3_working';           // bumped schema
   var STORAGE_LAST='maintInv_v3_lastSubmitted';
+  var STORAGE_HISTORY='maintInv_v3_submissions';
 
   var items = [];               // each item has photoIds[]
   var objectUrlCache = {};      // photoId -> objectURL (to revoke)
   var AUTO_SAVE_DELAY = 900;
+
+  const MAX_GALLERY_PHOTOS = 400;   // optional cap for very large PDFs
 
   function defaultItem(){
     return {
@@ -399,12 +421,25 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     try{ return JSON.parse(raw); }catch(e){ return null; }
   }
 
+  function getHistory(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_HISTORY)||'[]'); }
+    catch(_) { return []; }
+  }
+  function pushHistory(snapshot){
+    var list = getHistory();
+    list.push(snapshot);
+    if (list.length > 20) list = list.slice(-20); // keep last 20
+    localStorage.setItem(STORAGE_HISTORY, JSON.stringify(list));
+  }
+
   function setLastSubmitted(payload){
-    localStorage.setItem(STORAGE_LAST, JSON.stringify({
+    const snap = {
       submittedAt: new Date().toISOString(),
       meta: payload.meta,
       items: payload.items
-    }));
+    };
+    localStorage.setItem(STORAGE_LAST, JSON.stringify(snap));
+    pushHistory(snap);
   }
 
   function exportJSON(){
@@ -425,6 +460,32 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         loadLocal();
         flash('Imported (metadata). Note: photos must already be on this device.');
       }catch(err){ console.error(err); flash('Import failed.'); }
+    };
+    r.readAsText(file);
+  }
+
+  function exportBaseline(){
+    const snap = getLastSubmitted();
+    if(!snap){ flash('No baseline to export.'); return; }
+    const blob = new Blob([JSON.stringify(snap)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const dateStr = (snap.meta && snap.meta.invDate) ? snap.meta.invDate : new Date(snap.submittedAt).toISOString().slice(0,10);
+    a.download = 'inventory_baseline_'+dateStr+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  function importBaseline(file){
+    var r=new FileReader();
+    r.onload=function(e){
+      try{
+        const snap=JSON.parse(e.target.result);
+        if(!snap || !Array.isArray(snap.items)) throw new Error('Invalid baseline');
+        localStorage.setItem(STORAGE_LAST, JSON.stringify(snap));
+        pushHistory(snap);
+        updateChangeNotice();
+        flash('Baseline imported.');
+      }catch(err){ console.error(err); flash('Import baseline failed.'); }
     };
     r.readAsText(file);
   }
@@ -531,6 +592,16 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         tx.onerror = function(e){ rej(e.target.error); };
       });
     });
+  }
+
+  function wipeAllPhotos(){
+    return openDB().then(db => new Promise((res, rej)=>{
+      var tx = db.transaction('photos','readwrite');
+      var store = tx.objectStore('photos');
+      var req = store.clear();
+      req.onsuccess = function(){ res(true); };
+      req.onerror = function(e){ rej(e.target.error); };
+    }));
   }
 
   // Object URL cache helpers
@@ -767,8 +838,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     var tb = qs('#invBody'); if(!tb) return;
     tb.innerHTML = '';
 
-    // for (var pid in objectUrlCache){ if (objectUrlCache.hasOwnProperty(pid)) revokeObjectURL(pid); }
-
     for(var f=0; f<filtered.length; f++){
       (function(it2){
         var needsPhotos = !it2.photoIds || it2.photoIds.length===0;
@@ -781,7 +850,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
           for (var p=0;p<it2.photoIds.length;p++){
             photosHtmlParts.push(
               '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">'
-                + '<img data-photo-id="'+it2.photoIds[p]+'" class="thumb" alt="photo" />'
+                + '<img data-photo-id="'+it2.photoIds[p]+'" class="thumb" loading="lazy" alt="photo" />'
                 + '<button class="btn danger small" data-remove-photo="'+it2.id+':'+p+'">Remove</button>'
               + '</div>'
             );
@@ -935,16 +1004,19 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     return [norm(it.name), norm(it.location), norm(it.model), norm(it.serial)].join('|');
   }
 
-  function diffVsLast(currentItems){
-    var last = getLastSubmitted();
-    if(!last || !last.items || !last.items.length) return {added:[], missing:[]};
+  function diffVsSnapshot(currentItems, snapshot){
+    if(!snapshot || !snapshot.items || !snapshot.items.length) return {added:[], missing:[], lastMeta:null, submittedAt:null};
     var mapPrev = {}, mapCurr = {};
-    for (var i=0;i<last.items.length;i++){ mapPrev[itemKey(last.items[i])] = last.items[i]; }
+    for (var i=0;i<snapshot.items.length;i++){ mapPrev[itemKey(snapshot.items[i])] = snapshot.items[i]; }
     for (var j=0;j<currentItems.length;j++){ mapCurr[itemKey(currentItems[j])] = currentItems[j]; }
     var missing = [], added = [];
     for (var k in mapPrev){ if(!mapCurr[k]) missing.push(mapPrev[k]); }
     for (var k2 in mapCurr){ if(!mapPrev[k2]) added.push(mapCurr[k2]); }
-    return {added:added, missing:missing, lastMeta:last.meta, submittedAt:last.submittedAt};
+    return {added:added, missing:missing, lastMeta:snapshot.meta, submittedAt:snapshot.submittedAt};
+  }
+
+  function diffVsLast(currentItems){
+    return diffVsSnapshot(currentItems, getLastSubmitted());
   }
 
   function updateChangeNotice(){
@@ -977,17 +1049,25 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       + '<div class="small" style="margin-top:6px">'+ lastLine +'</div>';
   }
 
-  // Submit → archive baseline locally
+  // Submit → archive baseline locally (with stricter validation)
   qs('#submitBtn').addEventListener('click', function(){
     var noPhoto = [];
+    var emptyCore = 0;
     for (var i=0;i<items.length;i++){
-      if(!items[i].photoIds || !items[i].photoIds.length) noPhoto.push(items[i]);
+      var it = items[i];
+      if(!it.photoIds || !it.photoIds.length) noPhoto.push(it);
+      if(!it.name && !it.model && !it.serial) emptyCore++;
     }
     var notice = qs('#submitNotice');
     if(noPhoto.length){
       notice.style.display='block';
       notice.textContent = 'Cannot submit: ' + noPhoto.length + ' item' + (noPhoto.length!==1?'s':'') + ' missing required photo(s). Add at least one photo per item.';
       render(); flash('Add photos to all items before submitting.'); return;
+    }
+    if (emptyCore > 0){
+      notice.style.display='block';
+      notice.textContent = 'Please fill at least a name/model/serial for every item ('+emptyCore+' incomplete).';
+      return;
     }
     notice.style.display='none';
     var payload = workingPayload();
@@ -1029,10 +1109,20 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
   }
 
   async function downloadPDF(){
-    var jsPDF = window.jspdf && window.jspdf.jsPDF ? window.jspdf.jsPDF : null;
-    if(!jsPDF){ flash('PDF library not loaded'); return; }
-
+    // Guards for library load
+    var jsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : null;
+    if(!jsPDF || !window.jspdf || !window.jspdf.jsPDF){
+      flash('PDF libraries not loaded'); 
+      return;
+    }
     const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
+    if (typeof doc.autoTable !== 'function') {
+      flash('PDF table plugin not loaded');
+      return;
+    }
+
+    flash('Building summary…');
+
     const margin = 48;
     const pageWidth  = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -1077,7 +1167,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     catch(e){ doc.text('Total Estimated Value: $' + totalVal.toFixed(2), margin, y); }
     y += 14;
 
-       // Changes
+    // Changes vs previous
     const info = diffVsLast(items);
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
     doc.text('Changes vs Previous Submission', margin, y);
@@ -1143,6 +1233,8 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y += 42;
     }
 
+    flash('Adding line items…');
+
     // Inventory table: pull first photo (if any) from IDB and convert for PDF
     const head = [['Photo','Name','Location','Model','Serial','Qty','Est. Value','Line Total']];
     const body = [];
@@ -1196,14 +1288,19 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
         var x = data.cell.x, y0 = data.cell.y, width = data.cell.width, height = data.cell.height;
         var pad = 4, boxW = width - pad*2, boxH = height - pad*2;
         try {
-          doc.addImage(raw._img, 'JPEG', x + pad, y0 + pad, boxW, boxH, undefined, 'FAST');
-        } catch (e2) {
-          try { doc.addImage(raw._img, 'PNG', x + pad, y0 + pad, boxW, boxH, undefined, 'FAST'); }
-          catch(e3){
-            doc.setDrawColor(210); doc.rect(x + pad, y0 + pad, boxW, boxH);
-            doc.setFontSize(9); doc.setTextColor(130);
-            doc.text('No photo', x + pad + 6, y0 + pad + 14);
-          }
+          // Preserve aspect ratio using image properties
+          var props = doc.getImageProperties(raw._img);
+          var r = Math.min(boxW / props.width, boxH / props.height);
+          var w = props.width * r, h = props.height * r;
+          var dx = x + pad + (boxW - w)/2;
+          var dy = y0 + pad + (boxH - h)/2;
+          try { doc.addImage(raw._img, 'JPEG', dx, dy, w, h, undefined, 'FAST'); }
+          catch (e2) { try { doc.addImage(raw._img, 'PNG', dx, dy, w, h, undefined, 'FAST'); } catch(e3){} }
+        } catch(e){
+          // fallback
+          doc.setDrawColor(210); doc.rect(x + pad, y0 + pad, boxW, boxH);
+          doc.setFontSize(9); doc.setTextColor(130);
+          doc.text('No photo', x + pad + 6, y0 + pad + 14);
         }
       },
       didDrawPage: function(ctx){
@@ -1213,7 +1310,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       }
     });
 
-    // Photo gallery (optional): embed every photo; beware large PDFs
+    // -------- Photo gallery (optional) --------
     let py = doc.lastAutoTable.finalY + 24;
     if(py + 60 > pageHeight){ doc.addPage('letter','landscape'); py = 56; }
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
@@ -1221,8 +1318,11 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     py += 14;
 
     const thumbW = 120, thumbH = 90, gap = 10;
-    const perRow = Math.floor((pageWidth - margin*2 + gap)/ (thumbW + gap));
+    const perRow = Math.floor((pageWidth - margin*2 + gap) / (thumbW + gap));
+    let totalShown = 0;
+    let capped = false;
 
+    outer:
     for(const itp of items){
       if(py + 42 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; }
       doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(52,73,94);
@@ -1242,6 +1342,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 
       let col = 0;
       for(const pid of itp.photoIds){
+        if(totalShown >= MAX_GALLERY_PHOTOS){ capped = true; break outer; }
         if(py + thumbH + 22 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; col = 0; }
         // eslint-disable-next-line no-await-in-loop
         const durl = await getPhotoDataURL(pid, 1000, 1000, 0.8);
@@ -1249,11 +1350,19 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
           const x0 = margin + col*(thumbW+gap);
           try{ doc.addImage(durl, 'JPEG', x0, py, thumbW, thumbH, undefined, 'FAST'); }
           catch(e){ try{ doc.addImage(durl, 'PNG', x0, py, thumbW, thumbH, undefined, 'FAST'); } catch(e2){} }
+          totalShown++;
         }
         col++;
         if(col>=perRow){ col=0; py += thumbH + 12; }
       }
       if(col>0) py += thumbH + 12;
+    }
+
+    if(capped){
+      if(py + 40 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; }
+      doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(120);
+      doc.text('Note: Photo gallery capped at '+MAX_GALLERY_PHOTOS+' images to keep PDF size reasonable.', margin, py);
+      py += 16;
     }
 
     // Signature line
@@ -1264,12 +1373,12 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     doc.text('Signature (Conducted By)', margin, pageHeight-76);
 
     var dateSlug = (qs('#invDate') && qs('#invDate').value) ? qs('#invDate').value : new Date().toISOString().slice(0,10);
-    var idSlug = (propId||'').replace(/[^\w\-]+/g,'_').slice(0,40);
+    var idSlug = ((qs('#propertyId') && qs('#propertyId').value) || '').replace(/[^\w\-]+/g,'_').slice(0,40);
     var fname = 'Inventory_' + (idSlug ? idSlug + '_' : '') + dateSlug + '.pdf';
 
     doc.save(fname);
     flash('PDF downloaded.');
-  }
+  } // end downloadPDF
 
   /* ----------------- Top-level controls ----------------- */
 
@@ -1289,6 +1398,15 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     });
   }
 
+  // Baseline controls
+  qs('#exportBaselineBtn').addEventListener('click', exportBaseline);
+  var importBaseEl = qs('#importBaseline');
+  if(importBaseEl){
+    importBaseEl.addEventListener('change', function(e){
+      if(e.target && e.target.files && e.target.files[0]) importBaseline(e.target.files[0]);
+    });
+  }
+
   qs('#bulkVerifyBtn').addEventListener('click', function(){
     if(!items.length) return;
     for (var i=0;i<items.length;i++){ items[i].verified=true; }
@@ -1299,9 +1417,13 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     }
   });
 
-  qs('#clearAllBtn').addEventListener('click', function(){
-    if(!confirm('This will remove all items and session info on this device. Proceed?')) return;
-    localStorage.removeItem(STORAGE_KEY); items=[];
+  qs('#clearAllBtn').addEventListener('click', async function(){
+    if(!confirm('This will remove all items, session info, and ALL photos on this device. Proceed?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_LAST);
+    localStorage.removeItem(STORAGE_HISTORY);
+    try { await wipeAllPhotos(); } catch(_) {}
+    items=[];
     if(qs('#propertyId')) qs('#propertyId').value='';
     if(qs('#invDate')) qs('#invDate').value='';
     if(qs('#conductedBy')) qs('#conductedBy').value='';
@@ -1359,7 +1481,7 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     if(items.length===0){ addItem({name:'Boiler Pump', location:'Boiler Room'}); }
   })();
 
-})();
+})(); // IIFE end
 </script>
 </body>
 </html>
