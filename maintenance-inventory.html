@@ -10,6 +10,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg1:#667eea;--bg2:#764ba2;--panelTint:rgba(255,255,255,.95);--ink:#2c3e50;--inkSoft:#7f8c8d;--brand1:#3498db;--brand2:#2980b9;--dark1:#2c3e50;--dark2:#34495e;--goodBg:#e8f5e8;--good:#27ae60;--warnBg:#fff3cd;--warn:#856404;--posBg:#d1edcc;--pos:#155724;--negBg:#f8d7da;--neg:#721c24;--grid:#e0e0e0}
+html,body{overscroll-behavior-y:contain}
 body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));min-height:100vh;padding:20px}
 .container{max-width:1300px;margin:0 auto;background:var(--panelTint);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.1);backdrop-filter:blur(10px);overflow:hidden}
 .header{background:linear-gradient(135deg,var(--dark1),var(--brand1));color:#fff;padding:24px;text-align:center}
@@ -77,7 +78,6 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     <label class="pill"><input id="autoSave" type="checkbox" checked/> Auto-save</label>
     <button class="btn" id="submitBtn" title="Validate & archive this inventory">Submit Inventory</button>
     <button class="btn" id="pdfBtn">Download Inventory (PDF)</button>
-    <!-- NEW: global add item -->
     <button class="btn primary" id="addItemBtn">+ Add Item</button>
   </div>
 
@@ -198,106 +198,185 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 </div>
 
 <script>
-(()=>{
+(function(){
 
-  /* -------------------------
-     Robust UUID (mobile safe)
-  ------------------------- */
+  /* ---------- Polyfills & Setup ---------- */
+
+  // closest() polyfill
+  if (!Element.prototype.closest) {
+    Element.prototype.closest = function(s){
+      var el=this;
+      if(!document.documentElement.contains(el)) return null;
+      do {
+        if (el.matches && el.matches(s)) return el;
+        el = el.parentElement || el.parentNode;
+      } while (el && el.nodeType===1);
+      return null;
+    };
+  }
+
+  // crypto.randomUUID polyfill (robust)
   (function ensureUUID(){
     try{
-      if(!globalThis.crypto) globalThis.crypto = {};
-      if(typeof globalThis.crypto.randomUUID !== 'function'){
-        const rnd = () => (crypto.getRandomValues ? crypto.getRandomValues(new Uint8Array(1))[0] : Math.floor(Math.random()*256));
-        const hex = (n)=>n.toString(16).padStart(2,'0');
-        globalThis.crypto.randomUUID = function(){
-          const b = new Uint8Array(16);
-          if(crypto.getRandomValues) crypto.getRandomValues(b);
-          else for(let i=0;i<16;i++) b[i]=rnd();
-          b[6] = (b[6] & 0x0f) | 0x40; // version 4
-          b[8] = (b[8] & 0x3f) | 0x80; // variant
-          const h = Array.from(b,hex).join('');
-          return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+      if(!window.crypto) window.crypto = {};
+      if(typeof window.crypto.randomUUID !== 'function'){
+        var rnd = function(){ return (window.crypto.getRandomValues ? window.crypto.getRandomValues(new Uint8Array(1))[0] : Math.floor(Math.random()*256)); };
+        var hex = function(n){ var s=n.toString(16); return s.length===1?'0'+s:s; };
+        window.crypto.randomUUID = function(){
+          var b = new Uint8Array(16);
+          if(window.crypto.getRandomValues) window.crypto.getRandomValues(b);
+          else { for(var i=0;i<16;i++) b[i]=rnd(); }
+          b[6] = (b[6] & 0x0f) | 0x40;
+          b[8] = (b[8] & 0x3f) | 0x80;
+          var h=''; for(var j=0;j<16;j++) h+=hex(b[j]);
+          return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
         };
       }
-    }catch(e){ /* last-ditch fallback */ 
-      globalThis.crypto = globalThis.crypto || {};
-      globalThis.crypto.randomUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
-        const r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8); return v.toString(16);
-      });
+    }catch(e){
+      window.crypto = window.crypto || {};
+      window.crypto.randomUUID = function(){
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
+          var r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8); return v.toString(16);
+        });
+      };
     }
   })();
 
-  const qs=(s,r=document)=>r.querySelector(s);
-  const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const STORAGE_KEY='maintInv_v2_working';
-  const STORAGE_LAST='maintInv_v2_lastSubmitted';
+  // Request durable storage to reduce eviction
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().then(function(granted){
+      console.log('Persistent storage:', granted ? 'granted' : 'not granted');
+    });
+  }
 
-  let items = [];
-  const defaultItem = () => ({
-    id: crypto.randomUUID(),
-    name:'', location:'', model:'', serial:'', qty:1,
-    estimatedValue: 0,
-    condition:'Good', status:'Active',
-    lastService:'', nextDue:'', notes:'',
-    verified:false, photos:[]
-  });
+  /* ---------- Helpers ---------- */
 
-  const itemKey = it => [
-    (it.name||'').trim().toLowerCase(),
-    (it.location||'').trim().toLowerCase(),
-    (it.model||'').trim().toLowerCase(),
-    (it.serial||'').trim().toLowerCase()
-  ].join('|');
+  function qs(sel, root){ return (root||document).querySelector(sel); }
+  function qsa(sel, root){ var list=(root||document).querySelectorAll(sel); return Array.prototype.slice.call(list); }
 
-  let toastEl;
+  var STORAGE_KEY='maintInv_v2_working';
+  var STORAGE_LAST='maintInv_v2_lastSubmitted';
+
+  var items = [];
+  var userHasInteracted = false; // first-load guard
+
+  function defaultItem(){
+    return {
+      id: window.crypto.randomUUID(),
+      name:'', location:'', model:'', serial:'', qty:1,
+      estimatedValue: 0,
+      condition:'Good', status:'Active',
+      lastService:'', nextDue:'', notes:'',
+      verified:false, photos:[]
+    };
+  }
+
+  function itemKey(it){
+    function norm(s){ return (s?String(s):'').trim().toLowerCase(); }
+    return [norm(it.name), norm(it.location), norm(it.model), norm(it.serial)].join('|');
+  }
+
+  var toastEl;
   function flash(msg){
     if(!toastEl){
       toastEl=document.createElement('div');
-      Object.assign(toastEl.style,{position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',padding:'10px 14px',background:'rgba(44,62,80,.95)',color:'#fff',borderRadius:'10px',boxShadow:'0 8px 20px rgba(0,0,0,.2)',zIndex:'9999',transition:'opacity .25s ease'});
+      var st = toastEl.style;
+      st.position='fixed'; st.bottom='18px'; st.left='50%'; st.transform='translateX(-50%)';
+      st.padding='10px 14px'; st.background='rgba(44,62,80,.95)'; st.color='#fff';
+      st.borderRadius='10px'; st.boxShadow='0 8px 20px rgba(0,0,0,.2)'; st.zIndex='9999';
+      st.transition='opacity .25s ease';
       document.body.appendChild(toastEl);
     }
-    toastEl.textContent=msg; toastEl.style.opacity='1'; setTimeout(()=>toastEl.style.opacity='0',1400);
+    toastEl.textContent=msg; toastEl.style.opacity='1';
+    setTimeout(function(){ toastEl.style.opacity='0'; }, 1400);
+  }
+
+  function showCritical(msg){
+    var box = qs('#submitNotice');
+    if (!box) return;
+    box.style.display='block';
+    box.textContent = msg;
+  }
+  function hideCritical(){
+    var box = qs('#submitNotice');
+    if (!box) return;
+    box.style.display='none';
   }
 
   function workingPayload(){
     return {
       meta:{
-        propertyId: qs('#propertyId').value || '',
-        invDate: qs('#invDate').value || '',
-        conductedBy: qs('#conductedBy').value || '',
-        property: qs('#property').value || '',
-        overallNotes: qs('#overallNotes').value || ''
+        propertyId: (qs('#propertyId') && qs('#propertyId').value) || '',
+        invDate: (qs('#invDate') && qs('#invDate').value) || '',
+        conductedBy: (qs('#conductedBy') && qs('#conductedBy').value) || '',
+        property: (qs('#property') && qs('#property').value) || '',
+        overallNotes: (qs('#overallNotes') && qs('#overallNotes').value) || ''
       },
-      items
+      items: items
     };
   }
 
-  function saveLocal(show=true){
+  // Rotate backups so a bad save can't wipe everything
+  function checkpoint(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var key = 'maintInv_v2_checkpoint_' + Date.now();
+      localStorage.setItem(key, raw);
+      // keep last 5
+      var keys = [];
+      for (var i=0;i<localStorage.length;i++){
+        var k = localStorage.key(i);
+        if(/^maintInv_v2_checkpoint_/.test(k)) keys.push(k);
+      }
+      keys.sort();
+      while(keys.length > 5){
+        var drop = keys.shift();
+        localStorage.removeItem(drop);
+      }
+    }catch(e){ /* ignore quota here */ }
+  }
+
+  function saveLocal(show){
+    if (typeof show === 'undefined') show = true;
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workingPayload()));
       if(show) flash('Saved.');
-    }catch(e){ console.error(e); if(show) flash('Save failed.'); }
+      hideCritical();
+    }catch(e){
+      console.error('Save error', e);
+      showCritical('Storage is full — photos are too large to auto-save. Please Export (.json) now, or remove some photos. PDF export is still available.');
+      if(show) flash('Save failed.');
+    }
   }
 
   function loadLocal(){
-    const raw = localStorage.getItem(STORAGE_KEY);
+    var raw = localStorage.getItem(STORAGE_KEY);
     if(!raw){ flash('Nothing saved on this device yet.'); render(); updateChangeNotice(); return; }
     try{
-      const data = JSON.parse(raw);
-      qs('#propertyId').value = data?.meta?.propertyId || '';
-      qs('#invDate').value = data?.meta?.invDate || '';
-      qs('#conductedBy').value = data?.meta?.conductedBy || '';
-      qs('#property').value = data?.meta?.property || '';
-      qs('#overallNotes').value = data?.meta?.overallNotes || '';
-      items = Array.isArray(data?.items) ? data.items.map(it=>({ estimatedValue:0, ...it })) : [];
+      var data = JSON.parse(raw);
+      var meta = data && data.meta ? data.meta : {};
+      if(qs('#propertyId')) qs('#propertyId').value = meta.propertyId || '';
+      if(qs('#invDate')) qs('#invDate').value = meta.invDate || '';
+      if(qs('#conductedBy')) qs('#conductedBy').value = meta.conductedBy || '';
+      if(qs('#property')) qs('#property').value = meta.property || '';
+      if(qs('#overallNotes')) qs('#overallNotes').value = meta.overallNotes || '';
+      items = (data && data.items && data.items.length) ? data.items : [];
+      // normalize estimatedValue
+      for (var i=0;i<items.length;i++){
+        if (typeof items[i].estimatedValue === 'undefined') items[i].estimatedValue = 0;
+        if (!items[i].photos) items[i].photos = [];
+      }
       render(); updateChangeNotice(); flash('Loaded.');
-    }catch(e){ console.error(e); flash('Load failed.'); }
+    }catch(e){
+      console.error(e); flash('Load failed.');
+    }
   }
 
   function getLastSubmitted(){
-    const raw = localStorage.getItem(STORAGE_LAST);
+    var raw = localStorage.getItem(STORAGE_LAST);
     if(!raw) return null;
-    try{ return JSON.parse(raw); }catch{ return null; }
+    try{ return JSON.parse(raw); }catch(e){ return null; }
   }
 
   function setLastSubmitted(payload){
@@ -310,355 +389,482 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
 
   function exportJSON(){
     saveLocal(false);
-    const blob=new Blob([localStorage.getItem(STORAGE_KEY)||'{}'],{type:'application/json'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    const dateStr = (qs('#invDate').value||new Date().toISOString().slice(0,10));
-    a.download=`inventory_${dateStr}.json`; document.body.appendChild(a); a.click(); a.remove();
+    checkpoint();
+    var raw = localStorage.getItem(STORAGE_KEY) || '{}';
+    var blob=new Blob([raw],{type:'application/json'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    var dateStr = (qs('#invDate') && qs('#invDate').value) ? qs('#invDate').value : (new Date().toISOString().slice(0,10));
+    a.download='inventory_'+dateStr+'.json'; document.body.appendChild(a); a.click(); a.remove();
   }
 
   function importJSON(file){
-    const r=new FileReader();
-    r.onload=e=>{ try{
-      localStorage.setItem(STORAGE_KEY, e.target.result);
-      loadLocal();
-      flash('Imported.');
-    }catch(err){ console.error(err); flash('Import failed.'); } };
+    var r=new FileReader();
+    r.onload=function(e){
+      try{
+        localStorage.setItem(STORAGE_KEY, e.target.result);
+        loadLocal();
+        flash('Imported.');
+      }catch(err){ console.error(err); flash('Import failed.'); }
+    };
     r.readAsText(file);
   }
 
-  function currency(n){ const v=Number(n)||0; return v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}); }
+  function currency(n){
+    var v=Number(n)||0;
+    try{
+      return v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
+    }catch(e){
+      return '$'+v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+    }
+  }
+
   function updateTotalValueChip(){
-    const chip = qs('#totalValueChip');
+    var chip = qs('#totalValueChip');
     if(!chip) return;
-    const total = (items||[]).reduce((t,it)=> t + ((Number(it.estimatedValue)||0) * (Number(it.qty)||0)), 0);
-    chip.textContent = `Total Estimated Value: ${currency(total)}`;
+    var total = 0;
+    for(var i=0;i<items.length;i++){
+      var it = items[i];
+      total += (Number(it.estimatedValue)||0) * (Number(it.qty)||0);
+    }
+    chip.textContent = 'Total Estimated Value: ' + currency(total);
   }
 
   function addItem(prefill){
-    const it = Object.assign(defaultItem(), prefill||{});
+    var it = defaultItem();
+    if (prefill){
+      for (var k in prefill) if (prefill.hasOwnProperty(k)) it[k]=prefill[k];
+    }
     items.push(it);
     render();
-    if(qs('#autoSave').checked) saveLocal(false);
+    if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
     flash('Item added.');
   }
 
   function addItemAfterId(id){
-    const idx = items.findIndex(x=>x.id===id);
+    var idx = -1;
+    for(var i=0;i<items.length;i++){ if(items[i].id===id){ idx=i; break; } }
     if(idx<0){ addItem(); return; }
-    const it = defaultItem();
+    var it = defaultItem();
     items.splice(idx+1, 0, it);
     render();
-    setTimeout(()=>{ const el = qs(`[data-bind="${it.id}:name"]`); el?.scrollIntoView({behavior:'smooth', block:'center'}); el?.focus(); },0);
-    if(qs('#autoSave').checked) saveLocal(false);
+    setTimeout(function(){
+      var el = qs('[data-bind="'+it.id+':name"]');
+      if (el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'center'});
+      if (el && el.focus) el.focus();
+    },0);
+    if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
     flash('Item inserted.');
   }
 
   function removeItem(id){
     if(!confirm('Remove this item?')) return;
-    items = items.filter(x=>x.id!==id);
+    var next=[]; for(var i=0;i<items.length;i++){ if(items[i].id!==id) next.push(items[i]); }
+    items = next;
     render();
-    if(qs('#autoSave').checked) saveLocal(false);
+    if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
     flash('Item removed.');
   }
 
+  /* ---------- Photo handling: downscale/compress before save ---------- */
+
+  function dataURLToImage(dataURL){
+    return new Promise(function(res, rej){
+      var img = new Image();
+      img.onload = function(){ res(img); };
+      img.onerror = rej;
+      img.src = dataURL;
+    });
+  }
+  function resizeDataURL(dataURL, maxW, maxH, quality){
+    return dataURLToImage(dataURL).then(function(img){
+      var w = img.naturalWidth||img.width, h = img.naturalHeight||img.height;
+      var r = Math.min(maxW / w, maxH / h, 1); // only shrink
+      var cw = Math.round(w * r), ch = Math.round(h * r);
+      var c = document.createElement('canvas');
+      c.width = cw; c.height = ch;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, cw, ch);
+      try {
+        return c.toDataURL('image/jpeg', quality);
+      } catch(e) {
+        return dataURL; // fallback
+      }
+    });
+  }
+
   function onPhotoUpload(e, id){
-    const files = e.target.files;
-    if(!files?.length) return;
-    const it = items.find(x=>x.id===id);
+    var files = e.target && e.target.files ? e.target.files : null;
+    if(!files || !files.length) return;
+    var it = null;
+    for (var i=0;i<items.length;i++){ if(items[i].id===id){ it=items[i]; break; } }
     if(!it) return;
-    const readers = [];
-    for(const f of files){
-      const rd = new FileReader();
-      readers.push(new Promise(res=>{
-        rd.onload = ev => res(ev.target.result);
-        rd.readAsDataURL(f);
-      }));
+
+    var proms = [];
+    for (var j=0;j<files.length;j++){
+      (function(f){
+        var rd = new FileReader();
+        proms.push(new Promise(function(res){
+          rd.onload = function(ev){
+            // Downscale to max 1280 x 1280, JPEG quality 0.7
+            resizeDataURL(ev.target.result, 1280, 1280, 0.7).then(function(resized){
+              res(resized);
+            }).catch(function(){ res(ev.target.result); });
+          };
+          rd.readAsDataURL(f);
+        }));
+      })(files[j]);
     }
-    Promise.all(readers).then(urls=>{
-      it.photos.push(...urls);
+
+    Promise.all(proms).then(function(urls){
+      if (!it.photos) it.photos=[];
+      Array.prototype.push.apply(it.photos, urls);
       render();
-      if(qs('#autoSave').checked) saveLocal(false);
+      if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
     });
   }
 
   function removePhoto(id, idx){
-    const it = items.find(x=>x.id===id); if(!it) return;
+    var it = null;
+    for (var i=0;i<items.length;i++){ if(items[i].id===id){ it=items[i]; break; } }
+    if(!it || !it.photos) return;
     it.photos.splice(idx,1);
     render();
-    if(qs('#autoSave').checked) saveLocal(false);
+    if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
   }
 
   function conditionBadge(cond){
-    if(['Excellent','Good'].includes(cond)) return 'badge status-ok';
-    if(['Fair'].includes(cond)) return 'badge status-attn';
+    if(cond==='Excellent' || cond==='Good') return 'badge status-ok';
+    if(cond==='Fair') return 'badge status-attn';
     return 'badge status-bad';
   }
 
   function render(){
-    const q = qs('#searchTxt').value.trim().toLowerCase();
-    const fc = qs('#fCondition').value;
-    const fs = qs('#fStatus').value;
-    const fl = qs('#fLocation').value.trim().toLowerCase();
+    var qEl = qs('#searchTxt'), fcEl = qs('#fCondition'), fsEl = qs('#fStatus'), flEl = qs('#fLocation');
+    var q = qEl && qEl.value ? qEl.value.trim().toLowerCase() : '';
+    var fc = fcEl ? fcEl.value : '';
+    var fs = fsEl ? fsEl.value : '';
+    var fl = flEl && flEl.value ? flEl.value.trim().toLowerCase() : '';
 
-    const filtered = items.filter(it=>{
-      if(fc && it.condition!==fc) return false;
-      if(fs && it.status!==fs) return false;
-      if(fl && !String(it.location||'').toLowerCase().includes(fl)) return false;
+    var filtered = [];
+    for (var i=0;i<items.length;i++){
+      var it = items[i];
+      if(fc && it.condition!==fc) continue;
+      if(fs && it.status!==fs) continue;
+      if(fl && String(it.location||'').toLowerCase().indexOf(fl)===-1) continue;
       if(q){
-        const blob = [it.name,it.model,it.serial,it.location,it.notes].join(' ').toLowerCase();
-        if(!blob.includes(q)) return false;
+        var blob = (it.name||'')+' '+(it.model||'')+' '+(it.serial||'')+' '+(it.location||'')+' '+(it.notes||'');
+        if(blob.toLowerCase().indexOf(q)===-1) continue;
       }
-      return true;
-    });
+      filtered.push(it);
+    }
 
-    qs('#summaryChip').textContent = `${filtered.length} item${filtered.length!==1?'s':''}`;
+    var sumChip = qs('#summaryChip');
+    if (sumChip) sumChip.textContent = filtered.length + ' item' + (filtered.length!==1?'s':'');
 
-    const tb = qs('#invBody');
+    var tb = qs('#invBody');
+    if(!tb) return;
     tb.innerHTML = '';
 
-    for(const it of filtered){
-      const needsPhotos = !it.photos || it.photos.length===0;
-      const tr = document.createElement('tr');
+    for(var f=0; f<filtered.length; f++){
+      var it2 = filtered[f];
+      var needsPhotos = !it2.photos || it2.photos.length===0;
+      var tr = document.createElement('tr');
       if(needsPhotos) tr.classList.add('row-missing-photos');
 
-      const photosHtml = `
-        <div class="photo-stack">
-          ${it.photos.map((p,idx)=>`
-            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-              <img src="${p}" class="thumb" alt="photo"/>
-              <button class="btn danger small" data-remove-photo="${it.id}:${idx}">Remove</button>
-            </div>
-          `).join('')}
-        </div>
-        <hr class="sep"/>
-        <label class="btn" for="photo_${it.id}">+ Add Photos</label>
-        <input id="photo_${it.id}" type="file" accept="image/*" capture="environment" multiple />
-        ${needsPhotos ? '<div class="req-chip">Photos required</div>' : ''}
-      `;
+      // photos html
+      var photosHtmlParts = [];
+      photosHtmlParts.push('<div class="photo-stack">');
+      if (it2.photos && it2.photos.length){
+        for (var p=0;p<it2.photos.length;p++){
+          photosHtmlParts.push(
+            '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">'
+              + '<img src="'+it2.photos[p]+'" class="thumb" alt="photo"/>'
+              + '<button class="btn danger small" data-remove-photo="'+it2.id+':'+p+'">Remove</button>'
+            + '</div>'
+          );
+        }
+      }
+      photosHtmlParts.push('</div>');
+      photosHtmlParts.push('<hr class="sep"/>');
+      photosHtmlParts.push('<label class="btn" for="photo_'+it2.id+'">+ Add Photos</label>');
+      photosHtmlParts.push('<input id="photo_'+it2.id+'" type="file" accept="image/*" capture="environment" multiple />');
+      if (needsPhotos){ photosHtmlParts.push('<div class="req-chip">Photos required</div>'); }
+      var photosHtml = photosHtmlParts.join('');
 
-      const estVal = Number(it.estimatedValue)||0;
-      const qty = Number(it.qty)||0;
+      var estVal = Number(it2.estimatedValue)||0;
+      var qty = Number(it2.qty)||0;
 
-      tr.innerHTML = `
-        <td><input type="checkbox" ${it.verified?'checked':''} data-bind="${it.id}:verified"/></td>
-        <td style="min-width:220px">${photosHtml}</td>
-        <td><input type="text" value="${it.name||''}" placeholder="Item name" data-bind="${it.id}:name"/></td>
-        <td><input type="text" value="${it.location||''}" placeholder="e.g., Boiler Room" data-bind="${it.id}:location"/></td>
-        <td><input type="text" value="${it.model||''}" placeholder="Model #" data-bind="${it.id}:model"/></td>
-        <td><input type="text" value="${it.serial||''}" placeholder="Serial #" data-bind="${it.id}:serial"/></td>
-        <td><input type="number" min="0" value="${it.qty||1}" style="width:90px" data-bind="${it.id}:qty"/></td>
-        <td>
-          <input type="number" min="0" step="0.01" value="${it.estimatedValue??0}" style="width:120px" data-bind="${it.id}:estimatedValue"/>
-          <div class="small" style="margin-top:4px">${currency(estVal)} × ${qty||0} = <b>${currency(estVal*qty)}</b></div>
-        </td>
-        <td>
-          <select data-bind="${it.id}:condition">
-            ${['Excellent','Good','Fair','Needs Repair','Out of Service'].map(c=>`<option ${c===it.condition?'selected':''}>${c}</option>`).join('')}
-          </select>
-          <div class="${conditionBadge(it.condition)}" style="margin-top:6px">${it.condition}</div>
-        </td>
-        <td>
-          <select data-bind="${it.id}:status">
-            ${['Active','Spare','Retired'].map(s=>`<option ${s===it.status?'selected':''}>${s}</option>`).join('')}
-          </select>
-        </td>
-        <td><input type="date" value="${it.lastService||''}" data-bind="${it.id}:lastService"/></td>
-        <td><input type="date" value="${it.nextDue||''}" data-bind="${it.id}:nextDue"/></td>
-        <td><textarea class="notes" data-bind="${it.id}:notes" placeholder="Notes...">${it.notes||''}</textarea></td>
-        <td class="actions">
-          <button class="btn" data-dup="${it.id}">Duplicate</button>
-          <button class="btn danger" data-del="${it.id}">Remove</button>
-        </td>
-      `;
+      var rowHtml = ''
+        + '<td><input type="checkbox" '+(it2.verified?'checked':'')+' data-bind="'+it2.id+':verified"/></td>'
+        + '<td style="min-width:220px">'+photosHtml+'</td>'
+        + '<td><input type="text" value="'+(it2.name||'')+'" placeholder="Item name" data-bind="'+it2.id+':name"/></td>'
+        + '<td><input type="text" value="'+(it2.location||'')+'" placeholder="e.g., Boiler Room" data-bind="'+it2.id+':location"/></td>'
+        + '<td><input type="text" value="'+(it2.model||'')+'" placeholder="Model #" data-bind="'+it2.id+':model"/></td>'
+        + '<td><input type="text" value="'+(it2.serial||'')+'" placeholder="Serial #" data-bind="'+it2.id+':serial"/></td>'
+        + '<td><input type="number" min="0" value="'+(it2.qty||1)+'" style="width:90px" data-bind="'+it2.id+':qty"/></td>'
+        + '<td>'
+          + '<input type="number" min="0" step="0.01" value="'+(typeof it2.estimatedValue==='number'?it2.estimatedValue:0)+'" style="width:120px" data-bind="'+it2.id+':estimatedValue"/>'
+          + '<div class="small" style="margin-top:4px">'+currency(estVal)+' × '+(qty||0)+' = <b>'+currency(estVal*qty)+'</b></div>'
+        + '</td>'
+        + '<td>'
+          + '<select data-bind="'+it2.id+':condition">'
+            + ['Excellent','Good','Fair','Needs Repair','Out of Service'].map(function(c){ return '<option '+(c===it2.condition?'selected':'')+'>'+c+'</option>'; }).join('')
+          + '</select>'
+          + '<div class="'+conditionBadge(it2.condition)+'" style="margin-top:6px">'+it2.condition+'</div>'
+        + '</td>'
+        + '<td>'
+          + '<select data-bind="'+it2.id+':status">'
+            + ['Active','Spare','Retired'].map(function(s){ return '<option '+(s===it2.status?'selected':'')+'>'+s+'</option>'; }).join('')
+          + '</select>'
+        + '</td>'
+        + '<td><input type="date" value="'+(it2.lastService||'')+'" data-bind="'+it2.id+':lastService"/></td>'
+        + '<td><input type="date" value="'+(it2.nextDue||'')+'" data-bind="'+it2.id+':nextDue"/></td>'
+        + '<td><textarea class="notes" data-bind="'+it2.id+':notes" placeholder="Notes...">'+(it2.notes||'')+'</textarea></td>'
+        + '<td class="actions">'
+          + '<button class="btn" data-dup="'+it2.id+'">Duplicate</button>'
+          + '<button class="btn danger" data-del="'+it2.id+'">Remove</button>'
+        + '</td>';
+
+      tr.innerHTML = rowHtml;
       tb.appendChild(tr);
 
-      const addRow = document.createElement('tr');
+      var addRow = document.createElement('tr');
       addRow.className = 'add-row';
-      addRow.innerHTML = `<td colspan="14"><button class="btn primary" data-add-after="${it.id}">+ Add Item Below</button></td>`;
+      addRow.innerHTML = '<td colspan="14"><button class="btn primary" data-add-after="'+it2.id+'">+ Add Item Below</button></td>';
       tb.appendChild(addRow);
 
-      // photo input (can't delegate 'change' easily)
-      tr.querySelector(`#photo_${it.id}`).addEventListener('change', e=>onPhotoUpload(e, it.id));
+      // bind photo input change (delegating 'change' is unreliable)
+      var photoInput = tr.querySelector('#photo_'+it2.id);
+      if (photoInput){
+        (function(xid){
+          photoInput.addEventListener('change', function(e){ onPhotoUpload(e, xid); });
+        })(it2.id);
+      }
     }
 
     // bind model updates
-    qsa('[data-bind]').forEach(el=>{
-      el.addEventListener('input', onBind);
-      el.addEventListener('change', onBind);
-      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-        el.addEventListener('blur', ()=>render(), {passive:true});
-      }
-    });
+    var binds = qsa('[data-bind]');
+    for (var b=0;b<binds.length;b++){
+      (function(el){
+        el.addEventListener('input', onBind);
+        el.addEventListener('change', onBind);
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+          el.addEventListener('blur', function(){ render(); });
+        }
+      })(binds[b]);
+    }
 
     updateTotalValueChip();
     updateChangeNotice();
   }
 
-  // Event delegation for robust mobile behavior
-  qs('#invBody').addEventListener('click', (ev)=>{
-    const t = ev.target;
-    // add after
-    const addBtn = t.closest('[data-add-after]');
-    if(addBtn){ addItemAfterId(addBtn.dataset.addAfter); return; }
+  // Delegated actions for mobile robustness
+  var invBody = qs('#invBody');
+  if (invBody){
+    invBody.addEventListener('click', function(ev){
+      var t = ev.target;
 
-    // remove item
-    const delBtn = t.closest('[data-del]');
-    if(delBtn){ removeItem(delBtn.dataset.del); return; }
+      var addBtn = t.closest && t.closest('[data-add-after]');
+      if(addBtn){
+        addItemAfterId(addBtn.getAttribute('data-add-after'));
+        userHasInteracted = true;
+        return;
+      }
 
-    // duplicate
-    const dupBtn = t.closest('[data-dup]');
-    if(dupBtn){
-      const base = items.find(x=>x.id===dupBtn.dataset.dup);
-      if(!base) return;
-      const clone = JSON.parse(JSON.stringify(base));
-      clone.id = crypto.randomUUID();
-      clone.name = (base.name||'') + ' (Copy)';
-      const idx = items.findIndex(x=>x.id===base.id);
-      items.splice(idx+1,0,clone);
-      render(); if(qs('#autoSave').checked) saveLocal(false);
-      updateChangeNotice();
-      flash('Item duplicated.');
-      return;
-    }
+      var delBtn = t.closest && t.closest('[data-del]');
+      if(delBtn){
+        removeItem(delBtn.getAttribute('data-del'));
+        userHasInteracted = true;
+        return;
+      }
 
-    // remove photo
-    const rmPhoto = t.closest('[data-remove-photo]');
-    if(rmPhoto){
-      const [id, idx] = rmPhoto.dataset.removePhoto.split(':');
-      removePhoto(id, Number(idx));
-      return;
-    }
-  });
+      var dupBtn = t.closest && t.closest('[data-dup]');
+      if(dupBtn){
+        var id = dupBtn.getAttribute('data-dup');
+        var base = null, idx=-1;
+        for (var i=0;i<items.length;i++){ if(items[i].id===id){ base=items[i]; idx=i; break; } }
+        if(!base) return;
+        var clone = JSON.parse(JSON.stringify(base));
+        clone.id = window.crypto.randomUUID();
+        clone.name = (base.name||'') + ' (Copy)';
+        items.splice(idx+1,0,clone);
+        render(); if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
+        updateChangeNotice();
+        flash('Item duplicated.');
+        userHasInteracted = true;
+        return;
+      }
+
+      var rmPhoto = t.closest && t.closest('[data-remove-photo]');
+      if(rmPhoto){
+        var parts = rmPhoto.getAttribute('data-remove-photo').split(':');
+        removePhoto(parts[0], parseInt(parts[1],10));
+        userHasInteracted = true;
+        return;
+      }
+    });
+  }
 
   function onBind(e){
-    const target = e.target;
-    const ds = target.dataset.bind || '';
-    const parts = ds.split(':');
+    userHasInteracted = true;
+    var target = e.target;
+    var ds = target.getAttribute('data-bind') || '';
+    var parts = ds.split(':');
     if(parts.length<2) return;
-    const [id, field] = parts;
+    var id = parts[0], field = parts[1];
 
-    const it = items.find(x=>x.id===id);
+    var it = null;
+    for (var i=0;i<items.length;i++){ if(items[i].id===id){ it=items[i]; break; } }
     if(!it) return;
 
-    let val = target.type==='checkbox' ? target.checked : target.value;
+    var val;
+    if(target.type==='checkbox') val = !!target.checked;
+    else val = target.value;
+
     if(field==='qty' || field==='estimatedValue') val = Number(val)||0;
+
     it[field] = val;
 
     if(field==='qty' || field==='estimatedValue'){ updateTotalValueChip(); }
     if (target.tagName === 'SELECT' || target.type === 'checkbox' || target.type === 'date') { render(); }
 
-    if(qs('#autoSave').checked) saveLocal(false);
+    if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); }
   }
 
   function diffVsLast(currentItems){
-    const last = getLastSubmitted();
-    if(!last || !Array.isArray(last.items)) return {added:[], missing:[]};
-    const mapPrev = new Map(last.items.map(it=>[itemKey(it), it]));
-    const mapCurr = new Map(currentItems.map(it=>[itemKey(it), it]));
-    const missing = []; const added = [];
-    for(const [k,v] of mapPrev){ if(!mapCurr.has(k)) missing.push(v); }
-    for(const [k,v] of mapCurr){ if(!mapPrev.has(k)) added.push(v); }
-    return {added, missing, lastMeta:last.meta, submittedAt:last.submittedAt};
+    var last = getLastSubmitted();
+    if(!last || !last.items || !last.items.length) return {added:[], missing:[]};
+    var mapPrev = {};
+    var mapCurr = {};
+    for (var i=0;i<last.items.length;i++){ mapPrev[itemKey(last.items[i])] = last.items[i]; }
+    for (var j=0;j<currentItems.length;j++){ mapCurr[itemKey(currentItems[j])] = currentItems[j]; }
+    var missing = [], added = [];
+    for (var k in mapPrev){ if(!mapCurr[k]) missing.push(mapPrev[k]); }
+    for (var k2 in mapCurr){ if(!mapPrev[k2]) added.push(mapCurr[k2]); }
+    return {added:added, missing:missing, lastMeta:last.meta, submittedAt:last.submittedAt};
   }
 
   function updateChangeNotice(){
-    const {added, missing, lastMeta, submittedAt} = diffVsLast(items);
-    const box = qs('#changeNotice');
-    if(!added.length && !missing.length){
+    var info = diffVsLast(items);
+    var added = info.added||[], missing = info.missing||[], lastMeta = info.lastMeta, submittedAt = info.submittedAt;
+    var box = qs('#changeNotice');
+
+    if(!box) return;
+
+    if(added.length===0 && missing.length===0){
       if(!getLastSubmitted()){
         box.style.display='block'; box.classList.remove('critical');
-        box.innerHTML = `No previous submitted inventory found. Submitting will set a baseline.`;
+        box.innerHTML = 'No previous submitted inventory found. Submitting will set a baseline.';
       }else{
         box.style.display='none';
       }
       return;
     }
     box.style.display='block'; box.classList.remove('critical');
-    const lastLine = submittedAt ? `Last submitted: ${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}` : '';
-    box.innerHTML = `
-      <b>Changes since last submission:</b>
-      <ul style="margin:6px 0 0 18px;line-height:1.4">
-        <li><b>Added:</b> ${added.length || 0}</li>
-        <li><b>Missing:</b> ${missing.length || 0}</li>
-      </ul>
-      <div class="small" style="margin-top:6px">${lastLine}</div>
-    `;
+    var lastLine = '';
+    if (submittedAt){
+      lastLine = 'Last submitted: ' + (new Date(submittedAt).toLocaleString());
+      if (lastMeta && lastMeta.conductedBy) lastLine += ' by ' + lastMeta.conductedBy;
+    }
+    box.innerHTML = ''
+      + '<b>Changes since last submission:</b>'
+      + '<ul style="margin:6px 0 0 18px;line-height:1.4">'
+      +   '<li><b>Added:</b> ' + added.length + '</li>'
+      +   '<li><b>Missing:</b> ' + missing.length + '</li>'
+      + '</ul>'
+      + '<div class="small" style="margin-top:6px">'+ lastLine +'</div>';
   }
 
   qs('#submitBtn').addEventListener('click', onSubmitInventory);
   function onSubmitInventory(){
-    const noPhoto = items.filter(it=>!it.photos || it.photos.length===0);
-    const notice = qs('#submitNotice');
+    var noPhoto = [];
+    for (var i=0;i<items.length;i++){
+      if(!items[i].photos || !items[i].photos.length) noPhoto.push(items[i]);
+    }
+    var notice = qs('#submitNotice');
     if(noPhoto.length){
       notice.style.display='block';
-      notice.textContent = `Cannot submit: ${noPhoto.length} item${noPhoto.length!==1?'s':''} missing required photo(s). Add at least one photo per item.`;
+      notice.textContent = 'Cannot submit: ' + noPhoto.length + ' item' + (noPhoto.length!==1?'s':'') + ' missing required photo(s). Add at least one photo per item.';
       render(); flash('Add photos to all items before submitting.'); return;
     }
     notice.style.display='none';
-    const payload = workingPayload();
-    saveLocal(false);
+    var payload = workingPayload();
+    saveLocal(false); checkpoint();
     setLastSubmitted(payload);
     updateChangeNotice();
     flash('Inventory submitted & archived as baseline.');
   }
 
+  // PDF export (unchanged logic, with basic guards)
   qs('#pdfBtn').addEventListener('click', downloadPDF);
+  function downloadPDF(){
+    var jsPDF = window.jspdf && window.jspdf.jsPDF ? window.jspdf.jsPDF : null;
+    if(!jsPDF){ flash('PDF library not loaded'); return; }
 
-  async function downloadPDF(){
-    const { jsPDF } = window.jspdf;
-
-    const doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
-    const margin = 48;
-    const pageWidth  = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
+    var doc = new jsPDF({ unit:'pt', format:'letter', orientation:'landscape' });
+    var margin = 48;
+    var pageWidth  = doc.internal.pageSize.getWidth();
+    var pageHeight = doc.internal.pageSize.getHeight();
     doc.setLineHeightFactor(1.25);
 
-    // Header
     doc.setFillColor(52,73,94);
     doc.rect(0,0,pageWidth,72,'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(255,255,255);
     doc.text('Maintenance & Equipment Inventory', margin, 46);
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - margin, 46, {align:'right'});
+    try{ doc.text('Generated: ' + (new Date().toLocaleString()), pageWidth - margin, 46, {align:'right'}); }catch(e){ doc.text('Generated', pageWidth - margin, 46, {align:'right'}); }
 
-    // Meta
-    let y = 96;
-    const propId = qs('#propertyId').value || '';
+    var y = 96;
+    var propId = (qs('#propertyId') && qs('#propertyId').value) || '';
     doc.setTextColor(44,62,80);
 
     if(propId){
-      // Prominent Property Identifier line
       doc.setFont('helvetica','bold'); doc.setFontSize(13);
-      const propIdWrapped = doc.splitTextToSize(`Property: ${propId}`, pageWidth - margin*2);
+      var propIdWrapped = doc.splitTextToSize('Property: ' + propId, pageWidth - margin*2);
       doc.text(propIdWrapped, margin, y);
       y += propIdWrapped.length*14;
     }
 
     doc.setFont('helvetica','normal'); doc.setFontSize(12);
-    const invDate = qs('#invDate').value || '—';
-    const by = qs('#conductedBy').value || '—';
-    const prop = qs('#property').value || '—';
-    const notes = qs('#overallNotes').value || '';
-    const totalVal = (items||[]).reduce((t,it)=>t+((Number(it.estimatedValue)||0)*(Number(it.qty)||0)),0);
+    var invDate = (qs('#invDate') && qs('#invDate').value) || '—';
+    var by = (qs('#conductedBy') && qs('#conductedBy').value) || '—';
+    var prop = (qs('#property') && qs('#property').value) || '—';
+    var notes = (qs('#overallNotes') && qs('#overallNotes').value) || '';
+    var totalVal = 0;
+    for (var i2=0;i2<items.length;i2++){
+      var it = items[i2];
+      totalVal += (Number(it.estimatedValue)||0)*(Number(it.qty)||0);
+    }
 
-    doc.text(`Date: ${invDate}`, margin, y);
-    doc.text(`Conducted By: ${by}`, margin + 240, y);
-    doc.text(`Location/Property: ${doc.splitTextToSize(prop, 300)[0]}`, margin + 480, y);
+    doc.text('Date: ' + invDate, margin, y);
+    doc.text('Conducted By: ' + by, margin + 240, y);
+    doc.text('Location/Property: ' + (doc.splitTextToSize(prop, 300)[0]), margin + 480, y);
     y += 20;
 
-    doc.text(`Total Estimated Value: ${totalVal.toLocaleString('en-US',{style:'currency',currency:'USD'})}`, margin, y);
+    try{ doc.text('Total Estimated Value: ' + totalVal.toLocaleString('en-US',{style:'currency',currency:'USD'}), margin, y); }
+    catch(e){ doc.text('Total Estimated Value: $' + totalVal.toFixed(2), margin, y); }
     y += 14;
 
     if(notes){
       doc.setFontSize(11); doc.setTextColor(127,140,141);
-      const wrapped = doc.splitTextToSize(`Notes: ${notes}`, pageWidth - margin*2);
+      var wrapped = doc.splitTextToSize('Notes: ' + notes, pageWidth - margin*2);
       doc.text(wrapped, margin, y);
       y += wrapped.length*13 + 6;
       doc.setTextColor(44,62,80); doc.setFontSize(12);
     }
 
-    // Change log
-    const {added, missing, submittedAt, lastMeta} = diffVsLast(items);
+    var info = (function(){
+      var last = getLastSubmitted();
+      if(!last || !last.items || !last.items.length) return {added:[], missing:[], submittedAt:null, lastMeta:null};
+      var mapPrev = {}, mapCurr = {};
+      for (var i3=0;i3<last.items.length;i3++){ mapPrev[itemKey(last.items[i3])] = last.items[i3]; }
+      for (var j3=0;j3<items.length;j3++){ mapCurr[itemKey(items[j3])] = items[j3]; }
+      var miss=[], add=[];
+      for (var k in mapPrev){ if(!mapCurr[k]) miss.push(mapPrev[k]); }
+      for (var k2 in mapCurr){ if(!mapPrev[k2]) add.push(mapCurr[k2]); }
+      return {added:add, missing:miss, submittedAt:last.submittedAt, lastMeta:last.meta};
+    })();
+
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
     doc.text('Changes vs Previous Submission', margin, y);
     y += 10;
@@ -667,16 +873,26 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
     if(!getLastSubmitted()){
       doc.text('No previous submitted inventory found. This report will become the baseline once submitted.', margin, y);
       y += 18;
-    }else if(!added.length && !missing.length){
-      doc.text(`No changes since last submission (${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}).`, margin, y);
+    }else if((!info.added || !info.added.length) && (!info.missing || !info.missing.length)){
+      var noChTxt = 'No changes since last submission (' + (new Date(info.submittedAt).toLocaleString());
+      if(info.lastMeta && info.lastMeta.conductedBy) noChTxt += ' by ' + info.lastMeta.conductedBy;
+      noChTxt += ').';
+      doc.text(noChTxt, margin, y);
       y += 18;
     }else{
-      doc.text(`Last submitted: ${new Date(submittedAt).toLocaleString()}${lastMeta?.conductedBy?` by ${lastMeta.conductedBy}`:''}`, margin, y);
+      var lastTxt = 'Last submitted: ' + (new Date(info.submittedAt).toLocaleString());
+      if(info.lastMeta && info.lastMeta.conductedBy) lastTxt += ' by ' + info.lastMeta.conductedBy;
+      doc.text(lastTxt, margin, y);
       y += 14;
-      const rows = [
-        ...missing.map(it=>['Missing', it.name||'', it.location||'', it.model||'', it.serial||'', String(it.qty||0)]),
-        ...added  .map(it=>['Added',   it.name||'', it.location||'', it.model||'', it.serial||'', String(it.qty||0)]),
-      ];
+      var rows = [];
+      for (var m=0;m<(info.missing?info.missing.length:0);m++){
+        var mi = info.missing[m];
+        rows.push(['Missing', mi.name||'', mi.location||'', mi.model||'', mi.serial||'', String(mi.qty||0)]);
+      }
+      for (var a=0;a<(info.added?info.added.length:0);a++){
+        var ad = info.added[a];
+        rows.push(['Added', ad.name||'', ad.location||'', ad.model||'', ad.serial||'', String(ad.qty||0)]);
+      }
       doc.autoTable({
         head: [['Type','Name','Location','Model','Serial','Qty']],
         body: rows,
@@ -688,9 +904,9 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
           0:{cellWidth:70}, 1:{cellWidth:180, overflow:'linebreak'}, 2:{cellWidth:140, overflow:'linebreak'},
           3:{cellWidth:120, overflow:'linebreak'}, 4:{cellWidth:130, overflow:'linebreak'}, 5:{cellWidth:44, halign:'center'}
         },
-        didParseCell(data){
+        didParseCell: function(data){
           if(data.section==='body' && data.column.index===0){
-            const flag = data.cell.text[0];
+            var flag = data.cell.text[0];
             data.cell.styles.fillColor = (flag==='Missing') ? [248,215,218] : [226,242,228];
           }
         },
@@ -699,191 +915,186 @@ hr.sep{border:none;border-top:1px dashed #e5e7eb;margin:6px 0}
       y = doc.lastAutoTable.finalY + 20;
     }
 
-    // Banner (if photos missing)
-    const noPhoto = items.filter(it=>!it.photos || it.photos.length===0);
+    // Missing photos warning
+    var noPhoto = [];
+    for (var n=0;n<items.length;n++){
+      if(!items[n].photos || !items[n].photos.length) noPhoto.push(items[n]);
+    }
     if(noPhoto.length){
       doc.setFillColor(255,225,225);
       doc.roundedRect(margin, y, pageWidth-2*margin, 32, 6, 6, 'F');
       doc.setTextColor(134,27,27);
       doc.setFont('helvetica','bold'); doc.setFontSize(12);
-      doc.text(`Attention: ${noPhoto.length} item${noPhoto.length!==1?'s':''} missing required photo(s).`, margin+12, y+21);
+      doc.text('Attention: ' + noPhoto.length + ' item' + (noPhoto.length!==1?'s':'') + ' missing required photo(s).', margin+12, y+21);
       y += 42;
     }
 
-    /* Inventory table */
-    const all = items;
-    const head = [['Photo','Name','Location','Model','Serial','Qty','Est. Value','Line Total']];
-    const body = [];
-    for (const it of all) {
-      const ev = Number(it.estimatedValue) || 0;
-      const q  = Number(it.qty) || 0;
-      const line = ev * q;
+    // Inventory table + photo gallery (unchanged)
+    var head = [['Photo','Name','Location','Model','Serial','Qty','Est. Value','Line Total']];
+    var body = [];
+    for (var ii=0; ii<items.length; ii++) {
+      var it3 = items[ii];
+      var ev = Number(it3.estimatedValue) || 0;
+      var q  = Number(it3.qty) || 0;
+      var line = ev * q;
+      var photoCell = {content:'', rowSpan:2, styles:{halign:'center',valign:'middle'}, _img:(it3.photos && it3.photos[0])?it3.photos[0]:null};
 
-      const photoCell = {
-        content: '',
-        rowSpan: 2,
-        styles: { halign: 'center', valign:'middle' },
-        _img: (it.photos && it.photos[0]) ? it.photos[0] : null
-      };
+      var evStr='$'+ev.toFixed(2), lineStr='$'+line.toFixed(2);
+      try{ evStr = ev.toLocaleString('en-US',{style:'currency',currency:'USD'}); lineStr = line.toLocaleString('en-US',{style:'currency',currency:'USD'});}catch(e){}
 
-      body.push([
-        photoCell,
-        it.name || '',
-        it.location || '',
-        it.model || '',
-        it.serial || '',
-        String(q),
-        ev.toLocaleString('en-US',{style:'currency',currency:'USD'}),
-        line.toLocaleString('en-US',{style:'currency',currency:'USD'})
-      ]);
-
-      const details = [
-        `Condition: ${it.condition || '—'}`,
-        `Status: ${it.status || '—'}`,
-        `Service: ${it.lastService || '—'} → ${it.nextDue || '—'}`,
-        `Verified: ${it.verified ? 'Yes' : 'No'}`
-      ].join('   •   ') + (it.notes ? `\nNotes: ${it.notes}` : '');
-
+      body.push([photoCell, it3.name||'', it3.location||'', it3.model||'', it3.serial||'', String(q), evStr, lineStr]);
+      var details = 'Condition: ' + (it3.condition || '—')
+        + '   •   Status: ' + (it3.status || '—')
+        + '   •   Service: ' + (it3.lastService || '—') + ' → ' + (it3.nextDue || '—')
+        + '   •   Verified: ' + (it3.verified ? 'Yes' : 'No');
+      if (it3.notes) details += '\nNotes: ' + it3.notes;
       body.push([{ content: details, colSpan: 7 }]);
     }
 
     doc.autoTable({
-      head,
-      body,
+      head: head,
+      body: body,
       startY: y,
       theme: 'grid',
       tableWidth: 'wrap',
       styles: { fontSize:10, cellPadding:6, overflow:'linebreak', valign:'top', lineColor:[220,225,230], lineWidth:0.75, minCellHeight:18 },
       headStyles: { fillColor:[52,152,219], textColor:255, fontStyle:'bold', fontSize:10 },
-      columnStyles: {
-        0:{ cellWidth:96 },
-        1:{ cellWidth:140 },
-        2:{ cellWidth:110 },
-        3:{ cellWidth:90  },
-        4:{ cellWidth:100 },
-        5:{ cellWidth:30, halign:'center' },
-        6:{ cellWidth:60, halign:'right'  },
-        7:{ cellWidth:70, halign:'right'  }
-      },
+      columnStyles: { 0:{cellWidth:96}, 1:{cellWidth:140}, 2:{cellWidth:110}, 3:{cellWidth:90}, 4:{cellWidth:100}, 5:{cellWidth:30, halign:'center'}, 6:{cellWidth:60, halign:'right'}, 7:{cellWidth:70, halign:'right'} },
       rowPageBreak: 'avoid',
       margin: { left: margin, right: margin },
-      didDrawCell(data){
-        const raw = data.cell.raw;
+      didDrawCell: function(data){
+        var raw = data.cell && data.cell.raw ? data.cell.raw : null;
         if (!raw || !raw._img) return;
         if (data.section !== 'body' || data.column.index !== 0) return;
-
-        const { x, y, width, height } = data.cell;
-        const pad = 4;
-        const boxW = width - pad*2;
-        const boxH = height - pad*2;
+        var x = data.cell.x, y0 = data.cell.y, width = data.cell.width, height = data.cell.height;
+        var pad = 4, boxW = width - pad*2, boxH = height - pad*2;
         try {
-          const draw = (fmt) => doc.addImage(raw._img, fmt, x + pad, y + pad, boxW, boxH, undefined, 'FAST');
-          try { draw('JPEG'); } catch { draw('PNG'); }
-        } catch (e) {
-          doc.setDrawColor(210); doc.rect(x + pad, y + pad, boxW, boxH);
+          var draw = function(fmt){ doc.addImage(raw._img, fmt, x + pad, y0 + pad, boxW, boxH, undefined, 'FAST'); };
+          try { draw('JPEG'); } catch (e1) { draw('PNG'); }
+        } catch (e2) {
+          doc.setDrawColor(210); doc.rect(x + pad, y0 + pad, boxW, boxH);
           doc.setFontSize(9); doc.setTextColor(130);
-          doc.text('No photo', x + pad + 6, y + pad + 14);
+          doc.text('No photo', x + pad + 6, y0 + pad + 14);
         }
       },
-      didDrawPage: ({ pageNumber })=>{
+      didDrawPage: function(ctx){
+        var pageNumber = ctx.pageNumber;
         doc.setFontSize(9); doc.setTextColor(150);
-        doc.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 16, {align:'right'});
+        doc.text('Page ' + pageNumber, pageWidth - margin, pageHeight - 16, {align:'right'});
       }
     });
 
-    // Photo gallery
-    let py = doc.lastAutoTable.finalY + 24;
+    var thumbW = 120, thumbH = 90, gap = 10;
+    var py = doc.lastAutoTable.finalY + 24;
     if(py + 60 > pageHeight){ doc.addPage('letter','landscape'); py = 56; }
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(44,62,80);
     doc.text('Photo Verification', margin, py);
     py += 14;
+    var perRow = Math.floor((pageWidth - margin*2 + gap)/ (thumbW + gap));
 
-    const thumbW = 120, thumbH = 90, gap = 10;
-    const perRow = Math.floor((pageWidth - margin*2 + gap)/ (thumbW + gap));
-
-    for(const it of all){
+    for(var iii=0; iii<items.length; iii++){
+      var itp = items[iii];
       if(py + 42 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; }
       doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(52,73,94);
-      doc.text(`${it.name || 'Unnamed Item'} — ${it.location || '—'}`, margin, py);
+      doc.text((itp.name || 'Unnamed Item') + ' — ' + (itp.location || '—'), margin, py);
       py += 12;
       doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
-      const line = `Model: ${it.model||'—'}   Serial: ${it.serial||'—'}   Qty: ${it.qty||0}   Verified: ${it.verified?'Yes':'No'}`;
+      var line = 'Model: ' + (itp.model||'—') + '   Serial: ' + (itp.serial||'—') + '   Qty: ' + (itp.qty||0) + '   Verified: ' + (itp.verified?'Yes':'No');
       doc.text(doc.splitTextToSize(line, pageWidth - margin*2), margin, py);
       py += 12;
 
-      if(!it.photos?.length){
+      if(!itp.photos || !itp.photos.length){
         doc.setFontSize(10); doc.setTextColor(150);
         doc.text('No photos attached.', margin, py);
         py += 18;
         continue;
       }
 
-      let col = 0;
-      for(const p of it.photos){
+      var col = 0;
+      for(var pp=0; pp<itp.photos.length; pp++){
         if(py + thumbH + 22 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; col = 0; }
-        const x = margin + col*(thumbW+gap);
-        try{ doc.addImage(p, 'JPEG', x, py, thumbW, thumbH, undefined, 'FAST'); }
-        catch{ try{ doc.addImage(p, 'PNG', x, py, thumbW, thumbH, undefined, 'FAST'); } catch(e){} }
+        var x0 = margin + col*(thumbW+gap);
+        try{ doc.addImage(itp.photos[pp], 'JPEG', x0, py, thumbW, thumbH, undefined, 'FAST'); }
+        catch(e){ try{ doc.addImage(itp.photos[pp], 'PNG', x0, py, thumbW, thumbH, undefined, 'FAST'); } catch(e2){} }
         col++;
         if(col>=perRow){ col=0; py += thumbH + 12; }
       }
       if(col>0) py += thumbH + 12;
     }
 
-    // Signature
     if(py + 48 > pageHeight - 56){ doc.addPage('letter','landscape'); py = 56; }
     doc.setDrawColor(180);
     doc.line(margin, pageHeight-92, margin+260, pageHeight-92);
     doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(100);
     doc.text('Signature (Conducted By)', margin, pageHeight-76);
 
-    // Save name includes propertyId if present
-    const dateSlug = qs('#invDate').value || new Date().toISOString().slice(0,10);
-    const idSlug = (propId||'').replace(/[^\w\-]+/g,'_').slice(0,40);
-    const fname = `Inventory_${idSlug ? idSlug + '_' : ''}${dateSlug}.pdf`;
+    var dateSlug = (qs('#invDate') && qs('#invDate').value) ? qs('#invDate').value : new Date().toISOString().slice(0,10);
+    var idSlug = (propId||'').replace(/[^\w\-]+/g,'_').slice(0,40);
+    var fname = 'Inventory_' + (idSlug ? idSlug + '_' : '') + dateSlug + '.pdf';
 
     doc.save(fname);
     flash('PDF downloaded.');
   }
 
   // Top-level controls
-  qs('#saveBtn').addEventListener('click', ()=>saveLocal(true));
-  qs('#loadBtn').addEventListener('click', loadLocal);
-  qs('#exportJsonBtn').addEventListener('click', exportJSON);
-  qs('#importJson').addEventListener('change', e=>{ if(e.target.files?.[0]) importJSON(e.target.files[0]); });
+  qs('#saveBtn').addEventListener('click', function(){ userHasInteracted = true; saveLocal(true); checkpoint(); });
+  qs('#loadBtn').addEventListener('click', function(){ loadLocal(); });
+  qs('#exportJsonBtn').addEventListener('click', function(){ exportJSON(); });
+  var importEl = qs('#importJson');
+  if (importEl){
+    importEl.addEventListener('change', function(e){
+      if(e.target && e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
+    });
+  }
 
-  qs('#bulkVerifyBtn').addEventListener('click', ()=>{
+  qs('#bulkVerifyBtn').addEventListener('click', function(){
     if(!items.length) return;
-    items.forEach(it=>it.verified=true);
-    render(); if(qs('#autoSave').checked) saveLocal(false);
+    for (var i=0;i<items.length;i++){ items[i].verified=true; }
+    render(); if(qs('#autoSave') && qs('#autoSave').checked){ saveLocal(false); checkpoint(); }
   });
 
-  qs('#clearAllBtn').addEventListener('click', ()=>{
+  qs('#clearAllBtn').addEventListener('click', function(){
     if(!confirm('This will remove all items and session info on this device. Proceed?')) return;
     localStorage.removeItem(STORAGE_KEY); items=[];
-    qs('#propertyId').value=''; qs('#invDate').value=''; qs('#conductedBy').value=''; qs('#property').value=''; qs('#overallNotes').value='';
+    if(qs('#propertyId')) qs('#propertyId').value='';
+    if(qs('#invDate')) qs('#invDate').value='';
+    if(qs('#conductedBy')) qs('#conductedBy').value='';
+    if(qs('#property')) qs('#property').value='';
+    if(qs('#overallNotes')) qs('#overallNotes').value='';
     render(); updateChangeNotice(); flash('Reset.');
   });
 
-  // NEW: global add buttons
-  qs('#addItemBtn').addEventListener('click', ()=>addItem());
-  qs('#addItemBtnFooter').addEventListener('click', ()=>addItem());
+  qs('#addItemBtn').addEventListener('click', function(){ addItem(); userHasInteracted = true; });
+  qs('#addItemBtnFooter').addEventListener('click', function(){ addItem(); userHasInteracted = true; });
 
-  ['#searchTxt','#fCondition','#fStatus','#fLocation'].forEach(sel=>{
-    qs(sel).addEventListener('input', render);
-    qs(sel).addEventListener('change', render);
-  });
-  qs('#clearFiltersBtn').addEventListener('click', ()=>{
-    qs('#searchTxt').value=''; qs('#fCondition').value=''; qs('#fStatus').value=''; qs('#fLocation').value='';
+  // Filters
+  var filterIds = ['#searchTxt','#fCondition','#fStatus','#fLocation'];
+  for (var fi=0; fi<filterIds.length; fi++){
+    (function(sel){
+      var el = qs(sel); if(!el) return;
+      el.addEventListener('input', render);
+      el.addEventListener('change', render);
+    })(filterIds[fi]);
+  }
+  qs('#clearFiltersBtn').addEventListener('click', function(){
+    if(qs('#searchTxt')) qs('#searchTxt').value='';
+    if(qs('#fCondition')) qs('#fCondition').value='';
+    if(qs('#fStatus')) qs('#fStatus').value='';
+    if(qs('#fLocation')) qs('#fLocation').value='';
     render();
   });
 
-  ['#propertyId','#invDate','#conductedBy','#property','#overallNotes','#autoSave'].forEach(sel=>{
-    qs(sel).addEventListener('change', ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
-    qs(sel).addEventListener('input',  ()=>{ if(qs('#autoSave').checked) saveLocal(false); });
-  });
+  // Meta autosave
+  var metaIds = ['#propertyId','#invDate','#conductedBy','#property','#overallNotes','#autoSave'];
+  for (var mi=0; mi<metaIds.length; mi++){
+    (function(sel){
+      var el = qs(sel); if(!el) return;
+      el.addEventListener('change', function(){ userHasInteracted = true; if(qs('#autoSave') && qs('#autoSave').checked) saveLocal(false); });
+      el.addEventListener('input',  function(){ userHasInteracted = true; if(qs('#autoSave') && qs('#autoSave').checked) saveLocal(false); });
+    })(metaIds[mi]);
+  }
 
-  // Initial load + seed item
+  // Init
   loadLocal();
   if(items.length===0){ addItem({name:'Boiler Pump', location:'Boiler Room'}); }
 
